@@ -260,6 +260,10 @@ pub async fn prepare_shipment(
             .iter()
             .find(|line| {
                 line.get("product").and_then(Value::as_str) == Some(product)
+                    && requested
+                        .get("uom")
+                        .and_then(Value::as_str)
+                        .is_none_or(|unit| line.get("uom").and_then(Value::as_str) == Some(unit))
                     && line
                         .get("price")
                         .and_then(money::decimal)
@@ -284,6 +288,25 @@ pub async fn prepare_shipment(
                     )
                 })?,
             );
+            let ratio = line
+                .get("uom_ratio")
+                .and_then(money::decimal)
+                .unwrap_or(Decimal::ONE);
+            let base_qty = qty.checked_mul(ratio).ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    "logistics.shipment",
+                    vec!["Shipment base quantity exceeds the supported decimal range".into()],
+                )
+            })?;
+            line.insert(
+                "base_qty".into(),
+                money::json_number(base_qty).ok_or_else(|| {
+                    crate::error::ApiError::validation(
+                        "logistics.shipment",
+                        vec!["Shipment base quantity cannot be serialized".into()],
+                    )
+                })?,
+            );
         }
         normalized.push(line);
     }
@@ -295,7 +318,10 @@ pub async fn prepare_shipment(
             .get("product")
             .and_then(Value::as_str)
             .and_then(|value| Uuid::parse_str(value).ok());
-        let qty = line.get("qty").and_then(money::decimal);
+        let qty = line
+            .get("base_qty")
+            .and_then(money::decimal)
+            .or_else(|| line.get("qty").and_then(money::decimal));
         let (Some(product_id), Some(qty)) =
             (product_id, qty.filter(|value| *value > Decimal::ZERO))
         else {

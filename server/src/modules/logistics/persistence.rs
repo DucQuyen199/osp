@@ -8,11 +8,14 @@ use uuid::Uuid;
 
 #[derive(Hash, PartialEq, Eq)]
 enum PriceBucket {
-    Cents(Decimal),
+    Cents(Decimal, Option<String>),
 }
 
-fn price_bucket(price: Decimal) -> PriceBucket {
-    PriceBucket::Cents(price.round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero))
+fn price_bucket(price: Decimal, unit: Option<String>) -> PriceBucket {
+    PriceBucket::Cents(
+        price.round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero),
+        unit,
+    )
 }
 
 fn quantities(lines: &Value) -> R<HashMap<(String, PriceBucket), Decimal>> {
@@ -31,7 +34,13 @@ fn quantities(lines: &Value) -> R<HashMap<(String, PriceBucket), Decimal>> {
         ) else {
             continue;
         };
-        let key = (product.to_string(), price_bucket(price));
+        let key = (
+            product.to_string(),
+            price_bucket(
+                price,
+                line.get("uom").and_then(Value::as_str).map(str::to_owned),
+            ),
+        );
         let total = result.entry(key).or_insert(Decimal::ZERO);
         *total = total.checked_add(qty).ok_or_else(|| {
             crate::error::ApiError::validation(

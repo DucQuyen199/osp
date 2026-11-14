@@ -258,6 +258,9 @@ pub async fn handle_source_stock_event(
         None
     };
     for mut line in lines {
+        if let Some(base_qty) = line.get("base_qty").cloned() {
+            line["qty"] = base_qty;
+        }
         let Some(product) = line
             .get("product")
             .and_then(Value::as_str)
@@ -388,7 +391,10 @@ pub async fn handle_source_stock_event(
                 source,
                 "purchase_order" | "purchase_receipt" | "purchase_return" | "quality_return"
             ) {
-                if let Some(price) = allocation.get("price") {
+                if let Some(price) = allocation
+                    .get("base_price")
+                    .or_else(|| allocation.get("price"))
+                {
                     move_data.insert("unit_cost".into(), price.clone());
                 }
             }

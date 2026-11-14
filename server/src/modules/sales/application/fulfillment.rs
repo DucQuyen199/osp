@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 #[derive(Hash, PartialEq, Eq)]
-struct PriceBucket(Decimal);
+struct PriceBucket(Decimal, Option<String>);
 
 fn sales_amount_error() -> crate::error::ApiError {
     crate::error::ApiError::validation(
@@ -36,8 +36,10 @@ fn shipment_quantities(lines: &Value) -> R<HashMap<(String, PriceBucket), Decima
         ) else {
             continue;
         };
-        let price_bucket =
-            PriceBucket(price.round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero));
+        let price_bucket = PriceBucket(
+            price.round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero),
+            line.get("uom").and_then(Value::as_str).map(str::to_owned),
+        );
         let quantity = quantities
             .entry((product.into(), price_bucket))
             .or_insert(Decimal::ZERO);

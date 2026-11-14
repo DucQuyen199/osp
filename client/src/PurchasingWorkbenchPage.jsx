@@ -7,8 +7,8 @@ import { app, can, loadRefs, recordLabel } from './lib/state.js';
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
 const billForSupplierInvoice = (bills, invoice) => bills.find((row) => row.supplier_invoice_id === invoice.id);
-const keyOf = (line) => `${line.product}|${Number(line.price || 0)}|${Number(line.tax_rate ?? 0)}`;
-const orderPriceKeyOf = (line) => `${line.product}|${Number(line.price || 0)}`;
+const keyOf = (line) => `${line.product}|${Number(line.price || 0)}|${Number(line.tax_rate ?? 0)}|${line.uom || ''}`;
+const orderPriceKeyOf = (line) => `${line.product}|${Number(line.price || 0)}|${line.uom || ''}`;
 const lineValue = (line, taxes) => {
   const net = (Number(line.qty) || 0) * (Number(line.price) || 0);
   const rate = Number(taxes.get(line.tax)?.rate ?? line.tax_rate) || 0;
@@ -23,6 +23,7 @@ export default function PurchasingWorkbenchPage() {
   const [purchaseReturns, setPurchaseReturns] = useState([]);
   const [suppliers, setSuppliers] = useState(new Map());
   const [products, setProducts] = useState(new Map());
+  const [units, setUnits] = useState(new Map());
   const [warehouses, setWarehouses] = useState(new Map());
   const [taxes, setTaxes] = useState([]);
   const [currencies, setCurrencies] = useState(new Map());
@@ -55,7 +56,7 @@ export default function PurchasingWorkbenchPage() {
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
-      const [orderRes, receiptRes, requisitionRes, supplierInvoiceRes, returnRes, supplierMap, productMap, warehouseMap, taxRes, billRes, approvalRes, currencyMap, currencyRateRes] = await Promise.all([
+      const [orderRes, receiptRes, requisitionRes, supplierInvoiceRes, returnRes, supplierMap, productMap, unitMap, warehouseMap, taxRes, billRes, approvalRes, currencyMap, currencyRateRes] = await Promise.all([
         can('purchasing.purchase_order.read') ? api(`${dataPath('purchasing.purchase_order')}?limit=1000`) : Promise.resolve({ items: [] }),
         can('purchasing.purchase_receipt.read') ? api(`${dataPath('purchasing.purchase_receipt')}?limit=1000`) : Promise.resolve({ items: [] }),
         can('purchasing.purchase_requisition.read') ? api(`${dataPath('purchasing.purchase_requisition')}?limit=1000`) : Promise.resolve({ items: [] }),
@@ -63,6 +64,7 @@ export default function PurchasingWorkbenchPage() {
         can('purchasing.purchase_return.read') ? api(`${dataPath('purchasing.purchase_return')}?limit=1000`) : Promise.resolve({ items: [] }),
         can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
         can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
+        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
         can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
         can('master-data.tax.read') ? api(`${dataPath('master-data.tax')}?limit=1000`) : Promise.resolve({ items: [] }),
         can('accounting.bill.read') ? api(`${dataPath('accounting.bill')}?limit=1000`) : Promise.resolve({ items: [] }),
@@ -73,7 +75,7 @@ export default function PurchasingWorkbenchPage() {
       const orderRows = itemsOf(orderRes).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
       const requisitionRows = itemsOf(requisitionRes).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
       const supplierRows = new Map([...supplierMap].filter(([, row]) => row.is_supplier !== false));
-      setOrders(orderRows); setRequisitions(requisitionRows); setReceipts(itemsOf(receiptRes)); setSupplierInvoices(itemsOf(supplierInvoiceRes)); setPurchaseReturns(itemsOf(returnRes)); setSuppliers(supplierRows); setProducts(productMap); setWarehouses(warehouseMap);
+      setOrders(orderRows); setRequisitions(requisitionRows); setReceipts(itemsOf(receiptRes)); setSupplierInvoices(itemsOf(supplierInvoiceRes)); setPurchaseReturns(itemsOf(returnRes)); setSuppliers(supplierRows); setProducts(productMap); setUnits(unitMap); setWarehouses(warehouseMap);
       setTaxes(itemsOf(taxRes)); setBills(itemsOf(billRes)); setApprovalRequests(itemsOf(approvalRes));
       setCurrencies(currencyMap || new Map()); setCurrencyRates(itemsOf(currencyRateRes));
       setSelectedId((current) => orderRows.some((row) => row.id === current) ? current : orderRows[0]?.id || '');
@@ -88,6 +90,10 @@ export default function PurchasingWorkbenchPage() {
 
   useEffect(() => { document.title = 'Mua hàng và nhận hàng · OSP Suite'; load(); }, [load]);
   const taxById = useMemo(() => new Map(taxes.map((row) => [row.id, row])), [taxes]);
+  const unitsFor = (productId) => {
+    const baseUnit = products.get(productId)?.uom;
+    return baseUnit ? [...units.values()].filter((unit) => unit.id === baseUnit || unit.base_uom === baseUnit) : [];
+  };
   const selected = orders.find((row) => row.id === selectedId);
   const selectedReceipts = useMemo(() => receipts.filter((row) => row.purchase_order === selectedId).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))), [receipts, selectedId]);
   const billByOrder = useMemo(() => new Map(bills.filter((row) => row.source === 'purchase_order').map((row) => [row.source_id, row])), [bills]);
@@ -167,7 +173,7 @@ export default function PurchasingWorkbenchPage() {
     const payload = {
       supplier: orderForm.supplier, warehouse: orderForm.warehouse,
       expected_date: orderForm.expected_date || undefined,
-      lines: lines.map((line) => ({ product: line.product, qty: Number(line.qty), price: Number(line.price), tax: line.tax || undefined })),
+      lines: lines.map((line) => ({ product: line.product, qty: Number(line.qty), price: Number(line.price), uom: line.uom || undefined, tax: line.tax || undefined })),
     };
     const existing = editingId;
     await run(existing ? `${existing}:save` : 'order:create', () => api(existing ? dataPath('purchasing.purchase_order', existing) : dataPath('purchasing.purchase_order'), { method: existing ? 'PATCH' : 'POST', body: payload }), existing ? 'Đã cập nhật đơn mua nháp.' : 'Đã tạo đơn mua nháp; tổng tiền và thuế được tính lại trên máy chủ.');
@@ -205,7 +211,7 @@ export default function PurchasingWorkbenchPage() {
   function editOrder(row) {
     setEditingId(row.id); setSelectedId(row.id);
     setOrderForm({ supplier: row.supplier || '', warehouse: row.warehouse || '', expected_date: row.expected_date || '' });
-    setLines((row.lines || []).map((line) => ({ product: line.product || '', qty: String(line.qty || 1), price: String(line.price ?? ''), tax: line.tax || '' })));
+    setLines((row.lines || []).map((line) => ({ product: line.product || '', uom: line.uom || products.get(line.product)?.uom || '', qty: String(line.qty || 1), price: String(line.price ?? ''), tax: line.tax || '' })));
   }
 
   async function submitOrder(row) {
@@ -224,7 +230,7 @@ export default function PurchasingWorkbenchPage() {
   function prepareReceipt(row) {
     const ordered = new Map();
     for (const line of row.lines || []) {
-      const key = keyOf(line); const current = ordered.get(key) || { product: line.product, price: Number(line.price), qty: 0 };
+      const key = keyOf(line); const current = ordered.get(key) || { product: line.product, uom: line.uom, price: Number(line.price), qty: 0 };
       current.qty += Number(line.qty || 0); ordered.set(key, current);
     }
     const received = new Map();
@@ -239,7 +245,7 @@ export default function PurchasingWorkbenchPage() {
     event.preventDefault();
     const order = orders.find((row) => row.id === receiptOrderId);
     if (!order) return;
-    const receiptItems = receiptLines.filter((line) => Number(line.received ?? line.qty) > 0).map((line) => ({ product: line.product, qty: Number(line.received ?? line.qty), price: Number(line.price) }));
+    const receiptItems = receiptLines.filter((line) => Number(line.received ?? line.qty) > 0).map((line) => ({ product: line.product, uom: line.uom || undefined, qty: Number(line.received ?? line.qty), price: Number(line.price) }));
     if (!receiptItems.length) { setError('Nhập số lượng nhận lớn hơn 0 cho ít nhất một dòng.'); return; }
     await run(`${order.id}:receipt`, async () => {
       const receipt = await api(dataPath('purchasing.purchase_receipt'), { method: 'POST', body: { purchase_order: order.id, warehouse: order.warehouse, lines: receiptItems, note: receiptNote.trim() || undefined } });
@@ -257,7 +263,7 @@ export default function PurchasingWorkbenchPage() {
       issue_date: supplierInvoiceForm.issue_date, due_date: supplierInvoiceForm.due_date || undefined,
       currency: supplierInvoiceForm.currency || undefined,
       dispute_reason: supplierInvoiceForm.dispute_reason.trim() || undefined,
-      lines: invoiceableLines.map((line) => ({ ...line, qty: Number(invoiceQuantities[keyOf(line)] ?? line.qty) })).filter((line) => line.qty > 0).map((line) => { const key = keyOf(line); const tax = invoiceTaxes[key]; return { product: line.product, qty: line.qty, order_price: Number(line.price), price: Number(invoicePrices[key] ?? (supplierInvoiceIsBaseCurrency ? line.price : 0)), tax: tax === '__po__' || tax === undefined ? line.tax || undefined : tax || undefined }; }),
+      lines: invoiceableLines.map((line) => ({ ...line, qty: Number(invoiceQuantities[keyOf(line)] ?? line.qty) })).filter((line) => line.qty > 0).map((line) => { const key = keyOf(line); const tax = invoiceTaxes[key]; return { product: line.product, uom: line.uom || undefined, qty: line.qty, order_price: Number(line.price), price: Number(invoicePrices[key] ?? (supplierInvoiceIsBaseCurrency ? line.price : 0)), tax: tax === '__po__' || tax === undefined ? line.tax || undefined : tax || undefined }; }),
       adjustments: invoiceAdjustments.filter((line) => Number(line.amount) > 0 && line.description.trim()).map((line) => ({ ...line, amount: Number(line.amount), tax: line.tax || undefined })),
     } }), 'Đã lưu nháp hóa đơn nhà cung cấp. Hãy đối chiếu số hóa đơn và duyệt để ghi nhận công nợ.');
     setSupplierInvoiceForm((current) => ({ ...current, invoice_number: '', due_date: '', dispute_reason: '' }));
@@ -277,8 +283,8 @@ export default function PurchasingWorkbenchPage() {
     await api(dataPath('purchasing.supplier_invoice', invoice.id, 'submitted'), { method: 'POST', body: { resolution_note: note } });
   }
 
-  const addLine = () => setLines((current) => [...current, { product: [...products.keys()][0] || '', qty: '1', price: '', tax: '' }]);
-  const updateLine = (index, field, value) => setLines((current) => current.map((line, i) => i === index ? { ...line, [field]: value } : line));
+  const addLine = () => { const product = [...products.values()].find((row) => row.active !== false); setLines((current) => [...current, { product: product?.id || '', uom: product?.uom || '', qty: '1', price: '', tax: '' }]); };
+  const updateLine = (index, field, value) => setLines((current) => current.map((line, i) => i === index ? { ...line, [field]: value, ...(field === 'product' ? { uom: products.get(value)?.uom || '' } : {}) } : line));
   const canReceive = (row) => ['approved','partially_received'].includes(row.status) && can('purchasing.purchase_receipt.create');
   const orderLinesTotal = lines.reduce((sum, line) => sum + lineValue(line, taxById), 0);
 
@@ -305,7 +311,7 @@ export default function PurchasingWorkbenchPage() {
     {can('purchasing.purchase_order.create') && <section className="card card-pad"><div className="row wrap"><h2>{editingId ? 'Sửa đơn mua nháp' : 'Lập đơn mua trực tiếp'}</h2><span className="grow"/>{editingId && <button className="btn btn-ghost btn-sm" type="button" onClick={() => { setEditingId(''); setLines([{ product: [...products.keys()][0] || '', qty: '1', price: '', tax: '' }]); }}>Thoát chỉnh sửa</button>}</div>
       <form onSubmit={saveOrder}><div className="form-grid"><label className="field"><span className="label">Nhà cung cấp *</span><select className="select" required value={orderForm.supplier} onChange={(e) => setOrderForm({ ...orderForm, supplier: e.target.value })}><option value="">Chọn nhà cung cấp</option>{[...suppliers.values()].map((row) => <option key={row.id} value={row.id}>{recordLabel('master-data.party', row)}</option>)}</select></label><label className="field"><span className="label">Kho nhận *</span><select className="select" required value={orderForm.warehouse} onChange={(e) => setOrderForm({ ...orderForm, warehouse: e.target.value })}><option value="">Chọn kho</option>{[...warehouses.values()].filter((row) => row.active !== false).map((row) => <option key={row.id} value={row.id}>{recordLabel('inventory.warehouse', row)}</option>)}</select></label><label className="field"><span className="label">Ngày giao dự kiến</span><input className="input" type="date" value={orderForm.expected_date} onChange={(e) => setOrderForm({ ...orderForm, expected_date: e.target.value })}/></label></div>
         <div className="row wrap" style={{ marginTop: 14 }}><strong>Vật tư / hàng hóa</strong><span className="grow"/><button className="btn btn-secondary btn-sm" type="button" disabled={!products.size} onClick={addLine}>Thêm dòng</button></div>
-        {lines.map((line, index) => <div className="row wrap" key={index} style={{ marginTop: 8 }}><select className="select" required value={line.product} onChange={(e) => updateLine(index, 'product', e.target.value)}><option value="">Chọn hàng</option>{[...products.values()].filter((row) => row.active !== false).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select><input className="input num" aria-label="Số lượng đặt" type="number" min="0.000001" step="any" required value={line.qty} onChange={(e) => updateLine(index, 'qty', e.target.value)} style={{ maxWidth: 120 }}/><input className="input num" aria-label="Đơn giá mua" type="number" min="0.000001" step="any" required value={line.price} onChange={(e) => updateLine(index, 'price', e.target.value)} style={{ maxWidth: 160 }}/><select className="select" aria-label="Thuế" value={line.tax} onChange={(e) => updateLine(index, 'tax', e.target.value)}><option value="">Không thuế</option>{taxes.map((tax) => <option key={tax.id} value={tax.id}>{tax.name} · {tax.rate}%</option>)}</select><strong>{fmtMoney(lineValue(line, taxById))}</strong>{lines.length > 1 && <button className="btn btn-ghost btn-sm" type="button" aria-label="Xóa dòng" onClick={() => setLines((current) => current.filter((_, i) => i !== index))}>Bỏ</button>}</div>)}
+        {lines.map((line, index) => <div className="row wrap" key={index} style={{ marginTop: 8 }}><select className="select" required value={line.product} onChange={(e) => updateLine(index, 'product', e.target.value)}><option value="">Chọn hàng</option>{[...products.values()].filter((row) => row.active !== false).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>{unitsFor(line.product).length > 0 && <select className="select" aria-label="Đơn vị mua" value={line.uom || products.get(line.product)?.uom || ''} onChange={(e) => updateLine(index, 'uom', e.target.value)}>{unitsFor(line.product).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` · ${unit.ratio} × đơn vị gốc` : ' · đơn vị gốc'}</option>)}</select>}<input className="input num" aria-label="Số lượng đặt" type="number" min="0.000001" step="any" required value={line.qty} onChange={(e) => updateLine(index, 'qty', e.target.value)} style={{ maxWidth: 120 }}/><input className="input num" aria-label="Đơn giá mua" type="number" min="0.000001" step="any" required value={line.price} onChange={(e) => updateLine(index, 'price', e.target.value)} style={{ maxWidth: 160 }}/><select className="select" aria-label="Thuế" value={line.tax} onChange={(e) => updateLine(index, 'tax', e.target.value)}><option value="">Không thuế</option>{taxes.map((tax) => <option key={tax.id} value={tax.id}>{tax.name} · {tax.rate}%</option>)}</select><strong>{fmtMoney(lineValue(line, taxById))}</strong>{lines.length > 1 && <button className="btn btn-ghost btn-sm" type="button" aria-label="Xóa dòng" onClick={() => setLines((current) => current.filter((_, i) => i !== index))}>Bỏ</button>}</div>)}
         <div className="row wrap" style={{ marginTop: 12 }}><span className="grow"/><strong>Tổng dự kiến có thuế: {fmtMoney(orderLinesTotal)}</strong><button className="btn btn-primary" disabled={Boolean(busy) || !products.size || !warehouses.size || orderLinesTotal <= 0}>{editingId ? 'Lưu đơn mua nháp' : 'Tạo đơn mua nháp'}</button></div>
       </form>
     </section>}
@@ -313,7 +319,7 @@ export default function PurchasingWorkbenchPage() {
     {loading ? <div className="skeleton" data-h="row"/> : !orders.length ? <div className="card card-pad empty" style={{ marginTop: 16 }}>Chưa có đơn mua. Tạo đơn mua nháp, gửi duyệt rồi nhận hàng theo số lượng thực tế.</div> : <div className="layout-split" style={{ marginTop: 16 }}>
       <section className="card card-pad"><h2>Đơn mua hàng</h2><div className="table-wrap"><table className="table"><thead><tr><th>Nhà cung cấp</th><th>Giao dự kiến</th><th>Tổng</th><th>Trạng thái</th></tr></thead><tbody>{orders.map((row) => <tr key={row.id} className={selectedId === row.id ? 'selected' : ''} onClick={() => setSelectedId(row.id)} style={{ cursor: 'pointer' }}><td><strong>{suppliers.has(row.supplier) ? recordLabel('master-data.party', suppliers.get(row.supplier)) : 'Nhà cung cấp'}</strong><div className="small muted">{row.source ? `Nguồn: ${row.source}` : String(row.id).slice(0, 8)}</div></td><td>{fmtDate(row.expected_date)}</td><td>{fmtMoney(row.total || 0)}</td><td>{statusLabel(row.status)}</td></tr>)}</tbody></table></div></section>
       {selected && <section className="card card-pad"><div className="row wrap"><div><h2>{suppliers.has(selected.supplier) ? recordLabel('master-data.party', suppliers.get(selected.supplier)) : 'Đơn mua hàng'}</h2><div className="small muted">Kho nhận: {warehouses.get(selected.warehouse)?.name || '—'} · Giao dự kiến: {fmtDate(selected.expected_date)}</div></div><span className="grow"/><span className="badge warning">{statusLabel(selected.status)}</span></div>
-        <div className="table-wrap" style={{ marginTop: 12 }}><table className="table"><thead><tr><th>Hàng</th><th>Đặt</th><th>Đã nhận</th><th>Đơn giá</th><th>Thành tiền</th></tr></thead><tbody>{(selected.lines || []).map((line, index) => { const receivedQty = selectedReceipts.filter((receipt) => receipt.status === 'received').flatMap((receipt) => receipt.lines || []).filter((receiptLine) => keyOf(receiptLine) === keyOf(line)).reduce((sum, receiptLine) => sum + Number(receiptLine.qty || 0), 0); return <tr key={`${line.product}-${index}`}><td>{products.get(line.product)?.name || 'Hàng hóa'}</td><td>{line.qty}</td><td>{receivedQty}</td><td>{fmtMoney(line.price)}</td><td>{fmtMoney(line.line_total || Number(line.qty || 0) * Number(line.price || 0))}</td></tr>; })}</tbody><tfoot><tr><th colSpan="4">Tổng có thuế</th><th>{fmtMoney(selected.total || 0)}</th></tr></tfoot></table></div>
+        <div className="table-wrap" style={{ marginTop: 12 }}><table className="table"><thead><tr><th>Hàng</th><th>Đặt</th><th>Đã nhận</th><th>Đơn giá</th><th>Thành tiền</th></tr></thead><tbody>{(selected.lines || []).map((line, index) => { const receivedQty = selectedReceipts.filter((receipt) => receipt.status === 'received').flatMap((receipt) => receipt.lines || []).filter((receiptLine) => keyOf(receiptLine) === keyOf(line)).reduce((sum, receiptLine) => sum + Number(receiptLine.qty || 0), 0); return <tr key={`${line.product}-${index}`}><td>{products.get(line.product)?.name || 'Hàng hóa'}</td><td>{line.qty} {line.uom_name || units.get(line.uom)?.name || ''}</td><td>{receivedQty} {line.uom_name || units.get(line.uom)?.name || ''}</td><td>{fmtMoney(line.price)}</td><td>{fmtMoney(line.line_total || Number(line.qty || 0) * Number(line.price || 0))}</td></tr>; })}</tbody><tfoot><tr><th colSpan="4">Tổng có thuế</th><th>{fmtMoney(selected.total || 0)}</th></tr></tfoot></table></div>
         {selected.status === 'submitted' && workflowApproval && approvalByOrder.get(selected.id) && <p className="small muted" style={{ marginTop: 10 }}>Yêu cầu phê duyệt: <a href={`#/e/workflow-approval/approval_request/${approvalByOrder.get(selected.id).id}`}>{statusLabel(approvalByOrder.get(selected.id).status)} · mở yêu cầu</a></p>}
         <div className="row wrap" style={{ marginTop: 12 }}>{['draft','rejected'].includes(selected.status) && can('purchasing.purchase_order.update') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => editOrder(selected)}>Sửa nháp</button>}{['draft','rejected'].includes(selected.status) && can('purchasing.purchase_order.submitted') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy) || !(selected.lines || []).length || Number(selected.total) <= 0} onClick={() => submitOrder(selected)}>Gửi duyệt</button>}{selected.status === 'submitted' && !workflowApproval && can('purchasing.purchase_order.approved') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => approveOrder(selected)}>Duyệt đơn</button>}{['draft','submitted','approved','rejected'].includes(selected.status) && !(approvalByOrder.get(selected.id)?.status === 'pending') && can('purchasing.purchase_order.cancelled') && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => orderAction(selected, 'cancelled')}>Hủy đơn</button>}{canReceive(selected) && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => prepareReceipt(selected)}>Nhận hàng</button>}{billByOrder.has(selected.id) && <a className="btn btn-secondary btn-sm" href={`#/e/accounting/bill/${billByOrder.get(selected.id).id}`}>Mở hóa đơn {statusLabel(billByOrder.get(selected.id).status)}</a>}</div>
     {['partially_received','received'].includes(selected.status) && selectedReceipts.some((receipt) => receipt.status === 'received') && can('purchasing.supplier_invoice.create') && <form className="card card-pad" style={{ marginTop: 14 }} onSubmit={createSupplierInvoice}>

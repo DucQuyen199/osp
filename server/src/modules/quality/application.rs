@@ -270,10 +270,13 @@ pub async fn handle_source_event(
                     continue;
                 }
                 let mut data = Map::new();
-                for field in ["product", "qty"] {
+                for field in ["product", "lot"] {
                     if let Some(value) = line.get(field) {
                         data.insert(field.into(), value.clone());
                     }
+                }
+                if let Some(qty) = line.get("base_qty").or_else(|| line.get("qty")) {
+                    data.insert("qty".into(), qty.clone());
                 }
                 if let Some(lot) = line
                     .get("lot")
@@ -285,7 +288,7 @@ pub async fn handle_source_event(
                 if let Some(warehouse) = &warehouse {
                     data.insert("warehouse".into(), warehouse.clone());
                 }
-                if let Some(price) = line.get("price") {
+                if let Some(price) = line.get("base_price").or_else(|| line.get("price")) {
                     data.insert("unit_cost".into(), price.clone());
                 }
                 data.insert("source".into(), json!("purchase_receipt"));

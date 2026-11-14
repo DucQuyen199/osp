@@ -108,8 +108,8 @@ pub async fn validate_persistence(
                     .await?;
                 }
             }
-            if entity == "uom" && matches!(action, "created" | "updated") {
-                uom::validate_unit_base(tx, tenant, document, &mut errors).await?;
+            if entity == "uom" && matches!(action, "created" | "updated" | "removed") {
+                uom::validate_unit_base(tx, tenant, action, document, &mut errors).await?;
             }
         }
         "product_category" => {

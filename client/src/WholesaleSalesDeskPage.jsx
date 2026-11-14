@@ -12,6 +12,8 @@ export default function WholesaleSalesDeskPage() {
   const emailQueueEnabled = app.meta?.modules?.some((module) => module.id === 'communication') || false;
   const [parties, setParties] = useState(new Map());
   const [products, setProducts] = useState(new Map());
+  const [units, setUnits] = useState(new Map());
+  const [selectedUnits, setSelectedUnits] = useState({});
   const [warehouses, setWarehouses] = useState(new Map());
   const [priceLists, setPriceLists] = useState([]);
   const [quotations, setQuotations] = useState([]);
@@ -42,8 +44,8 @@ export default function WholesaleSalesDeskPage() {
       const logisticsEnabled = app.meta?.modules?.some((module) => module.id === 'logistics') && can('logistics.shipment.read');
       const accountingEnabled = app.meta?.modules?.some((module) => module.id === 'accounting') && can('accounting.invoice.read');
       const approvalEnabled = app.meta?.modules?.some((module) => module.id === 'workflow-approval') && can('workflow-approval.approval_request.read');
-      const [partyMap, productMap, warehouseMap, listResponse, quoteResponse, orderResponse, shipmentResponse, invoiceResponse, returnResponse, approvalResponse, creditResponse] = await Promise.all([
-        loadRefs('master-data.party'), loadRefs('master-data.product'), loadRefs('inventory.warehouse'),
+      const [partyMap, productMap, unitMap, warehouseMap, listResponse, quoteResponse, orderResponse, shipmentResponse, invoiceResponse, returnResponse, approvalResponse, creditResponse] = await Promise.all([
+        loadRefs('master-data.party'), loadRefs('master-data.product'), loadRefs('master-data.uom'), loadRefs('inventory.warehouse'),
         api(`${dataPath('sales.price_list')}?limit=1000`), api(`${dataPath('sales.quotation')}?limit=1000`), api(`${dataPath('sales.sales_order')}?limit=1000`),
         logisticsEnabled ? api(`${dataPath('logistics.shipment')}?limit=1000`) : Promise.resolve({ items: [] }),
         accountingEnabled ? api(`${dataPath('accounting.invoice')}?limit=1000`) : Promise.resolve({ items: [] }),
@@ -51,7 +53,7 @@ export default function WholesaleSalesDeskPage() {
         approvalEnabled ? api(`${dataPath('workflow-approval.approval_request')}?limit=1000`) : Promise.resolve({ items: [] }),
         can('accounting.credit_note.read') ? api(`${dataPath('accounting.credit_note')}?limit=1000`) : Promise.resolve({ items: [] }),
       ]);
-      setParties(partyMap); setProducts(productMap); setWarehouses(warehouseMap);
+      setParties(partyMap); setProducts(productMap); setUnits(unitMap); setWarehouses(warehouseMap);
       setPriceLists(itemsOf(listResponse));
       setQuotations(itemsOf(quoteResponse).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))));
       setOrders(itemsOf(orderResponse).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))));
@@ -66,9 +68,14 @@ export default function WholesaleSalesDeskPage() {
 
   const activeProducts = [...products.values()].filter((product) => product.active !== false).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
   const selectedList = priceLists.find((item) => item.id === priceList);
-  const cart = Object.entries(quantities).map(([id, qty]) => ({ product: products.get(id), qty: Number(qty) })).filter((line) => line.product && line.qty > 0);
-  const getPrice = (product) => selectedList?.items?.find((item) => item.product === product.id)?.price ?? product.price ?? 0;
-  const estimate = cart.reduce((total, line) => total + (Number(getPrice(line.product)) || 0) * line.qty, 0);
+  const unitsFor = (product) => product?.uom ? [...units.values()].filter((unit) => unit.id === product.uom || unit.base_uom === product.uom) : [];
+  const cart = Object.entries(quantities).map(([id, qty]) => ({ product: products.get(id), qty: Number(qty), uom: selectedUnits[id] || products.get(id)?.uom })).filter((line) => line.product && line.qty > 0);
+  const getPrice = (product, uomId) => {
+    const basePrice = Number(selectedList?.items?.find((item) => item.product === product.id)?.price ?? product.price ?? 0) || 0;
+    const unit = units.get(uomId);
+    return basePrice * (unit?.base_uom ? Number(unit.ratio || 0) : 1);
+  };
+  const estimate = cart.reduce((total, line) => total + getPrice(line.product, line.uom) * line.qty, 0);
   const setQuantity = (id, value) => setQuantities((current) => { const next = { ...current }; const qty = Math.max(0, Number(value) || 0); if (qty) next[id] = qty; else delete next[id]; return next; });
 
   const createQuote = async (event) => {
@@ -78,9 +85,9 @@ export default function WholesaleSalesDeskPage() {
       const created = await api(dataPath('sales.quotation'), { method: 'POST', body: {
         party, warehouse, price_list: priceList || undefined, shipping_address: shippingAddress.trim() || undefined,
         valid_until: validUntil || undefined, note: note.trim() || undefined,
-        lines: cart.map(({ product, qty }) => ({ product: product.id, qty })),
+        lines: cart.map(({ product, qty, uom }) => ({ product: product.id, qty, uom })),
       } });
-      setQuantities({}); setNote(''); await load(true);
+      setQuantities({}); setSelectedUnits({}); setNote(''); await load(true);
       setNotice(`Đã tạo báo giá ${String(created.id).slice(0, 8)}. Server áp dụng giá bảng hoặc giá danh mục và tính thuế.`);
     } catch (reason) { setError(reason.message || 'Không tạo được báo giá. Kiểm tra khách hàng, giá và ngày hiệu lực.'); }
     finally { setBusy(''); }
@@ -113,17 +120,18 @@ export default function WholesaleSalesDeskPage() {
     for (const line of order.lines || []) {
       const product = line.product;
       const price = Number(line.price || 0);
-      const key = `${product}:${price.toFixed(2)}`;
-      const current = groups.get(key) || { key, product, price, ordered: 0, name: products.get(product)?.name || 'Mặt hàng' };
+      const uom = line.uom || products.get(product)?.uom || '';
+      const key = `${product}:${price.toFixed(2)}:${uom}`;
+      const current = groups.get(key) || { key, product, price, uom: uom || undefined, uom_name: line.uom_name, ordered: 0, name: products.get(product)?.name || 'Mặt hàng' };
       current.ordered += Number(line.qty || 0);
       groups.set(key, current);
     }
     const requiresDelivery = app.meta?.modules?.some((module) => module.id === 'logistics') && Boolean(order.shipping_address?.trim());
     return [...groups.values()].map((line) => {
       const eligible = requiresDelivery
-        ? shipmentForOrder(order).filter((shipment) => shipment.status === 'delivered').flatMap((shipment) => shipment.lines || []).filter((item) => item.product === line.product && Math.abs(Number(item.price || 0) - line.price) <= .005).reduce((sum, item) => sum + Number(item.qty || 0), 0)
+        ? shipmentForOrder(order).filter((shipment) => shipment.status === 'delivered').flatMap((shipment) => shipment.lines || []).filter((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && Math.abs(Number(item.price || 0) - line.price) <= .005).reduce((sum, item) => sum + Number(item.qty || 0), 0)
         : line.ordered;
-      const alreadyReturned = returns.filter((record) => record.sales_order === order.id && ['submitted', 'approved', 'received'].includes(record.status)).flatMap((record) => record.lines || []).filter((item) => item.product === line.product && Math.abs(Number(item.price || 0) - line.price) <= .005).reduce((sum, item) => sum + Number(item.qty || 0), 0);
+      const alreadyReturned = returns.filter((record) => record.sales_order === order.id && ['submitted', 'approved', 'received'].includes(record.status)).flatMap((record) => record.lines || []).filter((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && Math.abs(Number(item.price || 0) - line.price) <= .005).reduce((sum, item) => sum + Number(item.qty || 0), 0);
       return { ...line, eligible, remaining: Math.max(0, eligible - alreadyReturned) };
     }).filter((line) => line.remaining > 0);
   };
@@ -134,15 +142,16 @@ export default function WholesaleSalesDeskPage() {
       if (['service', 'digital'].includes(line.kind)) continue;
       const product = line.product;
       const price = Number(line.price || 0);
-      const key = `${product}:${price.toFixed(2)}`;
-      const current = groups.get(key) || { key, product, price, ordered: 0 };
+      const uom = line.uom || products.get(product)?.uom || '';
+      const key = `${product}:${price.toFixed(2)}:${uom}`;
+      const current = groups.get(key) || { key, product, price, uom: uom || undefined, uom_name: line.uom_name, ordered: 0 };
       current.ordered += Number(line.qty || 0);
       groups.set(key, current);
     }
     const reserved = new Map();
     for (const shipment of shipmentForOrder(order).filter((row) => ['created', 'dispatched', 'delivered'].includes(row.status))) {
       for (const line of shipment.lines || []) {
-        const key = `${line.product}:${Number(line.price || 0).toFixed(2)}`;
+        const key = `${line.product}:${Number(line.price || 0).toFixed(2)}:${line.uom || products.get(line.product)?.uom || ''}`;
         reserved.set(key, (reserved.get(key) || 0) + Number(line.qty || 0));
       }
     }
@@ -157,6 +166,7 @@ export default function WholesaleSalesDeskPage() {
     const lines = openLines.map((line) => ({
       product: line.product,
       price: line.price,
+      uom: line.uom,
       qty: Number(shipmentQuantities[order.id]?.[line.key]) || 0,
       remaining: line.remaining,
     })).filter((line) => line.qty > 0);
@@ -166,7 +176,7 @@ export default function WholesaleSalesDeskPage() {
       const created = await api(dataPath('logistics.shipment'), { method: 'POST', body: {
         source: 'sales_order', source_id: order.id, party: order.party,
         warehouse: order.warehouse, destination: order.shipping_address,
-        lines: lines.map(({ product, price, qty }) => ({ product, price, qty })),
+        lines: lines.map(({ product, price, qty, uom }) => ({ product, price, qty, uom })),
       } });
       setShipmentQuantities((current) => { const next = { ...current }; delete next[order.id]; return next; });
       await load(true);
@@ -178,7 +188,7 @@ export default function WholesaleSalesDeskPage() {
   };
 
   const createReturn = async (order) => {
-    const lines = eligibleReturnLines(order).map((line) => ({ ...line, qty: Number(returnQuantities[`${order.id}:${line.key}`]) || 0 })).filter((line) => line.qty > 0).map(({ product, price, qty }) => ({ product, price, qty }));
+    const lines = eligibleReturnLines(order).map((line) => ({ ...line, qty: Number(returnQuantities[`${order.id}:${line.key}`]) || 0 })).filter((line) => line.qty > 0).map(({ product, price, qty, uom }) => ({ product, price, qty, uom }));
     if (!lines.length || !returnReasons[order.id]?.trim()) return;
     setBusy(`${order.id}:return`); setError(''); setNotice('');
     try {
@@ -214,7 +224,8 @@ export default function WholesaleSalesDeskPage() {
         <label className="field wholesale-address"><span>Ghi chú</span><input className="input" value={note} onChange={(event) => setNote(event.target.value)} /></label>
       </div>
       <div className="wholesale-product-grid">{activeProducts.map((product) => <article className="wholesale-product card" key={product.id}>
-        <strong>{recordLabel('master-data.product', product)}</strong><span className="num">{fmtMoney(getPrice(product))}</span>
+        <strong>{recordLabel('master-data.product', product)}</strong><span className="num">{fmtMoney(getPrice(product, selectedUnits[product.id] || product.uom))} / {units.get(selectedUnits[product.id] || product.uom)?.name || 'đơn vị'}</span>
+        {unitsFor(product).length > 1 && <label className="field"><span>Đơn vị bán</span><select className="select" value={selectedUnits[product.id] || product.uom} onChange={(event) => setSelectedUnits((current) => ({ ...current, [product.id]: event.target.value }))}>{unitsFor(product).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` · ${unit.ratio} × đơn vị gốc` : ' · đơn vị gốc'}</option>)}</select></label>}
         <label className="field"><span>Số lượng</span><input className="input" type="number" min="0" step="any" value={quantities[product.id] || ''} onChange={(event) => setQuantity(product.id, event.target.value)} /></label>
       </article>)}</div>
       <div className="wholesale-estimate"><span>Tạm tính theo bảng giá, chưa gồm thuế</span><strong className="num">{fmtMoney(estimate)}</strong></div>
@@ -226,7 +237,7 @@ export default function WholesaleSalesDeskPage() {
         const customer = parties.get(quote.party); const order = orderForQuote(quote);
         return <article className="card wholesale-document" key={quote.id}>
           <header><div><strong>{recordLabel('master-data.party', customer)}</strong><div className="small muted">Báo giá {String(quote.id).slice(0, 8)} · {quote.valid_until ? `hết hạn ${fmtDate(quote.valid_until)}` : 'không đặt ngày hết hạn'}</div></div><span className={`badge ${expired(quote) ? 'danger' : quote.status === 'accepted' ? 'success' : 'warning'}`}>{expired(quote) && quote.status === 'sent' ? 'Quá hạn' : statusLabel(quote.status)}</span></header>
-          <ul>{(quote.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{products.get(line.product)?.name || 'Mặt hàng'} × {line.qty}</span><strong className="num">{fmtMoney(line.line_total ?? Number(line.qty || 0) * Number(line.price || 0))}</strong></li>)}</ul>
+          <ul>{(quote.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{products.get(line.product)?.name || 'Mặt hàng'} × {line.qty} {line.uom_name || units.get(line.uom)?.name || ''}</span><strong className="num">{fmtMoney(line.line_total ?? Number(line.qty || 0) * Number(line.price || 0))}</strong></li>)}</ul>
           <div className="wholesale-total"><span>Tổng gồm thuế</span><strong className="num">{fmtMoney(quote.total || 0)}</strong></div>
           <footer>{quote.status === 'draft' && can('sales.quotation.sent') && <button className="button" disabled={!!busy || expired(quote)} onClick={() => transition('sales.quotation', quote, 'sent')}>Gửi báo giá</button>}
             {quote.status === 'sent' && !expired(quote) && can('sales.quotation.accepted') && <button className="button primary" disabled={!!busy} onClick={() => transition('sales.quotation', quote, 'accepted')}>Khách duyệt</button>}
@@ -244,12 +255,12 @@ export default function WholesaleSalesDeskPage() {
         const shipmentsForOrder = shipmentForOrder(order); const invoice = invoiceForOrder(order);
         return <article className="card wholesale-document" key={order.id}>
           <header><div><strong>{recordLabel('master-data.party', parties.get(order.party))}</strong><div className="small muted">Đơn {String(order.id).slice(0, 8)} · {order.shipping_address || 'Bán trực tiếp'}</div></div><span className={`badge ${order.status === 'delivered' ? 'success' : order.status === 'cancelled' ? 'plain' : 'warning'}`}>{statusLabel(order.status)}</span></header>
-          <ul>{(order.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{products.get(line.product)?.name || 'Mặt hàng'} × {line.qty}</span><strong className="num">{fmtMoney(line.line_total ?? Number(line.qty || 0) * Number(line.price || 0))}</strong></li>)}</ul>
+          <ul>{(order.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{products.get(line.product)?.name || 'Mặt hàng'} × {line.qty} {line.uom_name || units.get(line.uom)?.name || ''}</span><strong className="num">{fmtMoney(line.line_total ?? Number(line.qty || 0) * Number(line.price || 0))}</strong></li>)}</ul>
           <div className="wholesale-total"><span>Tổng gồm thuế</span><strong className="num">{fmtMoney(order.total || 0)}</strong></div>
           {shipmentsForOrder.map((shipment) => <div className="wholesale-related" key={shipment.id}><span>Chuyến giao · {statusLabel(shipment.status)}</span><a href={recordHref('logistics.shipment', shipment.id)}>Mở {String(shipment.id).slice(0, 8)}</a></div>)}
           {app.meta?.modules?.some((module) => module.id === 'logistics') && can('logistics.shipment.read') && can('logistics.shipment.create') && order.shipping_address?.trim() && ['confirmed', 'partially_delivered'].includes(order.status) && <div className="wholesale-related wholesale-shipment-create">
             <div><strong>Giao phần hàng còn lại</strong><div className="small muted">Chỉ tính các vận đơn đang mở hoặc đã giao; vận đơn thất bại không giữ số lượng.</div></div>
-            {remainingShipmentLines(order).length ? <div className="wholesale-shipment-lines">{remainingShipmentLines(order).map((line) => <label className="field" key={line.key}><span>{products.get(line.product)?.name || 'Mặt hàng'} · còn {line.remaining}</span><input className="input num" aria-label={`Số lượng giao ${products.get(line.product)?.name || line.product}`} type="number" min="0" max={line.remaining} step="any" value={shipmentQuantities[order.id]?.[line.key] || ''} onChange={(event) => setShipmentQuantities((current) => ({ ...current, [order.id]: { ...current[order.id], [line.key]: event.target.value } }))}/></label>)}<button className="button primary" type="button" disabled={Boolean(busy) || !remainingShipmentLines(order).some((line) => Number(shipmentQuantities[order.id]?.[line.key]) > 0)} onClick={() => createShipment(order)}>Tạo vận đơn đã chọn</button></div> : <span className="small muted">Hàng đã được phân công hết. Muốn tách chuyến chưa xuất phát, mở vận đơn nháp và giảm số lượng trước khi điều phối.</span>}
+            {remainingShipmentLines(order).length ? <div className="wholesale-shipment-lines">{remainingShipmentLines(order).map((line) => <label className="field" key={line.key}><span>{products.get(line.product)?.name || 'Mặt hàng'} · còn {line.remaining} {line.uom_name || units.get(line.uom)?.name || ''}</span><input className="input num" aria-label={`Số lượng giao ${products.get(line.product)?.name || line.product}`} type="number" min="0" max={line.remaining} step="any" value={shipmentQuantities[order.id]?.[line.key] || ''} onChange={(event) => setShipmentQuantities((current) => ({ ...current, [order.id]: { ...current[order.id], [line.key]: event.target.value } }))}/></label>)}<button className="button primary" type="button" disabled={Boolean(busy) || !remainingShipmentLines(order).some((line) => Number(shipmentQuantities[order.id]?.[line.key]) > 0)} onClick={() => createShipment(order)}>Tạo vận đơn đã chọn</button></div> : <span className="small muted">Hàng đã được phân công hết. Muốn tách chuyến chưa xuất phát, mở vận đơn nháp và giảm số lượng trước khi điều phối.</span>}
           </div>}
           <footer>{order.status === 'draft' && can('sales.sales_order.confirmed') && <button className="button primary" disabled={!!busy} onClick={() => transition('sales.sales_order', order, 'confirmed')}>Xác nhận đơn, giữ tồn và tạo hóa đơn</button>}
             {invoice && <a className="button" href={recordHref('accounting.invoice', invoice.id)}>Mở hóa đơn</a>}

@@ -18,7 +18,7 @@ async fn replenishment_rows(
         let shipments = if tenant.has_module("logistics") {
             "sales_shipments AS ( \
                SELECT shipment.source_id::uuid AS order_id, (line->>'product')::uuid AS product, \
-                 sum((line->>'qty')::numeric) AS qty \
+                 sum(COALESCE((line->>'base_qty')::numeric, (line->>'qty')::numeric)) AS qty \
                FROM logistics__shipment shipment \
                CROSS JOIN LATERAL jsonb_array_elements(COALESCE(shipment.lines, '[]'::jsonb)) line \
                WHERE shipment.tenant_id = $1 AND shipment.source = 'sales_order' \
@@ -31,7 +31,7 @@ async fn replenishment_rows(
         format!(
             "sales_order_lines AS ( \
                SELECT orders.id AS order_id, orders.warehouse, (line->>'product')::uuid AS product, \
-                 sum((line->>'qty')::numeric) AS qty \
+                 sum(COALESCE((line->>'base_qty')::numeric, (line->>'qty')::numeric)) AS qty \
                FROM sales__sales_order orders \
                CROSS JOIN LATERAL jsonb_array_elements(COALESCE(orders.lines, '[]'::jsonb)) line \
                WHERE orders.tenant_id = $1 AND orders.status IN ('confirmed', 'partially_delivered') \
@@ -76,24 +76,26 @@ async fn replenishment_rows(
     tx.query_json(
         &format!("WITH {sales_demand} ordered_lines AS ( \
            SELECT po.id AS order_id, po.tenant_id, po.warehouse, \
-             (line->>'product')::uuid AS product, (line->>'price')::numeric AS price, \
-             sum((line->>'qty')::numeric) AS ordered_qty \
+             (line->>'product')::uuid AS product, \
+             COALESCE((line->>'base_price')::numeric, (line->>'price')::numeric) AS price, \
+             sum(COALESCE((line->>'base_qty')::numeric, (line->>'qty')::numeric)) AS ordered_qty \
            FROM purchasing__purchase_order po \
            CROSS JOIN LATERAL jsonb_array_elements(COALESCE(po.lines, '[]'::jsonb)) line \
            WHERE po.tenant_id = $1 AND po.status IN ('draft', 'submitted', 'approved', 'partially_received') \
-           GROUP BY po.id, po.tenant_id, po.warehouse, (line->>'product')::uuid, (line->>'price')::numeric \
+           GROUP BY po.id, po.tenant_id, po.warehouse, (line->>'product')::uuid, \
+             COALESCE((line->>'base_price')::numeric, (line->>'price')::numeric) \
          ), incoming AS ( \
            SELECT ol.warehouse, ol.product, \
              sum(GREATEST(ol.ordered_qty - COALESCE(receipts.received_qty, 0), 0)) AS qty \
            FROM ordered_lines ol \
            LEFT JOIN LATERAL ( \
-             SELECT sum((received_line->>'qty')::numeric) AS received_qty \
+             SELECT sum(COALESCE((received_line->>'base_qty')::numeric, (received_line->>'qty')::numeric)) AS received_qty \
              FROM purchasing__purchase_receipt receipt \
              CROSS JOIN LATERAL jsonb_array_elements(COALESCE(receipt.lines, '[]'::jsonb)) received_line \
              WHERE receipt.tenant_id = ol.tenant_id AND receipt.purchase_order = ol.order_id \
                AND receipt.status = 'received' \
                AND received_line->>'product' = ol.product::text \
-               AND (received_line->>'price')::numeric = ol.price \
+               AND COALESCE((received_line->>'base_price')::numeric, (received_line->>'price')::numeric) = ol.price \
            ) receipts ON true \
            GROUP BY ol.warehouse, ol.product \
          ), open_requisitions AS ( \
@@ -101,14 +103,14 @@ async fn replenishment_rows(
              sum(GREATEST(requested.requested_qty - COALESCE(ordered.qty, 0), 0)) AS qty \
            FROM ( \
              SELECT pr.id, pr.tenant_id, pr.warehouse, (line->>'product')::uuid AS product, \
-               sum((line->>'qty')::numeric) AS requested_qty \
+               sum(COALESCE((line->>'base_qty')::numeric, (line->>'qty')::numeric)) AS requested_qty \
              FROM purchasing__purchase_requisition pr \
              CROSS JOIN LATERAL jsonb_array_elements(COALESCE(pr.lines, '[]'::jsonb)) line \
              WHERE pr.tenant_id = $1 AND pr.status IN ('draft', 'submitted', 'approved') \
              GROUP BY pr.id, pr.tenant_id, pr.warehouse, (line->>'product')::uuid \
            ) requested \
            LEFT JOIN LATERAL ( \
-             SELECT sum((ordered_line->>'qty')::numeric) AS qty \
+             SELECT sum(COALESCE((ordered_line->>'base_qty')::numeric, (ordered_line->>'qty')::numeric)) AS qty \
              FROM purchasing__purchase_order linked \
              CROSS JOIN LATERAL jsonb_array_elements(COALESCE(linked.lines, '[]'::jsonb)) ordered_line \
              WHERE linked.tenant_id = requested.tenant_id AND linked.source = 'purchase_requisition' \

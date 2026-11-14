@@ -333,6 +333,10 @@ async fn prepare_document_with_lock(
                 _ => true,
             };
             source.get("product").and_then(Value::as_str) == Some(product_id.to_string().as_str())
+                && line
+                    .get("uom")
+                    .and_then(Value::as_str)
+                    .is_none_or(|unit| source.get("uom").and_then(Value::as_str) == Some(unit))
                 && matches_price
         });
         if entity == "purchase_return" {
@@ -385,6 +389,122 @@ async fn prepare_document_with_lock(
                 ));
                 continue;
             }
+        }
+        if matches!(
+            entity,
+            "purchase_receipt" | "purchase_return" | "supplier_invoice"
+        ) && let Some(source) = source_line
+            && let Some(source_unit) = source.get("uom")
+        {
+            if line.get("uom").is_some_and(|unit| unit != source_unit) {
+                errors.push(format!(
+                    "Unit on line {} must match the source purchase order",
+                    index + 1
+                ));
+                continue;
+            }
+            line.insert("uom".into(), source_unit.clone());
+        }
+        for field in [
+            "base_qty",
+            "uom_name",
+            "uom_ratio",
+            "base_uom",
+            "base_price",
+        ] {
+            line.remove(field);
+        }
+        let selected_unit = match line.get("uom") {
+            Some(Value::String(value)) => match Uuid::parse_str(value) {
+                Ok(unit) => Some(unit),
+                Err(_) => {
+                    errors.push(format!(
+                        "Unit on purchase line {} must be a valid reference",
+                        index + 1
+                    ));
+                    continue;
+                }
+            },
+            Some(value) if !value.is_null() => {
+                errors.push(format!(
+                    "Unit on purchase line {} must be a valid reference",
+                    index + 1
+                ));
+                continue;
+            }
+            _ => None,
+        };
+        let mut unit = match crate::modules::master_data::unit_conversion::resolve(
+            tx,
+            tenant,
+            product_id,
+            selected_unit,
+        )
+        .await?
+        {
+            Ok(unit) => unit,
+            Err(message) => {
+                errors.push(format!("Unit on purchase line {}: {message}", index + 1));
+                continue;
+            }
+        };
+        if let Some(source) = source_line
+            && source.get("uom").and_then(Value::as_str)
+                == unit.unit_id.map(|id| id.to_string()).as_deref()
+        {
+            if let Some(ratio) = source.get("uom_ratio").and_then(money::decimal) {
+                unit.ratio = ratio;
+            }
+            if let Some(base_unit) = source
+                .get("base_uom")
+                .and_then(Value::as_str)
+                .and_then(|id| Uuid::parse_str(id).ok())
+            {
+                unit.base_unit_id = Some(base_unit);
+            }
+            if let Some(name) = source.get("uom_name").and_then(Value::as_str) {
+                unit.unit_name = Some(name.to_owned());
+            }
+        }
+        if let Some(quantity) = line.get("qty").and_then(money::decimal) {
+            let Some(base_quantity) = unit.base_quantity(quantity).and_then(money::json_number)
+            else {
+                errors.push(format!(
+                    "Quantity on purchase line {} exceeds the supported range",
+                    index + 1
+                ));
+                continue;
+            };
+            line.insert("base_qty".into(), base_quantity);
+        }
+        if let Some(unit_id) = unit.unit_id {
+            line.insert("uom".into(), json!(unit_id));
+        }
+        if let Some(unit_name) = unit.unit_name {
+            line.insert("uom_name".into(), json!(unit_name));
+        }
+        if let Some(base_unit_id) = unit.base_unit_id {
+            line.insert("base_uom".into(), json!(base_unit_id));
+        }
+        line.insert(
+            "uom_ratio".into(),
+            money::json_number(unit.ratio).ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    "purchasing.lines.uom_ratio",
+                    vec!["Unit ratio cannot be serialized".into()],
+                )
+            })?,
+        );
+        if let Some(price) = line.get("price").and_then(money::decimal) {
+            let Some(base_price) = price.checked_div(unit.ratio).and_then(money::json_number)
+            else {
+                errors.push(format!(
+                    "Price on purchase line {} exceeds the supported range",
+                    index + 1
+                ));
+                continue;
+            };
+            line.insert("base_price".into(), base_price);
         }
         let snapshot = source_line.and_then(|source| {
             source
