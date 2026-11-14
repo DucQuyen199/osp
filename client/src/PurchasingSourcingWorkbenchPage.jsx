@@ -99,12 +99,12 @@ export default function PurchasingSourcingWorkbenchPage() {
     }
     const meta = quoteMeta[row.id] || {};
     await run(`${row.id}:quoted`, async () => {
-      await api(dataPath('purchasing.rfq', row.id), { method: 'PATCH', body: {
-        quote_lines: lines,
-        quote_reference: meta.quote_reference ?? row.quote_reference ?? undefined,
-        valid_until: meta.valid_until ?? row.valid_until ?? undefined,
-      } });
-      await action(row, 'quoted');
+      const body = { quote_lines: lines };
+      const quoteReference = meta.quote_reference ?? row.quote_reference;
+      const validUntil = meta.valid_until ?? row.valid_until;
+      if (quoteReference != null) body.quote_reference = String(quoteReference).trim() || null;
+      if (validUntil != null) body.valid_until = validUntil || null;
+      await api(dataPath('purchasing.rfq', row.id, 'quoted'), { method: 'POST', body });
     }, 'Đã lưu báo giá và đưa vào bảng so sánh.');
   }
   async function rfqAction(row, verb) {
@@ -128,7 +128,7 @@ export default function PurchasingSourcingWorkbenchPage() {
         <div className="table-wrap"><table className="table"><thead><tr><th>Hàng yêu cầu</th><th>Số lượng</th></tr></thead><tbody>{(selected.lines || []).map((line, index) => <tr key={`${line.product}-${index}`}><td>{products.get(line.product)?.name || String(line.product).slice(0, 8)}</td><td>{line.qty}</td></tr>)}</tbody></table></div>
         {can('purchasing.rfq.create') && selected.status === 'approved' && !winner && <form className="row wrap" style={{ marginTop: 12 }} onSubmit={createRfq}><input className="input" aria-label="Hạn nhà cung cấp phản hồi báo giá" type="date" min={new Date().toISOString().slice(0, 10)} value={responseDue} onChange={(event) => setResponseDue(event.target.value)}/><select className="select" required value={supplierId} onChange={(event) => setSupplierId(event.target.value)}><option value="">Thêm nhà cung cấp vào vòng báo giá…</option>{eligibleSuppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{recordLabel('master-data.party', supplier)}</option>)}</select><button className="btn btn-primary" disabled={Boolean(busy) || !supplierId}>Tạo RFQ</button></form>}
         <div className="table-wrap" style={{ marginTop: 14 }}><table className="table"><thead><tr><th>Nhà cung cấp / hồ sơ</th><th>Báo giá từng dòng</th><th>Tổng sau thuế</th><th>Hiệu lực</th><th>Trạng thái / thao tác</th></tr></thead><tbody>{quotes.map((row) => {
-          const editable = row.status === 'sent' && can('purchasing.rfq.update');
+          const editable = row.status === 'sent' && can('purchasing.rfq.update') && can('purchasing.rfq.quoted');
           const draft = quoteLines(row);
           const meta = quoteMeta[row.id] || {};
           const total = quoteTotal({ quote_lines: draft });

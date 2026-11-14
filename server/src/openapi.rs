@@ -460,6 +460,34 @@ pub fn build(reg: &Registry) -> Value {
                             } } }
                         });
                     }
+                    if def.qname() == "purchasing.rfq" && action == "quoted" {
+                        operation["description"] = json!(
+                            "Save the supplier's complete quote, reference and validity date while moving the RFQ to quoted in one transaction. Every requested product and quantity must be covered and expired quotes are rejected."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": true,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "required": ["quote_lines"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "quote_lines": { "type": "array", "minItems": 1, "items": {
+                                        "type": "object",
+                                        "required": ["product", "qty", "price"],
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "product": { "type": "string", "format": "uuid" },
+                                            "qty": { "type": "number", "exclusiveMinimum": 0 },
+                                            "price": { "type": "number", "exclusiveMinimum": 0 },
+                                            "tax": { "type": "string", "format": "uuid" }
+                                        }
+                                    } },
+                                    "quote_reference": { "type": ["string", "null"], "maxLength": 120 },
+                                    "valid_until": { "type": ["string", "null"], "format": "date" }
+                                }
+                            } } }
+                        });
+                    }
                     paths.insert(
                         format!("{base}/{{id}}/{action}"),
                         json!({ "post": operation }),

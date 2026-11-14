@@ -2069,6 +2069,63 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     body.insert("no_show_reason".into(), serde_json::json!(reason));
                     return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
                 }
+                if q == "purchasing.rfq" && *action == "quoted" {
+                    let mut body = json_obj(&bytes)?;
+                    let allowed = body.contains_key("quote_lines")
+                        && body.keys().all(|field| {
+                            matches!(
+                                field.as_str(),
+                                "quote_lines" | "quote_reference" | "valid_until"
+                            )
+                        });
+                    let quote_lines_valid = body
+                        .get("quote_lines")
+                        .and_then(serde_json::Value::as_array)
+                        .is_some();
+                    let quote_reference = match body.get("quote_reference") {
+                        None | Some(serde_json::Value::Null) => None,
+                        Some(value) => value
+                            .as_str()
+                            .map(str::trim)
+                            .filter(|reference| reference.chars().count() <= 120)
+                            .map(|reference| (!reference.is_empty()).then(|| reference.to_owned())),
+                    };
+                    let reference_valid = !body.contains_key("quote_reference")
+                        || body["quote_reference"].is_null()
+                        || quote_reference.is_some();
+                    let valid_until = match body.get("valid_until") {
+                        None | Some(serde_json::Value::Null) => Some(None),
+                        Some(value) => value
+                            .as_str()
+                            .and_then(|date| {
+                                chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").ok()
+                            })
+                            .map(Some),
+                    };
+                    if !allowed || !quote_lines_valid || !reference_valid || valid_until.is_none() {
+                        return Err(ApiError::validation(
+                            "purchasing.rfq.quoted",
+                            vec!["Cần gửi quote_lines và chỉ hỗ trợ quote_reference (tối đa 120 ký tự), valid_until hợp lệ hoặc null".into()],
+                        ));
+                    }
+                    if body.contains_key("quote_reference") {
+                        body.insert(
+                            "quote_reference".into(),
+                            quote_reference
+                                .flatten()
+                                .map_or(serde_json::Value::Null, serde_json::Value::String),
+                        );
+                    }
+                    if body.contains_key("valid_until") {
+                        body.insert(
+                            "valid_until".into(),
+                            valid_until
+                                .flatten()
+                                .map_or(serde_json::Value::Null, |date| serde_json::json!(date)),
+                        );
+                    }
+                    return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
+                }
                 return json_ok(k.act(&actor, &t, &q, id, action).await?);
             }
             _ => {}
