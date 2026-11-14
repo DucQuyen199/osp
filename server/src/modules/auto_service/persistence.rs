@@ -159,6 +159,19 @@ async fn validate_repair_order(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -
                 if party != Some(vehicle_party) {
                     errors.push("Khách hàng trên lệnh sửa chữa phải trùng chủ sở hữu của xe".into());
                 }
+                let order_id = parse_id(document, "id");
+                let active_order = tx
+                    .query_opt(
+                        "SELECT id FROM auto_service__repair_order WHERE tenant_id = $1 AND vehicle = $2 AND status <> 'delivered' AND ($3::uuid IS NULL OR id <> $3) LIMIT 1",
+                        &[&tenant.id, &vehicle, &order_id],
+                    )
+                    .await?
+                    .is_some();
+                if active_order {
+                    errors.push(
+                        "Xe đã có lệnh sửa chữa chưa bàn giao; hãy tiếp tục lệnh đang mở".into(),
+                    );
+                }
             } else {
                 errors.push("Xe không tồn tại trong doanh nghiệp".into());
             }
