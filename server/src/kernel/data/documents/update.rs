@@ -108,7 +108,10 @@ impl Kernel {
             crate::modules::accounting::prepare_document(ent.def.name.as_str(), &mut cur);
         }
         if qname == "hotel.reservation"
-            && cur.get("status").and_then(Value::as_str) == Some("booked")
+            && matches!(
+                cur.get("status").and_then(Value::as_str),
+                Some("booked" | "checked_in")
+            )
         {
             let errors =
                 crate::modules::hotel::prepare_document(tx, t, ent.def.name.as_str(), &mut cur)

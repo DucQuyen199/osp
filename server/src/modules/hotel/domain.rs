@@ -88,6 +88,27 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
 
 pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<String> {
     if entity == "reservation"
+        && current.get("status").and_then(Value::as_str) == Some("checked_in")
+    {
+        let Some(fields) = patch.as_object() else {
+            return vec![
+                "An in-house stay can only be changed through the stay-extension workflow".into(),
+            ];
+        };
+        if fields.len() != 1 || !fields.contains_key("check_out") {
+            return vec!["During a stay, only the checkout date can be extended; guest, room, and rate snapshots are locked".into()];
+        }
+        let old_checkout = date(current, "check_out");
+        let new_checkout = date(patch, "check_out");
+        if old_checkout
+            .zip(new_checkout)
+            .is_some_and(|(old, new)| new > old)
+        {
+            return Vec::new();
+        }
+        return vec!["Checkout date must move later to extend an in-house stay".into()];
+    }
+    if entity == "reservation"
         && current.get("status").and_then(Value::as_str) == Some("no_show")
         && patch.as_object().is_some_and(|fields| !fields.is_empty())
     {

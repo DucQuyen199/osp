@@ -6,6 +6,12 @@ import { recordHref } from './lib/routes.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const today = () => new Date().toISOString().slice(0, 10);
+const nextDay = (value) => {
+  if (!value) return '';
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+};
 
 export default function HotelFrontDeskPage() {
   const [reservations, setReservations] = useState([]);
@@ -25,6 +31,7 @@ export default function HotelFrontDeskPage() {
   const [assignment, setAssignment] = useState('');
   const [chargeDescription, setChargeDescription] = useState('');
   const [chargeAmount, setChargeAmount] = useState('');
+  const [extendedCheckout, setExtendedCheckout] = useState({});
   const [busy, setBusy] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -102,6 +109,20 @@ export default function HotelFrontDeskPage() {
     finally { setBusy(''); }
   };
 
+  const extendStay = async (event) => {
+    event.preventDefault(); if (!selected) return;
+    const newCheckout = extendedCheckout[selected.id] || '';
+    if (!newCheckout || newCheckout <= selected.check_out) return;
+    setBusy(`${selected.id}:extend`); setError(''); setNotice('');
+    try {
+      await api(dataPath('hotel.reservation', selected.id), { method: 'PATCH', body: { check_out: newCheckout } });
+      setExtendedCheckout((current) => { const next = { ...current }; delete next[selected.id]; return next; });
+      await load(true);
+      setNotice('Đã gia hạn lưu trú. Hệ thống đã kiểm tra lịch phòng và tính lại số đêm, tổng tiền theo giá phòng đã chốt khi đặt.');
+    } catch (reason) { setError(reason.message || 'Không gia hạn được. Phòng có thể đã được đặt cho khoảng thời gian mới.'); }
+    finally { setBusy(''); }
+  };
+
   const reservationStatus = (status) => status === 'booked' ? 'warning' : status === 'checked_in' ? 'success' : status === 'checked_out' ? 'plain' : 'danger';
 
   return <div className="page hotel-frontdesk-page">
@@ -128,6 +149,11 @@ export default function HotelFrontDeskPage() {
           {selected.status === 'booked' && selected.check_in < today() && can('hotel.reservation.no_show') && can('hotel.reservation.update') && <div className="hotel-no-show-tools">{selectedCharges.length > 0 && <div className="alert warning" role="status">Đặt phòng còn phí folio; cần xử lý folio trước khi ghi nhận khách vắng mặt.</div>}<label className="field"><span className="label">Lý do khách vắng mặt *</span><textarea className="textarea" rows="2" maxLength="500" required value={noShowReason} onChange={(event) => setNoShowReasons((current) => ({ ...current, [selected.id]: event.target.value }))} placeholder="Ví dụ: khách không đến, không liên lạc được" /></label>{selectedCharges.length === 0 && <button className="btn btn-secondary" type="button" disabled={Boolean(busy) || !noShowReason.trim()} onClick={() => transition(selected, 'no_show')}>Ghi nhận khách vắng mặt</button>}</div>}
           <footer className="row wrap hotel-detail-actions">{selected.status === 'booked' && can('hotel.reservation.checked_in') && <button className="btn btn-primary" type="button" disabled={Boolean(busy) || !selected.room} title={!selected.room ? 'Phân phòng trước khi nhận khách' : ''} onClick={() => transition(selected, 'checked_in')}>Nhận phòng</button>}{selected.status === 'checked_in' && can('hotel.reservation.checked_out') && <button className="btn btn-primary" type="button" disabled={Boolean(busy)} onClick={() => transition(selected, 'checked_out')}>Trả phòng · chốt folio</button>}{selected.status === 'booked' && can('hotel.reservation.cancelled') && <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => transition(selected, 'cancelled')}>Hủy đặt phòng</button>}{selectedInvoice && can('accounting.invoice.read') && <a className="btn btn-secondary" href={recordHref('accounting.invoice', selectedInvoice.id)}>Mở hóa đơn · {statusLabel(selectedInvoice.status)}</a>}</footer>
         </article>
+        {selected.status === 'checked_in' && can('hotel.reservation.update') && <form className="card hotel-detail-card" onSubmit={extendStay}>
+          <header className="hotel-detail-head"><div><h3>Gia hạn lưu trú</h3><p className="small muted">Chỉ kéo dài ngày trả. Khách, phòng và giá đã chốt được giữ nguyên.</p></div></header>
+          <label className="field"><span className="label">Ngày trả mới</span><input className="input" type="date" min={nextDay(selected.check_out)} required value={extendedCheckout[selected.id] || ''} onChange={(event) => setExtendedCheckout((current) => ({ ...current, [selected.id]: event.target.value }))} /></label>
+          <div><button className="btn btn-primary" type="submit" disabled={Boolean(busy) || !extendedCheckout[selected.id] || extendedCheckout[selected.id] <= selected.check_out}>{busy === `${selected.id}:extend` ? 'Đang kiểm tra lịch phòng…' : 'Kiểm tra và gia hạn'}</button></div>
+        </form>}
         <article className="card hotel-detail-card"><header className="hotel-detail-head"><div><h3>Folio và phí phát sinh</h3><p className="small muted">Các khoản ghi vào folio sẽ cộng vào hóa đơn khi trả phòng.</p></div><strong>{fmtMoney(selected.total || 0)}</strong></header>
           {selectedCharges.length ? <div className="hotel-charge-list">{selectedCharges.map((charge) => <div className="hotel-charge-row" key={charge.id}><span>{charge.description}</span><strong>{fmtMoney(charge.amount)}</strong></div>)}</div> : <div className="small muted">Chưa có phí phát sinh.</div>}
           {['booked', 'checked_in'].includes(selected.status) && can('hotel.folio_charge.create') && <form className="hotel-charge-form" onSubmit={addCharge}><label className="field"><span className="label">Mô tả khoản phí *</span><input className="input" required value={chargeDescription} onChange={(event) => setChargeDescription(event.target.value)} placeholder="Ví dụ: minibar, giặt ủi" /></label><label className="field"><span className="label">Số tiền *</span><input className="input num" required type="number" min="0" step="any" value={chargeAmount} onChange={(event) => setChargeAmount(event.target.value)} /></label><button className="btn btn-secondary" type="submit" disabled={Boolean(busy)}>{busy === 'charge' ? 'Đang ghi…' : 'Ghi phí'}</button></form>}
