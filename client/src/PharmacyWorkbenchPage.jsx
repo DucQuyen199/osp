@@ -10,6 +10,7 @@ export default function PharmacyWorkbenchPage() {
   const [products, setProducts] = useState([]);
   const [parties, setParties] = useState(new Map());
   const [prescriptions, setPrescriptions] = useState([]);
+  const [dispensedByPrescription, setDispensedByPrescription] = useState(new Map());
   const [form, setForm] = useState({ prescription_no: '', party: '', prescriber: '', prescriber_license: '', issued_at: today(), valid_until: today(), notes: '' });
   const [lines, setLines] = useState([newLine()]);
   const [busy, setBusy] = useState(false);
@@ -20,12 +21,24 @@ export default function PharmacyWorkbenchPage() {
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const [productMap, partyMap, rxResponse] = await Promise.all([
+      const [productMap, partyMap, rxResponse, orderResponse] = await Promise.all([
         loadRefs('master-data.product'), loadRefs('master-data.party'), api(`${dataPath('pharmacy.prescription')}?limit=1000`),
+        can('pos.pos_order.read') ? api(`${dataPath('pos.pos_order')}?limit=1000`) : Promise.resolve({ items: [] }),
       ]);
       setProducts([...productMap.values()].filter((p) => p.active !== false && p.requires_prescription === true).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi')));
       setParties(partyMap);
       setPrescriptions((rxResponse.items || []).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))));
+      const dispensed = new Map();
+      for (const order of orderResponse.items || []) {
+        if (order.status !== 'completed' || !order.prescription) continue;
+        const quantities = dispensed.get(order.prescription) || new Map();
+        for (const line of Array.isArray(order.lines) ? order.lines : []) {
+          if (!line.product) continue;
+          quantities.set(line.product, (quantities.get(line.product) || 0) + Number(line.qty || 0));
+        }
+        dispensed.set(order.prescription, quantities);
+      }
+      setDispensedByPrescription(dispensed);
     } catch (reason) { setError(reason.message || 'Không tải được danh sách đơn thuốc.'); }
     finally { setLoading(false); }
   }, []);
@@ -88,7 +101,7 @@ export default function PharmacyWorkbenchPage() {
       {loading ? <div className="skeleton" data-h="row" /> : prescriptions.length === 0 ? <div className="empty">Chưa có đơn thuốc.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Số đơn</th><th>Khách hàng</th><th>Ngày kê</th><th>Hiệu lực đến</th><th>Thuốc</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{prescriptions.map((rx) => <tr key={rx.id}>
         <td><strong>{rx.prescription_no}</strong><div className="small muted">{rx.prescriber}{rx.prescriber_license ? ` · ${rx.prescriber_license}` : ''}</div></td>
         <td>{parties.get(rx.party)?.name || 'Khách hàng'}</td><td>{rx.issued_at}</td><td>{rx.valid_until}</td>
-        <td>{(Array.isArray(rx.items) ? rx.items : []).map((item) => <div key={`${item.product}-${item.dosage}`}>{productName(item.product)} × {item.qty}<div className="small muted">{item.dosage}</div></div>)}</td>
+        <td>{(Array.isArray(rx.items) ? rx.items : []).map((item) => { const dispensed = dispensedByPrescription.get(rx.id)?.get(item.product) || 0; const remaining = Math.max(0, Number(item.qty || 0) - dispensed); return <div key={`${item.product}-${item.dosage}`}>{productName(item.product)} · kê {item.qty}{dispensed > 0 && <span className="small muted"> · đã cấp {dispensed} · còn {remaining}</span>}<div className="small muted">{item.dosage}</div></div>; })}</td>
         <td>{statusLabel(rx.status)}{rx.dispensed_at && <div className="small muted">{fmtDateTime(rx.dispensed_at)}</div>}</td>
         <td className="row wrap">{rx.status === 'draft' && <button className="btn btn-primary btn-sm" type="button" disabled={busy || !can('pharmacy.prescription.verified')} onClick={() => transition(rx, 'verified')}>Xác minh</button>}{['draft', 'verified'].includes(rx.status) && <button className="btn btn-ghost btn-sm" type="button" disabled={busy || !can('pharmacy.prescription.cancelled')} onClick={() => transition(rx, 'cancelled')}>Hủy</button>}</td>
       </tr>)}</tbody></table></div>}

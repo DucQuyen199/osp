@@ -225,7 +225,7 @@ pub async fn validate_persistence(
     }
     // Pharmacy checks are activated only for prescriptions linked to the
     // dedicated pharmacy module. The prescription row lock serializes checkout
-    // attempts so the same prescription cannot be dispensed twice.
+    // attempts so cumulative partial fills cannot exceed the prescription.
     if tenant.has_module("pharmacy") {
         let prescription_id = document
             .get("prescription")
@@ -272,8 +272,8 @@ pub async fn validate_persistence(
                 let status: String = rx.get(1);
                 let valid_until: Option<chrono::NaiveDate> = rx.get(2);
                 let rx_items: Value = rx.get(3);
-                if status != "verified" {
-                    errors.push("Chỉ dùng đơn thuốc đã xác minh và chưa cấp".into());
+                if !matches!(status.as_str(), "verified" | "partially_dispensed") {
+                    errors.push("Chỉ dùng đơn thuốc đã xác minh hoặc đang cấp một phần".into());
                 }
                 if valid_until.is_none_or(|date| date < chrono::Utc::now().date_naive()) {
                     errors.push("Đơn thuốc đã hết hạn".into());
@@ -287,8 +287,15 @@ pub async fn validate_persistence(
                 }
                 let mut required_totals = std::collections::BTreeMap::<Uuid, Decimal>::new();
                 for (pid, qty) in &rx_required {
-                    *required_totals.entry(*pid).or_default() += *qty;
+                    let current = required_totals.get(pid).copied().unwrap_or(Decimal::ZERO);
+                    if let Some(total) = current.checked_add(*qty) {
+                        required_totals.insert(*pid, total);
+                    } else {
+                        errors.push("Số lượng thuốc kê đơn vượt giới hạn hỗ trợ".into());
+                    }
                 }
+                let previously_dispensed =
+                    dispensed_quantities_for_prescription(tx, tenant, rx_id).await?;
                 for (pid, qty) in &required_totals {
                     let allowed = rx_items
                         .as_array()
@@ -301,17 +308,17 @@ pub async fn validate_persistence(
                                 == Some(*pid)
                         })
                         .filter_map(|item| item.get("qty").and_then(money::decimal))
-                        .fold(Decimal::ZERO, |sum, value| sum + value);
-                    if allowed < *qty {
+                        .try_fold(Decimal::ZERO, |sum, value| sum.checked_add(value))
+                        .unwrap_or(Decimal::ZERO);
+                    let already_dispensed = previously_dispensed
+                        .get(pid)
+                        .copied()
+                        .unwrap_or(Decimal::ZERO);
+                    let combined = already_dispensed.checked_add(*qty);
+                    if combined.is_none_or(|total| allowed < total) {
                         errors.push(
-                            "Đơn thuốc không bao gồm đủ số lượng của thuốc kê đơn trong giỏ".into(),
+                            "Tổng số lượng đã và đang bán vượt quá số lượng kê trong đơn".into(),
                         );
-                    }
-                }
-                if action == "completed" && errors.is_empty() {
-                    let already = tx.query_opt("SELECT id FROM pos__pos_order WHERE tenant_id=$1 AND prescription=$2::text AND status='completed' LIMIT 1", &[&tenant.id, &rx_id]).await?.is_some();
-                    if already {
-                        errors.push("Đơn thuốc đã được dùng cho giao dịch khác".into());
                     }
                 }
             } else {
@@ -320,4 +327,43 @@ pub async fn validate_persistence(
         }
     }
     Ok(errors)
+}
+
+async fn dispensed_quantities_for_prescription(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    prescription_id: Uuid,
+) -> R<std::collections::BTreeMap<Uuid, Decimal>> {
+    let rows = tx
+        .query(
+            "SELECT lines FROM pos__pos_order WHERE tenant_id = $1 AND prescription = $2::text AND status = 'completed' FOR SHARE",
+            &[&tenant.id, &prescription_id],
+        )
+        .await?;
+    let mut totals = std::collections::BTreeMap::<Uuid, Decimal>::new();
+    for row in rows {
+        let lines: Value = row.get(0);
+        for line in lines.as_array().into_iter().flatten() {
+            let Some(product_id) = line
+                .get("product")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+            else {
+                continue;
+            };
+            let qty = line
+                .get("qty")
+                .and_then(money::decimal)
+                .unwrap_or(Decimal::ZERO);
+            let current = totals.get(&product_id).copied().unwrap_or(Decimal::ZERO);
+            let Some(total) = current.checked_add(qty) else {
+                return Err(crate::error::ApiError::validation(
+                    "pos.pos_order",
+                    vec!["Dispensed quantity exceeds the supported range".into()],
+                ));
+            };
+            totals.insert(product_id, total);
+        }
+    }
+    Ok(totals)
 }

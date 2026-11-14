@@ -19,7 +19,7 @@
         { "name": "valid_until", "type": "date", "required": true },
         { "name": "items", "type": "json", "required": true },
         { "name": "dispensed_at", "type": "datetime", "required": false, "system": true },
-        { "name": "status", "type": "enum", "required": false, "options": ["draft", "verified", "dispensed", "cancelled"] },
+        { "name": "status", "type": "enum", "required": false, "options": ["draft", "verified", "partially_dispensed", "dispensed", "cancelled"] },
         { "name": "notes", "type": "text", "required": false }
       ],
       "states": {
@@ -27,7 +27,8 @@
         "initial": "draft",
         "actions": {
           "verified": { "from": ["draft"], "to": "verified" },
-          "dispensed": { "from": ["verified"], "to": "dispensed" },
+          "partially_dispensed": { "from": ["verified", "partially_dispensed"], "to": "partially_dispensed" },
+          "dispensed": { "from": ["verified", "partially_dispensed"], "to": "dispensed" },
           "cancelled": { "from": ["draft", "verified"], "to": "cancelled" }
         }
       },

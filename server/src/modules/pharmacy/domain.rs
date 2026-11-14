@@ -99,7 +99,7 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
     }
     if matches!(
         document.get("status").and_then(Value::as_str),
-        Some("dispensed" | "verified")
+        Some("dispensed" | "partially_dispensed" | "verified")
     ) {
         vec!["Đơn đã xác minh hoặc cấp phát phải được giữ làm dấu vết".into()]
     } else {
