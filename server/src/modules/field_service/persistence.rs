@@ -78,6 +78,45 @@ pub async fn validate_persistence(
             }
         }
     }
+    if matches!(action, "created" | "updated" | "dispatched")
+        && document
+            .get("technician_employee")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+            .is_none()
+    {
+        if let (Some(technician), Some(start), Some(end)) = (
+            document
+                .get("technician")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|name| !name.is_empty()),
+            document.get("scheduled_at").and_then(Value::as_str),
+            document.get("scheduled_end").and_then(Value::as_str),
+        ) {
+            let lock_key = format!(
+                "field-service-contractor-calendar:{}:{}",
+                tenant.id,
+                technician.to_lowercase()
+            );
+            tx.query_opt(
+                "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                &[&lock_key],
+            )
+            .await?;
+            let current_id = document
+                .get("id")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+                .unwrap_or(Uuid::nil());
+            if tx.query_opt(
+                "SELECT id FROM field_service__work_order WHERE tenant_id=$1 AND technician_employee IS NULL AND lower(btrim(technician))=lower($2) AND status IN ('open','dispatched') AND scheduled_at IS NOT NULL AND scheduled_end IS NOT NULL AND scheduled_at < $4::text::timestamptz AND scheduled_end > $3::text::timestamptz AND id<>$5 LIMIT 1",
+                &[&tenant.id, &technician, &start, &end, &current_id],
+            ).await?.is_some() {
+                errors.push("Kỹ thuật viên bên ngoài đã có lệnh công việc khác trong khung giờ này".into());
+            }
+        }
+    }
     if let Some(ticket) = document
         .get("source_ticket")
         .and_then(Value::as_str)

@@ -5,23 +5,100 @@ use crate::{
     kernel::{Actor, Kernel, Opts, Tenant},
     money,
 };
+use rust_decimal::Decimal;
 use serde_json::{Map, Value};
 use uuid::Uuid;
 
 use super::persistence;
 
-/// Rebuild the work-order amount from its server-stored line snapshot.
-pub fn prepare_document(document: &mut Map<String, Value>) -> Vec<String> {
-    let Some(lines) = document.get("lines").and_then(Value::as_array) else {
+/// Snapshot catalog pricing and stock tracking for a work order.
+pub async fn prepare_document(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    document: &mut Map<String, Value>,
+    reprice: bool,
+) -> R<Vec<String>> {
+    let Some(lines) = document.get_mut("lines") else {
         document.insert("total".into(), Value::from(0));
-        return Vec::new();
+        return Ok(Vec::new());
     };
+    let Some(lines) = lines.as_array_mut() else {
+        return Ok(vec!["Dòng lệnh công việc phải là danh sách".into()]);
+    };
+    let mut errors = Vec::new();
+    for (index, line) in lines.iter_mut().enumerate() {
+        let prefix = format!("Dòng công việc {}", index + 1);
+        let Some(line) = line.as_object_mut() else {
+            errors.push(format!("{prefix} không hợp lệ"));
+            continue;
+        };
+        if !line
+            .get("qty")
+            .and_then(money::decimal)
+            .is_some_and(|qty| qty > Decimal::ZERO)
+        {
+            errors.push(format!("{prefix}: số lượng phải lớn hơn 0"));
+            continue;
+        }
+        if reprice {
+            let Some(product) = line
+                .get("product")
+                .and_then(Value::as_str)
+                .and_then(|id| Uuid::parse_str(id).ok())
+            else {
+                errors.push(format!("{prefix}: chọn vật tư hoặc dịch vụ hợp lệ"));
+                continue;
+            };
+            let Some(row) = tx
+                .query_opt(
+                    "SELECT kind, tracked, active, price::text, name FROM master_data__product WHERE tenant_id=$1 AND id=$2 FOR SHARE",
+                    &[&tenant.id, &product],
+                )
+                .await?
+            else {
+                errors.push(format!("{prefix}: sản phẩm không tồn tại trong doanh nghiệp"));
+                continue;
+            };
+            let kind: Option<String> = row.get(0);
+            let tracked: Option<bool> = row.get(1);
+            let active: Option<bool> = row.get(2);
+            let price_text: Option<String> = row.get(3);
+            let name: String = row.get(4);
+            if active == Some(false) {
+                errors.push(format!("{prefix}: sản phẩm đã ngừng kinh doanh"));
+                continue;
+            }
+            let Some(price) = price_text
+                .as_deref()
+                .and_then(money::decimal_str)
+                .filter(|price| *price >= Decimal::ZERO)
+            else {
+                errors.push(format!("{prefix}: sản phẩm chưa có đơn giá hợp lệ"));
+                continue;
+            };
+            line.insert(
+                "price".into(),
+                money::json_number(price).unwrap_or(Value::Null),
+            );
+            line.insert(
+                "kind".into(),
+                Value::String(kind.clone().unwrap_or_else(|| "goods".into())),
+            );
+            line.insert(
+                "tracked".into(),
+                Value::Bool(tracked.unwrap_or(kind.as_deref() == Some("goods"))),
+            );
+            line.insert("product_name".into(), Value::String(name));
+        }
+    }
+    if !errors.is_empty() {
+        return Ok(errors);
+    }
     let Some(total) = money::sum_line_totals(lines).and_then(money::json_number) else {
-        document.remove("total");
-        return vec!["Work-order lines have an invalid quantity, price, or total".into()];
+        return Ok(vec!["Không thể tính tổng lệnh công việc".into()]);
     };
     document.insert("total".into(), total);
-    Vec::new()
+    Ok(Vec::new())
 }
 
 pub async fn handle_source_event(

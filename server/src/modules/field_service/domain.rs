@@ -54,6 +54,28 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
         {
             vec!["Cần phân công nhân viên hoặc kỹ thuật viên bên ngoài trước khi điều phối lệnh công việc".into()]
         }
+        "dispatched" => {
+            if !document
+                .get("total")
+                .and_then(money::decimal)
+                .is_some_and(|amount| amount > Decimal::ZERO)
+            {
+                return vec!["Lệnh cần có dịch vụ hoặc vật tư tính phí trước khi điều phối".into()];
+            }
+            let start = document
+                .get("scheduled_at")
+                .and_then(Value::as_str)
+                .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok());
+            let end = document
+                .get("scheduled_end")
+                .and_then(Value::as_str)
+                .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok());
+            if !matches!((start, end), (Some(start), Some(end)) if start < end) {
+                vec!["Cần lên lịch bắt đầu và kết thúc hợp lệ trước khi điều phối lệnh".into()]
+            } else {
+                Vec::new()
+            }
+        }
         "done" => {
             let billable = document
                 .get("total")
@@ -82,6 +104,7 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
             "scheduled_at",
             "scheduled_end",
             "warehouse",
+            "lines",
         ]
         .iter()
         .any(|field| patch.get(*field).is_some())

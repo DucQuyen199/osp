@@ -39,7 +39,11 @@
    "name": "Hỗ trợ khách hàng",
    "permissions": [
     "helpdesk.*",
-    "field-service.work_order.*"
+    "field-service.work_order.*",
+    "master-data.party.read",
+    "master-data.product.read",
+    "inventory.warehouse.read",
+    "accounting.invoice.read"
    ]
   },
   "meter_reader": {

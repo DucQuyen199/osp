@@ -39,8 +39,12 @@
   "technician": {
    "name": "Kỹ thuật viên",
    "permissions": [
-    "field-service.work_order.*",
-    "inventory.stock_level.read"
+    "field-service.work_order.read",
+    "field-service.work_order.done",
+    "inventory.stock_level.read",
+    "master-data.party.read",
+    "master-data.product.read",
+    "inventory.warehouse.read"
    ]
   },
   "dispatcher": {
@@ -48,7 +52,11 @@
    "permissions": [
     "field-service.*",
     "booking.*",
-    "helpdesk.*"
+    "helpdesk.*",
+    "master-data.party.read",
+    "master-data.product.read",
+    "inventory.warehouse.read",
+    "accounting.invoice.read"
    ]
   }
  },
