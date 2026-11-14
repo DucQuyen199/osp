@@ -24,6 +24,7 @@
 - Added covers to dine-in restaurant orders, enforcing table seating capacity and preventing capacity reductions below open-order covers.
 - Added a hotel no-show action after the arrival date has passed, requiring a reason, retaining the reservation history, and releasing the room schedule.
 - Added partial insurance claim approvals, preserving the requested amount while using the approved amount for coverage limits and payout journal entries.
+- Added a school gradebook for entering and updating student scores by class, term, and subject, with roster-linked grading and server-enforced duplicate protection.
 - Linked purchase returns to the supplier invoice they reverse; returns before invoicing reduce GRNI directly, while billed returns create a debit note against the selected payable.
 - Serialized supplier invoice number uniqueness checks per tenant and supplier so concurrent approvals on different purchase orders cannot create duplicate payable documents.
 - Added permission-aware BI authoring for saved row and aggregate reports, dashboards with validated report widgets, and KPIs with aggregate sources and optional formulas, using enabled tenant entities and field metadata without manual JSON editing.

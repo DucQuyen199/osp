@@ -18,7 +18,11 @@ export default function EducationWorkbenchPage() {
   const [parties, setParties] = useState(new Map());
   const [sessions, setSessions] = useState([]);
   const [attendance, setAttendance] = useState([]);
+  const [grades, setGrades] = useState([]);
   const [selectedId, setSelectedId] = useState('');
+  const [gradeClass, setGradeClass] = useState('');
+  const [gradeTerm, setGradeTerm] = useState('');
+  const [gradeSubject, setGradeSubject] = useState('');
   const [form, setForm] = useState({ class: '', topic: '', starts_at: sessionDate(), ends_at: localDateTime(new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()) });
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -28,16 +32,19 @@ export default function EducationWorkbenchPage() {
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const [classRes, enrollmentRes, studentRes, partyMap, sessionRes, attendanceRes] = await Promise.all([
+      const [classRes, enrollmentRes, studentRes, partyMap, sessionRes, attendanceRes, gradeRes] = await Promise.all([
         api(`${dataPath('school.course_class')}?limit=1000`), api(`${dataPath('school.class_enrollment')}?limit=1000`),
         api(`${dataPath('school.student')}?limit=1000`), loadRefs('master-data.party'),
         api(`${dataPath('school.class_session')}?limit=1000`), api(`${dataPath('school.attendance')}?limit=1000`),
+        can('school.grade.read') ? api(`${dataPath('school.grade')}?limit=1000`) : Promise.resolve({ items: [] }),
       ]);
       const classItems = classRes.items || []; const sessionItems = sessionRes.items || [];
       setClasses(classItems); setEnrollments(enrollmentRes.items || []); setStudents(new Map((studentRes.items || []).map((x) => [x.id, x])));
       setParties(partyMap); setSessions(sessionItems.sort((a, b) => String(b.starts_at).localeCompare(String(a.starts_at))));
       setAttendance(attendanceRes.items || []);
+      setGrades(gradeRes.items || []);
       setForm((current) => ({ ...current, class: current.class || classItems[0]?.id || '' }));
+      setGradeClass((current) => current || classItems[0]?.id || '');
       setSelectedId((current) => current && sessionItems.some((x) => x.id === current) ? current : sessionItems[0]?.id || '');
     } catch (reason) { setError(reason.message || 'Không tải được dữ liệu lớp học.'); }
     finally { setLoading(false); }
@@ -50,6 +57,11 @@ export default function EducationWorkbenchPage() {
     .map((enrollment) => ({ enrollment, student: students.get(enrollment.student) }))
     .sort((a, b) => studentName(a.student, parties).localeCompare(studentName(b.student, parties), 'vi')), [enrollments, parties, selected, students]);
   const marks = useMemo(() => new Map(attendance.filter((item) => item.session === selectedId).map((item) => [item.enrollment, item])), [attendance, selectedId]);
+  const gradeRoster = useMemo(() => enrollments.filter((item) => item.class === gradeClass && item.status === 'active')
+    .map((enrollment) => ({ enrollment, student: students.get(enrollment.student) }))
+    .sort((a, b) => studentName(a.student, parties).localeCompare(studentName(b.student, parties), 'vi')), [enrollments, gradeClass, parties, students]);
+  const gradeMap = useMemo(() => new Map(grades.filter((grade) => grade.term?.trim().toLocaleLowerCase() === gradeTerm.trim().toLocaleLowerCase()
+    && grade.subject?.trim().toLocaleLowerCase() === gradeSubject.trim().toLocaleLowerCase()).map((grade) => [grade.enrollment, grade])), [grades, gradeSubject, gradeTerm]);
 
   async function createSession(event) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
@@ -68,6 +80,22 @@ export default function EducationWorkbenchPage() {
       else await api(dataPath('school.attendance'), { method: 'POST', body: { session: selectedId, enrollment: enrollmentId, status } });
       setNotice('Đã lưu điểm danh.'); await load();
     } catch (reason) { setError(reason.message || 'Không thể lưu điểm danh.'); }
+    finally { setBusy(false); }
+  }
+
+  async function saveGrade(enrollmentId, score) {
+    const term = gradeTerm.trim(); const subject = gradeSubject.trim(); const numericScore = Number(score);
+    if (!term || !subject || score === '' || !Number.isFinite(numericScore) || numericScore < 0 || numericScore > 100) {
+      setError('Hãy nhập học kỳ, môn học và điểm từ 0 đến 100.'); return;
+    }
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const existing = gradeMap.get(enrollmentId);
+      const body = { enrollment: enrollmentId, term, subject, score: numericScore };
+      if (existing) await api(dataPath('school.grade', existing.id), { method: 'PATCH', body: { term, subject, score: numericScore } });
+      else await api(dataPath('school.grade'), { method: 'POST', body });
+      setNotice('Đã lưu điểm học viên.'); await load();
+    } catch (reason) { setError(reason.message || 'Không thể lưu điểm học viên.'); }
     finally { setBusy(false); }
   }
 
@@ -99,7 +127,22 @@ export default function EducationWorkbenchPage() {
         <p className="small muted">Đã ghi nhận {roster.filter(({ enrollment }) => marks.has(enrollment.id)).length}/{roster.length} học viên. Chỉ có thể điểm danh từ giờ bắt đầu; cần ghi nhận đủ học viên để chốt buổi.</p>
       </>}
     </section>
+    {can('school.grade.read') && <section className="card card-pad" style={{ marginTop: 20 }}><div className="row wrap"><div><h2>Sổ điểm</h2><p className="small muted">Quản lý điểm theo lớp, học kỳ và môn; mỗi học viên có một điểm cho từng môn trong mỗi kỳ.</p></div></div>
+      <div className="form-grid" style={{ marginBottom: 14 }}>
+        <label className="field"><span className="label">Lớp *</span><select className="select" value={gradeClass} onChange={(event) => setGradeClass(event.target.value)}><option value="">Chọn lớp</option>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}{item.subject ? ` · ${item.subject}` : ''}</option>)}</select></label>
+        <label className="field"><span className="label">Học kỳ *</span><input className="input" required value={gradeTerm} onChange={(event) => setGradeTerm(event.target.value)} placeholder="Ví dụ: 2026-2027 / HK1" /></label>
+        <label className="field"><span className="label">Môn học *</span><input className="input" required value={gradeSubject} onChange={(event) => setGradeSubject(event.target.value)} placeholder="Ví dụ: Toán" /></label>
+      </div>
+      {!gradeClass ? <div className="empty">Chọn lớp để mở sổ điểm.</div> : gradeRoster.length === 0 ? <div className="empty">Lớp chưa có học viên đang ghi danh.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Mã học viên</th><th>Học viên</th><th>Điểm (0–100)</th><th>Thao tác</th></tr></thead><tbody>{gradeRoster.map(({ enrollment, student }) => { const party = parties.get(student?.party); const grade = gradeMap.get(enrollment.id); return <GradeRow key={enrollment.id} enrollment={enrollment} student={student} party={party} grade={grade} busy={busy} canCreate={can('school.grade.create')} canUpdate={can('school.grade.update')} onSave={saveGrade} />; })}</tbody></table></div>}
+    </section>}
   </div>;
+}
+
+function GradeRow({ enrollment, student, party, grade, busy, canCreate, canUpdate, onSave }) {
+  const [score, setScore] = useState(grade?.score == null ? '' : String(grade.score));
+  useEffect(() => setScore(grade?.score == null ? '' : String(grade.score)), [grade?.id, grade?.score]);
+  const allowed = grade ? canUpdate : canCreate;
+  return <tr><td>{student?.student_code || '—'}</td><td>{party ? recordLabel('master-data.party', party) : 'Học viên'}</td><td><input className="input num" aria-label={`Điểm ${student?.student_code || ''}`} type="number" min="0" max="100" step="any" value={score} disabled={!allowed} onChange={(event) => setScore(event.target.value)} /></td><td><button className="btn btn-primary btn-sm" type="button" disabled={busy || !allowed || !score.trim()} onClick={() => onSave(enrollment.id, score)}>{grade ? 'Cập nhật điểm' : 'Lưu điểm'}</button></td></tr>;
 }
 
 function studentName(student, parties) {
