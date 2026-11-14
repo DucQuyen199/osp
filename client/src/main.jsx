@@ -53,6 +53,7 @@ const UtilitiesWorkbenchPage = lazy(() => import('./UtilitiesWorkbenchPage.jsx')
 const FinanceOperationsPage = lazy(() => import('./FinanceOperationsPage.jsx'));
 const EventsOperationsPage = lazy(() => import('./EventsOperationsPage.jsx'));
 const FieldServiceWorkbenchPage = lazy(() => import('./FieldServiceWorkbenchPage.jsx'));
+const RealEstateWorkbenchPage = lazy(() => import('./RealEstateWorkbenchPage.jsx'));
 
 function parseRoute(hash = location.hash) {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
@@ -73,6 +74,7 @@ function parseRoute(hash = location.hash) {
   if (a === 'finance') return { name: 'finance-operations' };
   if (a === 'event-ops') return { name: 'events-operations' };
   if (a === 'field-service') return { name: 'field-service-workbench' };
+  if (a === 'real-estate') return { name: 'real-estate-workbench' };
   if (a === 'ecommerce') return { name: 'ecommerce-order-desk' };
   if (a === 'agriculture') return { name: 'agriculture-operations' };
   if (a === 'hotel') return { name: 'hotel-frontdesk' };
@@ -165,6 +167,7 @@ function Sidebar({ meta, route, onNavigate, open }) {
     {meta.modules.some((module) => ['lending', 'insurance'].includes(module.id)) && (can('lending.loan.read') || can('insurance.policy.read')) && link('#/finance', 'Cho vay và bảo hiểm', route.name === 'finance-operations', 'list')}
     {meta.modules.some((module) => module.id === 'events') && can('events.ticket.read') && can('events.event.read') && link('#/event-ops', 'Sự kiện và quầy vé', route.name === 'events-operations', 'list')}
     {meta.modules.some((module) => module.id === 'field-service') && can('field-service.work_order.read') && link('#/field-service', 'Điều phối hiện trường', route.name === 'field-service-workbench', 'list')}
+    {meta.modules.some((module) => module.id === 'real-estate') && can('real-estate.property.read') && link('#/real-estate', 'Sàn bất động sản', route.name === 'real-estate-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'ecommerce') && can('ecommerce.web_order.read') && link('#/ecommerce', 'Đơn hàng online', route.name === 'ecommerce-order-desk', 'list')}
     {meta.modules.some((module) => module.id === 'agriculture') && can('agriculture.crop_cycle.read') && link('#/agriculture', 'Điều hành mùa vụ', route.name === 'agriculture-operations', 'list')}
     {meta.modules.some((module) => module.id === 'hotel') && can('hotel.reservation.read') && link('#/hotel', 'Lễ tân khách sạn', route.name === 'hotel-frontdesk', 'list')}
@@ -354,6 +357,7 @@ function App() {
         : route.name === 'finance-operations' ? <FinanceOperationsPage />
         : route.name === 'events-operations' ? <EventsOperationsPage />
         : route.name === 'field-service-workbench' ? <FieldServiceWorkbenchPage />
+        : route.name === 'real-estate-workbench' ? <RealEstateWorkbenchPage />
         : route.name === 'ecommerce-order-desk' ? <EcommerceOrderDeskPage />
         : route.name === 'agriculture-operations' ? <AgricultureOperationsPage />
         : route.name === 'hotel-frontdesk' ? <HotelFrontDeskPage />

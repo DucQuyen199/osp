@@ -42,13 +42,20 @@
    "permissions": [
     "real-estate.*",
     "crm.*",
-    "booking.*"
+    "booking.*",
+    "master-data.party.read",
+    "accounting.invoice.read"
    ]
   },
   "leasing": {
    "name": "Quản lý cho thuê",
    "permissions": [
     "real-estate.lease.*",
+    "real-estate.property.read",
+    "real-estate.rent_cycle.read",
+    "real-estate.reservation.read",
+    "master-data.party.read",
+    "accounting.invoice.read",
     "contract.*"
    ]
   }
