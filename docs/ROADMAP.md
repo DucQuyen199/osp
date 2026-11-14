@@ -14,6 +14,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Webhook outbox được ghi cùng transaction phát event; worker Rust claim có lease, gửi HTTPS có kiểm tra SSRF và HMAC, retry có giới hạn, dead-letter cùng API quản trị retry/đóng delivery.
 - Nhật ký audit được RLS `FORCE` theo tenant; trigger PostgreSQL chặn cập nhật, xóa trực tiếp và `TRUNCATE` trong luồng DB thông thường.
 - RBAC, Argon2id, phiên và API token, rate limiting, OpenAPI 3.1.
+- MFA TOTP tùy chọn theo tài khoản, bí mật được mã hóa AES-256-GCM bằng khóa triển khai, mã khôi phục dùng một lần, chống phát lại mã, giới hạn thử và quản trị viên có thể đặt lại MFA với lý do kiểm toán.
 - React/Vite, giao diện quản trị, timeline liên module, responsive; design system và rà axe-core.
 - Bàn vận hành hóa đơn điện tử: hàng đợi theo trạng thái, liên kết hóa đơn kế toán, xem lỗi/phản hồi/lịch sử gọi provider, thử lại và yêu cầu hủy có lý do. Phát hành thật vẫn cần ánh xạ hợp đồng và thông tin xác thực từ provider được chọn.
 - Phụ lục hợp đồng được lập, gửi duyệt, áp dụng theo ngày hiệu lực và ghi snapshot lịch sử; hỗ trợ đổi tên, điều khoản, giá trị và ngày kết thúc trên hợp đồng đang hiệu lực.
@@ -29,8 +30,8 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 
 ## Còn thiếu
 
-- SSO/OIDC, 2FA, mã hóa at-rest, lưu audit độc lập/WORM chống DBA, metrics/traces/alerts và kiểm thử xâm nhập.
-- Email xác thực/thông báo hỗ trợ HTTPS provider hoặc SMTP mã hóa; còn cần cấu hình DNS email (SPF/DKIM/DMARC), API ngân hàng/thanh toán trực tiếp và adapter vận chuyển. Đối soát ngân hàng hiện nhận CSV và ISO 20022 CAMT.053 từ tệp.
+- SSO/OIDC, mã hóa at-rest toàn hệ thống, lưu audit độc lập/WORM chống DBA, metrics/traces/alerts và kiểm thử xâm nhập.
+- Email xác thực/thông báo đã hỗ trợ HTTPS provider hoặc SMTP mã hóa; còn cần cấu hình DNS email (SPF/DKIM/DMARC), API ngân hàng/thanh toán trực tiếp và adapter vận chuyển. Đối soát ngân hàng hiện nhận CSV và ISO 20022 CAMT.053 từ tệp.
 - Tối ưu chỉ mục/truy vấn theo workload, mở rộng scheduler và billing/licensing OSP.
 - Kế toán Việt Nam có mẫu tài khoản cấp 1 và các mã chi tiết được liệt kê trong phụ lục TT99/2025, TT133/2016; vẫn thiếu ánh xạ biểu mẫu, kê khai thuế chính thức, nhập ngân hàng trực tiếp và xác minh chuyên môn.
 - Hóa đơn điện tử cần adapter nhà cung cấp. Kho/sản xuất cần xác minh production và đào sâu các nghiệp vụ theo ngành.

@@ -32,6 +32,10 @@ Communication messages remain queued unless a transport is configured. Email can
 
 Initial email verification and password reset use the same worker and can use either configured email transport. Set `OSP_PUBLIC_URL` to the public HTTPS origin (localhost HTTP is allowed for local development) and configure SMTP or `OSP_COMM_EMAIL_ENDPOINT`. Signup creates the tenant and queues a one-time 24-hour verification link; it does not issue a usable login token until the email is verified. Password reset requests return the same response for existing and unknown accounts; valid requests queue a one-time token for 30 minutes, limited to three messages per account per hour. Expired links are not delivered. Successful reset changes the Argon2id password, consumes reset tokens, and revokes that user's active browser sessions and API tokens.
 
+### Optional authenticator MFA
+
+Before users enable TOTP, configure `OSP_TOTP_ENCRYPTION_KEY` with the Base64 encoding of 32 random bytes (generate with `openssl rand -base64 32`). Keep the same value in the secret manager and every app replica; do not commit it or change it during an ordinary deployment. The key encrypts each authenticator secret with AES-256-GCM. If it is missing or changed, users with MFA enabled cannot complete login until an administrator resets their MFA. A tenant admin can reset a user's MFA from **Settings → Users** with a recorded reason; this revokes that user's sessions and API tokens. Each user enables MFA from the account menu, confirms a live TOTP code, then must save the one-time recovery codes. Login challenges expire after five minutes and allow five attempts.
+
 ### E-invoice provider (optional)
 
 The Rust worker issues posted accounting invoices and processes cancellation requests through the configured HTTPS REST contract. Set `OSP_EINVOICE_ENDPOINT`, `OSP_EINVOICE_PROVIDER`, and `OSP_EINVOICE_TOKEN` in `.env`; `OSP_EINVOICE_TIMEOUT_SEC` accepts 1–120 seconds and `OSP_EINVOICE_INTERVAL_SEC=0` disables the worker. Without an endpoint, requests remain pending. The provider must honor the `Idempotency-Key` header for safe recovery after a worker restart. The generic adapter is not certified for a vendor API; map the payload and response to the actual provider contract before enabling production issuance.
@@ -57,6 +61,7 @@ Doanh nghiệp tạo ra chỉ chọn được trong số module đã cài; modul
 | `OSP_MODULES` / `--modules=` | tất cả | Danh sách module cần cài |
 | `OSP_DEMO` | `1` (dev) · `0` (production) | Bật `POST /api/demo` và nút "Dùng thử" |
 | `OSP_SIGNUP` | `0` trong Compose; script khởi tạo đặt `1` | Tắt sau khi tạo tenant/quản trị viên đầu tiên |
+| `OSP_TOTP_ENCRYPTION_KEY` | rỗng | Khóa Base64 32 byte để mã hóa bí mật TOTP; bắt buộc trước khi bất kỳ người dùng nào bật MFA |
 | `OSP_OUTBOX_INTERVAL_SEC` | `2` | Chu kỳ worker webhook outbox; đặt `0` để tạm dừng worker |
 | `NODE_ENV=production` | — | Tắt demo mặc định, bật log truy cập JSON (mỗi dòng: thời gian, request id, IP, phương thức, đường dẫn, trạng thái, ms) |
 
@@ -64,7 +69,7 @@ Máy chủ tắt êm khi nhận `SIGINT`/`SIGTERM` (đóng DB).
 
 ## 3. Dữ liệu và lưu trữ PostgreSQL
 
-PostgreSQL chứa **tất cả**: dữ liệu nghiệp vụ, doanh nghiệp, người dùng (băm mật khẩu), phiên (băm token), nhật ký sự kiện và kiểm toán. Mỗi bảng nghiệp vụ có khóa tenant và RLS bắt buộc.
+PostgreSQL chứa **tất cả**: dữ liệu nghiệp vụ, doanh nghiệp, người dùng (băm mật khẩu, bí mật MFA đã mã hóa), phiên (băm token), nhật ký sự kiện và kiểm toán. Mỗi bảng nghiệp vụ có khóa tenant và RLS bắt buộc.
 
 | Bảng | Nội dung |
 |---|---|

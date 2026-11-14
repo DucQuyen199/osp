@@ -47,6 +47,16 @@ CREATE TABLE IF NOT EXISTS osp_users (
   PRIMARY KEY (tenant_id, id)
 );
 ALTER TABLE osp_users ADD COLUMN IF NOT EXISTS email_verified boolean NOT NULL DEFAULT true;
+ALTER TABLE osp_users ADD COLUMN IF NOT EXISTS totp_enabled boolean NOT NULL DEFAULT false;
+ALTER TABLE osp_users ADD COLUMN IF NOT EXISTS totp_secret text;
+ALTER TABLE osp_users ADD COLUMN IF NOT EXISTS totp_nonce text;
+ALTER TABLE osp_users ADD COLUMN IF NOT EXISTS totp_pending_secret text;
+ALTER TABLE osp_users ADD COLUMN IF NOT EXISTS totp_pending_nonce text;
+ALTER TABLE osp_users ADD COLUMN IF NOT EXISTS totp_pending_expires_at timestamptz;
+ALTER TABLE osp_users ADD COLUMN IF NOT EXISTS totp_pending_attempts integer NOT NULL DEFAULT 0;
+ALTER TABLE osp_users ADD COLUMN IF NOT EXISTS totp_last_counter bigint NOT NULL DEFAULT -1;
+ALTER TABLE osp_users ADD COLUMN IF NOT EXISTS totp_disable_attempts integer NOT NULL DEFAULT 0;
+ALTER TABLE osp_users ADD COLUMN IF NOT EXISTS totp_disable_locked_until timestamptz;
 CREATE UNIQUE INDEX IF NOT EXISTS osp_users_email ON osp_users (tenant_id, lower(email)) WHERE email IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS osp_sessions (
@@ -59,6 +69,24 @@ CREATE TABLE IF NOT EXISTS osp_sessions (
   expires_at timestamptz
 );
 CREATE INDEX IF NOT EXISTS osp_sessions_user ON osp_sessions (tenant_id, user_id);
+ALTER TABLE osp_sessions ADD COLUMN IF NOT EXISTS attempts integer NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS osp_user_recovery_codes (
+  tenant_id text NOT NULL REFERENCES osp_tenants(id) ON DELETE CASCADE,
+  user_id text NOT NULL,
+  code_hash text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  used_at timestamptz,
+  PRIMARY KEY (tenant_id, user_id, code_hash)
+);
+CREATE INDEX IF NOT EXISTS osp_user_recovery_available
+  ON osp_user_recovery_codes (tenant_id, user_id, created_at) WHERE used_at IS NULL;
+ALTER TABLE osp_user_recovery_codes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE osp_user_recovery_codes FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON osp_user_recovery_codes;
+CREATE POLICY tenant_isolation ON osp_user_recovery_codes
+  USING (tenant_id = current_setting('app.tenant_id', true))
+  WITH CHECK (tenant_id = current_setting('app.tenant_id', true));
 
 CREATE TABLE IF NOT EXISTS osp_auth_mail_outbox (
   id uuid PRIMARY KEY,

@@ -9,6 +9,9 @@ export default function AuthPage({ route, onSignedIn }) {
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [mfaChallenge, setMfaChallenge] = useState('');
+  const [mfaTenant, setMfaTenant] = useState('');
+  const [rememberLogin, setRememberLogin] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -54,8 +57,28 @@ export default function AuthPage({ route, onSignedIn }) {
       const result = await api('/api/auth/login', { method: 'POST', body: {
         tenantId, email: String(values.get('email') || '').trim(), password: values.get('password'),
       } });
+      if (result.mfaRequired) {
+        setMfaChallenge(result.challengeToken);
+        setMfaTenant(tenantId);
+        setRememberLogin(values.get('remember') === 'on');
+        setMode('mfa');
+        return;
+      }
       await finish(tenantId, result.token, values.get('remember') === 'on');
     } catch (reason) { setError(reason.message || 'Không đăng nhập được.'); }
+    finally { setBusy(''); }
+  };
+
+  const completeMfaLogin = async (event) => {
+    event.preventDefault();
+    const values = new FormData(event.currentTarget);
+    setBusy('mfa'); setError('');
+    try {
+      const result = await api('/api/auth/mfa/complete', { method: 'POST', body: {
+        challengeToken: mfaChallenge, code: String(values.get('code') || '').trim(),
+      } });
+      await finish(result.tenantId || mfaTenant, result.token, rememberLogin);
+    } catch (reason) { setError(reason.message || 'Mã xác thực không hợp lệ hoặc đã hết hạn.'); }
     finally { setBusy(''); }
   };
 
@@ -146,14 +169,18 @@ export default function AuthPage({ route, onSignedIn }) {
       <ul className="hero-points"><li>{catalog.modules.length} module, bật dần theo nhu cầu</li><li>{catalog.verticals.length} gói ngành với thuật ngữ và quy trình sẵn có</li><li>Dữ liệu của bạn: xuất toàn bộ bất cứ lúc nào</li></ul>
     </section>
     <main className="landing-panel" id="main">
-      <div><h2>{mode === 'login' ? 'Chào mừng trở lại' : mode === 'signup' ? 'Bắt đầu trong vài phút' : mode === 'forgot' ? 'Khôi phục mật khẩu' : mode === 'verify-request' ? 'Gửi lại email xác minh' : mode === 'verify' ? 'Đang xác minh email' : 'Đặt mật khẩu mới'}</h2><p className="muted">{mode === 'login' ? 'Đăng nhập để tiếp tục.' : mode === 'signup' ? 'Chọn ngành, hệ thống bật sẵn các module và thuật ngữ phù hợp.' : mode === 'forgot' ? 'Nhập mã doanh nghiệp và email đăng nhập.' : mode === 'verify-request' ? 'Nhập mã doanh nghiệp và email đăng ký.' : mode === 'verify' ? 'Đang xác minh liên kết dùng một lần.' : 'Liên kết đặt lại chỉ dùng được một lần trong 30 phút.'}</p></div>
+      <div><h2>{mode === 'login' ? 'Chào mừng trở lại' : mode === 'mfa' ? 'Xác thực hai lớp' : mode === 'signup' ? 'Bắt đầu trong vài phút' : mode === 'forgot' ? 'Khôi phục mật khẩu' : mode === 'verify-request' ? 'Gửi lại email xác minh' : mode === 'verify' ? 'Đang xác minh email' : 'Đặt mật khẩu mới'}</h2><p className="muted">{mode === 'login' ? 'Đăng nhập để tiếp tục.' : mode === 'mfa' ? 'Nhập mã 6 chữ số từ ứng dụng xác thực hoặc một mã khôi phục chưa dùng.' : mode === 'signup' ? 'Chọn ngành, hệ thống bật sẵn các module và thuật ngữ phù hợp.' : mode === 'forgot' ? 'Nhập mã doanh nghiệp và email đăng nhập.' : mode === 'verify-request' ? 'Nhập mã doanh nghiệp và email đăng ký.' : mode === 'verify' ? 'Đang xác minh liên kết dùng một lần.' : 'Liên kết đặt lại chỉ dùng được một lần trong 30 phút.'}</p></div>
       {['login', 'signup'].includes(mode) && <div className="tabs" role="tablist" aria-label="Tài khoản">
         <button className="tab" role="tab" type="button" aria-selected={mode === 'login'} onClick={() => chooseMode('login')}>Đăng nhập</button>
         {catalog.signup && <button className="tab" role="tab" type="button" aria-selected={mode === 'signup'} onClick={() => chooseMode('signup')}>Tạo doanh nghiệp</button>}
       </div>}
       {notice && <div className="alert success" role="status">{notice}</div>}
       {error && <div className="alert danger" role="alert">{error}</div>}
-      {mode === 'login' ? <form className="stack" onSubmit={login}>
+      {mode === 'mfa' ? <form className="stack" onSubmit={completeMfaLogin}>
+        <div className="field"><label htmlFor="mfa-login-code">Mã xác thực hoặc mã khôi phục</label><input className="input mono" id="mfa-login-code" name="code" autoComplete="one-time-code" inputMode="numeric" maxLength="40" required autoFocus /></div>
+        <button className="btn btn-primary" type="submit" disabled={Boolean(busy)}>{busy === 'mfa' ? 'Đang xác minh…' : 'Xác minh và đăng nhập'}</button>
+        <button className="btn btn-ghost" type="button" disabled={Boolean(busy)} onClick={() => { setMfaChallenge(''); setMode('login'); }}>Quay lại đăng nhập</button>
+      </form> : mode === 'login' ? <form className="stack" onSubmit={login}>
         <div className="field"><label htmlFor="auth-tenant">Mã doanh nghiệp</label><input className="input mono" id="auth-tenant" name="tenantId" autoComplete="organization" required placeholder="t_xxxxxxxx" defaultValue={new URLSearchParams(location.search).get('tenant') || ''} /><p className="hint">Mã bắt đầu bằng t_, được cấp khi tạo doanh nghiệp.</p></div>
         <div className="field"><label htmlFor="auth-email">Email</label><input className="input" id="auth-email" name="email" type="email" autoComplete="username" required /></div>
         <div className="field"><label htmlFor="auth-password">Mật khẩu</label><input className="input" id="auth-password" name="password" type="password" autoComplete="current-password" required /></div>

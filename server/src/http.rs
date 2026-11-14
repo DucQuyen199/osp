@@ -423,6 +423,24 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     .await?,
             );
         }
+        (&Method::POST, Some("auth"), Some("mfa")) if seg(3) == Some("complete") => {
+            if !st.auth_limiter.take(ip) {
+                return Err(ApiError::new(
+                    429,
+                    "RATE_LIMITED",
+                    "Quá nhiều lần xác thực, thử lại sau",
+                ));
+            }
+            let body = json_obj(&bytes)?;
+            return json_ok(
+                crate::kernel::auth::mfa::complete_login(
+                    k,
+                    &s(&body, "challengeToken"),
+                    &s(&body, "code"),
+                )
+                .await?,
+            );
+        }
         (&Method::POST, Some("auth"), Some("password-reset")) => {
             if !st.auth_limiter.take(ip) {
                 return Err(ApiError::new(
@@ -556,6 +574,79 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
             .and_then(|(_, v)| v.parse().ok())
             .unwrap_or(d)
     };
+
+    match (&method, rest.as_slice()) {
+        (&Method::GET, ["auth", "mfa", "status"]) => {
+            return json_ok(crate::kernel::auth::mfa::status(k, &t, &actor).await?);
+        }
+        (&Method::POST, ["auth", "mfa", "setup"]) => {
+            if !st.auth_limiter.take(ip) {
+                return Err(ApiError::new(
+                    429,
+                    "RATE_LIMITED",
+                    "Quá nhiều yêu cầu, thử lại sau",
+                ));
+            }
+            let body = json_obj(&bytes)?;
+            return json_ok(
+                crate::kernel::auth::mfa::setup_start(k, &t, &actor, &s(&body, "password")).await?,
+            );
+        }
+        (&Method::POST, ["auth", "mfa", "confirm"]) => {
+            if !st.auth_limiter.take(ip) {
+                return Err(ApiError::new(
+                    429,
+                    "RATE_LIMITED",
+                    "Quá nhiều yêu cầu, thử lại sau",
+                ));
+            }
+            let body = json_obj(&bytes)?;
+            return json_ok(
+                crate::kernel::auth::mfa::setup_confirm(k, &t, &actor, &s(&body, "code"), &token)
+                    .await?,
+            );
+        }
+        (&Method::POST, ["auth", "mfa", "disable"]) => {
+            if !st.auth_limiter.take(ip) {
+                return Err(ApiError::new(
+                    429,
+                    "RATE_LIMITED",
+                    "Quá nhiều yêu cầu, thử lại sau",
+                ));
+            }
+            let body = json_obj(&bytes)?;
+            crate::kernel::auth::mfa::disable(
+                k,
+                &t,
+                &actor,
+                &s(&body, "password"),
+                &s(&body, "code"),
+                &token,
+            )
+            .await?;
+            return json_ok(json!({ "enabled": false }));
+        }
+        (&Method::POST, ["auth", "mfa", "users", target_user_id, "reset"]) => {
+            if !st.auth_limiter.take(ip) {
+                return Err(ApiError::new(
+                    429,
+                    "RATE_LIMITED",
+                    "Quá nhiều yêu cầu, thử lại sau",
+                ));
+            }
+            let body = json_obj(&bytes)?;
+            crate::kernel::auth::mfa::admin_reset(
+                k,
+                &t,
+                &actor,
+                target_user_id,
+                &s(&body, "reason"),
+            )
+            .await?;
+            return json_ok(json!({ "enabled": false, "sessionsRevoked": true }));
+        }
+        _ => {}
+    }
 
     match (&method, rest.as_slice()) {
         (&Method::GET, ["documents", document_id, "attachments"]) => {

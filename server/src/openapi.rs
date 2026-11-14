@@ -296,6 +296,61 @@ pub fn build(reg: &Registry) -> Value {
         } }),
     );
     paths.insert(
+        "/api/auth/mfa/complete".into(),
+        json!({ "post": {
+            "tags": ["auth"], "summary": "Complete a TOTP login challenge using an authenticator code or one-time recovery code",
+            "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                "type": "object", "required": ["challengeToken", "code"], "additionalProperties": false,
+                "properties": { "challengeToken": { "type": "string" }, "code": { "type": "string", "maxLength": 100 } }
+            } } } },
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "MFA challenge consumed and browser session issued" })), ("401".to_string(), err("Invalid, expired, replayed, or exhausted MFA challenge")), ("429".to_string(), err("Too many authentication attempts"))]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/auth/mfa/status".into(),
+        json!({ "get": {
+            "tags": ["auth"], "summary": "Read the current user's MFA status and remaining recovery-code count", "security": sec,
+            "parameters": [tid],
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Account MFA state" }))]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/auth/mfa/setup".into(),
+        json!({ "post": {
+            "tags": ["auth"], "summary": "Start TOTP enrollment after password reauthentication", "security": sec,
+            "parameters": [tid],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["password"], "additionalProperties": false, "properties": { "password": { "type": "string" } } } } } },
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Temporary secret and otpauth URI; enrollment expires after ten minutes" })), ("409".to_string(), err("MFA is already enabled")), ("503".to_string(), err("TOTP encryption key is not configured"))]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/auth/mfa/confirm".into(),
+        json!({ "post": {
+            "tags": ["auth"], "summary": "Confirm a live TOTP code and receive one-time recovery codes", "security": sec,
+            "parameters": [tid],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["code"], "additionalProperties": false, "properties": { "code": { "type": "string", "pattern": "^[0-9]{6}$" } } } } } },
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "MFA enabled and recovery codes returned once" })), ("422".to_string(), err("Setup code is invalid or setup has expired"))]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/auth/mfa/disable".into(),
+        json!({ "post": {
+            "tags": ["auth"], "summary": "Disable MFA after password and TOTP or recovery-code confirmation", "security": sec,
+            "parameters": [tid],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["password", "code"], "additionalProperties": false, "properties": { "password": { "type": "string" }, "code": { "type": "string", "maxLength": 100 } } } } } },
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "MFA disabled and other sessions revoked" })), ("401".to_string(), err("Password or MFA code is invalid")), ("429".to_string(), err("MFA verification is temporarily locked"))]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/auth/mfa/users/{userId}/reset".into(),
+        json!({ "post": {
+            "tags": ["auth"], "summary": "Reset a user's MFA with a required audit reason; tenant administrator only", "security": sec,
+            "parameters": [tid, { "name": "userId", "in": "path", "required": true, "schema": { "type": "string" } }],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["reason"], "additionalProperties": false, "properties": { "reason": { "type": "string", "minLength": 10, "maxLength": 500 } } } } } },
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "MFA and recovery codes cleared; user's sessions revoked" })), ("403".to_string(), err("Tenant administrator permission required"))]))
+        } }),
+    );
+    paths.insert(
         "/api/t/{tenantId}/reports/bi/kpis/{kpiId}".into(),
         json!({ "get": {
             "tags": ["bi"], "summary": "Evaluate a tenant KPI using its saved aggregate report and Rust formula", "security": sec,

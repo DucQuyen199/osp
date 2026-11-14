@@ -81,8 +81,7 @@ Giao diện chỉ chèn dữ liệu vào DOM bằng `textContent`; không dùng 
 
 | Giới hạn | Ảnh hưởng | Hướng xử lý |
 |---|---|---|
-| Chưa có **2FA/SSO/OIDC** | Chỉ mật khẩu | Lộ trình giai đoạn 2 |
-| Chưa có **quên mật khẩu qua email** | Quản trị viên đặt lại thủ công | Cần module gửi thư (communication + nhà cung cấp SMTP) |
+| Chưa có **SSO/OIDC** | Đăng nhập bằng email và mật khẩu nội bộ | Tích hợp IdP theo OIDC và quy trình provisioning |
 | Giới hạn tốc độ **trong bộ nhớ, theo IP socket** | Mất khi khởi động lại; sau proxy mọi người cùng một IP | Giới hạn ở proxy / Redis |
 | **Không mã hóa dữ liệu khi lưu** (at-rest) | Ai có quyền đọc volume có thể đọc dữ liệu | Mã hóa đĩa (BitLocker/LUKS), hoặc mã hóa volume PostgreSQL |
 | Audit append-only chưa chống được DBA/superuser có quyền đổi schema hoặc vô hiệu hóa trigger | Người có quyền quản trị PostgreSQL vẫn có thể thay đổi dữ liệu | Sao chép định kỳ sang kho WORM/độc lập nếu cần bằng chứng chống quản trị DB |

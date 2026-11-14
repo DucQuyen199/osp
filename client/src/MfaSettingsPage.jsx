@@ -1,0 +1,95 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import { api, tenantPath } from './lib/api.js';
+import { app } from './lib/state.js';
+
+export default function MfaSettingsPage() {
+  const [status, setStatus] = useState(null);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [setup, setSetup] = useState(null);
+  const [recoveryCodes, setRecoveryCodes] = useState([]);
+
+  const reload = useCallback(async () => {
+    setError('');
+    try { setStatus(await api(tenantPath('/auth/mfa/status'))); }
+    catch (reason) { setError(reason.message || 'Không tải được trạng thái bảo mật.'); }
+  }, []);
+
+  useEffect(() => { document.title = 'Bảo mật tài khoản · OSP Suite'; reload(); }, [reload]);
+
+  const startSetup = async (event) => {
+    event.preventDefault(); setBusy(true); setError(''); setNotice('');
+    try {
+      const result = await api(tenantPath('/auth/mfa/setup'), { method: 'POST', body: { password } });
+      setSetup(result); setPassword(''); setCode('');
+    } catch (reason) { setError(reason.message || 'Không bắt đầu được thiết lập xác thực hai lớp.'); }
+    finally { setBusy(false); }
+  };
+
+  const confirmSetup = async (event) => {
+    event.preventDefault(); setBusy(true); setError(''); setNotice('');
+    try {
+      const result = await api(tenantPath('/auth/mfa/confirm'), { method: 'POST', body: { code } });
+      setRecoveryCodes(result.recoveryCodes || []); setSetup(null); setCode('');
+      setStatus({ enabled: true, recoveryCodesRemaining: result.recoveryCodes?.length || 0 });
+      app.user.mfaEnabled = true;
+      setNotice('Đã bật xác thực hai lớp. Hãy lưu các mã khôi phục ở nơi an toàn.');
+    } catch (reason) { setError(reason.message || 'Mã xác thực không đúng.'); }
+    finally { setBusy(false); }
+  };
+
+  const disableMfa = async (event) => {
+    event.preventDefault(); setBusy(true); setError(''); setNotice('');
+    try {
+      await api(tenantPath('/auth/mfa/disable'), { method: 'POST', body: { password, code } });
+      setPassword(''); setCode(''); setRecoveryCodes([]); setStatus({ enabled: false, recoveryCodesRemaining: 0 });
+      app.user.mfaEnabled = false;
+      setNotice('Đã tắt xác thực hai lớp. Các phiên và API token khác đã bị thu hồi.');
+    } catch (reason) { setError(reason.message || 'Không tắt được xác thực hai lớp.'); }
+    finally { setBusy(false); }
+  };
+
+  const copyRecoveryCodes = async () => {
+    try { await navigator.clipboard.writeText(recoveryCodes.join('\n')); setNotice('Đã sao chép mã khôi phục.'); }
+    catch { setError('Trình duyệt không cho phép sao chép. Hãy lưu các mã hiển thị bên dưới.'); }
+  };
+
+  return <div className="page">
+    <div className="page-head"><div><h1>Bảo mật tài khoản</h1><p className="sub">Thêm mã xác thực cho lần đăng nhập bằng mật khẩu. Mã khôi phục chỉ dùng một lần.</p></div></div>
+    {error && <div className="alert danger" role="alert">{error}</div>}
+    {notice && <div className="alert success" role="status">{notice}</div>}
+    {!status ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <section className="card stack">
+      <div className="card-head"><h2>Xác thực hai lớp</h2><span className={`badge ${status.enabled ? 'success' : 'plain'}`}>{status.enabled ? 'Đang bật' : 'Đang tắt'}</span></div>
+      {status.enabled && <p className="muted">Còn {status.recoveryCodesRemaining} mã khôi phục. Bật MFA sẽ thu hồi các phiên khác và API token.</p>}
+      {!app.user?.hasPassword && <div className="alert">Tài khoản máy không có mật khẩu đăng nhập tương tác, vì vậy không thể bật TOTP.</div>}
+      {recoveryCodes.length > 0 && <div className="card card-pad stack">
+        <div><h3>Lưu mã khôi phục</h3><p className="small muted">Mỗi mã chỉ dùng được một lần. Chúng sẽ không hiển thị lại sau khi rời trang.</p></div>
+        <div className="kv mono">{recoveryCodes.map((item) => <code className="chip" key={item}>{item}</code>)}</div>
+        <div><button className="btn btn-secondary" type="button" onClick={copyRecoveryCodes}>Sao chép mã</button><button className="btn" type="button" onClick={() => setRecoveryCodes([])}>Đã lưu, ẩn mã</button></div>
+      </div>}
+      {!status.enabled && !setup && app.user?.hasPassword && <form className="stack" onSubmit={startSetup}>
+        <p>Ứng dụng tương thích TOTP như Google Authenticator, Microsoft Authenticator hoặc 1Password có thể dùng mã này.</p>
+        <label className="field"><span className="label">Mật khẩu hiện tại</span><input className="input" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+        <div><button className="btn btn-primary" disabled={busy || password.length < 8}>{busy ? 'Đang tạo mã…' : 'Bắt đầu thiết lập'}</button></div>
+      </form>}
+      {setup && <div className="stack">
+        <div className="alert">Thêm tài khoản bằng cách nhập khóa này vào ứng dụng xác thực. Khóa chỉ hiển thị trong phiên thiết lập 10 phút.</div>
+        <label className="field"><span className="label">Khóa TOTP</span><code className="input mono" style={{ display: 'block', overflowWrap: 'anywhere' }}>{setup.secret}</code></label>
+        <details><summary>Liên kết otpauth</summary><p className="small mono" style={{ overflowWrap: 'anywhere' }}>{setup.otpauthUrl}</p></details>
+        <form className="stack" onSubmit={confirmSetup}>
+          <label className="field"><span className="label">Mã 6 chữ số trong ứng dụng</span><input className="input mono" autoComplete="one-time-code" inputMode="numeric" maxLength="6" required value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} /></label>
+          <div className="row"><button className="btn btn-primary" disabled={busy || code.length !== 6}>{busy ? 'Đang xác minh…' : 'Bật xác thực hai lớp'}</button><button className="btn" type="button" disabled={busy} onClick={() => { setSetup(null); setCode(''); }}>Hủy</button></div>
+        </form>
+      </div>}
+      {status.enabled && <form className="stack" onSubmit={disableMfa}>
+        <h3>Tắt xác thực hai lớp</h3>
+        <label className="field"><span className="label">Mật khẩu hiện tại</span><input className="input" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+        <label className="field"><span className="label">Mã TOTP hoặc mã khôi phục</span><input className="input mono" autoComplete="one-time-code" required value={code} onChange={(event) => setCode(event.target.value)} /></label>
+        <div><button className="btn btn-danger" disabled={busy || password.length < 8 || !code.trim()}>{busy ? 'Đang tắt…' : 'Tắt xác thực hai lớp'}</button></div>
+      </form>}
+    </section>}
+  </div>;
+}

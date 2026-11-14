@@ -12,6 +12,8 @@ use std::time::{Duration, Instant};
 use subtle::ConstantTimeEq;
 use uuid::Uuid;
 
+pub(crate) mod mfa;
+
 const LOGIN_MAX_FAILS: u32 = 5;
 const LOGIN_WINDOW: Duration = Duration::from_secs(15 * 60);
 
@@ -175,6 +177,7 @@ impl Kernel {
             roles: roles_vec,
             disabled: false,
             has_password: hash.is_some(),
+            mfa_enabled: false,
             created_at: row.get(0),
         })
     }
@@ -243,7 +246,7 @@ impl Kernel {
         let conn = self.pool.get().await?;
         let rows = conn
             .query(
-                "SELECT id, name, email, roles, disabled, password_hash IS NOT NULL, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') FROM osp_users WHERE tenant_id = $1 ORDER BY created_at, id",
+                "SELECT id, name, email, roles, disabled, password_hash IS NOT NULL, totp_enabled, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') FROM osp_users WHERE tenant_id = $1 ORDER BY created_at, id",
                 &[&t.id],
             )
             .await?;
@@ -256,7 +259,8 @@ impl Kernel {
                 roles: r.get(3),
                 disabled: r.get(4),
                 has_password: r.get(5),
-                created_at: r.get(6),
+                mfa_enabled: r.get(6),
+                created_at: r.get(7),
             })
             .collect())
     }
@@ -463,7 +467,7 @@ impl Kernel {
         let row = {
             let conn = self.pool.get().await?;
             conn.query_opt(
-                "SELECT id, name, email, roles, disabled, password_hash, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'), email_verified FROM osp_users WHERE tenant_id = $1 AND lower(email) = $2",
+                "SELECT id, name, email, roles, disabled, password_hash, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'), email_verified, totp_enabled FROM osp_users WHERE tenant_id = $1 AND lower(email) = $2",
                 &[&tenant_id, &email.to_lowercase()],
             )
             .await?
@@ -510,10 +514,16 @@ impl Kernel {
                 "Hãy xác minh email từ liên kết đã gửi trước khi đăng nhập",
             ));
         }
-        self.login_fails.lock().unwrap().remove(&key);
         let r = row.unwrap();
         let uid: String = r.get(0);
         let t = self.tenant(tenant_id).await?;
+        if r.get::<_, bool>(8)
+            && let Some(challenge) = mfa::create_login_challenge(self, &t, &uid).await?
+        {
+            self.login_fails.lock().unwrap().remove(&key);
+            return Ok(challenge);
+        }
+        self.login_fails.lock().unwrap().remove(&key);
         let mut conn = self.pool.get().await?;
         let tx = Tx::begin(&mut conn, &t.id, true).await?;
         let (token, _, exp) = self
@@ -536,6 +546,7 @@ impl Kernel {
             roles: r.get(3),
             disabled: false,
             has_password: true,
+            mfa_enabled: false,
             created_at: r.get(6),
         };
         Ok(json!({ "token": token, "expiresAt": exp, "user": user }))
@@ -827,9 +838,9 @@ impl Kernel {
         let conn = self.pool.get().await.ok()?;
         let row = conn
             .query_opt(
-                "SELECT s.tenant_id, u.id, u.name, u.email, u.roles, u.disabled, u.password_hash IS NOT NULL, to_char(u.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') \
+                "SELECT s.tenant_id, u.id, u.name, u.email, u.roles, u.disabled, u.password_hash IS NOT NULL, u.totp_enabled, to_char(u.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') \
                  FROM osp_sessions s JOIN osp_users u ON u.tenant_id = s.tenant_id AND u.id = s.user_id \
-                 WHERE s.hash = $1 AND s.kind NOT IN ('reset', 'verify_email') AND u.email_verified = true AND (s.expires_at IS NULL OR s.expires_at > now())",
+                 WHERE s.hash = $1 AND s.kind NOT IN ('reset', 'verify_email', 'mfa') AND u.email_verified = true AND (s.expires_at IS NULL OR s.expires_at > now())",
                 &[&hash_token(token)],
             )
             .await
@@ -845,7 +856,8 @@ impl Kernel {
             roles: row.get(4),
             disabled: false,
             has_password: row.get(6),
-            created_at: row.get(7),
+            mfa_enabled: row.get(7),
+            created_at: row.get(8),
         };
         let actor = Actor::User {
             id: user.id.clone(),

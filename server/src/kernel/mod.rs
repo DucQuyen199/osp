@@ -422,5 +422,6 @@ pub struct PublicUser {
     pub roles: Vec<String>,
     pub disabled: bool,
     pub has_password: bool,
+    pub mfa_enabled: bool,
     pub created_at: String,
 }

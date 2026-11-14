@@ -13,6 +13,8 @@
 | **Phiên** — `POST /api/auth/login` | Người dùng qua giao diện | 12 giờ, thu hồi khi đăng xuất / đổi mật khẩu / khóa tài khoản |
 | **API token** — tạo trong Cài đặt hoặc `POST /api/t/:tid/tokens` | Tích hợp máy-máy | Không hết hạn, hoặc `ttlDays` |
 
+Tài khoản có MFA trả `{ "mfaRequired": true, "challengeToken", "expiresAt" }` thay vì phiên sau bước mật khẩu. Gửi `POST /api/auth/mfa/complete` với challenge token và mã TOTP hoặc mã khôi phục để nhận phiên. Challenge có hiệu lực 5 phút, tối đa 5 lượt.
+
 Gửi: `Authorization: Bearer osp_…`. Token chỉ hiện **một lần** khi tạo; máy chủ chỉ lưu băm SHA-256. Token có đúng quyền của người dùng sở hữu nó.
 
 ### `POST /api/auth/login`
@@ -29,6 +31,12 @@ Gửi: `Authorization: Bearer osp_…`. Token chỉ hiện **một lần** khi t
 
 ### `GET /api/auth/me` · `POST /api/auth/logout`
 `me` trả `{ tenantId, user }`. `logout` thu hồi chính token đang dùng.
+
+### MFA tài khoản
+
+Các endpoint `/api/t/{tenantId}/auth/mfa/*` chỉ tác động tới người dùng của token hiện tại. `GET /status` trả trạng thái và số mã khôi phục còn lại. `POST /setup` nhận mật khẩu hiện tại và trả khóa TOTP tạm cùng URI `otpauth` có hiệu lực 10 phút; `POST /confirm` nhận mã 6 chữ số đang hoạt động, bật MFA và trả 10 mã khôi phục đúng một lần. `POST /disable` cần mật khẩu cùng mã TOTP/mã khôi phục, rồi thu hồi các phiên và API token khác. Mã TOTP bị phát lại bị từ chối.
+
+Tenant admin có thể gọi `POST /api/t/{tenantId}/auth/mfa/users/{userId}/reset` với lý do 10–500 ký tự để đặt lại MFA và thu hồi toàn bộ phiên/token của người dùng. Bí mật TOTP chỉ lưu dạng ciphertext AES-256-GCM; máy chủ cần `OSP_TOTP_ENCRYPTION_KEY` là Base64 của 32 byte ổn định giữa các lần khởi động.
 
 ## 2. Công khai (không cần token)
 

@@ -33,6 +33,7 @@ import FailuresSettingsPage from './FailuresSettingsPage.jsx';
 import OutboxSettingsPage from './OutboxSettingsPage.jsx';
 import FieldsSettingsPage from './FieldsSettingsPage.jsx';
 import DataSettingsPage from './DataSettingsPage.jsx';
+import MfaSettingsPage from './MfaSettingsPage.jsx';
 import AuthPage from './AuthPage.jsx';
 import { api, onUnauthorized, session } from './lib/api.js';
 import { CATEGORY_ORDER, categoryLabel } from './lib/i18n.js';
@@ -139,6 +140,7 @@ function parseRoute(hash = location.hash) {
   if (a === 'reports' && b === 'marketing' && c === 'campaign-performance') return { name: 'marketing-campaign-performance' };
   if (a === 'reports' && b === 'helpdesk' && c === 'sla') return { name: 'helpdesk-sla' };
   if (a === 'settings') return { name: 'settings', tab: b || 'users' };
+  if (a === 'account' && b === 'security') return { name: 'account-security' };
   return { name: 'home' };
 }
 
@@ -381,6 +383,7 @@ function App() {
           <button className="btn btn-ghost" type="button" aria-haspopup="menu" aria-expanded={accountOpen} aria-label={`Tài khoản ${user.name}`} onClick={() => setAccountOpen((open) => !open)}><span className="avatar">{initials}</span></button>
           {accountOpen && <div className="menu-pop" role="menu">
             <div className="menu-item" role="none"><div><strong>{user.name}</strong><div className="faint">{user.email || 'Tài khoản máy'}</div></div></div>
+            <a className="menu-item" role="menuitem" href="#/account/security" onClick={() => setAccountOpen(false)}>Bảo mật tài khoản</a>
             <button className="menu-item" role="menuitem" type="button" onClick={logout}><Icon name="logout" />Đăng xuất</button>
           </div>}
         </div>
@@ -393,6 +396,7 @@ function App() {
           <EntityListPage key={route.qname} qname={route.qname} />
           {route.id && <EntityDetailPage key={`${route.qname}:${route.id}`} qname={route.qname} id={route.id} />}
         </>
+        : route.name === 'account-security' ? <MfaSettingsPage />
         : route.name === 'events' ? <EventsPage />
         : route.name === 'home' ? <HomePage summary={app.summary} />
         : route.name === 'module' ? <ModuleOverviewPage moduleId={route.module} summary={app.summary} />
