@@ -54,7 +54,7 @@ async fn validate_event(
             .and_then(money::decimal)
             .unwrap_or_default();
         let reserved: i64 = tx.query_opt(
-                "SELECT count(*) FROM events__ticket WHERE tenant_id = $1 AND event = $2 AND status NOT IN ('cancelled', 'refunded')",
+                "SELECT count(*) FROM events__ticket WHERE tenant_id = $1 AND event = $2 AND status NOT IN ('cancelled', 'refunded') AND (status <> 'reserved' OR reservation_expires_at > now())",
             &[&tenant.id, &id],
         ).await?.map(|row| row.get(0)).unwrap_or_default();
         if Decimal::from(reserved) > capacity {
@@ -94,7 +94,7 @@ async fn validate_ticket(
             errors.push("Không thể giữ vé sau thời điểm sự kiện bắt đầu".into());
         }
         let count: i64 = tx.query_opt(
-            "SELECT count(*) FROM events__ticket WHERE tenant_id = $1 AND event = $2 AND status NOT IN ('cancelled', 'refunded')",
+            "SELECT count(*) FROM events__ticket WHERE tenant_id = $1 AND event = $2 AND status NOT IN ('cancelled', 'refunded') AND (status <> 'reserved' OR reservation_expires_at > now())",
             &[&tenant.id, &event],
         ).await?.map(|row| row.get(0)).unwrap_or_default();
         if Decimal::from(count) >= capacity {
