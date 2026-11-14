@@ -55,6 +55,7 @@ const EventsOperationsPage = lazy(() => import('./EventsOperationsPage.jsx'));
 const FieldServiceWorkbenchPage = lazy(() => import('./FieldServiceWorkbenchPage.jsx'));
 const RealEstateWorkbenchPage = lazy(() => import('./RealEstateWorkbenchPage.jsx'));
 const ConstructionWorkbenchPage = lazy(() => import('./ConstructionWorkbenchPage.jsx'));
+const SubscriptionWorkbenchPage = lazy(() => import('./SubscriptionWorkbenchPage.jsx'));
 
 function parseRoute(hash = location.hash) {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
@@ -77,6 +78,7 @@ function parseRoute(hash = location.hash) {
   if (a === 'field-service') return { name: 'field-service-workbench' };
   if (a === 'real-estate') return { name: 'real-estate-workbench' };
   if (a === 'construction') return { name: 'construction-workbench' };
+  if (a === 'subscriptions') return { name: 'subscription-workbench' };
   if (a === 'ecommerce') return { name: 'ecommerce-order-desk' };
   if (a === 'agriculture') return { name: 'agriculture-operations' };
   if (a === 'hotel') return { name: 'hotel-frontdesk' };
@@ -171,6 +173,7 @@ function Sidebar({ meta, route, onNavigate, open }) {
     {meta.modules.some((module) => module.id === 'field-service') && can('field-service.work_order.read') && link('#/field-service', 'Điều phối hiện trường', route.name === 'field-service-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'real-estate') && can('real-estate.property.read') && link('#/real-estate', 'Sàn bất động sản', route.name === 'real-estate-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'construction') && (can('construction.boq.read') || can('construction.site.read')) && link('#/construction', 'Điều hành công trường', route.name === 'construction-workbench', 'list')}
+    {meta.modules.some((module) => module.id === 'subscription') && can('subscription.subscription.read') && link('#/subscriptions', 'Thuê bao và gia hạn', route.name === 'subscription-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'ecommerce') && can('ecommerce.web_order.read') && link('#/ecommerce', 'Đơn hàng online', route.name === 'ecommerce-order-desk', 'list')}
     {meta.modules.some((module) => module.id === 'agriculture') && can('agriculture.crop_cycle.read') && link('#/agriculture', 'Điều hành mùa vụ', route.name === 'agriculture-operations', 'list')}
     {meta.modules.some((module) => module.id === 'hotel') && can('hotel.reservation.read') && link('#/hotel', 'Lễ tân khách sạn', route.name === 'hotel-frontdesk', 'list')}
@@ -362,6 +365,7 @@ function App() {
         : route.name === 'field-service-workbench' ? <FieldServiceWorkbenchPage />
         : route.name === 'real-estate-workbench' ? <RealEstateWorkbenchPage />
         : route.name === 'construction-workbench' ? <ConstructionWorkbenchPage />
+        : route.name === 'subscription-workbench' ? <SubscriptionWorkbenchPage />
         : route.name === 'ecommerce-order-desk' ? <EcommerceOrderDeskPage />
         : route.name === 'agriculture-operations' ? <AgricultureOperationsPage />
         : route.name === 'hotel-frontdesk' ? <HotelFrontDeskPage />

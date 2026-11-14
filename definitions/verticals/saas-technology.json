@@ -46,7 +46,11 @@
    "permissions": [
     "crm.*",
     "helpdesk.*",
-    "subscription.subscription.*"
+    "subscription.subscription.*",
+    "subscription.plan.read",
+    "subscription.billing_cycle.read",
+    "master-data.party.read",
+    "accounting.invoice.read"
    ]
   },
   "engineer": {

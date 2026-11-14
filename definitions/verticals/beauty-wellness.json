@@ -56,7 +56,9 @@
     "booking.*",
     "subscription.*",
     "pos.*",
-    "loyalty.*"
+     "loyalty.*",
+     "master-data.party.read",
+     "accounting.invoice.read"
    ]
   }
  },
