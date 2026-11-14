@@ -331,7 +331,31 @@
       "master-data.party.read"
     ]
   },
-  "accounting_settlement_operator": {
+  "inventory_count_operator": {
+    "name": "Nhân viên kiểm kê kho",
+    "permissions": [
+      "inventory.stock_count.read",
+      "inventory.stock_count.create",
+      "inventory.stock_count.update",
+      "inventory.stock_count.submitted",
+      "inventory.stock_count.cancelled",
+      "inventory.warehouse.read",
+      "inventory.warehouse_location.read",
+      "inventory.lot.read",
+      "master-data.product.read"
+    ]
+  },  "inventory_count_approver": {
+    "name": "Quản lý duyệt kiểm kê",
+    "permissions": [
+      "inventory.stock_count.read",
+      "inventory.stock_count.approved",
+      "inventory.stock_count.rejected",
+      "inventory.warehouse.read",
+      "inventory.warehouse_location.read",
+      "inventory.lot.read",
+      "master-data.product.read"
+    ]
+  },  "accounting_settlement_operator": {
     "name": "Nhân viên thu chi điều chỉnh",
     "permissions": [
       "accounting.payment.read",

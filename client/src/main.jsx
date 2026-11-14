@@ -69,6 +69,7 @@ const SalesReturnsWorkbenchPage = lazy(() => import('./SalesReturnsWorkbenchPage
 const BankReconciliationWorkbenchPage = lazy(() => import('./BankReconciliationWorkbenchPage.jsx'));
 const AccountingPeriodClosePage = lazy(() => import('./AccountingPeriodClosePage.jsx'));
 const AccountingAdjustmentRefundsPage = lazy(() => import('./AccountingAdjustmentRefundsPage.jsx'));
+const InventoryStockCountWorkbenchPage = lazy(() => import('./InventoryStockCountWorkbenchPage.jsx'));
 
 function parseRoute(hash = location.hash) {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
@@ -103,6 +104,7 @@ function parseRoute(hash = location.hash) {
   if (a === 'expenses') return { name: 'expense-workbench' };
   if (a === 'returns') return { name: 'sales-returns-workbench' };
   if (a === 'bank-reconciliation') return { name: 'bank-reconciliation-workbench' };
+  if (a === 'inventory-counts') return { name: 'inventory-stock-count-workbench' };
   if (a === 'period-close') return { name: 'accounting-period-close' };
   if (a === 'refunds') return { name: 'accounting-adjustment-refunds' };
   if (a === 'ecommerce') return { name: 'ecommerce-order-desk' };
@@ -186,6 +188,7 @@ function Sidebar({ meta, route, onNavigate, open }) {
     {meta.modules.some((module) => module.id === 'inventory') && can('inventory.reorder_rule.read') && link('#/reports/inventory/replenishment', 'Bổ sung tồn kho', route.name === 'inventory-replenishment', 'list')}
     {meta.modules.some((module) => module.id === 'inventory') && can('inventory.stock_move.read') && link('#/reports/inventory/location-stock', 'Tồn theo vị trí', route.name === 'inventory-location-stock', 'list')}
     {meta.modules.some((module) => module.id === 'inventory') && can('inventory.lot.read') && can('inventory.stock_move.read') && link('#/reports/inventory/lot-expiry', 'Lô sắp hết hạn', route.name === 'inventory-lot-expiry', 'list')}
+    {meta.modules.some((module) => module.id === 'inventory') && can('inventory.stock_count.read') && link('#/inventory-counts', 'Kiểm kê kho', route.name === 'inventory-stock-count-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'restaurant') && can('restaurant.kitchen_ticket.read') && link('#/reports/restaurant/kitchen-board', 'Màn hình bếp', route.name === 'restaurant-kitchen-board', 'list')}
     {meta.modules.some((module) => module.id === 'logistics') && can('logistics.shipment.read') && link('#/reports/logistics/delivery-board', 'Điều phối giao hàng', route.name === 'logistics-delivery-board', 'list')}
     {meta.modules.some((module) => module.id === 'hotel') && can('hotel.room.read') && link('#/reports/hotel/housekeeping-board', 'Buồng phòng', route.name === 'hotel-housekeeping-board', 'list')}
@@ -389,6 +392,7 @@ function App() {
         : route.name === 'inventory-replenishment' ? <InventoryReplenishmentPage />
         : route.name === 'inventory-location-stock' ? <InventoryLocationStockPage />
         : route.name === 'inventory-quality-holds' ? <InventoryQualityHoldsPage />
+        : route.name === 'inventory-stock-count-workbench' ? <InventoryStockCountWorkbenchPage />
         : route.name === 'inventory-lot-traceability' ? <InventoryLotTraceabilityPage lotId={route.lotId} />
         : route.name === 'inventory-lot-expiry' ? <InventoryLotExpiryPage />
         : route.name === 'restaurant-kitchen-board' ? <RestaurantKitchenBoardPage />
