@@ -17,6 +17,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - React/Vite, giao diện quản trị, timeline liên module, responsive; design system và rà axe-core.
 - Bàn vận hành hóa đơn điện tử: hàng đợi theo trạng thái, liên kết hóa đơn kế toán, xem lỗi/phản hồi/lịch sử gọi provider, thử lại và yêu cầu hủy có lý do. Phát hành thật vẫn cần ánh xạ hợp đồng và thông tin xác thực từ provider được chọn.
 - Phụ lục hợp đồng được lập, gửi duyệt, áp dụng theo ngày hiệu lực và ghi snapshot lịch sử; hỗ trợ đổi tên, điều khoản, giá trị và ngày kết thúc trên hợp đồng đang hiệu lực.
+- Thuê bao lưu ngày bắt đầu mặc định và neo ngày thu theo lịch gốc, tránh trôi lịch tháng/quý/năm qua các tháng ngắn; kỳ đến hạn tiếp tục tự lập hóa đơn bằng scheduler.
 - Docker image Linux đã build và chạy qua Compose test riêng; đã diễn tập pg_dump/pg_restore, restart, RLS, phiên đăng nhập và luồng bán hàng sau khôi phục. Vẫn cần xác minh vận hành/tải/HA trên hạ tầng production thực tế.
 
 ## Còn thiếu

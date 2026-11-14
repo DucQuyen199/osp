@@ -4,7 +4,7 @@ use crate::{
     kernel::{Actor, Kernel, Opts, Tenant},
     money,
 };
-use chrono::{Months, NaiveDate};
+use chrono::{Datelike, NaiveDate};
 use rust_decimal::Decimal;
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
@@ -36,6 +36,15 @@ fn interval_months(interval: &str) -> Option<u32> {
         "yearly" => Some(12),
         _ => None,
     }
+}
+
+fn next_anchored_date(anchor: NaiveDate, previous: NaiveDate, months: u32) -> Option<NaiveDate> {
+    let month_index = previous.year() * 12 + previous.month0() as i32 + months as i32;
+    let year = month_index.div_euclid(12);
+    let month = (month_index.rem_euclid(12) + 1) as u32;
+    (1..=anchor.day())
+        .rev()
+        .find_map(|day| NaiveDate::from_ymd_opt(year, month, day))
 }
 
 async fn schedule_cycle(
@@ -74,19 +83,16 @@ async fn schedule_cycle(
     let Some(amount) = price.filter(|amount| *amount > Decimal::ZERO) else {
         return Ok(true);
     };
-    let due_date = if let Some(base_date) = base_date {
-        base_date
-            .checked_add_months(Months::new(months))
-            .ok_or_else(|| {
-                ApiError::validation(
-                    "subscription",
-                    vec!["Next billing date exceeds the supported calendar range".into()],
-                )
-            })?
-    } else if let Some(start) = start {
-        start
-    } else {
-        tx.query_one_row("SELECT current_date", &[]).await?.get(0)
+    let today: NaiveDate = tx.query_one_row("SELECT current_date", &[]).await?.get(0);
+    let anchor = start.or(base_date).unwrap_or(today);
+    let due_date = match base_date {
+        Some(previous) => next_anchored_date(anchor, previous, months).ok_or_else(|| {
+            ApiError::validation(
+                "subscription",
+                vec!["Next billing date exceeds the supported calendar range".into()],
+            )
+        })?,
+        None => start.unwrap_or(today),
     };
     if let Some(existing) = tx
         .query_opt(
@@ -283,6 +289,16 @@ pub async fn prepare_document(
     entity: &str,
     document: &mut Map<String, Value>,
 ) -> R<Vec<String>> {
+    if entity == "subscription"
+        && document.get("id").is_none()
+        && document
+            .get("start")
+            .is_none_or(|value| value.is_null() || value.as_str().is_some_and(str::is_empty))
+    {
+        let start: NaiveDate = tx.query_one_row("SELECT current_date", &[]).await?.get(0);
+        document.insert("start".into(), json!(start));
+        return Ok(Vec::new());
+    }
     if entity != "billing_cycle" {
         return Ok(Vec::new());
     }
