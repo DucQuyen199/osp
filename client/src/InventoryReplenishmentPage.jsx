@@ -57,7 +57,7 @@ export default function InventoryReplenishmentPage() {
   }, new Map());
 
   return <div className="page">
-    <div className="page-head"><div><h1>Đề xuất bổ sung tồn kho</h1><p className="sub">So sánh tồn khả dụng với ngưỡng tối thiểu và trừ lượng còn chờ nhận từ đơn mua đã duyệt.</p></div><a className="btn btn-secondary" href="#/e/inventory/reorder_rule">Định mức bổ sung</a></div>
+    <div className="page-head"><div><h1>Đề xuất bổ sung tồn kho</h1><p className="sub">Tồn dự kiến đã tính đơn bán còn phải giao, đơn mua chờ nhận, đề nghị mua mở và hàng đang giữ để kiểm tra chất lượng.</p></div><a className="btn btn-secondary" href="#/e/inventory/reorder_rule">Định mức bổ sung</a></div>
     {error && <div className="alert danger" role="alert">{error}</div>}
     {notice && <div className="alert success" role="status">{notice.message} {notice.id && <a href={`#/e/purchasing/purchase_requisition/${encodeURIComponent(notice.id)}`}>Mở đề nghị mua</a>}</div>}
     {loading && !report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : report && <div className="stack">
@@ -71,11 +71,13 @@ export default function InventoryReplenishmentPage() {
           {creatingWarehouse === warehouse.id ? 'Đang tạo…' : `Tạo cho ${warehouse.name} · ${warehouse.count} dòng`}
         </button>)}</div>
       </section>}
-      {!report.items?.length ? <div className="empty"><h3>Không có đề xuất bổ sung</h3><p>Tồn khả dụng ở các định mức đã cấu hình đang trên ngưỡng tối thiểu.</p></div> : <div className="card table-wrap"><table className="table">
-        <thead><tr><th scope="col">SKU</th><th scope="col">Sản phẩm</th><th scope="col">Kho</th><th scope="col" className="right">Tồn khả dụng</th><th scope="col" className="right">Đơn mua chờ nhận</th><th scope="col" className="right">Đề nghị mua mở</th><th scope="col" className="right">Tối thiểu</th><th scope="col" className="right">Mục tiêu</th><th scope="col" className="right">Đề xuất mua</th></tr></thead>
+      {!report.items?.length ? <div className="empty"><h3>Không có đề xuất bổ sung</h3><p>Tồn dự kiến ở các định mức đã cấu hình đang trên ngưỡng tối thiểu.</p></div> : <div className="card table-wrap"><table className="table">
+        <thead><tr><th scope="col">SKU</th><th scope="col">Sản phẩm</th><th scope="col">Kho</th><th scope="col" className="right">Tồn khả dụng</th><th scope="col" className="right">Đơn bán chưa giao</th><th scope="col" className="right">Tồn dự kiến</th><th scope="col" className="right">Đơn mua chờ nhận</th><th scope="col" className="right">Đề nghị mua mở</th><th scope="col" className="right">Tối thiểu</th><th scope="col" className="right">Mục tiêu</th><th scope="col" className="right">Đề xuất mua</th></tr></thead>
         <tbody>{report.items.map((item) => <tr key={item.id}>
           <td>{item.sku}</td><td>{item.product}</td><td>{item.warehouse}</td>
           <td className="right">{quantity(item.availableQty)}{item.unit ? ` ${item.unit}` : ''}</td>
+          <td className="right">{quantity(item.committedQty)}{item.unit ? ` ${item.unit}` : ''}</td>
+          <td className="right">{quantity(item.projectedQty)}{item.unit ? ` ${item.unit}` : ''}</td>
           <td className="right">{quantity(item.incomingQty)}{item.unit ? ` ${item.unit}` : ''}</td>
           <td className="right">{quantity(item.requisitionQty)}{item.unit ? ` ${item.unit}` : ''}</td>
           <td className="right">{quantity(item.minimumQty)}</td><td className="right">{quantity(item.targetQty)}</td>

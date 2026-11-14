@@ -942,7 +942,7 @@ pub fn build(reg: &Registry) -> Value {
         json!({ "get": {
             "tags": ["inventory"], "summary": "Stock replenishment suggestions", "security": sec,
             "parameters": [tid],
-            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Items below minimum, net of open purchase-order quantities and unconverted requisition quantities by product and warehouse; partially sourced requisitions retain their unconverted balance" })), ("403".to_string(), err("Missing inventory.reorder_rule.read permission"))]))
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Items whose projected stock is below minimum, net of QC holds, open purchase-order quantities, unconverted requisitions, and confirmed tracked-product sales demand; response includes committedQty and projectedQty" })), ("403".to_string(), err("Missing inventory.reorder_rule.read permission"))]))
         } }),
     );
     paths.insert(

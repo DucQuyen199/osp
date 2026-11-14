@@ -146691,7 +146691,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Items below minimum, net of open purchase-order quantities and unconverted requisition quantities by product and warehouse; partially sourced requisitions retain their unconverted balance"
+            "description": "Items whose projected stock is below minimum, net of QC holds, open purchase-order quantities, unconverted requisitions, and confirmed tracked-product sales demand; response includes committedQty and projectedQty"
           },
           "401": {
             "content": {
