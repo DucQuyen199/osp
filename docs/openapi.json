@@ -117386,7 +117386,7 @@
     },
     "/api/t/{tenantId}/data/purchasing/supplier_invoice/{id}/disputed": {
       "post": {
-        "description": "Phát sự kiện `purchasing.supplier_invoice.disputed` cho các module khác phản ứng.",
+        "description": "Save the required supplier-invoice dispute reason and move the invoice from submitted to disputed atomically; no payable bill is created while disputed.",
         "parameters": [
           {
             "in": "path",
@@ -117406,6 +117406,27 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "dispute_reason": {
+                    "maxLength": 500,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "dispute_reason"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -117556,7 +117577,7 @@
     },
     "/api/t/{tenantId}/data/purchasing/supplier_invoice/{id}/submitted": {
       "post": {
-        "description": "Phát sự kiện `purchasing.supplier_invoice.submitted` cho các module khác phản ứng.",
+        "description": "When resubmitting a disputed supplier invoice, record the resolution note with the transition. Draft and rejected invoice submissions may continue without a body.",
         "parameters": [
           {
             "in": "path",
@@ -117576,6 +117597,27 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "resolution_note": {
+                    "maxLength": 1000,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "resolution_note"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": false
+        },
         "responses": {
           "200": {
             "content": {

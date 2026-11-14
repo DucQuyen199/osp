@@ -396,6 +396,38 @@ pub fn build(reg: &Registry) -> Value {
                             } } }
                         });
                     }
+                    if def.qname() == "purchasing.supplier_invoice" && action == "disputed" {
+                        operation["description"] = json!(
+                            "Save the required supplier-invoice dispute reason and move the invoice from submitted to disputed atomically; no payable bill is created while disputed."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": true,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "required": ["dispute_reason"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "dispute_reason": { "type": "string", "minLength": 1, "maxLength": 500 }
+                                }
+                            } } }
+                        });
+                    }
+                    if def.qname() == "purchasing.supplier_invoice" && action == "submitted" {
+                        operation["description"] = json!(
+                            "When resubmitting a disputed supplier invoice, record the resolution note with the transition. Draft and rejected invoice submissions may continue without a body."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": false,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "required": ["resolution_note"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "resolution_note": { "type": "string", "minLength": 1, "maxLength": 1000 }
+                                }
+                            } } }
+                        });
+                    }
                     paths.insert(
                         format!("{base}/{{id}}/{action}"),
                         json!({ "post": operation }),

@@ -113,6 +113,15 @@ fn validate_quote_lines(document: &Value) -> Vec<String> {
 }
 
 pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<String> {
+    if entity == "supplier_invoice"
+        && patch.get("resolution_note").is_some()
+        && current.get("status").and_then(Value::as_str) != Some("disputed")
+    {
+        return vec![
+            "A resolution note can only be recorded while resolving a disputed supplier invoice"
+                .into(),
+        ];
+    }
     let protected: &[&str] = match entity {
         "purchase_return" if current.get("status").and_then(Value::as_str) != Some("draft") => &[
             "purchase_order",
