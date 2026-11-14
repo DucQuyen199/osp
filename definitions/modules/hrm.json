@@ -349,6 +349,21 @@
    "states": null,
    "computed": {},
    "constraints": []
+  },
+  {
+   "name": "work_schedule_entry",
+   "label": "Lịch ca theo ngày",
+   "fields": [
+    { "name": "employee", "type": "ref", "required": true, "ref": "hrm.employee" },
+    { "name": "work_date", "type": "date", "required": true },
+    { "name": "is_working", "type": "bool", "required": true },
+    { "name": "start_at", "type": "datetime", "required": false },
+    { "name": "end_at", "type": "datetime", "required": false },
+    { "name": "break_minutes", "type": "number", "required": false }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
   }
  ],
  "rules": [],

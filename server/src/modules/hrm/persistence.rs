@@ -3,6 +3,7 @@ mod attendance;
 mod employees;
 mod leave;
 mod organization;
+mod schedule;
 
 use crate::{db::Tx, error::R, kernel::Tenant};
 use serde_json::Value;
@@ -25,6 +26,7 @@ pub async fn validate_persistence(
         "department" | "holiday" => {
             organization::validate(tx, tenant, entity, action, document).await
         }
+        "work_schedule_entry" => schedule::validate(tx, tenant, action, document).await,
         _ => Ok(Vec::new()),
     }
 }

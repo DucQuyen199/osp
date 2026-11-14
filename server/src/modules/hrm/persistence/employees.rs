@@ -65,6 +65,16 @@ pub(super) async fn validate(
         }
         if tx
             .query_opt(
+                "SELECT 1 FROM hrm__work_schedule_entry WHERE tenant_id = $1 AND employee = $2 AND work_date > $3 LIMIT 1",
+                &[&tenant.id, &employee, &termination_date],
+            )
+            .await?
+            .is_some()
+        {
+            return Ok(vec!["Remove scheduled shifts after the termination date before terminating the employee".into()]);
+        }
+        if tx
+            .query_opt(
                 "SELECT 1 FROM hrm__leave_request WHERE tenant_id = $1 AND employee = $2 AND status IN ('submitted', 'approved') AND end_date > $3 LIMIT 1",
                 &[&tenant.id, &employee, &termination_date],
             )

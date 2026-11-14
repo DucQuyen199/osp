@@ -157,26 +157,30 @@ pub(super) async fn calculate_from_attendance(
                WHERE e.tenant_id = $1 AND e.status IN ('active', 'terminated') \
                  AND (e.hire_date IS NULL OR e.hire_date < $3) \
                  AND (e.termination_date IS NULL OR e.termination_date >= $2) \
-             ), working_days AS ( \
-               SELECT sal.id AS employee, count(*)::numeric AS working_days \
+             ), work_calendar AS ( \
+               SELECT sal.id AS employee, work_day.work_date::date AS work_date, \
+                 CASE WHEN ws.id IS NULL THEN sal.standard_hours_per_day \
+                   ELSE EXTRACT(EPOCH FROM (ws.end_at - ws.start_at))::numeric / 3600 - COALESCE(ws.break_minutes, 0)::numeric / 60 \
+                 END AS expected_hours \
                FROM eligible sal CROSS JOIN LATERAL generate_series($2::date, $3::date - 1, interval '1 day') AS work_day(work_date) \
-               WHERE EXTRACT(ISODOW FROM work_day.work_date)::int IN (SELECT value::int FROM jsonb_array_elements_text(sal.work_weekdays) AS selected(value)) \
-               GROUP BY sal.id \
+               LEFT JOIN hrm__work_schedule_entry ws ON ws.tenant_id = $1 AND ws.employee = sal.id AND ws.work_date = work_day.work_date::date \
+               WHERE (ws.id IS NULL AND EXTRACT(ISODOW FROM work_day.work_date)::int IN (SELECT value::int FROM jsonb_array_elements_text(sal.work_weekdays) AS selected(value))) \
+                 OR (ws.id IS NOT NULL AND ws.is_working) \
+             ), working_days AS ( \
+               SELECT employee, count(*)::numeric AS working_days FROM work_calendar GROUP BY employee \
              ), counted_days AS ( \
                SELECT a.employee, a.date AS work_date, \
                  LEAST(1::numeric, GREATEST(0::numeric, round( \
-                   EXTRACT(EPOCH FROM (a.check_out - a.check_in))::numeric / 3600 / sal.standard_hours_per_day, 6 \
+                   EXTRACT(EPOCH FROM (a.check_out - a.check_in))::numeric / 3600 / cal.expected_hours, 6 \
                  ))) AS day_fraction \
-               FROM hrm__attendance a \
+               FROM work_calendar cal JOIN hrm__attendance a ON a.tenant_id = $1 AND a.employee = cal.employee AND a.date = cal.work_date \
                JOIN hrm__employee e ON e.tenant_id = a.tenant_id AND e.id = a.employee \
-               JOIN eligible sal ON sal.id = e.id \
-               WHERE a.tenant_id = $1 AND sal.salary > 0 \
-                 AND a.date >= $2 AND a.date < $3 \
+               JOIN eligible sal ON sal.id = e.id AND sal.salary > 0 \
+               WHERE a.date >= $2 AND a.date < $3 \
                  AND a.date >= COALESCE(e.hire_date, $2) \
                  AND a.date <= COALESCE(e.termination_date, $3 - 1) \
-                 AND EXTRACT(ISODOW FROM a.date)::int IN (SELECT value::int FROM jsonb_array_elements_text(sal.work_weekdays) AS selected(value)) \
                  AND a.check_in IS NOT NULL AND a.check_out IS NOT NULL \
-               UNION \
+               UNION ALL \
                SELECT lr.employee, leave_day.work_date::date AS work_date, \
                  CASE WHEN lr.partial_day IN ('morning', 'afternoon') THEN 0.5 ELSE 1 END::numeric AS day_fraction \
                FROM hrm__leave_request lr \
@@ -192,18 +196,18 @@ pub(super) async fn calculate_from_attendance(
                  AND lr.start_date < $3 AND lr.end_date >= $2 \
                  AND lr.end_date >= COALESCE(e.hire_date, $2) \
                  AND lr.start_date <= COALESCE(e.termination_date, $3 - 1) \
-                 AND EXTRACT(ISODOW FROM leave_day.work_date)::int IN (SELECT value::int FROM jsonb_array_elements_text(sal.work_weekdays) AS selected(value)) \
-               UNION \
+                 AND EXISTS (SELECT 1 FROM work_calendar cal WHERE cal.employee = lr.employee AND cal.work_date = leave_day.work_date::date) \
+               UNION ALL \
                SELECT e.id, h.date AS work_date, 1::numeric AS day_fraction \
                FROM hrm__holiday h \
                JOIN hrm__employee e ON e.tenant_id = h.tenant_id \
                JOIN eligible sal ON sal.id = e.id \
+               JOIN work_calendar cal ON cal.employee = e.id AND cal.work_date = h.date \
                WHERE h.tenant_id = $1 AND sal.salary > 0 \
                  AND h.date >= $2 AND h.date < $3 \
                  AND h.date >= COALESCE(e.hire_date, $2) \
                  AND h.date <= COALESCE(e.termination_date, $3 - 1) \
                  AND h.pay_treatment = 'paid' \
-                 AND EXTRACT(ISODOW FROM h.date)::int IN (SELECT value::int FROM jsonb_array_elements_text(sal.work_weekdays) AS selected(value)) \
              ), paid_days AS ( \
                SELECT employee, work_date, LEAST(1::numeric, round(sum(day_fraction), 6)) AS day_fraction \
                FROM counted_days GROUP BY employee, work_date \

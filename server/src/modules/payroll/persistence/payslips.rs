@@ -91,18 +91,37 @@ pub(super) async fn validate_created(
             .as_ref()
             .map(|row| row.get::<_, String>(11))
             .unwrap_or_else(|| working_weekdays_json.clone());
-        let employee_work_weekdays: Vec<u8> = serde_json::from_str(&employee_work_weekdays_json)
-            .map_err(|_| {
-                crate::error::ApiError::validation(
-                    "hrm.employee",
-                    vec!["Employee work_weekdays must contain ISO weekdays from 1 to 7".into()],
-                )
-            })?;
         let employee_hours_per_day = employee_row
             .as_ref()
             .map(|row| decimal_column(row, 12, "employee standard hours per day"))
             .transpose()?
             .unwrap_or(hours_per_day);
+        let (expected_paid_days, expected_working_days) = if let Some(first_day) = period
+            .as_deref()
+            .and_then(|value| NaiveDate::parse_from_str(&format!("{value}-01"), "%Y-%m-%d").ok())
+        {
+            let (next_year, next_month) = if first_day.month() == 12 {
+                (first_day.year() + 1, 1)
+            } else {
+                (first_day.year(), first_day.month() + 1)
+            };
+            if let Some(next_month) = NaiveDate::from_ymd_opt(next_year, next_month, 1) {
+                counted_paid_days(
+                    tx,
+                    tenant,
+                    employee,
+                    first_day,
+                    next_month,
+                    &employee_hours_per_day.to_string(),
+                    &employee_work_weekdays_json,
+                )
+                .await?
+            } else {
+                (Decimal::ZERO, Decimal::ZERO)
+            }
+        } else {
+            (Decimal::ZERO, Decimal::ZERO)
+        };
         if !employee_row
             .as_ref()
             .is_some_and(|row| matches!(row.get::<_, String>(0).as_str(), "active" | "terminated"))
@@ -137,27 +156,12 @@ pub(super) async fn validate_created(
                 errors.push("Payslip work schedule snapshots must match the employee schedule and payroll defaults".into());
             }
             let expected_overtime_pay = if overtime_weighted_hours > Decimal::ZERO {
-                if let Some(first_day) = period.as_deref().and_then(|value| {
-                    NaiveDate::parse_from_str(&format!("{value}-01"), "%Y-%m-%d").ok()
-                }) {
-                    let (year, month) = if first_day.month() == 12 {
-                        (first_day.year() + 1, 1)
-                    } else {
-                        (first_day.year(), first_day.month() + 1)
-                    };
-                    if let Some(next_month) = NaiveDate::from_ymd_opt(year, month, 1) {
-                        calculate_overtime_pay(
-                            expected_salary,
-                            working_weekdays(first_day, next_month, &employee_work_weekdays),
-                            employee_hours_per_day,
-                            overtime_weighted_hours,
-                        )?
-                    } else {
-                        Decimal::ZERO
-                    }
-                } else {
-                    Decimal::ZERO
-                }
+                calculate_overtime_pay(
+                    expected_salary,
+                    expected_working_days,
+                    employee_hours_per_day,
+                    overtime_weighted_hours,
+                )?
             } else {
                 Decimal::ZERO
             };
@@ -326,41 +330,16 @@ pub(super) async fn validate_created(
                 }
             }
         }
-        if let Some(period) = period.as_deref() {
-            if let Some(first_day) =
-                NaiveDate::parse_from_str(&format!("{period}-01"), "%Y-%m-%d").ok()
-            {
-                let (next_year, next_month) = if first_day.month() == 12 {
-                    (first_day.year() + 1, 1)
-                } else {
-                    (first_day.year(), first_day.month() + 1)
-                };
-                if let Some(next_month_start) = NaiveDate::from_ymd_opt(next_year, next_month, 1) {
-                    let working_days =
-                        working_weekdays(first_day, next_month_start, &employee_work_weekdays);
-                    let hours_per_day_text = employee_hours_per_day.to_string();
-                    let paid_days = counted_paid_days(
-                        tx,
-                        tenant,
-                        employee,
-                        first_day,
-                        next_month_start,
-                        &hours_per_day_text,
-                        &employee_work_weekdays_json,
-                    )
-                    .await?;
-                    let captured_paid = decimal_field(document, "paid_days");
-                    let captured_working = decimal_field(document, "working_days");
-                    let day_tolerance = Decimal::new(1, 6);
-                    if !captured_paid.is_some_and(|value| {
-                        money::within_tolerance(value, paid_days, day_tolerance)
-                    }) || !captured_working.is_some_and(|value| {
-                        money::within_tolerance(value, working_days, day_tolerance)
-                    }) {
-                        errors.push("Payslip paid and working days must match the locked attendance and calendar for its month".into());
-                    }
-                }
-            }
+        let captured_paid = decimal_field(document, "paid_days");
+        let captured_working = decimal_field(document, "working_days");
+        let day_tolerance = Decimal::new(1, 6);
+        if !captured_paid
+            .is_some_and(|value| money::within_tolerance(value, expected_paid_days, day_tolerance))
+            || !captured_working.is_some_and(|value| {
+                money::within_tolerance(value, expected_working_days, day_tolerance)
+            })
+        {
+            errors.push("Payslip paid and working days must match the locked attendance and schedule calendar for its month".into());
         }
         if tx
                     .query_opt(

@@ -77,3 +77,5 @@ Các module CRM/Marketing, bán hàng, mua hàng, loyalty, logistics, field serv
 - Nhân sự và payroll hỗ trợ lịch tuần ISO cùng giờ chuẩn riêng theo từng nhân viên, kế thừa mặc định của kỳ lương khi không cấu hình; lịch này được dùng xuyên suốt cho ngày công, phép hưởng lương, ngày lễ và tăng ca. Ca xoay theo ngày cụ thể vẫn cần phát triển.
 
 - Mỗi phiếu lương lưu lại bộ ngày trong tuần và giờ chuẩn đã dùng để tính, giúp kiểm toán lịch áp dụng sau khi hồ sơ nhân sự thay đổi.
+
+- Lịch nhân sự có ngoại lệ theo ngày: ca bắt đầu/kết thúc, giờ nghỉ không tính lương, ca qua đêm và ngày nghỉ ghi đè lịch tuần; payroll dùng cùng lịch và khóa sửa sau khi có phiếu lương. Còn thiếu bộ tạo lịch xoay lặp tự động và lịch mẫu/đội ca.

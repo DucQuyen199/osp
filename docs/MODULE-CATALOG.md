@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **50 module**, **190 loại dữ liệu**, **860 sự kiện**.
+Tổng: **50 module**, **191 loại dữ liệu**, **863 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -307,6 +307,7 @@ Tổng: **50 module**, **190 loại dữ liệu**, **860 sự kiện**.
 | `leave_allocation` Hạn mức nghỉ | — |
 | `holiday` Ngày lễ doanh nghiệp | — |
 | `attendance` Chấm công | — |
+| `work_schedule_entry` Lịch ca theo ngày | — |
 
 ### lms
 **Đào tạo (LMS)** — Khóa học, bài học, ghi danh và tiến độ học.

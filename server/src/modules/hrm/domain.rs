@@ -62,6 +62,7 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
         "leave_request" => validate_leave_request(document),
         "leave_allocation" => validate_leave_allocation(document),
         "salary_revision" => validate_salary_revision(document),
+        "work_schedule_entry" => validate_work_schedule_entry(document),
         "holiday" => {
             let mut errors = Vec::new();
             if document
@@ -124,6 +125,80 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
         }
         _ => Vec::new(),
     }
+}
+
+fn validate_work_schedule_entry(document: &Value) -> Vec<String> {
+    let Some(work_date) = document
+        .get("work_date")
+        .and_then(Value::as_str)
+        .and_then(|value| {
+            NaiveDate::parse_from_str(value.get(..10).unwrap_or(""), "%Y-%m-%d").ok()
+        })
+    else {
+        return vec!["Work schedule requires a valid work_date".into()];
+    };
+    let is_working = document.get("is_working").and_then(Value::as_bool);
+    let mut errors = Vec::new();
+    if is_working.is_none() {
+        errors.push("Work schedule requires is_working".into());
+    }
+    let parse = |field: &str| {
+        document
+            .get(field)
+            .and_then(Value::as_str)
+            .and_then(|value| {
+                DateTime::parse_from_rfc3339(value)
+                    .map(|date| (date.timestamp_millis(), date.date_naive()))
+                    .or_else(|_| {
+                        NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S%.f")
+                            .map(|date| (date.and_utc().timestamp_millis(), date.date()))
+                    })
+                    .or_else(|_| {
+                        NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M")
+                            .map(|date| (date.and_utc().timestamp_millis(), date.date()))
+                    })
+                    .ok()
+            })
+    };
+    let start = parse("start_at");
+    let end = parse("end_at");
+    let break_minutes = document
+        .get("break_minutes")
+        .and_then(money::decimal)
+        .unwrap_or(Decimal::ZERO);
+    if break_minutes < Decimal::ZERO || break_minutes.fract() != Decimal::ZERO {
+        errors.push("Work shift break_minutes must be a non-negative whole number".into());
+    }
+    match is_working {
+        Some(true) => {
+            let (Some((start_ms, start_date)), Some((end_ms, _))) = (start, end) else {
+                errors.push("Working schedule entries require start_at and end_at".into());
+                return errors;
+            };
+            if start_date != work_date {
+                errors.push(
+                    "Shift start_at must fall on work_date in the supplied local time zone".into(),
+                );
+            }
+            let duration_ms = end_ms - start_ms;
+            if duration_ms <= 0 || duration_ms > 24 * 60 * 60 * 1000 {
+                errors.push(
+                    "Shift end_at must be after start_at and no more than 24 hours later".into(),
+                );
+            } else if break_minutes * Decimal::from(60_000) >= Decimal::from(duration_ms) {
+                errors.push("Shift break_minutes must be shorter than the scheduled shift".into());
+            }
+        }
+        Some(false) => {
+            if start.is_some() || end.is_some() || break_minutes > Decimal::ZERO {
+                errors.push(
+                    "Non-working schedule entries cannot include shift times or breaks".into(),
+                );
+            }
+        }
+        None => {}
+    }
+    errors
 }
 
 fn validate_leave_request(document: &Value) -> Vec<String> {
@@ -252,7 +327,13 @@ fn validate_salary_revision(document: &Value) -> Vec<String> {
 }
 
 pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<String> {
-    if entity == "employee"
+    if entity == "work_schedule_entry"
+        && ["employee", "work_date"]
+            .iter()
+            .any(|field| patch.get(*field).is_some())
+    {
+        vec!["A work schedule entry cannot be moved to another employee or date; remove it and create a new entry".into()]
+    } else if entity == "employee"
         && current.get("status").and_then(Value::as_str) == Some("terminated")
         && ["hire_date", "termination_date"]
             .iter()
