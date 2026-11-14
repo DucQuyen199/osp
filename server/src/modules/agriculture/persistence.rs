@@ -1,7 +1,40 @@
 //! Tenant ownership, crop-cycle locks, and stock destination validation.
 use crate::{db::Tx, error::R, kernel::Tenant};
-use serde_json::Value;
+use serde_json::{Map, Value};
 use uuid::Uuid;
+
+pub async fn prepare_input_application(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    document: &mut Map<String, Value>,
+) -> R<Vec<String>> {
+    if document.get("kind").and_then(Value::as_str) != Some("pesticide") {
+        return Ok(Vec::new());
+    }
+    let Some(product) = parse_id(&Value::Object(document.clone()), "product") else {
+        return Ok(Vec::new());
+    };
+    let Some(row) = tx
+        .query_opt(
+            "SELECT COALESCE(preharvest_interval_days, 0)::text FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+            &[&tenant.id, &product],
+        )
+        .await?
+    else {
+        return Ok(Vec::new());
+    };
+    let interval: String = row.get(0);
+    let Some(snapshot) = serde_json::from_str::<Value>(&interval)
+        .ok()
+        .filter(|value| value.is_number())
+    else {
+        return Ok(vec![
+            "Бүтээгдэхүүний ургацын өмнөх хүлээлгийн хугацаа буруу байна".into(),
+        ]);
+    };
+    document.insert("preharvest_interval_days".into(), snapshot);
+    Ok(Vec::new())
+}
 
 pub async fn validate_persistence(
     tx: &Tx<'_>,
@@ -140,7 +173,7 @@ async fn validate_harvest(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<V
     }
     if let Some(row) = tx
         .query_opt(
-            "SELECT ia.date + ceil(COALESCE(p.preharvest_interval_days, 0))::int AS harvest_allowed_on, p.name FROM agriculture__input_application ia JOIN master_data__product p ON p.tenant_id = ia.tenant_id AND p.id = ia.product WHERE ia.tenant_id = $1 AND ia.cycle = $2 AND ia.kind = 'pesticide' AND ia.date + ceil(COALESCE(p.preharvest_interval_days, 0))::int > $3::date ORDER BY harvest_allowed_on DESC LIMIT 1",
+            "SELECT ia.date + ceil(COALESCE(ia.preharvest_interval_days, p.preharvest_interval_days, 0))::int AS harvest_allowed_on, p.name FROM agriculture__input_application ia JOIN master_data__product p ON p.tenant_id = ia.tenant_id AND p.id = ia.product WHERE ia.tenant_id = $1 AND ia.cycle = $2 AND ia.kind = 'pesticide' AND ia.date + ceil(COALESCE(ia.preharvest_interval_days, p.preharvest_interval_days, 0))::int > $3::date ORDER BY harvest_allowed_on DESC LIMIT 1",
             &[&tenant.id, &cycle, &date],
         )
         .await?

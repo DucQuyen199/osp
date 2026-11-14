@@ -1776,6 +1776,10 @@
             ],
             "type": "string"
           },
+          "preharvest_interval_days": {
+            "readOnly": true,
+            "type": "number"
+          },
           "product": {
             "description": "Tham chiếu tới master-data.product",
             "format": "uuid",
@@ -1818,6 +1822,10 @@
               "seed"
             ],
             "type": "string"
+          },
+          "preharvest_interval_days": {
+            "readOnly": true,
+            "type": "number"
           },
           "product": {
             "description": "Tham chiếu tới master-data.product",

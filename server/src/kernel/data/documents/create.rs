@@ -64,6 +64,13 @@ impl Kernel {
                 return Err(ApiError::validation(&qname, errors));
             }
         }
+        if qname == "agriculture.input_application" {
+            let errors =
+                crate::modules::agriculture::prepare_input_application(tx, t, &mut clean).await?;
+            if !errors.is_empty() {
+                return Err(ApiError::validation(&qname, errors));
+            }
+        }
         if qname.starts_with("clinic.") {
             let errors =
                 crate::modules::clinic::prepare_document(tx, t, ent.def.name.as_str(), &mut clean)

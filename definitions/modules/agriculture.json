@@ -182,6 +182,13 @@
           "required": true
         },
         {
+          "name": "preharvest_interval_days",
+          "label": "Хүлээлгийн хугацаа хэрэглэсэн үеийн (өдөр)",
+          "type": "number",
+          "required": false,
+          "system": true
+        },
+        {
           "name": "warehouse",
           "type": "ref",
           "required": false,

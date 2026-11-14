@@ -67,7 +67,7 @@ export default function AgricultureOperationsPage() {
   const cycleInputs = useMemo(() => applications.filter((item) => item.cycle === cycleId).sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))), [applications, cycleId]);
   const harvestRestriction = useMemo(() => cycleInputs.reduce((latest, application) => {
     if (application.kind !== 'pesticide') return latest;
-    const intervalDays = Number(products.get(application.product)?.preharvest_interval_days) || 0;
+    const intervalDays = Number(application.preharvest_interval_days ?? products.get(application.product)?.preharvest_interval_days) || 0;
     if (intervalDays <= 0 || !application.date) return latest;
     const applicationDate = new Date(`${application.date}T00:00:00Z`);
     if (!Number.isFinite(applicationDate.getTime())) return latest;
@@ -176,7 +176,7 @@ export default function AgricultureOperationsPage() {
           </form>
         </div>}
         <div className="agriculture-history-grid"><article className="card agriculture-panel"><h3>Lịch sử thu hoạch</h3>{cycleHarvests.length ? <div className="agriculture-history">{cycleHarvests.map((harvest) => { const lot = [...lots.values()].find((item) => item.product === harvest.product && item.code === harvest.lot_code); return <div className="agriculture-history-row" key={harvest.id}><div><strong>{products.get(harvest.product)?.name || 'Nông sản'} · {fmtNumber(harvest.qty)}</strong><div className="small muted">{fmtDate(harvest.date)}{harvest.grade ? ` · ${harvest.grade}` : ''}{harvest.lot_code ? ` · Lô ${harvest.lot_code}` : ''}</div></div>{lot && can('inventory.stock_move.read') && <a className="small" href={recordHref('inventory.lot', lot.id)}>Truy xuất lô</a>}</div>; })}</div> : <div className="empty">Chưa ghi nhận thu hoạch.</div>}</article>
-          <article className="card agriculture-panel"><h3>Nhật ký vật tư</h3>{cycleInputs.length ? <div className="agriculture-history">{cycleInputs.map((record) => <div className="agriculture-history-row" key={record.id}><div><strong>{inputKinds.find(([value]) => value === record.kind)?.[1] || record.kind}{record.product ? ` · ${products.get(record.product)?.name || 'Sản phẩm'}` : ''}</strong><div className="small muted">{fmtDate(record.date)} · {fmtNumber(record.qty)}{record.warehouse ? ` · ${warehouses.get(record.warehouse)?.name || 'Kho'}` : ''}</div></div></div>)}</div> : <div className="empty">Chưa ghi nhận vật tư.</div>}</article></div>
+          <article className="card agriculture-panel"><h3>Nhật ký vật tư</h3>{cycleInputs.length ? <div className="agriculture-history">{cycleInputs.map((record) => <div className="agriculture-history-row" key={record.id}><div><strong>{inputKinds.find(([value]) => value === record.kind)?.[1] || record.kind}{record.product ? ` · ${products.get(record.product)?.name || 'Sản phẩm'}` : ''}</strong><div className="small muted">{fmtDate(record.date)} · {fmtNumber(record.qty)}{record.kind === 'pesticide' && record.preharvest_interval_days != null ? ` · Хүлээлгийн хугацаа ${fmtNumber(record.preharvest_interval_days)} хоног` : ''}{record.warehouse ? ` · ${warehouses.get(record.warehouse)?.name || 'Kho'}` : ''}</div></div></div>)}</div> : <div className="empty">Chưa ghi nhận vật tư.</div>}</article></div>
       </> : <div className="empty card-pad">Chọn vụ mùa để xem nhật ký, nhập vật tư và sản lượng.</div>}</section></div>
     </>}
   </div>;
