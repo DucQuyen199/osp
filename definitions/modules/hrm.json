@@ -3,7 +3,7 @@
  "name": "Nhân sự",
  "description": "Hồ sơ nhân viên, phòng ban, chức danh, nghỉ phép, chấm công.",
  "category": "people",
- "version": "0.4.0",
+ "version": "0.5.0",
  "depends": [
   "master-data"
  ],
@@ -362,6 +362,27 @@
     { "name": "break_minutes", "type": "number", "required": false }
    ],
    "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "work_schedule_pattern",
+   "label": "Mẫu ca luân phiên",
+   "fields": [
+    { "name": "employee", "type": "ref", "required": true, "ref": "hrm.employee" },
+    { "name": "start_date", "type": "date", "required": true },
+    { "name": "end_date", "type": "date", "required": true },
+    { "name": "timezone", "type": "string", "required": true },
+    { "name": "cycle", "type": "json", "required": true },
+    { "name": "status", "type": "enum", "required": false, "options": ["draft", "applied"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "applied": { "from": ["draft"], "to": "applied" }
+    }
+   },
    "computed": {},
    "constraints": []
   }

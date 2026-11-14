@@ -26,7 +26,9 @@ pub async fn validate_persistence(
         "department" | "holiday" => {
             organization::validate(tx, tenant, entity, action, document).await
         }
-        "work_schedule_entry" => schedule::validate(tx, tenant, action, document).await,
+        "work_schedule_entry" | "work_schedule_pattern" => {
+            schedule::validate(tx, tenant, entity, action, document).await
+        }
         _ => Ok(Vec::new()),
     }
 }

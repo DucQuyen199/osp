@@ -1,15 +1,19 @@
 //! Per-day work schedule overrides used by attendance and payroll.
 use crate::{db::Tx, error::R, kernel::Tenant};
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
 use serde_json::Value;
 use uuid::Uuid;
 
 pub(super) async fn validate(
     tx: &Tx<'_>,
     tenant: &Tenant,
+    entity: &str,
     action: &str,
     document: &Value,
 ) -> R<Vec<String>> {
+    if entity == "work_schedule_pattern" {
+        return validate_pattern(tx, tenant, action, document).await;
+    }
     if !matches!(action, "created" | "updated" | "removed") {
         return Ok(Vec::new());
     }
@@ -96,4 +100,168 @@ pub(super) async fn validate(
         errors.push(format!("Work schedule entries for {period} are locked because a payslip already exists"));
     }
     Ok(errors)
+}
+
+async fn validate_pattern(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    action: &str,
+    document: &Value,
+) -> R<Vec<String>> {
+    if !matches!(action, "created" | "updated" | "removed" | "applied") {
+        return Ok(Vec::new());
+    }
+    let Some(employee) = document
+        .get("employee")
+        .and_then(Value::as_str)
+        .and_then(|id| Uuid::parse_str(id).ok())
+    else {
+        return Ok(vec!["Shift rotation requires a valid employee".into()]);
+    };
+    let parse_date = |field: &str| {
+        document
+            .get(field)
+            .and_then(Value::as_str)
+            .and_then(|value| {
+                NaiveDate::parse_from_str(value.get(..10).unwrap_or(""), "%Y-%m-%d").ok()
+            })
+    };
+    let (Some(start), Some(end)) = (parse_date("start_date"), parse_date("end_date")) else {
+        return Ok(vec![
+            "Shift rotation requires valid start_date and end_date".into(),
+        ]);
+    };
+    let Some(timezone) = document.get("timezone").and_then(Value::as_str) else {
+        return Ok(vec!["Shift rotation requires an IANA time zone".into()]);
+    };
+    let mut errors = Vec::new();
+    if tx
+        .query_opt(
+            "SELECT 1 FROM pg_timezone_names WHERE name = $1 LIMIT 1",
+            &[&timezone],
+        )
+        .await?
+        .is_none()
+    {
+        errors.push("Shift rotation time zone must be a supported IANA name".into());
+    }
+    if action == "removed" {
+        if document.get("status").and_then(Value::as_str) == Some("applied") {
+            errors.push("An applied shift rotation cannot be deleted; its generated schedule is retained for payroll history".into());
+        }
+        return Ok(errors);
+    }
+    if action == "updated" && document.get("status").and_then(Value::as_str) == Some("applied") {
+        errors.push(
+            "An applied shift rotation is immutable; create a new rotation for a later period"
+                .into(),
+        );
+        return Ok(errors);
+    }
+    if action == "applied" {
+        let mut month = start.with_day(1).unwrap_or(start);
+        let final_month = end.with_day(1).unwrap_or(end);
+        while month <= final_month {
+            let period = month.format("%Y-%m").to_string();
+            tx.query_opt(
+                "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                &[&format!("payroll-calendar:{}:{period}", tenant.id)],
+            )
+            .await?;
+            if month == final_month {
+                break;
+            }
+            month = if month.month() == 12 {
+                NaiveDate::from_ymd_opt(month.year() + 1, 1, 1).unwrap_or(final_month)
+            } else {
+                NaiveDate::from_ymd_opt(month.year(), month.month() + 1, 1).unwrap_or(final_month)
+            };
+        }
+    }
+    let employee_row = tx
+        .query_opt(
+            "SELECT status, hire_date, termination_date FROM hrm__employee WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+            &[&tenant.id, &employee],
+        )
+        .await?;
+    let employee_valid = employee_row.is_some_and(|row| {
+        let status: String = row.get(0);
+        let hire_date: Option<NaiveDate> = row.get(1);
+        let termination_date: Option<NaiveDate> = row.get(2);
+        status == "active"
+            && hire_date.is_none_or(|date| start >= date)
+            && termination_date.is_none_or(|date| end <= date)
+    });
+    if !employee_valid {
+        errors.push(
+            "Shift rotation dates must fall within the active employee's employment period".into(),
+        );
+    }
+    if action != "applied" || !errors.is_empty() {
+        return Ok(errors);
+    }
+    if tx
+        .query_opt(
+            "SELECT 1 FROM hrm__work_schedule_entry WHERE tenant_id = $1 AND employee = $2 AND work_date BETWEEN $3 AND $4 LIMIT 1",
+            &[&tenant.id, &employee, &start, &end],
+        )
+        .await?
+        .is_some()
+    {
+        errors.push("The rotation overlaps existing daily schedule entries; remove or adjust those entries first".into());
+    }
+    let pattern_id = document
+        .get("id")
+        .and_then(Value::as_str)
+        .and_then(|id| Uuid::parse_str(id).ok())
+        .unwrap_or(Uuid::nil());
+    if tx
+        .query_opt(
+            "SELECT 1 FROM hrm__work_schedule_pattern WHERE tenant_id = $1 AND employee = $2 AND status = 'applied' AND start_date <= $4 AND end_date >= $3 AND id <> $5 LIMIT 1",
+            &[&tenant.id, &employee, &start, &end, &pattern_id],
+        )
+        .await?
+        .is_some()
+    {
+        errors.push("The rotation overlaps another applied rotation for this employee".into());
+    }
+    let first_period = start.format("%Y-%m").to_string();
+    let last_period = end.format("%Y-%m").to_string();
+    if tx
+        .query_opt(
+            "SELECT 1 FROM payroll__payslip s JOIN payroll__payroll_run r ON r.tenant_id = s.tenant_id AND r.id = s.run WHERE s.tenant_id = $1 AND s.employee = $2 AND r.period BETWEEN $3 AND $4 LIMIT 1",
+            &[&tenant.id, &employee, &first_period, &last_period],
+        )
+        .await?
+        .is_some()
+    {
+        errors.push("A shift rotation cannot be applied to a month that already contains a payslip".into());
+    }
+    if !errors.is_empty() {
+        return Ok(errors);
+    }
+    let cycle_json = serde_json::to_string(document.get("cycle").ok_or_else(|| {
+        crate::error::ApiError::validation(
+            "hrm.work_schedule_pattern",
+            vec!["Shift rotation cycle is required".into()],
+        )
+    })?)
+    .map_err(|_| {
+        crate::error::ApiError::validation(
+            "hrm.work_schedule_pattern",
+            vec!["Shift rotation cycle is invalid".into()],
+        )
+    })?;
+    tx.execute(
+        "INSERT INTO hrm__work_schedule_entry (tenant_id, id, created_at, updated_at, employee, work_date, is_working, start_at, end_at, break_minutes) \
+         SELECT $1, gen_random_uuid(), now(), now(), $2, days.work_date::date, (slot.day->>'is_working')::boolean, \
+           CASE WHEN (slot.day->>'is_working')::boolean THEN ((days.work_date::date + (slot.day->>'start_time')::time) AT TIME ZONE $6::text) ELSE NULL END, \
+           CASE WHEN (slot.day->>'is_working')::boolean THEN ((days.work_date::date + (slot.day->>'end_time')::time + CASE WHEN (slot.day->>'end_time')::time <= (slot.day->>'start_time')::time THEN interval '1 day' ELSE interval '0 day' END) AT TIME ZONE $6::text) ELSE NULL END, \
+           COALESCE((slot.day->>'break_minutes')::int, 0) \
+         FROM generate_series($3::date, $4::date, interval '1 day') AS days(work_date) \
+         CROSS JOIN LATERAL (SELECT $5::jsonb -> (((days.work_date::date - $3::date)::int % jsonb_array_length($5::jsonb))::int) AS day) AS slot",
+        &[&tenant.id, &employee, &start, &end, &cycle_json, &timezone],
+    )
+    .await?;
+    Ok(Vec::new())
 }

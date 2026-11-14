@@ -78,4 +78,4 @@ Các module CRM/Marketing, bán hàng, mua hàng, loyalty, logistics, field serv
 
 - Mỗi phiếu lương lưu lại bộ ngày trong tuần và giờ chuẩn đã dùng để tính, giúp kiểm toán lịch áp dụng sau khi hồ sơ nhân sự thay đổi.
 
-- Lịch nhân sự có ngoại lệ theo ngày: ca bắt đầu/kết thúc, giờ nghỉ không tính lương, ca qua đêm và ngày nghỉ ghi đè lịch tuần; payroll dùng cùng lịch và khóa sửa sau khi có phiếu lương. Lịch luân phiên vẫn cần bộ tạo chu kỳ tự động và mẫu/đội ca.
+- Lịch nhân sự hỗ trợ ngoại lệ theo ngày và mẫu ca luân phiên theo chu kỳ tối đa 366 ngày; khi áp dụng, lịch được sinh thành bản ghi theo ngày với giờ địa phương/múi giờ và chịu cùng khóa payroll. Mẫu/đội ca dùng chung cho nhiều nhân viên và lịch lặp dài hạn vẫn cần phát triển.

@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **50 module**, **191 loại dữ liệu**, **863 sự kiện**.
+Tổng: **50 module**, **192 loại dữ liệu**, **867 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -308,6 +308,7 @@ Tổng: **50 module**, **191 loại dữ liệu**, **863 sự kiện**.
 | `holiday` Ngày lễ doanh nghiệp | — |
 | `attendance` Chấm công | — |
 | `work_schedule_entry` Lịch ca theo ngày | — |
+| `work_schedule_pattern` Mẫu ca luân phiên | `draft` → **applied** (draft→applied) |
 
 ### lms
 **Đào tạo (LMS)** — Khóa học, bài học, ghi danh và tiến độ học.

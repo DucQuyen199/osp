@@ -1,6 +1,6 @@
 //! Pure hrm rules and lifecycle policies.
 use crate::money;
-use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, Utc};
+use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use rust_decimal::Decimal;
 use serde_json::Value;
 fn validate_period(document: &Value) -> Vec<String> {
@@ -63,6 +63,7 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
         "leave_allocation" => validate_leave_allocation(document),
         "salary_revision" => validate_salary_revision(document),
         "work_schedule_entry" => validate_work_schedule_entry(document),
+        "work_schedule_pattern" => validate_work_schedule_pattern(document),
         "holiday" => {
             let mut errors = Vec::new();
             if document
@@ -201,6 +202,94 @@ fn validate_work_schedule_entry(document: &Value) -> Vec<String> {
     errors
 }
 
+fn validate_work_schedule_pattern(document: &Value) -> Vec<String> {
+    let mut errors = Vec::new();
+    let parse_date = |field: &str| {
+        document
+            .get(field)
+            .and_then(Value::as_str)
+            .and_then(|value| {
+                NaiveDate::parse_from_str(value.get(..10).unwrap_or(""), "%Y-%m-%d").ok()
+            })
+    };
+    let (Some(start), Some(end)) = (parse_date("start_date"), parse_date("end_date")) else {
+        return vec!["Shift rotation requires valid start_date and end_date".into()];
+    };
+    if end < start {
+        errors.push("Shift rotation end_date must be on or after start_date".into());
+    } else if (end - start).num_days() > 365 {
+        errors.push("A shift rotation can generate at most 366 calendar days at a time".into());
+    }
+    if document
+        .get("timezone")
+        .and_then(Value::as_str)
+        .is_none_or(|value| value.trim().is_empty())
+    {
+        errors.push("Shift rotation requires an IANA time zone".into());
+    }
+    let Some(cycle) = document.get("cycle").and_then(Value::as_array) else {
+        return {
+            errors.push("Shift rotation cycle must be a JSON array".into());
+            errors
+        };
+    };
+    if cycle.is_empty() || cycle.len() > 31 {
+        errors.push("Shift rotation cycle must contain between 1 and 31 days".into());
+    }
+    for (index, day) in cycle.iter().enumerate() {
+        let working = day.get("is_working").and_then(Value::as_bool);
+        let start_time = day
+            .get("start_time")
+            .and_then(Value::as_str)
+            .and_then(|value| NaiveTime::parse_from_str(value, "%H:%M").ok());
+        let end_time = day
+            .get("end_time")
+            .and_then(Value::as_str)
+            .and_then(|value| NaiveTime::parse_from_str(value, "%H:%M").ok());
+        let break_minutes = day
+            .get("break_minutes")
+            .and_then(money::decimal)
+            .unwrap_or(Decimal::ZERO);
+        if break_minutes < Decimal::ZERO || break_minutes.fract() != Decimal::ZERO {
+            errors.push(format!(
+                "Shift rotation day {} break must be a non-negative whole number of minutes",
+                index + 1
+            ));
+        }
+        match working {
+            Some(true) => {
+                let (Some(start_time), Some(end_time)) = (start_time, end_time) else {
+                    errors.push(format!(
+                        "Shift rotation day {} requires valid start_time and end_time",
+                        index + 1
+                    ));
+                    continue;
+                };
+                let mut duration = (end_time - start_time).num_minutes();
+                if duration <= 0 {
+                    duration += 24 * 60;
+                }
+                if break_minutes >= Decimal::from(duration) {
+                    errors.push(format!("Shift rotation day {} requires a whole-minute break shorter than its shift", index + 1));
+                }
+            }
+            Some(false) => {
+                if start_time.is_some() || end_time.is_some() || break_minutes > Decimal::ZERO {
+                    errors.push(format!(
+                        "Non-working rotation day {} cannot include times or a break",
+                        index + 1
+                    ));
+                }
+            }
+            None => errors.push(format!(
+                "Shift rotation day {} requires is_working",
+                index + 1
+            )),
+        }
+    }
+    errors
+}
+
 fn validate_leave_request(document: &Value) -> Vec<String> {
     let mut errors = validate_period(document);
     let partial_day = document
@@ -333,6 +422,13 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
             .any(|field| patch.get(*field).is_some())
     {
         vec!["A work schedule entry cannot be moved to another employee or date; remove it and create a new entry".into()]
+    } else if entity == "work_schedule_pattern"
+        && current.get("status").and_then(Value::as_str) == Some("applied")
+    {
+        vec![
+            "An applied shift rotation is immutable; create a new rotation for a later period"
+                .into(),
+        ]
     } else if entity == "employee"
         && current.get("status").and_then(Value::as_str) == Some("terminated")
         && ["hire_date", "termination_date"]

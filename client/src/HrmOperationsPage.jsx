@@ -26,6 +26,7 @@ const localDateTimeIso = (date, time) => {
   return `${date}T${time}:00${sign}${String(Math.floor(offset / 60)).padStart(2, '0')}:${String(offset % 60).padStart(2, '0')}`;
 };
 const nextLocalDate = (date) => { const [year, month, day] = date.split('-').map(Number); const value = new Date(year, month - 1, day + 1); return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`; };
+const addLocalDays = (date, days) => { const [year, month, day] = date.split('-').map(Number); const value = new Date(year, month - 1, day + days); return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`; };
 const fmtTime = (value) => value ? new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : '--';
 
 export default function HrmOperationsPage() {
@@ -36,6 +37,7 @@ export default function HrmOperationsPage() {
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [scheduleEntries, setScheduleEntries] = useState([]);
+  const [schedulePatterns, setSchedulePatterns] = useState([]);
   const [salaryRevisions, setSalaryRevisions] = useState([]);
   const [allocations, setAllocations] = useState([]);
   const [approvalRequests, setApprovalRequests] = useState([]);
@@ -45,6 +47,7 @@ export default function HrmOperationsPage() {
   const [leaveForm, setLeaveForm] = useState({ employee: '', kind: 'annual', start_date: '', end_date: '', partial_day: 'full', pay_treatment: 'paid', reason: '' });
   const [revisionForm, setRevisionForm] = useState({ employee: '', effective_from: '', base_salary: '', reason: '' });
   const [scheduleForm, setScheduleForm] = useState({ employee: '', work_date: localDate(), is_working: true, start_time: '09:00', end_time: '17:00', break_minutes: '60' });
+  const [patternForm, setPatternForm] = useState({ employee: '', start_date: localDate(), end_date: addLocalDays(localDate(), 27), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', cycle: [{ is_working: true, start_time: '09:00', end_time: '17:00', break_minutes: 60 }, { is_working: false, start_time: '', end_time: '', break_minutes: 0 }] });
   const [busy, setBusy] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -54,13 +57,14 @@ export default function HrmOperationsPage() {
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
-      const [employeeRes, leaveRes, attendanceRes, revisionRes, allocationRes, scheduleRes, departmentMap, positionMap, requestRes] = await Promise.all([
+      const [employeeRes, leaveRes, attendanceRes, revisionRes, allocationRes, scheduleRes, patternRes, departmentMap, positionMap, requestRes] = await Promise.all([
         can('hrm.employee.read') ? api(`${dataPath('hrm.employee')}?limit=2000`) : Promise.resolve({ items: [] }),
         can('hrm.leave_request.read') ? api(`${dataPath('hrm.leave_request')}?limit=2000`) : Promise.resolve({ items: [] }),
         can('hrm.attendance.read') ? api(`${dataPath('hrm.attendance')}?limit=3000`) : Promise.resolve({ items: [] }),
         can('hrm.salary_revision.read') ? api(`${dataPath('hrm.salary_revision')}?limit=1000`) : Promise.resolve({ items: [] }),
         can('hrm.leave_allocation.read') ? api(`${dataPath('hrm.leave_allocation')}?limit=2000`) : Promise.resolve({ items: [] }),
         can('hrm.work_schedule_entry.read') ? api(`${dataPath('hrm.work_schedule_entry')}?limit=3000`) : Promise.resolve({ items: [] }),
+        can('hrm.work_schedule_pattern.read') ? api(`${dataPath('hrm.work_schedule_pattern')}?limit=1000`) : Promise.resolve({ items: [] }),
         can('hrm.department.read') ? loadRefs('hrm.department') : Promise.resolve(new Map()),
         can('hrm.position.read') ? loadRefs('hrm.position') : Promise.resolve(new Map()),
         workflowApproval && can('workflow-approval.approval_request.read') ? api(`${dataPath('workflow-approval.approval_request')}?limit=1000`) : Promise.resolve({ items: [] }),
@@ -72,11 +76,13 @@ export default function HrmOperationsPage() {
       setSalaryRevisions(itemsOf(revisionRes).sort((a, b) => String(b.effective_from || '').localeCompare(String(a.effective_from || ''))));
       setAllocations(itemsOf(allocationRes)); setDepartments(departmentMap); setPositions(positionMap); setApprovalRequests(itemsOf(requestRes));
       setScheduleEntries(itemsOf(scheduleRes).sort((a, b) => String(a.work_date || '').localeCompare(String(b.work_date || ''))));
+      setSchedulePatterns(itemsOf(patternRes).sort((a, b) => String(b.start_date || '').localeCompare(String(a.start_date || ''))));
       const activeEmployee = employeeRows.find((row) => row.status === 'active');
       setPunchEmployee((id) => employeeRows.some((row) => row.id === id && row.status === 'active') ? id : activeEmployee?.id || '');
       setLeaveForm((form) => ({ ...form, employee: employeeRows.some((row) => row.id === form.employee && row.status === 'active') ? form.employee : activeEmployee?.id || '' }));
       setRevisionForm((form) => ({ ...form, employee: employeeRows.some((row) => row.id === form.employee && row.status === 'active') ? form.employee : activeEmployee?.id || '' }));
       setScheduleForm((form) => ({ ...form, employee: employeeRows.some((row) => row.id === form.employee && row.status === 'active') ? form.employee : activeEmployee?.id || '' }));
+      setPatternForm((form) => ({ ...form, employee: employeeRows.some((row) => row.id === form.employee && row.status === 'active') ? form.employee : activeEmployee?.id || '' }));
     } catch (reason) { setError(reason.message || 'Không tải được dữ liệu nhân sự.'); }
     finally { if (!quiet) setLoading(false); }
   }, [attendanceDate, workflowApproval]);
@@ -134,6 +140,22 @@ export default function HrmOperationsPage() {
     await run(`${row.id}:remove`, () => api(dataPath('hrm.work_schedule_entry', row.id), { method: 'DELETE' }), 'Đã xóa ngoại lệ lịch; ngày này trở về lịch tuần của nhân viên.');
   }
 
+  async function createSchedulePattern(event) {
+    event.preventDefault();
+    await run('schedule-pattern:create', async () => {
+      const row = await api(dataPath('hrm.work_schedule_pattern'), { method: 'POST', body: patternForm });
+      if (can('hrm.work_schedule_pattern.applied')) await action('hrm.work_schedule_pattern', row, 'applied');
+    }, can('hrm.work_schedule_pattern.applied') ? 'Đã tạo lịch luân phiên và sinh các ca theo ngày; payroll và hạn mức phép sẽ dùng lịch mới.' : 'Đã lưu mẫu ca nháp để người có quyền áp dụng.');
+  }
+
+  async function applySchedulePattern(row) {
+    await run(`${row.id}:applied`, () => action('hrm.work_schedule_pattern', row, 'applied'), 'Đã sinh lịch luân phiên thành các ca theo ngày.');
+  }
+
+  async function removeSchedulePattern(row) {
+    await run(`${row.id}:remove`, () => api(dataPath('hrm.work_schedule_pattern', row.id), { method: 'DELETE' }), 'Đã xóa mẫu ca nháp.');
+  }
+
   async function createLeave(event) {
     event.preventDefault();
     await run('leave:create', async () => {
@@ -185,6 +207,27 @@ export default function HrmOperationsPage() {
       {!attendance.length && !loading && <p className="small muted">Chưa có bản ghi chấm công trong ngày đã chọn.</p>}
     </section>
 
+    {(can('hrm.work_schedule_pattern.create') || can('hrm.work_schedule_pattern.read')) && <section className="card card-pad" style={{ marginTop: 16 }}>
+      <h2>Lịch ca luân phiên</h2>
+      <p className="small muted">Khai báo chu kỳ ngày làm/nghỉ, ngày bắt đầu và múi giờ. Khi áp dụng, hệ thống sinh lịch theo ngày để chấm công, nghỉ phép và payroll cùng sử dụng.</p>
+      {can('hrm.work_schedule_pattern.create') && <form className="form-grid" onSubmit={createSchedulePattern}>
+        <label className="field"><span className="label">Nhân viên *</span><select className="select" required value={patternForm.employee} onChange={(event) => setPatternForm({ ...patternForm, employee: event.target.value })}><option value="">Chọn nhân viên</option>{activeEmployees.map((row) => <option key={row.id} value={row.id}>{recordLabel('hrm.employee', row)}</option>)}</select></label>
+        <label className="field"><span className="label">Ngày bắt đầu chu kỳ *</span><input className="input" required type="date" value={patternForm.start_date} onChange={(event) => setPatternForm({ ...patternForm, start_date: event.target.value })}/></label>
+        <label className="field"><span className="label">Sinh lịch đến ngày *</span><input className="input" required min={patternForm.start_date} max={addLocalDays(patternForm.start_date, 365)} type="date" value={patternForm.end_date} onChange={(event) => setPatternForm({ ...patternForm, end_date: event.target.value })}/></label>
+        <label className="field"><span className="label">Múi giờ IANA *</span><input className="input" required value={patternForm.timezone} onChange={(event) => setPatternForm({ ...patternForm, timezone: event.target.value })} placeholder="Asia/Ho_Chi_Minh"/></label>
+        <div className="field" style={{ gridColumn: '1 / -1' }}><span className="label">Các ngày trong chu kỳ (lặp từ ngày bắt đầu)</span><div className="stack" style={{ marginTop: 8 }}>
+          {patternForm.cycle.map((day, index) => <div className="row wrap card card-pad" key={index} style={{ gap: 12 }}>
+            <strong>Ngày {index + 1}</strong>
+            <label className="row small"><input type="checkbox" checked={day.is_working} onChange={(event) => setPatternForm((form) => ({ ...form, cycle: form.cycle.map((item, itemIndex) => itemIndex === index ? { ...item, is_working: event.target.checked, start_time: event.target.checked ? (item.start_time || '09:00') : '', end_time: event.target.checked ? (item.end_time || '17:00') : '', break_minutes: event.target.checked ? (item.break_minutes || 0) : 0 } : item) }))}/>Có ca làm</label>
+            {day.is_working && <><label className="field"><span className="label">Bắt đầu</span><input className="input" type="time" required value={day.start_time} onChange={(event) => setPatternForm((form) => ({ ...form, cycle: form.cycle.map((item, itemIndex) => itemIndex === index ? { ...item, start_time: event.target.value } : item) }))}/></label><label className="field"><span className="label">Kết thúc</span><input className="input" type="time" required value={day.end_time} onChange={(event) => setPatternForm((form) => ({ ...form, cycle: form.cycle.map((item, itemIndex) => itemIndex === index ? { ...item, end_time: event.target.value } : item) }))}/></label><label className="field"><span className="label">Nghỉ (phút)</span><input className="input num" type="number" min="0" max="1439" step="1" value={day.break_minutes} onChange={(event) => setPatternForm((form) => ({ ...form, cycle: form.cycle.map((item, itemIndex) => itemIndex === index ? { ...item, break_minutes: Number(event.target.value) } : item) }))}/></label></>}
+            <button type="button" className="btn btn-ghost btn-sm" disabled={patternForm.cycle.length <= 1} onClick={() => setPatternForm((form) => ({ ...form, cycle: form.cycle.filter((_, itemIndex) => itemIndex !== index) }))}>Xóa ngày</button>
+          </div>)}
+          <button type="button" className="btn btn-secondary btn-sm" disabled={patternForm.cycle.length >= 31} onClick={() => setPatternForm((form) => ({ ...form, cycle: [...form.cycle, { is_working: true, start_time: '09:00', end_time: '17:00', break_minutes: 60 }] }))}>Thêm ngày vào chu kỳ</button>
+        </div></div>
+        <div className="row"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !patternForm.employee || !patternForm.start_date || !patternForm.end_date || patternForm.end_date < patternForm.start_date || !patternForm.cycle.length}>{can('hrm.work_schedule_pattern.applied') ? 'Tạo và áp dụng lịch' : 'Lưu mẫu nháp'}</button></div>
+      </form>}
+      {can('hrm.work_schedule_pattern.read') && <div className="table-wrap" style={{ marginTop: 18 }}><table className="table"><thead><tr><th>Nhân viên</th><th>Khoảng ngày</th><th>Chu kỳ / múi giờ</th><th>Trạng thái</th><th/></tr></thead><tbody>{schedulePatterns.map((row) => <tr key={row.id}><td>{employeeMap.get(row.employee) ? recordLabel('hrm.employee', employeeMap.get(row.employee)) : 'Nhân viên'}</td><td>{fmtDate(row.start_date)} – {fmtDate(row.end_date)}</td><td>{Array.isArray(row.cycle) ? `${row.cycle.length} ngày` : '—'} · {row.timezone}</td><td>{statusLabel(row.status)}</td><td><div className="row wrap">{row.status === 'draft' && can('hrm.work_schedule_pattern.applied') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => applySchedulePattern(row)}>Áp dụng</button>}{row.status === 'draft' && can('hrm.work_schedule_pattern.delete') && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => removeSchedulePattern(row)}>Xóa nháp</button>}</div></td></tr>)}</tbody></table>{!schedulePatterns.length && <p className="small muted">Chưa có mẫu ca luân phiên.</p>}</div>}
+    </section>}
     {(can('hrm.work_schedule_entry.create') || can('hrm.work_schedule_entry.read')) && <section className="card card-pad" style={{ marginTop: 16 }}><h2>Lịch ca theo ngày</h2><p className="small muted">Mỗi dòng ghi đè lịch tuần của nhân viên trong đúng một ngày. Bỏ lịch để trở về lịch tuần; ca qua đêm được hỗ trợ.</p>{can('hrm.work_schedule_entry.create') && <form className="form-grid" onSubmit={saveScheduleEntry}><label className="field"><span className="label">Nhân viên *</span><select className="select" required value={scheduleForm.employee} onChange={(event) => setScheduleForm({ ...scheduleForm, employee: event.target.value })}><option value="">Chọn nhân viên</option>{activeEmployees.map((row) => <option key={row.id} value={row.id}>{recordLabel('hrm.employee', row)}</option>)}</select></label><label className="field"><span className="label">Ngày làm việc *</span><input className="input" required type="date" value={scheduleForm.work_date} onChange={(event) => setScheduleForm({ ...scheduleForm, work_date: event.target.value })}/></label><label className="row small" style={{ alignSelf: 'end', paddingBottom: 10 }}><input type="checkbox" checked={scheduleForm.is_working} onChange={(event) => setScheduleForm({ ...scheduleForm, is_working: event.target.checked })}/>Có ca làm việc trong ngày này</label>{scheduleForm.is_working && <><label className="field"><span className="label">Bắt đầu *</span><input className="input" required type="time" value={scheduleForm.start_time} onChange={(event) => setScheduleForm({ ...scheduleForm, start_time: event.target.value })}/></label><label className="field"><span className="label">Kết thúc *</span><input className="input" required type="time" value={scheduleForm.end_time} onChange={(event) => setScheduleForm({ ...scheduleForm, end_time: event.target.value })}/></label><label className="field"><span className="label">Nghỉ không tính giờ (phút)</span><input className="input num" type="number" min="0" max="1439" step="1" value={scheduleForm.break_minutes} onChange={(event) => setScheduleForm({ ...scheduleForm, break_minutes: event.target.value })}/></label></>}<div className="row"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !scheduleForm.employee || !scheduleForm.work_date}>{scheduleEntries.some((row) => row.employee === scheduleForm.employee && row.work_date === scheduleForm.work_date) ? 'Cập nhật lịch ngày' : 'Lưu lịch ngày'}</button></div></form>}{can('hrm.work_schedule_entry.read') && <><h3 style={{ marginTop: 18 }}>Ngoại lệ trong tháng {scheduleForm.work_date.slice(0, 7)}</h3>{scheduleEntriesThisMonth.length ? <div className="table-wrap"><table className="table"><thead><tr><th>Ngày</th><th>Nhân viên</th><th>Lịch áp dụng</th><th/></tr></thead><tbody>{scheduleEntriesThisMonth.map((row) => <tr key={row.id}><td>{fmtDate(row.work_date)}</td><td>{employeeMap.get(row.employee) ? recordLabel('hrm.employee', employeeMap.get(row.employee)) : 'Nhân viên'}</td><td>{row.is_working ? `${fmtTime(row.start_at)}–${fmtTime(row.end_at)} · nghỉ ${row.break_minutes || 0} phút` : 'Ngày nghỉ'}</td><td>{can('hrm.work_schedule_entry.delete') && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => removeScheduleEntry(row)}>Xóa ngoại lệ</button>}</td></tr>)}</tbody></table></div> : <p className="small muted">Chưa có ngoại lệ lịch trong tháng này.</p>}</>}</section>}
     {can('hrm.employee.create') && <section className="card card-pad" style={{ marginTop: 16 }}><h2>Tiếp nhận nhân viên</h2><form onSubmit={createEmployee}><div className="form-grid"><label className="field"><span className="label">Họ và tên *</span><input className="input" required value={employeeForm.name} onChange={(event) => setEmployeeForm({ ...employeeForm, name: event.target.value })}/></label><label className="field"><span className="label">Mã nhân viên</span><input className="input" value={employeeForm.code} onChange={(event) => setEmployeeForm({ ...employeeForm, code: event.target.value })}/></label><label className="field"><span className="label">Email</span><input className="input" type="email" value={employeeForm.email} onChange={(event) => setEmployeeForm({ ...employeeForm, email: event.target.value })}/></label><label className="field"><span className="label">Điện thoại</span><input className="input" type="tel" value={employeeForm.phone} onChange={(event) => setEmployeeForm({ ...employeeForm, phone: event.target.value })}/></label><label className="field"><span className="label">Phòng ban</span><select className="select" value={employeeForm.department} onChange={(event) => setEmployeeForm({ ...employeeForm, department: event.target.value })}><option value="">Chọn phòng ban</option>{[...departments.values()].map((row) => <option key={row.id} value={row.id}>{recordLabel('hrm.department', row)}</option>)}</select></label><label className="field"><span className="label">Chức danh</span><select className="select" value={employeeForm.position} onChange={(event) => setEmployeeForm({ ...employeeForm, position: event.target.value })}><option value="">Chọn chức danh</option>{[...positions.values()].map((row) => <option key={row.id} value={row.id}>{recordLabel('hrm.position', row)}</option>)}</select></label><label className="field"><span className="label">Ngày vào làm</span><input className="input" type="date" value={employeeForm.hire_date} onChange={(event) => setEmployeeForm({ ...employeeForm, hire_date: event.target.value })}/></label><label className="field"><span className="label">Lương cơ bản ban đầu</span><input className="input num" type="number" min="0" step="any" value={employeeForm.base_salary} onChange={(event) => setEmployeeForm({ ...employeeForm, base_salary: event.target.value })}/></label></div><div className="field" style={{ gridColumn: '1 / -1' }}><label className="row small"><input type="checkbox" checked={employeeForm.customSchedule} onChange={(event) => setEmployeeForm({ ...employeeForm, customSchedule: event.target.checked })}/>Lịch tuần và giờ chuẩn riêng cho nhân viên</label>{employeeForm.customSchedule && <div className="form-grid" style={{ marginTop: 8 }}><label className="field"><span className="label">Giờ chuẩn mỗi ngày</span><input className="input num" type="number" min="1" max="24" step="0.25" value={employeeForm.standard_hours_per_day} onChange={(event) => setEmployeeForm({ ...employeeForm, standard_hours_per_day: event.target.value })}/></label><fieldset className="field" style={{ border: 0, padding: 0, margin: 0 }}><legend className="label">Ngày làm việc</legend><div className="row wrap" style={{ gap: 10 }}>{weekdayOptions.map(([day, label]) => <label className="row small" key={day} style={{ gap: 5 }}><input type="checkbox" checked={employeeForm.work_weekdays.includes(day)} onChange={() => setEmployeeForm((current) => ({ ...current, work_weekdays: current.work_weekdays.includes(day) ? current.work_weekdays.filter((value) => value !== day) : [...current.work_weekdays, day].sort((a, b) => a - b) }))}/>{label}</label>)}</div></fieldset><span className="small muted" style={{ gridColumn: '1 / -1' }}>Nếu không bật, nhân viên dùng lịch làm việc và giờ chuẩn của kỳ lương.</span></div>}</div><div className="row" style={{ marginTop: 12 }}><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || (employeeForm.customSchedule && !employeeForm.work_weekdays.length)}>Tạo hồ sơ</button></div></form></section>}
 
