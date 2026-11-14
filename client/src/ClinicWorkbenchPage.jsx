@@ -15,6 +15,8 @@ export default function ClinicWorkbenchPage() {
   const [warehouses, setWarehouses] = useState(new Map());
   const [selectedId, setSelectedId] = useState('');
   const [patientId, setPatientId] = useState('');
+  const [patientRegistration, setPatientRegistration] = useState({ mode: can('master-data.party.create') ? 'new' : 'existing', party: '', name: '', phone: '', email: '', dob: '', gender: '', blood_type: '', allergies: '', insurance_no: '' });
+  const [pendingPatientParty, setPendingPatientParty] = useState(null);
   const [doctor, setDoctor] = useState(app.user?.name || '');
   const [complaint, setComplaint] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
@@ -49,6 +51,10 @@ export default function ClinicWorkbenchPage() {
   useEffect(() => { document.title = 'Điều phối phòng khám · OSP Suite'; load(); }, [load]);
 
   const selected = encounters.find((item) => item.id === selectedId) || null;
+  const availablePatientParties = useMemo(() => {
+    const registered = new Set(patients.map((item) => item.party));
+    return [...parties.values()].filter((party) => party.kind !== 'company' && !registered.has(party.id));
+  }, [parties, patients]);
   const patient = selected ? patients.find((item) => item.id === selected.patient) : null;
   const patientParty = patient ? parties.get(patient.party) : null;
   const encounterPrescriptions = useMemo(() => prescriptions.filter((item) => item.encounter === selectedId), [prescriptions, selectedId]);
@@ -71,6 +77,31 @@ export default function ClinicWorkbenchPage() {
       setNotice('Đã tiếp nhận lượt khám.');
     } catch (reason) { setError(reason.message || 'Không tạo được lượt khám.'); }
     finally { setBusy(false); }
+  };
+
+  const registerPatient = async (event) => {
+    event.preventDefault(); setBusy(true); setError(''); setNotice('');
+    try {
+      let partyId = pendingPatientParty?.id || (patientRegistration.mode === 'existing' ? patientRegistration.party : '');
+      if (!partyId) {
+        const party = await api(dataPath('master-data.party'), { method: 'POST', body: {
+          name: patientRegistration.name.trim(), kind: 'person', is_customer: true,
+          phone: patientRegistration.phone.trim() || undefined, email: patientRegistration.email.trim() || undefined,
+        } });
+        partyId = party.id;
+        setPendingPatientParty({ id: party.id, name: party.name || patientRegistration.name.trim() });
+      }
+      const patient = await api(dataPath('clinic.patient'), { method: 'POST', body: {
+        party: partyId, dob: patientRegistration.dob || undefined, gender: patientRegistration.gender || undefined,
+        blood_type: patientRegistration.blood_type.trim() || undefined, allergies: patientRegistration.allergies.trim() || undefined,
+        insurance_no: patientRegistration.insurance_no.trim() || undefined,
+      } });
+      await load(true); setPatientId(patient.id);
+      setPatientRegistration({ mode: can('master-data.party.create') ? 'new' : 'existing', party: '', name: '', phone: '', email: '', dob: '', gender: '', blood_type: '', allergies: '', insurance_no: '' });
+      setPendingPatientParty(null); setNotice('Đã đăng ký hồ sơ bệnh nhân. Có thể tiếp nhận lượt khám ngay.');
+    } catch (reason) {
+      setError(reason.message || 'Không đăng ký được hồ sơ bệnh nhân. Nếu thông tin liên hệ đã tạo, hãy thử lại để hoàn tất hồ sơ.');
+    } finally { setBusy(false); }
   };
 
   const completeEncounter = async (event) => {
@@ -122,6 +153,21 @@ export default function ClinicWorkbenchPage() {
     <div className="page-head"><div><h1>Điều phối phòng khám</h1><p className="sub">Tiếp nhận bệnh nhân, hoàn tất lượt khám, theo dõi xét nghiệm và phát thuốc theo kho. Hồ sơ được hiển thị theo quyền clinic của tài khoản.</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={() => load()}>Làm mới</button></div>
     {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
     {loading ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <>
+      {can('clinic.patient.create') && (can('master-data.party.create') || can('master-data.party.read')) && <section className="card clinic-intake"><div><h2>Đăng ký bệnh nhân</h2><p className="small muted">Tạo hồ sơ bệnh nhân và thông tin liên hệ; dị ứng, nhóm máu và bảo hiểm sẽ gắn với hồ sơ y tế.</p></div><form className="clinic-intake-form" onSubmit={registerPatient}>
+        {!pendingPatientParty && can('master-data.party.create') && <label className="field"><span className="label">Thông tin liên hệ *</span><select className="select" value={patientRegistration.mode} onChange={(event) => setPatientRegistration({ ...patientRegistration, mode: event.target.value, party: '' })}><option value="new">Tạo người liên hệ mới</option><option value="existing">Dùng người liên hệ có sẵn</option></select></label>}
+        {patientRegistration.mode === 'existing' && !pendingPatientParty ? <><label className="field"><span className="label">Người liên hệ *</span><select className="select" required value={patientRegistration.party} onChange={(event) => setPatientRegistration({ ...patientRegistration, party: event.target.value })}><option value="">Chọn người liên hệ</option>{availablePatientParties.map((party) => <option key={party.id} value={party.id}>{recordLabel('master-data.party', party)}</option>)}</select></label>{!availablePatientParties.length && <p className="small muted">Không còn người liên hệ cá nhân chưa có hồ sơ bệnh nhân.</p>}</> : <>
+          <label className="field"><span className="label">Họ tên *</span><input className="input" required disabled={!!pendingPatientParty} value={patientRegistration.name} onChange={(event) => setPatientRegistration({ ...patientRegistration, name: event.target.value })} /></label>
+          <label className="field"><span className="label">Điện thoại</span><input className="input" disabled={!!pendingPatientParty} value={patientRegistration.phone} onChange={(event) => setPatientRegistration({ ...patientRegistration, phone: event.target.value })} /></label>
+          <label className="field"><span className="label">Email</span><input className="input" type="email" disabled={!!pendingPatientParty} value={patientRegistration.email} onChange={(event) => setPatientRegistration({ ...patientRegistration, email: event.target.value })} /></label>
+        </>}
+        <label className="field"><span className="label">Ngày sinh</span><input className="input" type="date" value={patientRegistration.dob} onChange={(event) => setPatientRegistration({ ...patientRegistration, dob: event.target.value })} /></label>
+        <label className="field"><span className="label">Giới tính</span><select className="select" value={patientRegistration.gender} onChange={(event) => setPatientRegistration({ ...patientRegistration, gender: event.target.value })}><option value="">Chưa khai báo</option><option value="male">Nam</option><option value="female">Nữ</option><option value="other">Khác</option></select></label>
+        <label className="field"><span className="label">Nhóm máu</span><input className="input" value={patientRegistration.blood_type} onChange={(event) => setPatientRegistration({ ...patientRegistration, blood_type: event.target.value })} /></label>
+        <label className="field"><span className="label">Số bảo hiểm</span><input className="input" value={patientRegistration.insurance_no} onChange={(event) => setPatientRegistration({ ...patientRegistration, insurance_no: event.target.value })} /></label>
+        <label className="field"><span className="label">Dị ứng cần lưu ý</span><input className="input" value={patientRegistration.allergies} onChange={(event) => setPatientRegistration({ ...patientRegistration, allergies: event.target.value })} /></label>
+        {pendingPatientParty && <p className="small muted">Đã tạo liên hệ “{pendingPatientParty.name}”; gửi lại để hoàn tất hồ sơ bệnh nhân.</p>}
+        <button className="btn btn-primary" type="submit" disabled={busy || (patientRegistration.mode === 'existing' && !pendingPatientParty && !patientRegistration.party) || (patientRegistration.mode === 'new' && !patientRegistration.name.trim())}>Đăng ký hồ sơ</button>
+      </form></section>}
       <section className="card clinic-intake"><div><h2>Tiếp nhận lượt khám</h2><p className="small muted">Chỉ chọn hồ sơ bệnh nhân đã đăng ký; lượt khám tự liên kết đúng khách hàng của hồ sơ.</p></div><form className="clinic-intake-form" onSubmit={createEncounter}>
         <label className="field"><span className="label">Bệnh nhân *</span><select className="select" required value={patientId} onChange={(event) => setPatientId(event.target.value)}><option value="">Chọn hồ sơ</option>{patients.map((item) => <option key={item.id} value={item.id}>{recordLabel('master-data.party', parties.get(item.party))}</option>)}</select></label>
         <label className="field"><span className="label">Bác sĩ</span><input className="input" value={doctor} onChange={(event) => setDoctor(event.target.value)} /></label>
