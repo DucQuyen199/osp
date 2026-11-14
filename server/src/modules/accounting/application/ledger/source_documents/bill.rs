@@ -134,8 +134,72 @@ pub(super) async fn handle(
             )?);
         }
         if supplier_invoice_id.is_some() {
+            let mut adjustment_net = Decimal::ZERO;
+            if let Some(adjustments) = event.get("purchase_adjustments").and_then(Value::as_array) {
+                for adjustment in adjustments {
+                    let kind = adjustment
+                        .get("kind")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default();
+                    let amount = adjustment
+                        .get("amount")
+                        .and_then(crate::money::decimal)
+                        .ok_or_else(|| {
+                            crate::error::ApiError::validation(
+                                "accounting.bill",
+                                vec!["Supplier invoice adjustment amount is invalid".into()],
+                            )
+                        })?;
+                    let code = adjustment
+                        .get("account_code")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default();
+                    if amount <= Decimal::ZERO || !matches!(kind, "charge" | "discount") {
+                        return Err(crate::error::ApiError::validation(
+                            "accounting.bill",
+                            vec!["Supplier invoice adjustment is invalid".into()],
+                        ));
+                    }
+                    let sign = if kind == "discount" {
+                        Decimal::NEGATIVE_ONE
+                    } else {
+                        Decimal::ONE
+                    };
+                    let signed_amount = amount
+                        .checked_mul(sign)
+                        .ok_or_else(|| overflow_error(event_type))?;
+                    adjustment_net = adjustment_net
+                        .checked_add(signed_amount)
+                        .ok_or_else(|| overflow_error(event_type))?;
+                    if code != "632" {
+                        return Err(crate::error::ApiError::validation(
+                            "accounting.bill",
+                            vec!["Supplier invoice adjustment account is invalid".into()],
+                        ));
+                    }
+                    let account =
+                        ensure_account(kernel, tx, tenant, "632", "Chênh lệch giá mua", "expense")
+                            .await?;
+                    if signed_amount > Decimal::ZERO {
+                        lines.push(journal_line_decimal_with_department(
+                            account,
+                            signed_amount,
+                            Decimal::ZERO,
+                            department,
+                        )?);
+                    } else {
+                        lines.push(journal_line_decimal_with_department(
+                            account,
+                            Decimal::ZERO,
+                            signed_amount.abs(),
+                            department,
+                        )?);
+                    }
+                }
+            }
             let variance = net
                 .checked_sub(clear_amount)
+                .and_then(|value| value.checked_sub(adjustment_net))
                 .ok_or_else(|| overflow_error(event_type))?;
             if variance.abs() > amount_tolerance() {
                 let price_variance =

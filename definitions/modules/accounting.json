@@ -333,6 +333,12 @@
      "required": false,
      "system": true
     },
+    {
+     "name": "purchase_adjustments",
+     "type": "json",
+     "required": false,
+     "system": true
+    },
    {
     "name": "department",
     "type": "ref",

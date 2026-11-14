@@ -84,6 +84,101 @@ fn add_lines(
     Ok(())
 }
 
+fn adjustment_totals(lines: &Value) -> R<(Decimal, Decimal)> {
+    let lines = lines.as_array().ok_or_else(|| {
+        ApiError::validation(
+            "purchasing.supplier_invoice.adjustments",
+            vec!["Invoice adjustments must be an array".into()],
+        )
+    })?;
+    let mut net_total = Decimal::ZERO;
+    let mut tax_total = Decimal::ZERO;
+    for line in lines {
+        let kind = line.get("kind").and_then(Value::as_str).unwrap_or_default();
+        let amount = line.get("amount").and_then(money::decimal);
+        let tax_rate = line.get("tax_rate").and_then(money::decimal);
+        let tax_amount = line.get("tax_amount").and_then(money::decimal);
+        let description = line
+            .get("description")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .is_some_and(|value| !value.is_empty());
+        let account = line
+            .get("account_code")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let (Some(amount), Some(tax_rate), Some(tax_amount)) = (amount, tax_rate, tax_amount)
+        else {
+            return Err(ApiError::validation(
+                "purchasing.supplier_invoice.adjustments",
+                vec!["Invoice adjustment amounts are invalid".into()],
+            ));
+        };
+        if !matches!(kind, "charge" | "discount")
+            || !description
+            || amount <= Decimal::ZERO
+            || !(Decimal::ZERO..=Decimal::ONE_HUNDRED).contains(&tax_rate)
+            || tax_amount < Decimal::ZERO
+            || account != "632"
+        {
+            return Err(ApiError::validation(
+                "purchasing.supplier_invoice.adjustments",
+                vec![
+                    "Invoice adjustment type, amount, tax, description, or account is invalid"
+                        .into(),
+                ],
+            ));
+        }
+        let expected_tax =
+            crate::money::line_amounts(Decimal::ONE, amount, Decimal::ZERO, tax_rate)
+                .map(|(_, _, tax, _)| tax)
+                .ok_or_else(|| {
+                    ApiError::validation(
+                        "purchasing.supplier_invoice.adjustments",
+                        vec!["Invoice adjustment exceeds the supported range".into()],
+                    )
+                })?;
+        if expected_tax != tax_amount {
+            return Err(ApiError::validation(
+                "purchasing.supplier_invoice.adjustments",
+                vec!["Invoice adjustment tax does not match its tax rate".into()],
+            ));
+        }
+        let sign = if kind == "discount" {
+            Decimal::NEGATIVE_ONE
+        } else {
+            Decimal::ONE
+        };
+        net_total = net_total
+            .checked_add(amount.checked_mul(sign).ok_or_else(|| {
+                ApiError::validation(
+                    "purchasing.supplier_invoice.adjustments",
+                    vec!["Invoice adjustment amount exceeds the supported range".into()],
+                )
+            })?)
+            .ok_or_else(|| {
+                ApiError::validation(
+                    "purchasing.supplier_invoice.adjustments",
+                    vec!["Invoice adjustments exceed the supported range".into()],
+                )
+            })?;
+        tax_total = tax_total
+            .checked_add(tax_amount.checked_mul(sign).ok_or_else(|| {
+                ApiError::validation(
+                    "purchasing.supplier_invoice.adjustments",
+                    vec!["Invoice adjustment tax exceeds the supported range".into()],
+                )
+            })?)
+            .ok_or_else(|| {
+                ApiError::validation(
+                    "purchasing.supplier_invoice.adjustments",
+                    vec!["Invoice adjustment tax exceeds the supported range".into()],
+                )
+            })?;
+    }
+    Ok((net_total, tax_total))
+}
+
 pub(super) async fn validate(
     tx: &Tx<'_>,
     tenant: &Tenant,
@@ -164,6 +259,26 @@ pub(super) async fn validate(
                 vec!["Matched receipt value is missing".into()],
             )
         })?;
+        let adjustment_net = amount(document, "adjustment_net").ok_or_else(|| {
+            ApiError::validation(
+                "purchasing.supplier_invoice.adjustment_net",
+                vec!["Invoice adjustment net is missing".into()],
+            )
+        })?;
+        let adjustment_tax = amount(document, "adjustment_tax").ok_or_else(|| {
+            ApiError::validation(
+                "purchasing.supplier_invoice.adjustment_tax",
+                vec!["Invoice adjustment tax is missing".into()],
+            )
+        })?;
+        let (expected_adjustment_net, expected_adjustment_tax) = adjustment_totals(
+            document
+                .get("adjustments")
+                .unwrap_or(&Value::Array(Vec::new())),
+        )?;
+        if adjustment_net != expected_adjustment_net || adjustment_tax != expected_adjustment_tax {
+            errors.push("Invoice adjustment totals do not match the adjustment lines".into());
+        }
         let net = total.checked_sub(tax).ok_or_else(|| {
             ApiError::validation(
                 "purchasing.supplier_invoice.total",
@@ -237,7 +352,11 @@ pub(super) async fn validate(
             ]);
         };
         add_lines(&mut billed, current_lines, true)?;
-        if billed.is_empty()
+        let has_adjustments = document
+            .get("adjustments")
+            .and_then(Value::as_array)
+            .is_some_and(|lines| !lines.is_empty());
+        if (billed.is_empty() && !has_adjustments)
             || billed.iter().any(|(key, qty)| {
                 received
                     .get(key)
@@ -247,7 +366,7 @@ pub(super) async fn validate(
                     .is_none_or(|limit| *qty > limit)
             })
         {
-            errors.push("Cumulative supplier invoice quantities cannot exceed quantities received at the same unit prices".into());
+            errors.push("An invoice needs matched goods or a charge/discount line, and cumulative quantities cannot exceed receipts at PO prices".into());
         }
         if tx.query_opt(
             "SELECT id FROM accounting__bill WHERE tenant_id=$1 AND source='purchase_order' AND source_id=$2 AND supplier_invoice_id IS NULL AND status<>'void' LIMIT 1 FOR UPDATE",

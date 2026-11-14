@@ -329,6 +329,9 @@
     { "name": "tax_total", "type": "money", "required": false, "system": true },
     { "name": "matched_net", "type": "money", "required": false, "system": true },
     { "name": "price_variance", "type": "money", "required": false, "system": true },
+    { "name": "adjustments", "type": "json", "required": false },
+    { "name": "adjustment_net", "type": "money", "required": false, "system": true },
+    { "name": "adjustment_tax", "type": "money", "required": false, "system": true },
     { "name": "lines", "type": "json", "required": true },
     { "name": "status", "type": "enum", "required": false, "options": ["draft", "approved"] }
    ],

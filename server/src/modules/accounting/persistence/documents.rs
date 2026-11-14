@@ -164,7 +164,7 @@ pub(super) async fn validate_posted_document(
                     .unwrap_or_else(|| Value::Array(Vec::new()));
                 let expected_bill = if let Some(invoice_id) = supplier_invoice_id {
                     match tx.query_opt(
-                        "SELECT purchase_order,supplier,total::text,COALESCE(tax_total,0)::text,status,lines,invoice_number,department,COALESCE(matched_net,0)::text FROM purchasing__supplier_invoice WHERE tenant_id=$1 AND id=$2 FOR UPDATE",
+                        "SELECT purchase_order,supplier,total::text,COALESCE(tax_total,0)::text,status,lines,invoice_number,department,COALESCE(matched_net,0)::text,COALESCE(adjustments,'[]'::jsonb) FROM purchasing__supplier_invoice WHERE tenant_id=$1 AND id=$2 FOR UPDATE",
                         &[&tenant.id, &invoice_id],
                     ).await? {
                         Some(invoice) => {
@@ -177,6 +177,7 @@ pub(super) async fn validate_posted_document(
                             let invoice_number: String = invoice.get(6);
                             let invoice_department: Option<Uuid> = invoice.get(7);
                             let matched_net = database_amount(&invoice, 8)?;
+                            let invoice_adjustments: Value = invoice.get(9);
                             if invoice_order != order_id || invoice_supplier != supplier {
                                 errors.push("Supplier invoice does not match the source purchase order".into());
                             }
@@ -197,6 +198,11 @@ pub(super) async fn validate_posted_document(
                             }
                             if !amount(document, "grni_match_amount").is_some_and(|value| money::within_tolerance(value, matched_net, amount_tolerance())) {
                                 errors.push("Bill receipt-matched value must match its supplier invoice".into());
+                            }
+                            if document.get("purchase_adjustments").unwrap_or(&Value::Null)
+                                != &invoice_adjustments
+                            {
+                                errors.push("Bill purchase adjustments must match its supplier invoice".into());
                             }
                             Some(invoice_lines)
                         }

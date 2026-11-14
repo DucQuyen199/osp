@@ -463,6 +463,175 @@ async fn prepare_document_with_lock(
             }
         }
     }
+    if entity == "supplier_invoice" {
+        let adjustment_lines = document
+            .entry("adjustments")
+            .or_insert_with(|| Value::Array(Vec::new()));
+        let Some(adjustment_lines) = adjustment_lines.as_array_mut() else {
+            return Ok(vec!["Invoice adjustments must be an array".into()]);
+        };
+        let mut adjustment_net = Decimal::ZERO;
+        let mut adjustment_tax = Decimal::ZERO;
+        for (index, line) in adjustment_lines.iter_mut().enumerate() {
+            let Some(line) = line.as_object_mut() else {
+                errors.push(format!(
+                    "Invoice adjustment {} must be an object",
+                    index + 1
+                ));
+                continue;
+            };
+            let kind = line
+                .get("kind")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned();
+            let description = line
+                .get("description")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty());
+            let Some(amount) = line.get("amount").and_then(money::decimal) else {
+                errors.push(format!(
+                    "Invoice adjustment {} amount is invalid",
+                    index + 1
+                ));
+                continue;
+            };
+            let account_code = line
+                .get("account_code")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            if !matches!(kind.as_str(), "charge" | "discount")
+                || description.is_none()
+                || amount <= Decimal::ZERO
+            {
+                errors.push(format!(
+                    "Invoice adjustment {} needs a description, a positive amount, and charge/discount type",
+                    index + 1
+                ));
+                continue;
+            }
+            if account_code != "632" {
+                errors.push(format!(
+                    "Invoice adjustment {} must post to purchase expense (632)",
+                    index + 1
+                ));
+                continue;
+            }
+            let tax_rate = if let Some(tax_id) = line.get("tax").and_then(Value::as_str) {
+                let Some(tax_id) = Uuid::parse_str(tax_id).ok() else {
+                    errors.push(format!("Invoice adjustment {} tax is invalid", index + 1));
+                    continue;
+                };
+                let tax = tx.query_opt(
+                    &format!("SELECT name, rate::text FROM master_data__tax WHERE tenant_id = $1 AND id = $2{lock}"),
+                    &[&tenant.id, &tax_id],
+                ).await?;
+                let Some(tax) = tax else {
+                    errors.push(format!(
+                        "Invoice adjustment {} tax does not belong to this tenant",
+                        index + 1
+                    ));
+                    continue;
+                };
+                let Some(rate) = money::decimal_str(&tax.get::<_, String>(1)) else {
+                    errors.push(format!(
+                        "Invoice adjustment {} tax rate is invalid",
+                        index + 1
+                    ));
+                    continue;
+                };
+                if !(Decimal::ZERO..=Decimal::ONE_HUNDRED).contains(&rate) {
+                    errors.push(format!(
+                        "Invoice adjustment {} tax rate must be between 0 and 100",
+                        index + 1
+                    ));
+                    continue;
+                }
+                line.insert("tax_name".into(), json!(tax.get::<_, String>(0)));
+                rate
+            } else {
+                line.remove("tax_name");
+                Decimal::ZERO
+            };
+            let Some((_, _, tax_amount, _)) =
+                money::line_amounts(Decimal::ONE, amount, Decimal::ZERO, tax_rate)
+            else {
+                errors.push(format!(
+                    "Invoice adjustment {} exceeds the supported amount range",
+                    index + 1
+                ));
+                continue;
+            };
+            let sign = if kind == "discount" {
+                Decimal::NEGATIVE_ONE
+            } else {
+                Decimal::ONE
+            };
+            let Some(signed_net) = amount.checked_mul(sign) else {
+                errors.push(format!(
+                    "Invoice adjustment {} exceeds the supported amount range",
+                    index + 1
+                ));
+                continue;
+            };
+            let Some(signed_tax) = tax_amount.checked_mul(sign) else {
+                errors.push(format!(
+                    "Invoice adjustment {} tax exceeds the supported amount range",
+                    index + 1
+                ));
+                continue;
+            };
+            let Some(next_adjustment_net) = adjustment_net.checked_add(signed_net) else {
+                errors.push("Invoice adjustments exceed the supported net amount".into());
+                continue;
+            };
+            let Some(next_adjustment_tax) = adjustment_tax.checked_add(signed_tax) else {
+                errors.push("Invoice adjustment tax exceeds the supported amount".into());
+                continue;
+            };
+            adjustment_net = next_adjustment_net;
+            adjustment_tax = next_adjustment_tax;
+            line.insert("tax_rate".into(), json!(tax_rate));
+            if let (Some(amount_value), Some(tax_value)) =
+                (money::json_number(amount), money::json_number(tax_amount))
+            {
+                line.insert("amount".into(), amount_value);
+                line.insert("tax_amount".into(), tax_value);
+            } else {
+                errors.push(format!(
+                    "Invoice adjustment {} cannot be serialized",
+                    index + 1
+                ));
+            }
+        }
+        let Some(next_total) = total
+            .checked_add(adjustment_net)
+            .and_then(|value| value.checked_add(adjustment_tax))
+        else {
+            errors.push("Supplier invoice total exceeds the supported amount".into());
+            return Ok(errors);
+        };
+        let (Some(next_tax_total), Some(next_net_total)) = (
+            tax_total.checked_add(adjustment_tax),
+            net_total.checked_add(adjustment_net),
+        ) else {
+            errors.push("Supplier invoice tax or net amount exceeds the supported range".into());
+            return Ok(errors);
+        };
+        total = next_total;
+        tax_total = next_tax_total;
+        net_total = next_net_total;
+        if let (Some(net_value), Some(tax_value)) = (
+            money::json_number(adjustment_net),
+            money::json_number(adjustment_tax),
+        ) {
+            document.insert("adjustment_net".into(), net_value);
+            document.insert("adjustment_tax".into(), tax_value);
+        } else {
+            errors.push("Supplier invoice adjustments cannot be serialized".into());
+        }
+    }
     if matches!(
         entity,
         "purchase_order" | "purchase_return" | "purchase_receipt" | "supplier_invoice"

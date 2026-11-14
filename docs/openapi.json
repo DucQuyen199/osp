@@ -406,6 +406,10 @@
             "readOnly": true,
             "type": "number"
           },
+          "purchase_adjustments": {
+            "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)",
+            "readOnly": true
+          },
           "source": {
             "type": "string"
           },
@@ -507,6 +511,10 @@
           "paid_amount": {
             "readOnly": true,
             "type": "number"
+          },
+          "purchase_adjustments": {
+            "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)",
+            "readOnly": true
           },
           "source": {
             "type": "string"
@@ -12938,6 +12946,17 @@
       "purchasing_supplier_invoice": {
         "description": "Hóa đơn nhà cung cấp",
         "properties": {
+          "adjustment_net": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "adjustment_tax": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "adjustments": {
+            "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
+          },
           "createdAt": {
             "format": "date-time",
             "readOnly": true,
@@ -13013,6 +13032,17 @@
         "additionalProperties": false,
         "description": "Hóa đơn nhà cung cấp (dữ liệu gửi lên)",
         "properties": {
+          "adjustment_net": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "adjustment_tax": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "adjustments": {
+            "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
+          },
           "department": {
             "description": "Tham chiếu tới hrm.department",
             "format": "uuid",
