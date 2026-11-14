@@ -106,6 +106,16 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
         ];
     }
     match (entity, action) {
+        ("claim", "rejected") => {
+            let reason = document
+                .get("rejection_reason")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .unwrap_or_default();
+            if !(5..=1000).contains(&reason.chars().count()) {
+                return vec!["Cần ghi lý do từ chối bồi thường (5–1000 ký tự)".into()];
+            }
+        }
         ("policy", "activated") => {
             if date(document, "start_date").is_none() || date(document, "end_date").is_none() {
                 return vec![
@@ -149,6 +159,14 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
 pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<String> {
     if !patch.as_object().is_some_and(|patch| !patch.is_empty()) {
         return Vec::new();
+    }
+    if entity == "claim"
+        && let Some(reason) = patch.get("rejection_reason")
+    {
+        let reason = reason.as_str().map(str::trim).unwrap_or_default();
+        if !(5..=1000).contains(&reason.chars().count()) {
+            return vec!["Lý do từ chối bồi thường phải có từ 5 đến 1000 ký tự".into()];
+        }
     }
     if entity == "claim"
         && current.get("status").and_then(Value::as_str) == Some("approved")

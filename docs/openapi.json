@@ -7276,6 +7276,9 @@
             "format": "uuid",
             "type": "string"
           },
+          "rejection_reason": {
+            "type": "string"
+          },
           "status": {
             "enum": [
               "submitted",
@@ -7329,6 +7332,9 @@
           "policy": {
             "description": "Tham chiếu tới insurance.policy",
             "format": "uuid",
+            "type": "string"
+          },
+          "rejection_reason": {
             "type": "string"
           }
         },
@@ -71248,7 +71254,7 @@
     },
     "/api/t/{tenantId}/data/insurance/claim/{id}/approved": {
       "post": {
-        "description": "Phát sự kiện `insurance.claim.approved` cho các module khác phản ứng.",
+        "description": "Record the approved claim amount and approve the claim atomically with the tenant-locked cumulative policy-limit check.",
         "parameters": [
           {
             "in": "path",
@@ -71268,6 +71274,26 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "approved_amount": {
+                    "exclusiveMinimum": 0,
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "approved_amount"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -71333,7 +71359,7 @@
     },
     "/api/t/{tenantId}/data/insurance/claim/{id}/paid": {
       "post": {
-        "description": "Phát sự kiện `insurance.claim.paid` cho các module khác phản ứng.",
+        "description": "Record the payout method and expense account, pay the approved claim, and post its accounting journal atomically.",
         "parameters": [
           {
             "in": "path",
@@ -71353,6 +71379,34 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "expense_account": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "method": {
+                    "enum": [
+                      "cash",
+                      "bank"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "method",
+                  "expense_account"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -71418,7 +71472,7 @@
     },
     "/api/t/{tenantId}/data/insurance/claim/{id}/rejected": {
       "post": {
-        "description": "Phát sự kiện `insurance.claim.rejected` cho các module khác phản ứng.",
+        "description": "Retain the required reason on the claim history while rejecting it in one transaction.",
         "parameters": [
           {
             "in": "path",
@@ -71438,6 +71492,27 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "rejection_reason": {
+                    "maxLength": 1000,
+                    "minLength": 5,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "rejection_reason"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {

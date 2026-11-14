@@ -127,6 +127,12 @@
           "required": false
         },
         {
+          "name": "rejection_reason",
+          "label": "Lý do từ chối bồi thường",
+          "type": "text",
+          "required": false
+        },
+        {
           "name": "expense_account",
           "type": "ref",
           "required": false,

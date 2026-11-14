@@ -28,6 +28,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Sổ học phí liên kết ghi danh với khoản thu; phát hành tạo hóa đơn kế toán có đúng hạn thanh toán và thanh toán đủ tự đồng bộ trạng thái học phí.
 - Bán và hoàn vé sự kiện lưu phương thức thanh toán/lý do hoàn cùng lần chuyển trạng thái; bút toán kế toán và trạng thái vé cùng commit hoặc rollback.
 - Nhà hàng ghi nhận phương thức thanh toán và lý do hủy cùng lần chuyển trạng thái; xuất kho, thanh toán và hủy phiếu bếp chờ cùng commit hoặc rollback.
+- Bảo hiểm lưu lý do từ chối bồi thường; số tiền duyệt, quyết định bồi thường và thông tin chi trả cùng kiểm tra hạn mức/bút toán trong giao dịch.
 - Ký thầu phụ chỉ ghi nhận cam kết chi phí; hồ sơ nghiệm thu/đề nghị thanh toán có giá trị lũy kế được giới hạn trong hợp đồng và chỉ phát sinh hóa đơn phải trả sau khi duyệt.
 - Mua hàng chỉ ghi nhận GRNI khi nhận kho; nhiều hóa đơn nhà cung cấp theo từng đợt nhận được đối chiếu lũy kế với số lượng nhận/trả và GRNI, công nợ chỉ phát sinh sau khi duyệt từng hóa đơn; hàng trả trước hóa đơn giảm GRNI, hàng trả sau hóa đơn gắn với bill để điều chỉnh giảm phải trả.
 - BI hỗ trợ tự thiết kế báo cáo dòng/tổng hợp, dashboard, KPI, snapshot theo lịch ngày/tuần và gửi CSV qua hàng đợi email; lịch chạy được ràng buộc với người tạo/lên lịch và tự dừng khi người đó mất quyền đọc dữ liệu hoặc bị khóa.

@@ -222,6 +222,55 @@ pub fn build(reg: &Registry) -> Value {
                             } } }
                         });
                     }
+                    if def.qname() == "insurance.claim" && action == "approved" {
+                        operation["description"] = json!(
+                            "Record the approved claim amount and approve the claim atomically with the tenant-locked cumulative policy-limit check."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": true,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "required": ["approved_amount"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "approved_amount": { "type": "number", "exclusiveMinimum": 0 }
+                                }
+                            } } }
+                        });
+                    }
+                    if def.qname() == "insurance.claim" && action == "rejected" {
+                        operation["description"] = json!(
+                            "Retain the required reason on the claim history while rejecting it in one transaction."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": true,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "required": ["rejection_reason"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "rejection_reason": { "type": "string", "minLength": 5, "maxLength": 1000 }
+                                }
+                            } } }
+                        });
+                    }
+                    if def.qname() == "insurance.claim" && action == "paid" {
+                        operation["description"] = json!(
+                            "Record the payout method and expense account, pay the approved claim, and post its accounting journal atomically."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": true,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "required": ["method", "expense_account"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "method": { "type": "string", "enum": ["cash", "bank"] },
+                                    "expense_account": { "type": "string", "format": "uuid" }
+                                }
+                            } } }
+                        });
+                    }
                     paths.insert(
                         format!("{base}/{{id}}/{action}"),
                         json!({ "post": operation }),

@@ -1805,6 +1805,30 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                         return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
                     }
                 }
+                if q == "insurance.claim" && matches!(*action, "approved" | "rejected" | "paid") {
+                    let body = json_obj(&bytes)?;
+                    let valid = match *action {
+                        "approved" => body.len() == 1 && body.contains_key("approved_amount"),
+                        "rejected" => body.len() == 1 && body.contains_key("rejection_reason"),
+                        "paid" => {
+                            body.len() == 2
+                                && body.contains_key("method")
+                                && body.contains_key("expense_account")
+                        }
+                        _ => false,
+                    };
+                    if !valid {
+                        return Err(ApiError::validation(
+                            match *action {
+                                "approved" => "insurance.claim.approved",
+                                "rejected" => "insurance.claim.rejected",
+                                _ => "insurance.claim.paid",
+                            },
+                            vec!["Dữ liệu action bồi thường thiếu trường bắt buộc hoặc có trường không được hỗ trợ".into()],
+                        ));
+                    }
+                    return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
+                }
                 return json_ok(k.act(&actor, &t, &q, id, action).await?);
             }
             _ => {}

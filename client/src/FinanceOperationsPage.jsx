@@ -17,6 +17,7 @@ export default function FinanceOperationsPage() {
   const [invoices, setInvoices] = useState([]);
   const [claimPay, setClaimPay] = useState({});
   const [claimApprovalAmounts, setClaimApprovalAmounts] = useState({});
+  const [claimRejectionReasons, setClaimRejectionReasons] = useState({});
   const [repaymentMethods, setRepaymentMethods] = useState({});
   const [loanForm, setLoanForm] = useState({ party: '', principal: '', rate: '', term_months: '12', method: 'bank' });
   const [policyForm, setPolicyForm] = useState({ number: '', party: '', product: '', premium: '', coverage_limit: '', start_date: today(), end_date: '' });
@@ -120,8 +121,7 @@ export default function FinanceOperationsPage() {
     const values = claimPay[claim.id] || {};
     setBusy(true); setError(''); setNotice('');
     try {
-      await api(dataPath('insurance.claim', claim.id), { method: 'PATCH', body: { method: values.method, expense_account: values.expense_account } });
-      await actions('insurance.claim', claim, 'paid');
+      await api(dataPath('insurance.claim', claim.id, 'paid'), { method: 'POST', body: { method: values.method, expense_account: values.expense_account } });
       setNotice('Đã chi trả bồi thường và ghi bút toán kế toán.'); await load();
     } catch (reason) { setError(reason.message || 'Không thể chi trả hồ sơ bồi thường.'); }
     finally { setBusy(false); }
@@ -130,14 +130,19 @@ export default function FinanceOperationsPage() {
   async function claimAction(claim, action) {
     setBusy(true); setError(''); setNotice('');
     try {
+      let body;
       if (action === 'approved') {
         const approvedAmount = Number(claimApprovalAmounts[claim.id] ?? claim.amount);
         if (!Number.isFinite(approvedAmount) || approvedAmount <= 0 || approvedAmount > Number(claim.amount)) {
           throw new Error('Số tiền duyệt phải lớn hơn 0 và không vượt số tiền yêu cầu.');
         }
-        await api(dataPath('insurance.claim', claim.id), { method: 'PATCH', body: { approved_amount: approvedAmount } });
+        body = { approved_amount: approvedAmount };
+      } else {
+        const reason = (claimRejectionReasons[claim.id] || '').trim();
+        if (reason.length < 5 || reason.length > 1000) throw new Error('Nhập lý do từ chối từ 5 đến 1000 ký tự.');
+        body = { rejection_reason: reason };
       }
-      await actions('insurance.claim', claim, action);
+      await api(dataPath('insurance.claim', claim.id, action), { method: 'POST', body });
       setNotice(action === 'approved' ? 'Đã duyệt hồ sơ bồi thường.' : 'Đã từ chối hồ sơ bồi thường.'); await load();
     } catch (reason) { setError(reason.message || 'Không thể cập nhật hồ sơ bồi thường.'); }
     finally { setBusy(false); }
@@ -192,7 +197,13 @@ export default function FinanceOperationsPage() {
         <label className="field full"><span className="label">Mô tả sự cố</span><textarea className="textarea" value={claimForm.description} onChange={(e) => setClaimForm((x) => ({ ...x, description: e.target.value }))} /></label>
         <div className="row full"><span className="grow" /><button className="btn btn-primary" disabled={busy || loading || !activePolicies.length}>Tiếp nhận hồ sơ</button></div>
       </form>}
-      {!claims.length && !loading ? <div className="empty">Chưa có hồ sơ bồi thường.</div> : <div className="table-wrap" style={{ marginTop: 12 }}><table className="table"><thead><tr><th>Mã hồ sơ</th><th>Hợp đồng</th><th>Sự cố</th><th>Yêu cầu / duyệt</th><th>Trạng thái</th><th>Thẩm định / chi trả</th></tr></thead><tbody>{claims.map((claim) => { const policy = policies.find((item) => item.id === claim.policy); const pay = claimPay[claim.id] || {}; return <tr key={claim.id}><td>{claim.number}<div className="small muted">{claim.description}</div></td><td>{policy?.number || 'Hợp đồng'}</td><td>{fmtDate(claim.incident_date)}</td><td><div>Yêu cầu: {money(claim.amount)}</div>{claim.status === 'submitted' && can('insurance.claim.approved') ? <label className="field"><span className="small muted">Số tiền duyệt</span><input className="input num" aria-label="Số tiền bồi thường được duyệt" type="number" min="0.01" max={claim.amount} step="any" value={claimApprovalAmounts[claim.id] ?? claim.amount} onChange={(event) => setClaimApprovalAmounts((current) => ({ ...current, [claim.id]: event.target.value }))} /></label> : claim.approved_amount != null && <div className="small">Duyệt: {money(claim.approved_amount)}</div>}</td><td>{statusLabel(claim.status)}</td><td className="row wrap">{claim.status === 'submitted' && can('insurance.claim.approved') && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => claimAction(claim, 'approved')}>Duyệt</button>}{claim.status === 'submitted' && can('insurance.claim.rejected') && <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => claimAction(claim, 'rejected')}>Từ chối</button>}{claim.status === 'approved' && can('insurance.claim.paid') && <><select className="select" aria-label="Phương thức chi trả" value={pay.method || ''} onChange={(e) => setClaimPay((x) => ({ ...x, [claim.id]: { ...pay, method: e.target.value } }))}><option value="">Phương thức</option><option value="bank">Ngân hàng</option><option value="cash">Tiền mặt</option></select><select className="select" aria-label="Tài khoản chi phí bồi thường" value={pay.expense_account || ''} onChange={(e) => setClaimPay((x) => ({ ...x, [claim.id]: { ...pay, expense_account: e.target.value } }))}><option value="">Tài khoản chi phí</option>{accounts.filter((a) => a.kind === 'expense').map((a) => <option key={a.id} value={a.id}>{a.code} · {a.name}</option>)}</select><button className="btn btn-primary btn-sm" disabled={busy || !pay.method || !pay.expense_account} onClick={() => payClaim(claim)}>Chi trả</button></>}</td></tr>; })}</tbody></table></div>}
+      {!claims.length && !loading ? <div className="empty">Chưa có hồ sơ bồi thường.</div> : <div className="table-wrap" style={{ marginTop: 12 }}><table className="table"><thead><tr><th>Mã hồ sơ</th><th>Hợp đồng</th><th>Sự cố</th><th>Yêu cầu / duyệt</th><th>Trạng thái</th><th>Thẩm định / chi trả</th></tr></thead><tbody>{claims.map((claim) => {
+        const policy = policies.find((item) => item.id === claim.policy); const pay = claimPay[claim.id] || {};
+        const canApprove = can('insurance.claim.approved') && can('insurance.claim.update');
+        const canReject = can('insurance.claim.rejected') && can('insurance.claim.update');
+        const canPay = can('insurance.claim.paid') && can('insurance.claim.update');
+        return <tr key={claim.id}><td>{claim.number}<div className="small muted">{claim.description}</div>{claim.status === 'rejected' && claim.rejection_reason && <div className="small">Lý do từ chối: {claim.rejection_reason}</div>}</td><td>{policy?.number || 'Hợp đồng'}</td><td>{fmtDate(claim.incident_date)}</td><td><div>Yêu cầu: {money(claim.amount)}</div>{claim.status === 'submitted' && canApprove ? <label className="field"><span className="small muted">Số tiền duyệt</span><input className="input num" aria-label="Số tiền bồi thường được duyệt" type="number" min="0.01" max={claim.amount} step="any" value={claimApprovalAmounts[claim.id] ?? claim.amount} onChange={(event) => setClaimApprovalAmounts((current) => ({ ...current, [claim.id]: event.target.value }))} /></label> : claim.approved_amount != null && <div className="small">Duyệt: {money(claim.approved_amount)}</div>}</td><td>{statusLabel(claim.status)}</td><td className="row wrap">{claim.status === 'submitted' && canApprove && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => claimAction(claim, 'approved')}>Duyệt</button>}{claim.status === 'submitted' && canReject && <><label className="field"><span className="small muted">Lý do từ chối *</span><textarea className="textarea" rows="2" maxLength="1000" value={claimRejectionReasons[claim.id] || ''} onChange={(event) => setClaimRejectionReasons((current) => ({ ...current, [claim.id]: event.target.value }))} /></label><button className="btn btn-ghost btn-sm" disabled={busy || (claimRejectionReasons[claim.id] || '').trim().length < 5} onClick={() => claimAction(claim, 'rejected')}>Từ chối</button></>}{claim.status === 'approved' && canPay && <><select className="select" aria-label="Phương thức chi trả" value={pay.method || ''} onChange={(e) => setClaimPay((x) => ({ ...x, [claim.id]: { ...pay, method: e.target.value } }))}><option value="">Phương thức</option><option value="bank">Ngân hàng</option><option value="cash">Tiền mặt</option></select><select className="select" aria-label="Tài khoản chi phí bồi thường" value={pay.expense_account || ''} onChange={(e) => setClaimPay((x) => ({ ...x, [claim.id]: { ...pay, expense_account: e.target.value } }))}><option value="">Tài khoản chi phí</option>{accounts.filter((a) => a.kind === 'expense').map((a) => <option key={a.id} value={a.id}>{a.code} · {a.name}</option>)}</select><button className="btn btn-primary btn-sm" disabled={busy || !pay.method || !pay.expense_account} onClick={() => payClaim(claim)}>Chi trả</button></>}</td></tr>;
+      })}</tbody></table></div>}
       <p className="small muted">Chỉ chi trả sau phê duyệt. Khi chi trả, hệ thống yêu cầu tài khoản chi phí và phương thức tiền mặt/ngân hàng rồi tự ghi bút toán.</p>
     </section>}
   </div>;
