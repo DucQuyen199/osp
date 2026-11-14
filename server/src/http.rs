@@ -2034,6 +2034,24 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     body.insert("resolution_note".into(), serde_json::json!(note));
                     return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
                 }
+                if q == "hrm.employee" && *action == "terminated" {
+                    let mut body = json_obj(&bytes)?;
+                    let date = body
+                        .get("termination_date")
+                        .and_then(serde_json::Value::as_str)
+                        .and_then(|date| chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").ok());
+                    if body.len() != 1 || date.is_none() {
+                        return Err(ApiError::validation(
+                            "hrm.employee.terminated",
+                            vec![
+                                "Cần gửi duy nhất termination_date theo định dạng YYYY-MM-DD"
+                                    .into(),
+                            ],
+                        ));
+                    }
+                    body.insert("termination_date".into(), serde_json::json!(date.unwrap()));
+                    return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
+                }
                 return json_ok(k.act(&actor, &t, &q, id, action).await?);
             }
             _ => {}

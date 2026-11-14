@@ -67668,7 +67668,7 @@
     },
     "/api/t/{tenantId}/data/hrm/employee/{id}/terminated": {
       "post": {
-        "description": "Phát sự kiện `hrm.employee.terminated` cho các module khác phản ứng.",
+        "description": "Save the termination effective date and terminate the employee atomically after validating hire date, attendance and pending leave; downstream payroll synchronization shares the transaction.",
         "parameters": [
           {
             "in": "path",
@@ -67688,6 +67688,26 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "termination_date": {
+                    "format": "date",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "termination_date"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {

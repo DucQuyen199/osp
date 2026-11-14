@@ -119,8 +119,7 @@ export default function HrmOperationsPage() {
   async function terminateEmployee(row) {
     const terminationDate = localDate();
     await run(`${row.id}:terminated`, async () => {
-      const updated = await api(dataPath('hrm.employee', row.id), { method: 'PATCH', body: { termination_date: terminationDate } });
-      await action('hrm.employee', updated, 'terminated');
+      await api(dataPath('hrm.employee', row.id, 'terminated'), { method: 'POST', body: { termination_date: terminationDate } });
     }, 'Đã kết thúc hồ sơ nhân viên. Máy chủ đã kiểm tra chấm công và nghỉ phép còn vướng.');
   }
 

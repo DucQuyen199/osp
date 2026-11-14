@@ -428,6 +428,22 @@ pub fn build(reg: &Registry) -> Value {
                             } } }
                         });
                     }
+                    if def.qname() == "hrm.employee" && action == "terminated" {
+                        operation["description"] = json!(
+                            "Save the termination effective date and terminate the employee atomically after validating hire date, attendance and pending leave; downstream payroll synchronization shares the transaction."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": true,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "required": ["termination_date"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "termination_date": { "type": "string", "format": "date" }
+                                }
+                            } } }
+                        });
+                    }
                     paths.insert(
                         format!("{base}/{{id}}/{action}"),
                         json!({ "post": operation }),
