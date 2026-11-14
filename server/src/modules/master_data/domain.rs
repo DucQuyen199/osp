@@ -35,7 +35,16 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
     }
     match entity {
         "currency_rate" => errors.extend(currency_rates::validate(document)),
-        "uom" => validate_rate(document, "ratio", true, &mut errors),
+        "uom" => {
+            validate_rate(document, "ratio", true, &mut errors);
+            if document
+                .get("base_uom")
+                .is_some_and(|value| !value.is_null())
+                && document.get("ratio").and_then(money::decimal).is_none()
+            {
+                errors.push("ratio is required for a unit converted from a base unit".into());
+            }
+        }
         "currency" => validate_rate(document, "rate", true, &mut errors),
         "tax" => {
             if let Some(value) = document.get("rate").filter(|value| !value.is_null()) {

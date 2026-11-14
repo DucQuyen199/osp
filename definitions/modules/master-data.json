@@ -3,7 +3,7 @@
  "name": "Dữ liệu gốc",
  "description": "Danh mục dùng chung cho mọi module: đối tác (khách hàng/nhà cung cấp), sản phẩm, chi nhánh, đơn vị tính, tiền tệ, thuế.",
  "category": "core",
- "version": "0.1.0",
+ "version": "0.2.0",
  "depends": [],
  "core": true,
  "entities": [
@@ -143,6 +143,7 @@
     },
     {
      "name": "uom",
+     "label": "Đơn vị tồn kho gốc",
      "type": "ref",
      "ref": "master-data.uom",
      "required": false
@@ -244,7 +245,15 @@
      "required": true
     },
     {
+     "name": "base_uom",
+     "label": "Quy đổi về đơn vị gốc",
+     "type": "ref",
+     "ref": "master-data.uom",
+     "required": false
+    },
+    {
      "name": "ratio",
+     "label": "Số đơn vị gốc trong một đơn vị này",
      "type": "number",
      "required": false
     }

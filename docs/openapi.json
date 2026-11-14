@@ -11041,6 +11041,11 @@
       "master_data_uom": {
         "description": "Đơn vị tính",
         "properties": {
+          "base_uom": {
+            "description": "Tham chiếu tới master-data.uom",
+            "format": "uuid",
+            "type": "string"
+          },
           "createdAt": {
             "format": "date-time",
             "readOnly": true,
@@ -11069,6 +11074,11 @@
         "additionalProperties": false,
         "description": "Đơn vị tính (dữ liệu gửi lên)",
         "properties": {
+          "base_uom": {
+            "description": "Tham chiếu tới master-data.uom",
+            "format": "uuid",
+            "type": "string"
+          },
           "name": {
             "type": "string"
           },

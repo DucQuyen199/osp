@@ -8,6 +8,7 @@ mod credit_limit;
 mod currency_rates;
 mod product;
 mod unique;
+mod uom;
 
 pub async fn validate_persistence(
     tx: &Tx<'_>,
@@ -52,6 +53,9 @@ pub async fn validate_persistence(
             }
             if matches!(action, "created" | "updated") && tenant.has_module("inventory") {
                 product::validate_expiry_policy(tx, tenant, action, document, &mut errors).await?;
+            }
+            if matches!(action, "created" | "updated") {
+                uom::validate_product_unit(tx, tenant, document, &mut errors).await?;
             }
         }
         "branch" => {
@@ -103,6 +107,9 @@ pub async fn validate_persistence(
                     )
                     .await?;
                 }
+            }
+            if entity == "uom" && matches!(action, "created" | "updated") {
+                uom::validate_unit_base(tx, tenant, document, &mut errors).await?;
             }
         }
         "product_category" => {
