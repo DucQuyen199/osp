@@ -90,6 +90,49 @@ fn next_due(report: &Value, now: DateTime<Utc>) -> R<DateTime<Utc>> {
         .ok_or_else(|| ApiError::internal("Scheduled report next run time exceeds date range"))
 }
 
+async fn audited_schedule_owner(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    report_id: Uuid,
+    action: &str,
+) -> R<Option<String>> {
+    let target = format!("bi.report#{report_id}");
+    Ok(tx
+        .query_opt(
+            "SELECT user_id FROM osp_audit WHERE tenant_id=$1 AND target=$2 AND action=$3 ORDER BY seq DESC LIMIT 1 FOR SHARE",
+            &[&tenant.id, &target, &action],
+        )
+        .await?
+        .map(|row| row.get(0)))
+}
+
+async fn pause_report(
+    kernel: &Kernel,
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    report_entity: &crate::kernel::Ent,
+    report_id: Uuid,
+    event_id: Uuid,
+    depth: u32,
+) -> R<()> {
+    kernel
+        .act_in(
+            tx,
+            &Actor::System,
+            tenant,
+            report_entity,
+            &report_id.to_string(),
+            "paused",
+            &Opts {
+                depth: Some(depth + 1),
+                causation: Some(event_id),
+                silent: false,
+            },
+        )
+        .await?;
+    Ok(())
+}
+
 pub async fn handle_source_event(
     kernel: &Kernel,
     tx: &Tx<'_>,
@@ -125,6 +168,25 @@ pub async fn handle_source_event(
             ) {
                 return Ok(false);
             }
+            let owner = audited_schedule_owner(tx, tenant, report_id, "create")
+                .await?
+                .ok_or_else(|| {
+                    ApiError::validation(
+                        "bi.report.schedule",
+                        vec!["A scheduled report must be created by an active tenant user".into()],
+                    )
+                })?;
+            kernel
+                .update_in(
+                    tx,
+                    &Actor::System,
+                    tenant,
+                    &report_entity,
+                    &report_id.to_string(),
+                    Map::from_iter([("schedule_owner".into(), json!(owner))]),
+                    &Opts::top(),
+                )
+                .await?;
             kernel
                 .act_in(
                     tx,
@@ -155,6 +217,30 @@ pub async fn handle_source_event(
                 .await?;
         }
         "scheduled" => {
+            let current = kernel
+                .get(&Actor::System, tenant, "bi.report", &report_id.to_string())
+                .await?;
+            let owner = audited_schedule_owner(tx, tenant, report_id, "scheduled")
+                .await?
+                .or_else(|| {
+                    current
+                        .get("schedule_owner")
+                        .and_then(Value::as_str)
+                        .map(str::to_owned)
+                });
+            let Some(owner) = owner else {
+                pause_report(
+                    kernel,
+                    tx,
+                    tenant,
+                    &report_entity,
+                    report_id,
+                    event_id,
+                    depth,
+                )
+                .await?;
+                return Ok(true);
+            };
             let interval = cadence(event)?;
             let next = Utc::now().checked_add_signed(interval).ok_or_else(|| {
                 ApiError::internal("Scheduled report next run time exceeds date range")
@@ -166,7 +252,10 @@ pub async fn handle_source_event(
                     tenant,
                     &report_entity,
                     &report_id.to_string(),
-                    Map::from_iter([("next_run_at".into(), json!(next.to_rfc3339()))]),
+                    Map::from_iter([
+                        ("next_run_at".into(), json!(next.to_rfc3339())),
+                        ("schedule_owner".into(), json!(owner)),
+                    ]),
                     &Opts::top(),
                 )
                 .await?;
@@ -175,8 +264,89 @@ pub async fn handle_source_event(
             let report = kernel
                 .get(&Actor::System, tenant, "bi.report", &report_id.to_string())
                 .await?;
+            let owner_id = report
+                .get("schedule_owner")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok());
+            let owner = if let Some(owner_id) = owner_id {
+                tx.query_opt(
+                    "SELECT roles,disabled FROM osp_users WHERE tenant_id=$1 AND id=$2 FOR SHARE",
+                    &[&tenant.id, &owner_id],
+                )
+                .await?
+            } else {
+                None
+            };
+            let Some(owner) = owner.filter(|row| !row.get::<_, bool>(1)) else {
+                pause_report(
+                    kernel,
+                    tx,
+                    tenant,
+                    &report_entity,
+                    report_id,
+                    event_id,
+                    depth,
+                )
+                .await?;
+                return Ok(true);
+            };
+            let actor = Actor::User {
+                id: report
+                    .get("schedule_owner")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_owned(),
+                roles: owner.get(0),
+            };
+            let actor_roles = match &actor {
+                Actor::User { roles, .. } => roles,
+                Actor::System => unreachable!(),
+            };
+            let current_roles = tx
+                .query(
+                    "SELECT id,name,permissions FROM osp_roles WHERE tenant_id=$1 AND id=ANY($2) ORDER BY id FOR SHARE",
+                    &[&tenant.id, actor_roles],
+                )
+                .await?;
+            let mut permission_tenant = tenant.clone();
+            permission_tenant.roles.clear();
+            for role in current_roles {
+                permission_tenant.roles.insert(
+                    role.get(0),
+                    crate::defs::RoleDef {
+                        name: role.get(1),
+                        permissions: role.get(2),
+                    },
+                );
+            }
+            let source = report
+                .get("query")
+                .and_then(|query| query.get("source"))
+                .and_then(Value::as_str)
+                .and_then(|source| kernel.ent(tenant, source).ok());
+            let has_access = kernel.can(&permission_tenant, &actor, "bi.report.read")
+                && source.is_some_and(|source| {
+                    kernel.can(
+                        &permission_tenant,
+                        &actor,
+                        &format!("{}.read", source.qname()),
+                    )
+                });
+            if !has_access {
+                pause_report(
+                    kernel,
+                    tx,
+                    tenant,
+                    &report_entity,
+                    report_id,
+                    event_id,
+                    depth,
+                )
+                .await?;
+                return Ok(true);
+            }
             let result = kernel
-                .run_bi_report(&Actor::System, tenant, &report_id.to_string())
+                .run_bi_report(&actor, &permission_tenant, &report_id.to_string())
                 .await?;
             if result.to_string().len() > 2_000_000 {
                 return Err(ApiError::validation(

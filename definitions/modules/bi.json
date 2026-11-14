@@ -59,6 +59,12 @@
      "options": ["paused", "scheduled"]
     },
     {
+     "name": "schedule_owner",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
      "name": "next_run_at",
      "type": "datetime",
      "required": false,

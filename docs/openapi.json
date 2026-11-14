@@ -2403,6 +2403,10 @@
             ],
             "type": "string"
           },
+          "schedule_owner": {
+            "readOnly": true,
+            "type": "string"
+          },
           "schedule_status": {
             "enum": [
               "paused",
@@ -2442,6 +2446,10 @@
               "daily",
               "weekly"
             ],
+            "type": "string"
+          },
+          "schedule_owner": {
+            "readOnly": true,
             "type": "string"
           }
         },
@@ -8093,6 +8101,10 @@
           "amount": {
             "type": "number"
           },
+          "capitalized_amount": {
+            "readOnly": true,
+            "type": "number"
+          },
           "cost_method": {
             "enum": [
               "fifo",
@@ -8115,14 +8127,6 @@
           },
           "receipt": {
             "type": "string"
-          },
-          "remaining_amount": {
-            "readOnly": true,
-            "type": "number"
-          },
-          "remaining_qty": {
-            "readOnly": true,
-            "type": "number"
           },
           "source_bill": {
             "type": "string"
@@ -8150,6 +8154,10 @@
           "amount": {
             "type": "number"
           },
+          "capitalized_amount": {
+            "readOnly": true,
+            "type": "number"
+          },
           "cost_method": {
             "enum": [
               "fifo",
@@ -8162,14 +8170,6 @@
           },
           "receipt": {
             "type": "string"
-          },
-          "remaining_amount": {
-            "readOnly": true,
-            "type": "number"
-          },
-          "remaining_qty": {
-            "readOnly": true,
-            "type": "number"
           },
           "source_bill": {
             "type": "string"
@@ -8189,9 +8189,8 @@
           "source_invoice",
           "receipt",
           "amount",
-          "remaining_amount",
+          "capitalized_amount",
           "layer_qty",
-          "remaining_qty",
           "cost_method"
         ],
         "type": "object"

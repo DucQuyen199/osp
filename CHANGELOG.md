@@ -33,6 +33,7 @@
 - Serialized supplier invoice number uniqueness checks per tenant and supplier so concurrent approvals on different purchase orders cannot create duplicate payable documents.
 - Added permission-aware BI authoring for saved row and aggregate reports, dashboards with validated report widgets, and KPIs with aggregate sources and optional formulas, using enabled tenant entities and field metadata without manual JSON editing.
 - Implemented daily and weekly BI report schedules with pause/resume actions, transactional report-run snapshots, a 2 MB snapshot limit, and report history.
+- Bound scheduled BI report execution to the user who created or explicitly scheduled it; each run now rechecks that user's current report and source permissions and pauses delivery when the account is disabled or access is revoked.
 - Added a product expiry-required policy for perishable goods, enforcing dated lots at lot creation and stock movement while protecting existing traceability history.
 - Added supplier invoice price and tax variance capture against received purchase-order lines, with quantity matching at PO cost and posting purchase price differences separately from GRNI.
 - Added invoice-level supplier charges and discounts with descriptions, tax-code snapshots, and separate expense postings, preserving the line-by-line PO match for goods.
