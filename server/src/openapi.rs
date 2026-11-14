@@ -358,6 +358,22 @@ pub fn build(reg: &Registry) -> Value {
                             } } }
                         });
                     }
+                    if def.qname() == "pos.pos_session" && action == "closed" {
+                        operation["description"] = json!(
+                            "Record counted closing cash and close the POS session atomically after checking unfinished orders and cash movements; expected cash and variance are calculated from posted sales, refunds and cash movements."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": true,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "required": ["closing_cash"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "closing_cash": { "type": "number", "minimum": 0 }
+                                }
+                            } } }
+                        });
+                    }
                     paths.insert(
                         format!("{base}/{{id}}/{action}"),
                         json!({ "post": operation }),

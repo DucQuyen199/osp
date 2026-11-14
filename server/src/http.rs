@@ -1952,6 +1952,20 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     body.insert("cancellation_reason".into(), serde_json::json!(reason));
                     return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
                 }
+                if q == "pos.pos_session" && *action == "closed" {
+                    let body = json_obj(&bytes)?;
+                    let valid_cash = body
+                        .get("closing_cash")
+                        .and_then(crate::money::decimal)
+                        .is_some_and(|cash| cash >= rust_decimal::Decimal::ZERO);
+                    if body.len() != 1 || !valid_cash {
+                        return Err(ApiError::validation(
+                            "pos.pos_session.closed",
+                            vec!["Cần gửi duy nhất closing_cash là số không âm".into()],
+                        ));
+                    }
+                    return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
+                }
                 return json_ok(k.act(&actor, &t, &q, id, action).await?);
             }
             _ => {}

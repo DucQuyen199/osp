@@ -109180,7 +109180,7 @@
     },
     "/api/t/{tenantId}/data/pos/pos_session/{id}/closed": {
       "post": {
-        "description": "Phát sự kiện `pos.pos_session.closed` cho các module khác phản ứng.",
+        "description": "Record counted closing cash and close the POS session atomically after checking unfinished orders and cash movements; expected cash and variance are calculated from posted sales, refunds and cash movements.",
         "parameters": [
           {
             "in": "path",
@@ -109200,6 +109200,26 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "closing_cash": {
+                    "minimum": 0,
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "closing_cash"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {

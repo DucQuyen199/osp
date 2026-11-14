@@ -32,6 +32,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Đối soát ngân hàng lưu liên kết payment/bút toán khớp thủ công và lý do bỏ qua cùng lần đổi trạng thái của dòng sao kê.
 - Phòng khám hoàn tất lượt khám cùng thông tin bác sĩ, chẩn đoán, phí và hóa đơn phải thu; kết quả xét nghiệm lưu cùng trạng thái hoàn tất.
 - Hóa đơn điện tử lưu lý do hủy cùng giao dịch chuyển sang chờ provider xử lý hủy.
+- POS ghi nhận tiền thực đếm và chốt ca trong cùng giao dịch sau khi kiểm tra đơn/phiếu quỹ nháp và tính chênh lệch tiền.
 - Ký thầu phụ chỉ ghi nhận cam kết chi phí; hồ sơ nghiệm thu/đề nghị thanh toán có giá trị lũy kế được giới hạn trong hợp đồng và chỉ phát sinh hóa đơn phải trả sau khi duyệt.
 - Mua hàng chỉ ghi nhận GRNI khi nhận kho; nhiều hóa đơn nhà cung cấp theo từng đợt nhận được đối chiếu lũy kế với số lượng nhận/trả và GRNI, công nợ chỉ phát sinh sau khi duyệt từng hóa đơn; hàng trả trước hóa đơn giảm GRNI, hàng trả sau hóa đơn gắn với bill để điều chỉnh giảm phải trả.
 - BI hỗ trợ tự thiết kế báo cáo dòng/tổng hợp, dashboard, KPI, snapshot theo lịch ngày/tuần và gửi CSV qua hàng đợi email; lịch chạy được ràng buộc với người tạo/lên lịch và tự dừng khi người đó mất quyền đọc dữ liệu hoặc bị khóa.

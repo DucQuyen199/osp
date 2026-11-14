@@ -196,8 +196,7 @@ export default function PosTerminalPage() {
     if (!activeSession) return;
     setBusy(true); setError(''); setNotice('');
     try {
-      await api(dataPath('pos.pos_session', activeSession.id), { method: 'PATCH', body: { closing_cash: Number(closingCash) } });
-      const closed = await api(dataPath('pos.pos_session', activeSession.id, 'closed'), { method: 'POST' });
+      const closed = await api(dataPath('pos.pos_session', activeSession.id, 'closed'), { method: 'POST', body: { closing_cash: Number(closingCash) } });
       setNotice(`Đã chốt ca. Tiền kỳ vọng ${fmtMoney(closed.expected_cash)}; chênh lệch ${fmtMoney(closed.cash_difference)}.`);
       setClosingCash(''); await load(true);
     } catch (reason) { setError(reason.message || 'Không chốt được ca. Hãy xử lý hết đơn chờ và phiếu thu chi nháp trước.'); }
@@ -220,7 +219,7 @@ export default function PosTerminalPage() {
           <button className="btn btn-primary" type="submit" disabled={busy || !can('pos.pos_session.create')}>{busy ? 'Đang mở…' : 'Mở ca'}</button>
         </form></details>
       </section>
-      {!activeSession ? <div className="empty card-pad">Chọn một ca đang mở hoặc mở ca mới để sử dụng quầy.</div> : !activeSession.warehouse ? <div className="alert warning">Ca này được tạo trước khi bắt buộc chọn kho. Hãy chốt ca cũ và mở ca mới để tiếp tục bán.<form className="pos-close-form" onSubmit={closeSession}><label className="field"><span className="label">Tiền mặt thực đếm để chốt ca</span><input className="input num" type="number" min="0" step="any" required value={closingCash} onChange={(event) => setClosingCash(event.target.value)} /></label><button className="btn btn-secondary" type="submit" disabled={busy || !can('pos.pos_session.closed')}>Chốt ca cũ</button></form></div> : <div className="pos-layout">
+      {!activeSession ? <div className="empty card-pad">Chọn một ca đang mở hoặc mở ca mới để sử dụng quầy.</div> : !activeSession.warehouse ? <div className="alert warning">Ca này được tạo trước khi bắt buộc chọn kho. Hãy chốt ca cũ và mở ca mới để tiếp tục bán.<form className="pos-close-form" onSubmit={closeSession}><label className="field"><span className="label">Tiền mặt thực đếm để chốt ca</span><input className="input num" type="number" min="0" step="any" required value={closingCash} onChange={(event) => setClosingCash(event.target.value)} /></label><button className="btn btn-secondary" type="submit" disabled={busy || !can('pos.pos_session.update') || !can('pos.pos_session.closed')}>Chốt ca cũ</button></form></div> : <div className="pos-layout">
         <section className="pos-products-panel"><div className="row wrap"><h2>Sản phẩm</h2><span className="grow" /><input className="input pos-search" type="search" placeholder="Tìm tên hoặc mã hàng" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
           <div className="pos-products">{filteredProducts.map((product) => <button className={`card pos-product${quantities[product.id] ? ' selected' : ''}`} key={product.id} type="button" disabled={!can('pos.pos_order.create')} onClick={() => setQty(product.id, (Number(quantities[product.id]) || 0) + 1)}><strong>{product.name}</strong><span className="small muted">{product.sku || 'Không mã'}</span><span className="num">{fmtMoney(displayPrice(product))}</span>{product.tracked !== false && <span className="small faint">Quản lý tồn kho</span>}</button>)}</div>
           {!filteredProducts.length && <div className="empty">Không có sản phẩm phù hợp.</div>}
@@ -241,7 +240,7 @@ export default function PosTerminalPage() {
           </form>
             {cashMovements.filter((item) => item.session === sessionId).map((movement) => <div className="pos-pending-item" key={movement.id}><div><strong>{movement.direction === 'cash_in' ? 'Nộp quỹ' : 'Chi quỹ'} · {fmtMoney(movement.amount)}</strong><div className="small muted">{movement.reason}</div></div><button className="btn btn-primary btn-sm" type="button" disabled={busy || !can('pos.cash_movement.posted')} onClick={() => postCashMovement(movement)}>Ghi sổ</button><button className="btn btn-ghost btn-sm" type="button" disabled={busy || !can('pos.cash_movement.delete')} onClick={() => removeCashMovement(movement)}>Xóa</button></div>)}
           </details>
-          <form className="pos-close-form" onSubmit={closeSession}><label className="field"><span className="label">Tiền mặt thực đếm khi chốt ca</span><input className="input num" type="number" min="0" step="any" required value={closingCash} onChange={(event) => setClosingCash(event.target.value)} /></label><button className="btn btn-secondary" type="submit" disabled={busy || cart.length > 0 || !can('pos.pos_session.closed')}>Chốt ca</button></form>{cart.length > 0 && <p className="small muted">Xóa các mặt hàng trong giỏ trước khi chốt ca.</p>}
+          <form className="pos-close-form" onSubmit={closeSession}><label className="field"><span className="label">Tiền mặt thực đếm khi chốt ca</span><input className="input num" type="number" min="0" step="any" required value={closingCash} onChange={(event) => setClosingCash(event.target.value)} /></label><button className="btn btn-secondary" type="submit" disabled={busy || cart.length > 0 || !can('pos.pos_session.update') || !can('pos.pos_session.closed')}>Chốt ca</button></form>{cart.length > 0 && <p className="small muted">Xóa các mặt hàng trong giỏ trước khi chốt ca.</p>}
         </aside>
       </div>}
     </>}
