@@ -29,6 +29,7 @@ export default function WholesaleSalesDeskPage() {
   const [quantities, setQuantities] = useState({});
   const [returnQuantities, setReturnQuantities] = useState({});
   const [returnReasons, setReturnReasons] = useState({});
+  const [shipmentQuantities, setShipmentQuantities] = useState({});
   const [busy, setBusy] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -126,6 +127,55 @@ export default function WholesaleSalesDeskPage() {
     }).filter((line) => line.remaining > 0);
   };
 
+  const remainingShipmentLines = (order) => {
+    const groups = new Map();
+    for (const line of order.lines || []) {
+      if (['service', 'digital'].includes(line.kind)) continue;
+      const product = line.product;
+      const price = Number(line.price || 0);
+      const key = `${product}:${price.toFixed(2)}`;
+      const current = groups.get(key) || { key, product, price, ordered: 0 };
+      current.ordered += Number(line.qty || 0);
+      groups.set(key, current);
+    }
+    const reserved = new Map();
+    for (const shipment of shipmentForOrder(order).filter((row) => ['created', 'dispatched', 'delivered'].includes(row.status))) {
+      for (const line of shipment.lines || []) {
+        const key = `${line.product}:${Number(line.price || 0).toFixed(2)}`;
+        reserved.set(key, (reserved.get(key) || 0) + Number(line.qty || 0));
+      }
+    }
+    return [...groups.values()].map((line) => ({
+      ...line,
+      remaining: Math.max(0, line.ordered - (reserved.get(line.key) || 0)),
+    })).filter((line) => line.remaining > 0.000001);
+  };
+
+  const createShipment = async (order) => {
+    const openLines = remainingShipmentLines(order);
+    const lines = openLines.map((line) => ({
+      product: line.product,
+      price: line.price,
+      qty: Number(shipmentQuantities[order.id]?.[line.key]) || 0,
+      remaining: line.remaining,
+    })).filter((line) => line.qty > 0);
+    if (!lines.length || lines.some((line) => line.qty > line.remaining + 0.000001)) return;
+    setBusy(`${order.id}:shipment`); setError(''); setNotice('');
+    try {
+      const created = await api(dataPath('logistics.shipment'), { method: 'POST', body: {
+        source: 'sales_order', source_id: order.id, party: order.party,
+        warehouse: order.warehouse, destination: order.shipping_address,
+        lines: lines.map(({ product, price, qty }) => ({ product, price, qty })),
+      } });
+      setShipmentQuantities((current) => { const next = { ...current }; delete next[order.id]; return next; });
+      await load(true);
+      setNotice(`Đã tạo vận đơn ${String(created.id).slice(0, 8)} cho số lượng được chọn.`);
+    } catch (reason) {
+      setError(reason.message || 'Không tạo được vận đơn. Hệ thống kiểm tra lại lượng còn giao trên đơn.');
+      await load(true);
+    } finally { setBusy(''); }
+  };
+
   const createReturn = async (order) => {
     const lines = eligibleReturnLines(order).map((line) => ({ ...line, qty: Number(returnQuantities[`${order.id}:${line.key}`]) || 0 })).filter((line) => line.qty > 0).map(({ product, price, qty }) => ({ product, price, qty }));
     if (!lines.length || !returnReasons[order.id]?.trim()) return;
@@ -196,6 +246,10 @@ export default function WholesaleSalesDeskPage() {
           <ul>{(order.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{products.get(line.product)?.name || 'Mặt hàng'} × {line.qty}</span><strong className="num">{fmtMoney(line.line_total ?? Number(line.qty || 0) * Number(line.price || 0))}</strong></li>)}</ul>
           <div className="wholesale-total"><span>Tổng gồm thuế</span><strong className="num">{fmtMoney(order.total || 0)}</strong></div>
           {shipmentsForOrder.map((shipment) => <div className="wholesale-related" key={shipment.id}><span>Chuyến giao · {statusLabel(shipment.status)}</span><a href={recordHref('logistics.shipment', shipment.id)}>Mở {String(shipment.id).slice(0, 8)}</a></div>)}
+          {app.meta?.modules?.some((module) => module.id === 'logistics') && can('logistics.shipment.read') && can('logistics.shipment.create') && order.shipping_address?.trim() && ['confirmed', 'partially_delivered'].includes(order.status) && <div className="wholesale-related wholesale-shipment-create">
+            <div><strong>Giao phần hàng còn lại</strong><div className="small muted">Chỉ tính các vận đơn đang mở hoặc đã giao; vận đơn thất bại không giữ số lượng.</div></div>
+            {remainingShipmentLines(order).length ? <div className="wholesale-shipment-lines">{remainingShipmentLines(order).map((line) => <label className="field" key={line.key}><span>{products.get(line.product)?.name || 'Mặt hàng'} · còn {line.remaining}</span><input className="input num" aria-label={`Số lượng giao ${products.get(line.product)?.name || line.product}`} type="number" min="0" max={line.remaining} step="any" value={shipmentQuantities[order.id]?.[line.key] || ''} onChange={(event) => setShipmentQuantities((current) => ({ ...current, [order.id]: { ...current[order.id], [line.key]: event.target.value } }))}/></label>)}<button className="button primary" type="button" disabled={Boolean(busy) || !remainingShipmentLines(order).some((line) => Number(shipmentQuantities[order.id]?.[line.key]) > 0)} onClick={() => createShipment(order)}>Tạo vận đơn đã chọn</button></div> : <span className="small muted">Hàng đã được phân công hết. Muốn tách chuyến chưa xuất phát, mở vận đơn nháp và giảm số lượng trước khi điều phối.</span>}
+          </div>}
           <footer>{order.status === 'draft' && can('sales.sales_order.confirmed') && <button className="button primary" disabled={!!busy} onClick={() => transition('sales.sales_order', order, 'confirmed')}>Xác nhận đơn, giữ tồn và tạo hóa đơn</button>}
             {invoice && <a className="button" href={recordHref('accounting.invoice', invoice.id)}>Mở hóa đơn</a>}
             <a className="button" href={recordHref('sales.sales_order', order.id)}>Chi tiết đơn</a>

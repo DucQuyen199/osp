@@ -9,6 +9,7 @@
 - Anchored subscription billing dates to the original start day, preventing month-end billing dates from drifting after short months.
 - Routed pharmacy prescription dispensing through the prescription state machine and event handler after a completed POS sale, keeping dispense timestamps and audit history in the same transaction.
 - Added lot code and optional expiry traceability for lot-tracked manufacturing outputs, and aligned production QC quantities with accepted good output when recording scrap.
+- Added partial-shipment creation from wholesale sales orders, showing remaining quantities after open and completed shipments and delegating final over-shipment checks to the server.
 
 ### Changed
 - Scoped the runtime data ignore rule to the repository root so nested application source such as `server/src/kernel/data` is tracked and included in source releases.
