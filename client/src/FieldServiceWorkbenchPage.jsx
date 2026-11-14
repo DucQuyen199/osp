@@ -17,11 +17,12 @@ export default function FieldServiceWorkbenchPage() {
   const [parties, setParties] = useState(new Map());
   const [products, setProducts] = useState(new Map());
   const [warehouses, setWarehouses] = useState(new Map());
+  const [employees, setEmployees] = useState(new Map());
   const [invoices, setInvoices] = useState([]);
   const [tickets, setTickets] = useState(new Map());
   const [selectedId, setSelectedId] = useState('');
-  const [form, setForm] = useState({ party: '', title: '', address: '', technician: '', scheduled_at: futureSlot(2), scheduled_end: futureSlot(3), warehouse: '' });
-  const [editForm, setEditForm] = useState({ party: '', title: '', address: '', technician: '', scheduled_at: '', scheduled_end: '', warehouse: '' });
+  const [form, setForm] = useState({ party: '', title: '', address: '', technician: '', technician_employee: '', scheduled_at: futureSlot(2), scheduled_end: futureSlot(3), warehouse: '' });
+  const [editForm, setEditForm] = useState({ party: '', title: '', address: '', technician: '', technician_employee: '', scheduled_at: '', scheduled_end: '', warehouse: '' });
   const [newLines, setNewLines] = useState([]);
   const [editLines, setEditLines] = useState([]);
   const [busy, setBusy] = useState('');
@@ -34,15 +35,16 @@ export default function FieldServiceWorkbenchPage() {
     try {
       const showInvoices = can('accounting.invoice.read');
       const showTickets = can('helpdesk.ticket.read');
-      const [orderResponse, partyMap, productMap, warehouseMap, invoiceResponse, ticketResponse] = await Promise.all([
+      const [orderResponse, partyMap, productMap, warehouseMap, invoiceResponse, ticketResponse, employeeMap] = await Promise.all([
         api(`${dataPath('field-service.work_order')}?limit=1000`), loadRefs('master-data.party'), loadRefs('master-data.product'),
         loadRefs('inventory.warehouse'),
         showInvoices ? api(`${dataPath('accounting.invoice')}?limit=1000`) : Promise.resolve({ items: [] }),
         showTickets ? api(`${dataPath('helpdesk.ticket')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('hrm.employee.read') ? loadRefs('hrm.employee') : Promise.resolve(new Map()),
       ]);
       const nextOrders = itemsOf(orderResponse).sort((a, b) => String(b.scheduled_at || b.created_at || '').localeCompare(String(a.scheduled_at || a.created_at || '')));
       setOrders(nextOrders); setParties(partyMap); setProducts(productMap); setWarehouses(warehouseMap);
-      setInvoices(itemsOf(invoiceResponse)); setTickets(new Map(itemsOf(ticketResponse).map((item) => [item.id, item])));
+      setInvoices(itemsOf(invoiceResponse)); setTickets(new Map(itemsOf(ticketResponse).map((item) => [item.id, item]))); setEmployees(employeeMap);
       setSelectedId((current) => nextOrders.some((item) => item.id === current) ? current : nextOrders[0]?.id || '');
       setForm((current) => ({ ...current, party: current.party || [...partyMap.keys()][0] || '' }));
     } catch (reason) { setError(reason.message || 'Không tải được lệnh công việc.'); }
@@ -70,7 +72,7 @@ export default function FieldServiceWorkbenchPage() {
     setEditLines((selected.lines || []).map((line) => ({ product: line.product || '', qty: String(line.qty || 1), price: line.price })));
     setEditForm((current) => ({
       ...current,
-      party: selected.party || '', title: selected.title || '', address: selected.address || '', technician: selected.technician || '',
+      party: selected.party || '', title: selected.title || '', address: selected.address || '', technician: selected.technician || '', technician_employee: selected.technician_employee || '',
       scheduled_at: localDateTime(selected.scheduled_at), scheduled_end: localDateTime(selected.scheduled_end), warehouse: selected.warehouse || '',
     }));
   }, [selectedId]);
@@ -84,14 +86,16 @@ export default function FieldServiceWorkbenchPage() {
     event.preventDefault(); setBusy('create'); setError(''); setNotice('');
     try {
       const created = await api(dataPath('field-service.work_order'), { method: 'POST', body: {
-        party: form.party, title: form.title.trim(), address: form.address.trim() || undefined, technician: form.technician.trim() || undefined,
+        party: form.party, title: form.title.trim(), address: form.address.trim() || undefined,
+        technician: form.technician_employee ? undefined : form.technician.trim() || undefined,
+        technician_employee: form.technician_employee || undefined,
         scheduled_at: form.scheduled_at ? new Date(form.scheduled_at).toISOString() : undefined,
         scheduled_end: form.scheduled_end ? new Date(form.scheduled_end).toISOString() : undefined,
         warehouse: form.warehouse || undefined,
         lines: newLines.map((line) => ({ product: line.product, qty: Number(line.qty) })),
       } });
       setNotice(`Đã tạo lệnh ${String(created.id).slice(0, 8)}. Giá và trạng thái tồn được chụp từ danh mục.`);
-      setForm((current) => ({ ...current, title: '', address: '', technician: '', warehouse: '' })); setNewLines([]); await load(true); setSelectedId(created.id);
+      setForm((current) => ({ ...current, title: '', address: '', technician: '', technician_employee: '', warehouse: '' })); setNewLines([]); await load(true); setSelectedId(created.id);
     } catch (reason) { setError(reason.message || 'Không thể tạo lệnh công việc.'); }
     finally { setBusy(''); }
   }
@@ -100,7 +104,9 @@ export default function FieldServiceWorkbenchPage() {
     setBusy(`${order.id}:save`); setError(''); setNotice('');
     try {
       const body = {
-        title: editForm.title.trim(), address: editForm.address.trim() || null, technician: editForm.technician.trim() || null,
+        title: editForm.title.trim(), address: editForm.address.trim() || null,
+        technician: editForm.technician_employee ? null : editForm.technician.trim() || null,
+        technician_employee: editForm.technician_employee || null,
         scheduled_at: editForm.scheduled_at ? new Date(editForm.scheduled_at).toISOString() : null,
         scheduled_end: editForm.scheduled_end ? new Date(editForm.scheduled_end).toISOString() : null,
         warehouse: editForm.warehouse || null,
@@ -127,6 +133,10 @@ export default function FieldServiceWorkbenchPage() {
   const addEditLine = () => setEditLines((current) => [...current, { product: productChoices[0]?.id || '', qty: '1' }]);
   const selectedTicket = selected?.source_ticket && tickets.get(selected.source_ticket);
   const canManage = can('field-service.work_order.update');
+  const assignedTechnician = (order) => {
+    const employee = order?.technician_employee && employees.get(order.technician_employee);
+    return employee ? recordLabel('hrm.employee', employee) : order?.technician || 'Chưa phân công';
+  };
 
   return <div className="page">
     <div className="page-head"><div><h1>Điều phối dịch vụ hiện trường</h1><p className="sub">Tiếp nhận việc, chốt vật tư và giá theo danh mục, xếp lịch kỹ thuật viên, xuất kho và lập hóa đơn khi hoàn tất.</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>Làm mới</button></div>
@@ -136,7 +146,8 @@ export default function FieldServiceWorkbenchPage() {
       <label className="field"><span className="label">Khách hàng *</span><select className="select" required value={form.party} onChange={(e) => updateForm('party', e.target.value)}><option value="">Chọn khách hàng</option>{[...parties.values()].map((party) => <option key={party.id} value={party.id}>{recordLabel('master-data.party', party)}</option>)}</select></label>
       <label className="field"><span className="label">Công việc *</span><input className="input" required value={form.title} onChange={(e) => updateForm('title', e.target.value)} /></label>
       <label className="field"><span className="label">Địa chỉ thực hiện</span><input className="input" value={form.address} onChange={(e) => updateForm('address', e.target.value)} /></label>
-      <label className="field"><span className="label">Kỹ thuật viên / nhà thầu *</span><input className="input" required value={form.technician} onChange={(e) => updateForm('technician', e.target.value)} /></label>
+      {can('hrm.employee.read') && <label className="field"><span className="label">Nhân viên nội bộ</span><select className="select" value={form.technician_employee} onChange={(e) => setForm((current) => ({ ...current, technician_employee: e.target.value, technician: e.target.value ? '' : current.technician }))}><option value="">Chọn nhân viên (hoặc nhà thầu)</option>{[...employees.values()].filter((employee) => employee.status === 'active').map((employee) => <option key={employee.id} value={employee.id}>{recordLabel('hrm.employee', employee)}</option>)}</select></label>}
+      <label className="field"><span className="label">Kỹ thuật viên / nhà thầu {!form.technician_employee && '*'}</span><input className="input" required={!form.technician_employee} disabled={Boolean(form.technician_employee)} value={form.technician} onChange={(e) => setForm((current) => ({ ...current, technician: e.target.value, technician_employee: e.target.value ? '' : current.technician_employee }))} /></label>
       <label className="field"><span className="label">Bắt đầu *</span><input className="input" required type="datetime-local" value={form.scheduled_at} onChange={(e) => updateForm('scheduled_at', e.target.value)} /></label>
       <label className="field"><span className="label">Kết thúc dự kiến *</span><input className="input" required type="datetime-local" min={form.scheduled_at} value={form.scheduled_end} onChange={(e) => updateForm('scheduled_end', e.target.value)} /></label>
       <label className="field"><span className="label">Kho vật tư</span><select className="select" value={form.warehouse} onChange={(e) => updateForm('warehouse', e.target.value)}><option value="">Chọn kho nếu có vật tư theo dõi tồn</option>{[...warehouses.values()].filter((item) => item.active !== false).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
@@ -150,14 +161,15 @@ export default function FieldServiceWorkbenchPage() {
 
     <div className="row wrap" style={{ margin: '18px 0 10px' }}><h2>Lệnh công việc</h2><span className="badge warning">{openCount} đang xử lý</span></div>
     {loading ? <div className="skeleton" data-h="row" /> : !orders.length ? <div className="card card-pad empty">Chưa có lệnh công việc.</div> : <div className="layout-split">
-      <section className="card card-pad"><div className="table-wrap"><table className="table"><thead><tr><th>Công việc</th><th>Lịch</th><th>Kỹ thuật viên</th><th>Trạng thái</th></tr></thead><tbody>{orders.map((order) => <tr key={order.id} className={selectedId === order.id ? 'selected' : ''} onClick={() => setSelectedId(order.id)} style={{ cursor: 'pointer' }}><td><strong>{order.title}</strong><div className="small muted">{parties.get(order.party) ? recordLabel('master-data.party', parties.get(order.party)) : 'Khách hàng'}{order.address ? ` · ${order.address}` : ''}</div></td><td>{order.scheduled_at ? fmtDateTime(order.scheduled_at) : 'Chưa xếp lịch'}</td><td>{order.technician || 'Chưa phân công'}</td><td>{statusLabel(order.status)}</td></tr>)}</tbody></table></div></section>
+      <section className="card card-pad"><div className="table-wrap"><table className="table"><thead><tr><th>Công việc</th><th>Lịch</th><th>Kỹ thuật viên</th><th>Trạng thái</th></tr></thead><tbody>{orders.map((order) => <tr key={order.id} className={selectedId === order.id ? 'selected' : ''} onClick={() => setSelectedId(order.id)} style={{ cursor: 'pointer' }}><td><strong>{order.title}</strong><div className="small muted">{parties.get(order.party) ? recordLabel('master-data.party', parties.get(order.party)) : 'Khách hàng'}{order.address ? ` · ${order.address}` : ''}</div></td><td>{order.scheduled_at ? fmtDateTime(order.scheduled_at) : 'Chưa xếp lịch'}</td><td>{assignedTechnician(order)}</td><td>{statusLabel(order.status)}</td></tr>)}</tbody></table></div></section>
       {selected && <section className="card card-pad"><div className="row wrap"><div><h2>{selected.title}</h2><div className="small muted">{parties.get(selected.party) ? recordLabel('master-data.party', parties.get(selected.party)) : 'Khách hàng'} · {selected.address || 'Chưa có địa chỉ'}</div></div><span className="grow" /><span className="badge warning">{statusLabel(selected.status)}</span></div>
         {selectedTicket && <p className="small muted">Ticket nguồn: {selectedTicket.subject || selectedTicket.id}</p>}
         {selected.status === 'open' && canManage ? <>
           <div className="form-grid" style={{ marginTop: 12 }}>
             <label className="field"><span className="label">Công việc</span><input className="input" value={editForm.title} onChange={(e) => updateEditForm('title', e.target.value)} /></label>
             <label className="field"><span className="label">Địa chỉ</span><input className="input" value={editForm.address} onChange={(e) => updateEditForm('address', e.target.value)} /></label>
-            <label className="field"><span className="label">Kỹ thuật viên / nhà thầu *</span><input className="input" value={editForm.technician} onChange={(e) => updateEditForm('technician', e.target.value)} /></label>
+            {can('hrm.employee.read') && <label className="field"><span className="label">Nhân viên nội bộ</span><select className="select" value={editForm.technician_employee} onChange={(e) => setEditForm((current) => ({ ...current, technician_employee: e.target.value, technician: e.target.value ? '' : current.technician }))}><option value="">Chọn nhân viên (hoặc nhà thầu)</option>{[...employees.values()].filter((employee) => employee.status === 'active').map((employee) => <option key={employee.id} value={employee.id}>{recordLabel('hrm.employee', employee)}</option>)}</select></label>}
+            <label className="field"><span className="label">Kỹ thuật viên / nhà thầu {!editForm.technician_employee && '*'}</span><input className="input" required={!editForm.technician_employee} disabled={Boolean(editForm.technician_employee)} value={editForm.technician} onChange={(e) => setEditForm((current) => ({ ...current, technician: e.target.value, technician_employee: e.target.value ? '' : current.technician_employee }))} /></label>
             <label className="field"><span className="label">Kho vật tư</span><select className="select" value={editForm.warehouse} onChange={(e) => updateEditForm('warehouse', e.target.value)}><option value="">Chọn kho</option>{[...warehouses.values()].filter((item) => item.active !== false).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
             <label className="field"><span className="label">Bắt đầu *</span><input className="input" type="datetime-local" value={editForm.scheduled_at} onChange={(e) => updateEditForm('scheduled_at', e.target.value)} /></label>
             <label className="field"><span className="label">Kết thúc *</span><input className="input" type="datetime-local" min={editForm.scheduled_at} value={editForm.scheduled_end} onChange={(e) => updateEditForm('scheduled_end', e.target.value)} /></label>
@@ -165,9 +177,9 @@ export default function FieldServiceWorkbenchPage() {
           <div className="row wrap" style={{ marginTop: 14 }}><h3>Vật tư / dịch vụ</h3><span className="grow" /><button className="btn btn-secondary btn-sm" type="button" disabled={!productChoices.length} onClick={addEditLine}>Thêm dòng</button></div>
           {editLines.map((line, index) => <div className="row wrap" key={index} style={{ marginTop: 8 }}><select className="select" value={line.product} onChange={(e) => updateEditLine(index, 'product', e.target.value)}><option value="">Chọn vật tư / dịch vụ</option>{productChoices.map((item) => <option key={item.id} value={item.id}>{item.name} · {fmtMoney(item.price || 0)}</option>)}</select><input className="input num" aria-label="Số lượng" type="number" min="0.001" step="any" value={line.qty} onChange={(e) => updateEditLine(index, 'qty', e.target.value)} style={{ maxWidth: 140 }} /><strong>{fmtMoney(lineTotal(line, products))}</strong><button className="btn btn-ghost btn-sm" type="button" aria-label="Xóa dòng" onClick={() => setEditLines((current) => current.filter((_, i) => i !== index))}>Bỏ</button></div>)}
           <div className="row wrap" style={{ marginTop: 10 }}><span className="grow" /><strong>Tổng theo danh mục: {fmtMoney(editTotal)}</strong><button className="btn btn-secondary" type="button" disabled={Boolean(busy) || (hasTrackedEditLine && !editForm.warehouse)} onClick={() => saveOpenOrder(selected)}>Lưu thay đổi</button></div>
-        </> : <><p className="small muted">{selected.technician || 'Chưa phân công'} · {selected.scheduled_at ? `${fmtDateTime(selected.scheduled_at)} – ${fmtDateTime(selected.scheduled_end)}` : 'Chưa có lịch'} · Kho {warehouses.get(selected.warehouse)?.name || '—'}</p><div className="table-wrap"><table className="table"><thead><tr><th>Vật tư / dịch vụ</th><th>Số lượng</th><th>Đơn giá đã chụp</th><th>Thành tiền</th></tr></thead><tbody>{(selected.lines || []).map((line, index) => <tr key={`${line.product}-${index}`}><td>{line.product_name || products.get(line.product)?.name || 'Mục dịch vụ'}</td><td>{line.qty}</td><td>{fmtMoney(line.price || 0)}</td><td>{fmtMoney(Number(line.qty || 0) * Number(line.price || 0))}</td></tr>)}</tbody><tfoot><tr><th colSpan="3">Tổng cộng</th><th>{fmtMoney(selected.total || 0)}</th></tr></tfoot></table></div></>}
+        </> : <><p className="small muted">{assignedTechnician(selected)} · {selected.scheduled_at ? `${fmtDateTime(selected.scheduled_at)} – ${fmtDateTime(selected.scheduled_end)}` : 'Chưa có lịch'} · Kho {warehouses.get(selected.warehouse)?.name || '—'}</p><div className="table-wrap"><table className="table"><thead><tr><th>Vật tư / dịch vụ</th><th>Số lượng</th><th>Đơn giá đã chụp</th><th>Thành tiền</th></tr></thead><tbody>{(selected.lines || []).map((line, index) => <tr key={`${line.product}-${index}`}><td>{line.product_name || products.get(line.product)?.name || 'Mục dịch vụ'}</td><td>{line.qty}</td><td>{fmtMoney(line.price || 0)}</td><td>{fmtMoney(Number(line.qty || 0) * Number(line.price || 0))}</td></tr>)}</tbody><tfoot><tr><th colSpan="3">Tổng cộng</th><th>{fmtMoney(selected.total || 0)}</th></tr></tfoot></table></div></>}
         {selectedInvoice && <p style={{ marginTop: 12 }}><a className="btn btn-secondary btn-sm" href={`#/e/accounting/invoice/${selectedInvoice.id}`}>Mở hóa đơn {statusLabel(selectedInvoice.status)}</a></p>}
-        <div className="row wrap" style={{ marginTop: 14 }}>{selected.status === 'open' && can('field-service.work_order.dispatched') && <button className="btn btn-primary" disabled={Boolean(busy) || !selected.technician?.trim() || !selected.scheduled_at || !selected.scheduled_end || Number(selected.total) <= 0} onClick={() => transition(selected, 'dispatched')}>Điều phối</button>}{selected.status === 'dispatched' && can('field-service.work_order.done') && <button className="btn btn-primary" disabled={Boolean(busy)} onClick={() => transition(selected, 'done')}>Hoàn tất · xuất kho và lập hóa đơn</button>}{['open', 'dispatched'].includes(selected.status) && can('field-service.work_order.cancelled') && <button className="btn btn-ghost" disabled={Boolean(busy)} onClick={() => transition(selected, 'cancelled')}>Hủy lệnh</button>}</div>
+        <div className="row wrap" style={{ marginTop: 14 }}>{selected.status === 'open' && can('field-service.work_order.dispatched') && <button className="btn btn-primary" disabled={Boolean(busy) || (!selected.technician_employee && !selected.technician?.trim()) || !selected.scheduled_at || !selected.scheduled_end || Number(selected.total) <= 0} onClick={() => transition(selected, 'dispatched')}>Điều phối</button>}{selected.status === 'dispatched' && can('field-service.work_order.done') && <button className="btn btn-primary" disabled={Boolean(busy)} onClick={() => transition(selected, 'done')}>Hoàn tất · xuất kho và lập hóa đơn</button>}{['open', 'dispatched'].includes(selected.status) && can('field-service.work_order.cancelled') && <button className="btn btn-ghost" disabled={Boolean(busy)} onClick={() => transition(selected, 'cancelled')}>Hủy lệnh</button>}</div>
       </section>}
     </div>}
   </div>;

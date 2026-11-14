@@ -28,6 +28,7 @@
 - Protected clinic chart integrity by limiting prescription creation and edits to open encounters and preventing prescription or lab orders from being reassigned to another encounter; lab results may still be recorded after a visit is completed.
 - Enabled full-batch manufacturing scrap closeout with a required scrap reason and expense account, skipped finished-goods QC when output is zero, and routed abnormal-scrap WIP journal posting from the production completion event.
 - Prevented future-period utility meter readings in both the workbench and server validation so unfinished consumption cannot be billed early.
+- Added internal HRM employee assignment to the field-service workbench, preserving contractor assignment and enabling scheduled conflict checks for either technician type.
 - Linked purchase returns to the supplier invoice they reverse; returns before invoicing reduce GRNI directly, while billed returns create a debit note against the selected payable.
 - Serialized supplier invoice number uniqueness checks per tenant and supplier so concurrent approvals on different purchase orders cannot create duplicate payable documents.
 - Added permission-aware BI authoring for saved row and aggregate reports, dashboards with validated report widgets, and KPIs with aggregate sources and optional formulas, using enabled tenant entities and field metadata without manual JSON editing.
