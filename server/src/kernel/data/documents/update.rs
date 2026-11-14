@@ -298,9 +298,14 @@ impl Kernel {
         if qname == "booking.booking"
             && cur.get("status").and_then(Value::as_str) == Some("requested")
         {
-            let errors =
-                crate::modules::booking::prepare_document(tx, t, ent.def.name.as_str(), &mut cur)
-                    .await?;
+            let errors = crate::modules::booking::prepare_update(
+                tx,
+                t,
+                ent.def.name.as_str(),
+                &mut cur,
+                &changed,
+            )
+            .await?;
             if !errors.is_empty() {
                 return Err(ApiError::validation(&qname, errors));
             }

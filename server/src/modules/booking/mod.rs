@@ -3,7 +3,7 @@ mod application;
 mod domain;
 mod persistence;
 
-pub use application::prepare_document;
+pub use application::{prepare_document, prepare_update};
 pub use domain::{validate, validate_action, validate_update};
 pub use persistence::validate_persistence;
 

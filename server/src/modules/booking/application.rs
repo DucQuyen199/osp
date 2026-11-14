@@ -94,3 +94,28 @@ pub async fn prepare_document(
     }
     Ok(errors)
 }
+
+/// Recalculate service-derived snapshots when an editable request changes its
+/// start time or service. A caller may provide an explicit replacement end or
+/// negotiated price in the same update.
+pub async fn prepare_update(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    entity: &str,
+    document: &mut Map<String, Value>,
+    changed: &[String],
+) -> R<Vec<String>> {
+    if entity == "booking" {
+        let service_changed = changed.iter().any(|field| field == "service");
+        let start_changed = changed.iter().any(|field| field == "starts_at");
+        let end_changed = changed.iter().any(|field| field == "ends_at");
+        let price_changed = changed.iter().any(|field| field == "price");
+        if (service_changed || start_changed) && !end_changed {
+            document.remove("ends_at");
+        }
+        if service_changed && !price_changed {
+            document.remove("price");
+        }
+    }
+    prepare_document(tx, tenant, entity, document).await
+}

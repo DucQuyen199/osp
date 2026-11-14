@@ -21,6 +21,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Nhà thuốc chỉ ghi nhận cấp phát qua state machine sau giao dịch POS hoàn tất; timestamp, lịch sử đơn thuốc và bán hàng cùng commit/rollback.
 - Lệnh sản xuất theo dõi sản lượng đạt/phế phẩm riêng trong QC; thành phẩm theo dõi lô nhận mã lô và hạn dùng được liên kết tới phiếu QC và tồn kho.
 - Bàn bán buôn cho phép lập thêm vận đơn theo số lượng còn lại, tính cả chuyến nháp/đang giao/đã giao và loại phần giao thất bại khỏi lượng đã phân công.
+- Lịch hẹn ở trạng thái yêu cầu tính lại giờ kết thúc và giá mặc định khi đổi dịch vụ hoặc giờ bắt đầu; khung giờ mới tiếp tục qua kiểm tra khóa tài nguyên và trùng lịch.
 - Docker image Linux đã build và chạy qua Compose test riêng; đã diễn tập pg_dump/pg_restore, restart, RLS, phiên đăng nhập và luồng bán hàng sau khôi phục. Vẫn cần xác minh vận hành/tải/HA trên hạ tầng production thực tế.
 
 ## Còn thiếu
