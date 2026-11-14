@@ -21,6 +21,7 @@
 - Added a tenant-scoped maintenance technician roster and assignment on open work orders, including contractor/internal type, specialty, contact, and safeguards against assigning inactive technicians or deactivating technicians with open work.
 - Prevented future-dated crop planting, input application, and harvest records from changing agricultural inventory before those field operations occur; enforced on the API and date controls.
 - Hardened payroll attendance by rejecting future punch timestamps, requiring a check-in before check-out, matching the work date to the local check-in date, and preventing attendance before the employee's hire date.
+- Added SPA route focus management: after navigation, keyboard and screen-reader users land on the new page heading with a visible focus indicator.
 - Made supplier invoice dispute reasons and dispute resolution notes atomic with their state transitions.
 - Made employee termination dates atomic with termination, attendance/leave checks and payroll synchronization.
 - Made hotel no-show reasons atomic with reservation status changes and room-calendar release.

@@ -361,6 +361,15 @@ function App() {
     return () => document.removeEventListener('keydown', shortcut);
   }, []);
 
+  useEffect(() => {
+    if (!ready || !session.current() || !meta || !user) return;
+    const heading = document.querySelector('#main h1');
+    const target = heading || document.getElementById('main');
+    if (!target) return;
+    if (heading && !heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
+    target.focus();
+  }, [route, ready, meta, user]);
+
   if (!ready) return <div className="landing-panel"><div className="skeleton" data-h="row" /></div>;
   if (!session.current()) return <>
     {error && <div className="toast toast-danger" role="alert">{error}</div>}
