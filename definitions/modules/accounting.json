@@ -806,9 +806,43 @@
      "required": false,
      "ref": "accounting.debit_note",
      "system": true
+    },
+    {
+     "name": "settlement_batch",
+     "type": "ref",
+     "required": false,
+     "ref": "accounting.settlement_batch",
+     "system": true
     }
    ],
    "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "settlement_batch",
+   "label": "Phiếu thu/chi phân bổ công nợ",
+   "fields": [
+    { "name": "party", "type": "ref", "required": true, "ref": "master-data.party" },
+    { "name": "direction", "type": "enum", "required": true, "options": ["receipt", "disbursement"] },
+    { "name": "currency", "type": "ref", "required": true, "ref": "master-data.currency" },
+    { "name": "amount", "type": "money", "required": true },
+    { "name": "method", "type": "enum", "required": true, "options": ["cash", "card", "transfer", "ewallet", "bank"] },
+    { "name": "payment_date", "type": "date", "required": true },
+    { "name": "reference", "type": "string", "required": false },
+    { "name": "allocations", "type": "json", "required": true },
+    { "name": "status", "type": "enum", "required": false, "options": ["draft", "submitted", "approved", "rejected", "cancelled"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "submitted": { "from": ["draft", "rejected"], "to": "submitted" },
+     "approved": { "from": ["submitted"], "to": "approved" },
+     "rejected": { "from": ["submitted"], "to": "rejected" },
+     "cancelled": { "from": ["draft", "rejected"], "to": "cancelled" }
+    }
+   },
    "computed": {},
    "constraints": []
   },

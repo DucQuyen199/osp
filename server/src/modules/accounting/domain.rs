@@ -194,6 +194,55 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                 );
             }
         }
+        "settlement_batch" => {
+            if !amount(document, "amount").is_some_and(|value| value > Decimal::ZERO) {
+                errors.push("Settlement batch total must be greater than zero".into());
+            }
+            if !matches!(
+                document.get("direction").and_then(Value::as_str),
+                Some("receipt" | "disbursement")
+            ) {
+                errors.push("Settlement batch direction must be receipt or disbursement".into());
+            }
+            if date(document, "payment_date").is_none() {
+                errors.push("Settlement batch requires a valid payment date".into());
+            }
+            let Some(allocations) = document.get("allocations").and_then(Value::as_array) else {
+                errors.push("Settlement batch requires invoice allocations".into());
+                return errors;
+            };
+            if allocations.is_empty() {
+                errors.push("Settlement batch needs at least one invoice allocation".into());
+            }
+            let receipt = document.get("direction").and_then(Value::as_str) == Some("receipt");
+            let mut total = Decimal::ZERO;
+            for (index, allocation) in allocations.iter().enumerate() {
+                let document_ref = if receipt { "invoice" } else { "bill" };
+                let other_ref = if receipt { "bill" } else { "invoice" };
+                let valid_reference = allocation
+                    .get(document_ref)
+                    .and_then(Value::as_str)
+                    .is_some_and(|id| !id.is_empty())
+                    && allocation.get(other_ref).is_none_or(Value::is_null);
+                let value = allocation.get("amount").and_then(crate::money::decimal);
+                if !valid_reference || value.is_none_or(|amount| amount <= Decimal::ZERO) {
+                    errors.push(format!("Settlement allocation {} must reference one matching invoice or bill and a positive amount", index + 1));
+                    continue;
+                }
+                let Some(next) = total.checked_add(value.unwrap_or_default()) else {
+                    errors.push("Settlement allocation total exceeds the supported range".into());
+                    break;
+                };
+                total = next;
+            }
+            if amount(document, "amount").is_some_and(|value| {
+                !crate::money::within_tolerance(total, value, Decimal::new(5, 3))
+            }) {
+                errors.push(
+                    "Settlement batch total must equal the sum of its invoice allocations".into(),
+                );
+            }
+        }
         "bank_statement" => {
             if let (Some(start), Some(end)) =
                 (date(document, "start_date"), date(document, "end_date"))
@@ -236,6 +285,14 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
             &["*"]
         }
         "payment" => &["*"],
+        "settlement_batch"
+            if !matches!(
+                current.get("status").and_then(Value::as_str),
+                Some("draft" | "rejected")
+            ) =>
+        {
+            &["*"]
+        }
         "bank_statement" if current.get("status").and_then(Value::as_str) != Some("draft") => {
             &["*"]
         }
@@ -311,6 +368,14 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
         "period" if document.get("status").and_then(Value::as_str) == Some("period_closed") => {
             vec!["Kỳ kế toán đã khóa không được xóa; hãy mở lại kỳ trước".into()]
         }
+        "settlement_batch"
+            if !matches!(
+                document.get("status").and_then(Value::as_str),
+                Some("draft" | "rejected")
+            ) =>
+        {
+            vec!["Only a draft or rejected settlement batch can be deleted".into()]
+        }
         "payment" => vec!["Payment là dấu vết tài chính, không được xóa trực tiếp".into()],
         "bank_statement_line"
             if document.get("status").and_then(Value::as_str) != Some("unmatched") =>
@@ -341,6 +406,7 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
     match (entity, action) {
+        ("settlement_batch", "submitted" | "approved") => validate("settlement_batch", document),
         ("period", "closed") => {
             let Some(start) = date(document, "start_date") else {
                 return vec!["Kỳ kế toán cần ngày bắt đầu hợp lệ".into()];

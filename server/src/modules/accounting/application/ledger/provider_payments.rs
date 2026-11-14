@@ -12,6 +12,11 @@ pub(super) async fn handle_event(
 ) -> R<Option<bool>> {
     match event_type {
         "accounting.payment.created" => {
+            if event.get("source").and_then(Value::as_str) == Some("settlement_batch") {
+                // The approved batch posts one consolidated journal after all of its
+                // allocation payments have updated their individual balances.
+                return Ok(Some(true));
+            }
             if event.get("source").and_then(Value::as_str)
                 == Some("payroll_contribution_remittance")
             {

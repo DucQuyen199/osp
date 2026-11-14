@@ -11,6 +11,7 @@ const APPROVAL_TARGETS: &[&str] = &[
     "purchasing.purchase_return",
     "expense.expense_claim",
     "hrm.leave_request",
+    "accounting.settlement_batch",
 ];
 
 fn valid_approvers(value: &Value) -> bool {
@@ -105,6 +106,12 @@ pub fn request_for_event(event_type: &str, event: &Value) -> Option<Map<String, 
             None,
             event.get("employee"),
         ),
+        "accounting.settlement_batch.submitted" => (
+            "accounting.settlement_batch",
+            "Duyệt phiếu thu/chi phân bổ công nợ",
+            event.get("amount"),
+            None,
+        ),
         _ => return None,
     };
     let record_id = event.get("id")?.as_str()?;
@@ -143,6 +150,7 @@ pub fn decision_for_event(event_type: &str, event: &Value) -> Option<(&'static s
         "purchasing.purchase_return" => "purchasing.purchase_return",
         "expense.expense_claim" => "expense.expense_claim",
         "hrm.leave_request" => "hrm.leave_request",
+        "accounting.settlement_batch" => "accounting.settlement_batch",
         _ => return None,
     };
     Some((entity, action))

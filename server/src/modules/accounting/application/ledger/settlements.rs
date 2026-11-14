@@ -22,6 +22,7 @@ fn amount_tolerance() -> Decimal {
 mod disbursements;
 mod payroll_expense;
 mod provider_payments;
+mod settlement_batches;
 
 pub(super) async fn handle_event(
     kernel: &Kernel,
@@ -47,6 +48,9 @@ pub(super) async fn handle_event(
         "accounting.payment.created" => {
             provider_payments::handle_event(kernel, tx, tenant, event_type, event, event_id, depth)
                 .await
+        }
+        "accounting.settlement_batch.approved" => {
+            settlement_batches::handle_event(kernel, tx, tenant, event, event_id, depth).await
         }
         _ => Ok(None),
     }

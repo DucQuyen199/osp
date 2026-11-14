@@ -401,7 +401,28 @@
       "accounting.bill.read",
       "accounting.credit_note.read",
       "accounting.debit_note.read",
-      "master-data.party.read"
+      "accounting.settlement_batch.read",
+      "master-data.party.read",
+      "accounting.settlement_batch.create",
+      "accounting.settlement_batch.update",
+      "accounting.settlement_batch.submitted",
+      "accounting.settlement_batch.cancelled",
+      "master-data.currency.read"
+    ]
+  },
+  "accounting_settlement_approver": {
+    "name": "Kế toán duyệt thu chi",
+    "permissions": [
+      "accounting.settlement_batch.read",
+      "accounting.invoice.read",
+      "accounting.bill.read",
+      "accounting.payment.read",
+      "accounting.account.read",
+      "master-data.party.read",
+      "master-data.currency.read",
+      "workflow-approval.approval_request.read",
+      "workflow-approval.approval_request.approved",
+      "workflow-approval.approval_request.rejected"
     ]
   },
   "accounting_period_manager": {

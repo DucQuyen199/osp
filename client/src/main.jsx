@@ -69,6 +69,7 @@ const SalesReturnsWorkbenchPage = lazy(() => import('./SalesReturnsWorkbenchPage
 const BankReconciliationWorkbenchPage = lazy(() => import('./BankReconciliationWorkbenchPage.jsx'));
 const AccountingPeriodClosePage = lazy(() => import('./AccountingPeriodClosePage.jsx'));
 const AccountingAdjustmentRefundsPage = lazy(() => import('./AccountingAdjustmentRefundsPage.jsx'));
+const AccountingSettlementWorkbenchPage = lazy(() => import('./AccountingSettlementWorkbenchPage.jsx'));
 const InventoryStockCountWorkbenchPage = lazy(() => import('./InventoryStockCountWorkbenchPage.jsx'));
 
 function parseRoute(hash = location.hash) {
@@ -107,6 +108,7 @@ function parseRoute(hash = location.hash) {
   if (a === 'inventory-counts') return { name: 'inventory-stock-count-workbench' };
   if (a === 'period-close') return { name: 'accounting-period-close' };
   if (a === 'refunds') return { name: 'accounting-adjustment-refunds' };
+  if (a === 'settlements') return { name: 'accounting-settlement-workbench' };
   if (a === 'ecommerce') return { name: 'ecommerce-order-desk' };
   if (a === 'agriculture') return { name: 'agriculture-operations' };
   if (a === 'hotel') return { name: 'hotel-frontdesk' };
@@ -215,6 +217,7 @@ function Sidebar({ meta, route, onNavigate, open }) {
     {meta.modules.some((module) => module.id === 'sales') && can('sales.sales_return.read') && link('#/returns', 'Trả hàng bán', route.name === 'sales-returns-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'accounting') && can('accounting.bank_statement.read') && link('#/bank-reconciliation', 'Đối soát ngân hàng', route.name === 'bank-reconciliation-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'accounting') && can('accounting.payment.create') && can('accounting.payment.read') && ((can('accounting.credit_note.read') && can('accounting.invoice.read')) || (can('accounting.debit_note.read') && can('accounting.bill.read'))) && link('#/refunds', 'Hoàn tiền điều chỉnh', route.name === 'accounting-adjustment-refunds', 'payment')}
+    {meta.modules.some((module) => module.id === 'accounting') && can('accounting.settlement_batch.read') && link('#/settlements', 'Thu/chi phân bổ công nợ', route.name === 'accounting-settlement-workbench', 'payment')}
     {meta.modules.some((module) => module.id === 'accounting') && can('accounting.period.read') && link('#/period-close', 'Khóa sổ kế toán', route.name === 'accounting-period-close', 'list')}
     {meta.modules.some((module) => module.id === 'ecommerce') && can('ecommerce.web_order.read') && link('#/ecommerce', 'Đơn hàng online', route.name === 'ecommerce-order-desk', 'list')}
     {meta.modules.some((module) => module.id === 'agriculture') && can('agriculture.crop_cycle.read') && link('#/agriculture', 'Điều hành mùa vụ', route.name === 'agriculture-operations', 'list')}
@@ -422,6 +425,7 @@ function App() {
         : route.name === 'bank-reconciliation-workbench' ? <BankReconciliationWorkbenchPage />
         : route.name === 'accounting-period-close' ? <AccountingPeriodClosePage />
         : route.name === 'accounting-adjustment-refunds' ? <AccountingAdjustmentRefundsPage />
+        : route.name === 'accounting-settlement-workbench' ? <AccountingSettlementWorkbenchPage />
         : route.name === 'ecommerce-order-desk' ? <EcommerceOrderDeskPage />
         : route.name === 'agriculture-operations' ? <AgricultureOperationsPage />
         : route.name === 'hotel-frontdesk' ? <HotelFrontDeskPage />

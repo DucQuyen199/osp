@@ -10,6 +10,7 @@ mod documents;
 mod journals;
 mod payments;
 mod periods;
+mod settlement_batches;
 mod stock_posting;
 
 pub use stock_posting::post_stock_movement;
@@ -126,6 +127,9 @@ pub async fn validate_persistence(
     }
     if entity == "account" {
         return accounts::validate_persistence(tx, tenant, action, document).await;
+    }
+    if entity == "settlement_batch" {
+        return settlement_batches::validate(tx, tenant, action, document).await;
     }
     let mut errors = Vec::new();
     if entity == "journal_entry" {
