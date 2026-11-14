@@ -50,6 +50,29 @@ async fn replenishment_rows(
     } else {
         "sales_demand AS (SELECT NULL::uuid AS warehouse, NULL::uuid AS product, 0::numeric AS qty WHERE FALSE),".into()
     };
+    let quality_holds = if tenant.has_module("quality") {
+        "quality_holds AS ( \
+           SELECT inspection.tenant_id, inspection.product, inspection.warehouse, inspection.lot, \
+             sum(CASE WHEN inspection.status = 'passed' THEN 0::numeric ELSE GREATEST( \
+               inspection.qty::numeric - COALESCE(dispositions.qty, 0) - COALESCE(returned.qty, 0), 0::numeric \
+             ) END) AS qty \
+           FROM quality__inspection inspection \
+           LEFT JOIN LATERAL (SELECT SUM(disposition.qty::numeric) AS qty \
+             FROM quality__inspection_disposition disposition \
+             WHERE disposition.tenant_id = inspection.tenant_id AND disposition.inspection = inspection.id \
+               AND disposition.status = 'posted') dispositions ON TRUE \
+           LEFT JOIN LATERAL (SELECT SUM(stock_move.qty::numeric) AS qty \
+             FROM inventory__stock_move stock_move \
+             WHERE stock_move.tenant_id = inspection.tenant_id AND stock_move.source = 'quality_return' \
+               AND stock_move.source_id = inspection.id::text AND stock_move.product = inspection.product \
+               AND stock_move.warehouse = inspection.warehouse AND stock_move.lot IS NOT DISTINCT FROM inspection.lot::text \
+               AND stock_move.direction = 'out') returned ON TRUE \
+           WHERE inspection.tenant_id = $1 AND inspection.source IN ('purchase_order', 'purchase_receipt') \
+           GROUP BY inspection.tenant_id, inspection.product, inspection.warehouse, inspection.lot \
+         ), "
+    } else {
+        "quality_holds AS (SELECT NULL::uuid AS tenant_id, NULL::uuid AS product, NULL::uuid AS warehouse, NULL::uuid AS lot, 0::numeric AS qty WHERE FALSE), "
+    };
     tx.query_json(
         &format!("WITH {sales_demand} ordered_lines AS ( \
            SELECT po.id AS order_id, po.tenant_id, po.warehouse, \
@@ -95,9 +118,35 @@ async fn replenishment_rows(
                AND (ordered_line->>'product')::uuid = requested.product \
            ) ordered ON true \
            GROUP BY requested.warehouse, requested.product \
+         ), {quality_holds} lot_balances AS ( \
+           SELECT lot.tenant_id, lot.product, move.warehouse, lot.id AS lot, lot.expiry, \
+             sum(CASE WHEN move.direction = 'in' THEN move.qty::numeric ELSE -move.qty::numeric END) AS qty \
+           FROM inventory__lot lot \
+           JOIN inventory__stock_move move ON move.tenant_id = lot.tenant_id AND move.product = lot.product \
+             AND move.lot = lot.id::text AND move.warehouse IS NOT NULL \
+           WHERE lot.tenant_id = $1 \
+           GROUP BY lot.tenant_id, lot.product, move.warehouse, lot.id, lot.expiry \
+         ), lot_positions AS ( \
+           SELECT lot_balances.tenant_id, lot_balances.product, lot_balances.warehouse, \
+             sum(GREATEST(lot_balances.qty - COALESCE(quality_holds.qty, 0), 0)) \
+               FILTER (WHERE lot_balances.expiry IS NULL OR lot_balances.expiry >= CURRENT_DATE) AS usable_qty, \
+             sum(GREATEST(lot_balances.qty, 0)) AS total_qty \
+           FROM lot_balances \
+           LEFT JOIN quality_holds ON quality_holds.tenant_id = lot_balances.tenant_id \
+             AND quality_holds.product = lot_balances.product AND quality_holds.warehouse = lot_balances.warehouse \
+             AND quality_holds.lot IS NOT DISTINCT FROM lot_balances.lot \
+           GROUP BY lot_balances.tenant_id, lot_balances.product, lot_balances.warehouse \
          ), balances AS ( \
-           SELECT product, warehouse, COALESCE(qty, 0) - COALESCE(held_qty, 0) AS available_qty \
-           FROM inventory__stock_level WHERE tenant_id = $1 \
+           SELECT stock.product, stock.warehouse, \
+             CASE WHEN COALESCE(product.lot_tracked, false) THEN \
+               COALESCE(lot_positions.usable_qty, 0) + GREATEST( \
+                 COALESCE(stock.qty, 0) - COALESCE(stock.held_qty, 0) - COALESCE(lot_positions.total_qty, 0), 0 \
+               ) ELSE COALESCE(stock.qty, 0) - COALESCE(stock.held_qty, 0) END AS available_qty \
+           FROM inventory__stock_level stock \
+           JOIN master_data__product product ON product.tenant_id = stock.tenant_id AND product.id = stock.product \
+           LEFT JOIN lot_positions ON lot_positions.tenant_id = stock.tenant_id \
+             AND lot_positions.product = stock.product AND lot_positions.warehouse = stock.warehouse \
+           WHERE stock.tenant_id = $1 \
          ) SELECT jsonb_build_object( \
            'id', rule.id, 'productId', product.id, 'sku', product.sku, 'product', product.name, \
            'unit', product.uom, 'warehouseId', warehouse.id, 'warehouse', warehouse.name, \

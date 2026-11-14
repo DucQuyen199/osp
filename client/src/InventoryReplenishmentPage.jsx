@@ -57,7 +57,7 @@ export default function InventoryReplenishmentPage() {
   }, new Map());
 
   return <div className="page">
-    <div className="page-head"><div><h1>Đề xuất bổ sung tồn kho</h1><p className="sub">Tồn dự kiến đã tính đơn bán còn phải giao, đơn mua chờ nhận, đề nghị mua mở và hàng đang giữ để kiểm tra chất lượng.</p></div><a className="btn btn-secondary" href="#/e/inventory/reorder_rule">Định mức bổ sung</a></div>
+    <div className="page-head"><div><h1>Đề xuất bổ sung tồn kho</h1><p className="sub">Tồn khả dụng loại trừ lô hết hạn và hàng giữ để kiểm tra chất lượng; tồn dự kiến tính thêm đơn bán còn phải giao, đơn mua chờ nhận và đề nghị mua mở.</p></div><a className="btn btn-secondary" href="#/e/inventory/reorder_rule">Định mức bổ sung</a></div>
     {error && <div className="alert danger" role="alert">{error}</div>}
     {notice && <div className="alert success" role="status">{notice.message} {notice.id && <a href={`#/e/purchasing/purchase_requisition/${encodeURIComponent(notice.id)}`}>Mở đề nghị mua</a>}</div>}
     {loading && !report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : report && <div className="stack">
