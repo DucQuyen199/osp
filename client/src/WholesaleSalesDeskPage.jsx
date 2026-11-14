@@ -8,6 +8,7 @@ const itemsOf = (response) => Array.isArray(response?.items) ? response.items : 
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function WholesaleSalesDeskPage() {
+  const emailQueueEnabled = app.meta?.modules?.some((module) => module.id === 'communication') || false;
   const [parties, setParties] = useState(new Map());
   const [products, setProducts] = useState(new Map());
   const [warehouses, setWarehouses] = useState(new Map());
@@ -59,7 +60,7 @@ export default function WholesaleSalesDeskPage() {
     finally { if (!quiet) setLoading(false); }
   }, []);
 
-  useEffect(() => { document.title = 'Bán buôn · OSP Suite'; load(); const timer = window.setInterval(() => load(true), 20000); return () => window.clearInterval(timer); }, [load]);
+  useEffect(() => { document.title = 'Bán hàng và báo giá · OSP Suite'; load(); const timer = window.setInterval(() => load(true), 20000); return () => window.clearInterval(timer); }, [load]);
 
   const activeProducts = [...products.values()].filter((product) => product.active !== false).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
   const selectedList = priceLists.find((item) => item.id === priceList);
@@ -91,7 +92,9 @@ export default function WholesaleSalesDeskPage() {
       const message = action === 'confirmed'
         ? 'Đơn đã xác nhận. Hạn mức tín dụng và tồn khả dụng đã được kiểm tra; hệ thống tạo hóa đơn và chuyến giao nếu có địa chỉ.'
         : action === 'accepted' ? 'Báo giá đã duyệt; hệ thống tạo đơn bán nháp.'
-          : action === 'sent' ? 'Đã gửi báo giá cho khách hàng.'
+          : action === 'sent' ? (emailQueueEnabled
+            ? 'Báo giá đã gửi và email chi tiết đã xếp vào hàng đợi gửi.'
+            : 'Đã ghi nhận báo giá đã gửi cho khách hàng.')
             : action === 'expired' ? 'Đã đánh dấu báo giá hết hạn.' : 'Đã cập nhật trạng thái chứng từ.';
       setNotice(message);
     } catch (reason) { setError(reason.message || 'Không cập nhật được chứng từ. Kiểm tra giá, tín dụng và tồn kho.'); await load(true); }
@@ -148,7 +151,7 @@ export default function WholesaleSalesDeskPage() {
   };
 
   return <div className="page-content wholesale-sales-page">
-    <header className="page-header"><div><h1>Bán buôn và phân phối</h1><p className="muted">Báo giá theo khách hàng, duyệt thành đơn, kiểm soát tín dụng và giao hàng.</p></div><button className="button" onClick={() => load()} disabled={loading}>Làm mới</button></header>
+    <header className="page-header"><div><h1>Bán hàng, báo giá và giao hàng</h1><p className="muted">Lập báo giá theo khách hàng, chuyển báo giá được chấp nhận thành đơn, kiểm soát tín dụng và theo dõi giao hàng.</p></div><button className="button" onClick={() => load()} disabled={loading}>Làm mới</button></header>
     {error && <div className="alert error" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
     {can('sales.quotation.create') && <section className="wholesale-create card"><h2>Lập báo giá</h2><form onSubmit={createQuote}>
       <div className="wholesale-form">

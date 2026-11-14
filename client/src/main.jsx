@@ -100,6 +100,7 @@ function parseRoute(hash = location.hash) {
   if (a === 'wellness') return { name: 'wellness-booking-workbench' };
   if (a === 'purchasing') return { name: 'purchasing-workbench' };
   if (a === 'sourcing') return { name: 'purchasing-sourcing-workbench' };
+  if (a === 'sales') return { name: 'wholesale-sales-desk' };
   if (a === 'maintenance') return { name: 'maintenance-workbench' };
   if (a === 'recruitment') return { name: 'recruitment-workbench' };
   if (a === 'payroll') return { name: 'payroll-workbench' };
@@ -227,7 +228,7 @@ function Sidebar({ meta, route, onNavigate, open }) {
     {meta.modules.some((module) => module.id === 'hotel') && can('hotel.reservation.read') && link('#/hotel', 'Lễ tân khách sạn', route.name === 'hotel-frontdesk', 'list')}
     {meta.modules.some((module) => module.id === 'auto-service') && can('auto-service.repair_order.read') && link('#/workshop', 'Xưởng sửa chữa', route.name === 'auto-service-workshop', 'list')}
     {meta.modules.some((module) => module.id === 'restaurant') && can('restaurant.table_order.read') && can('restaurant.table_order.create') && link('#/restaurant', 'Order nhà hàng', route.name === 'restaurant-service', 'list')}
-    {meta.modules.some((module) => module.id === 'sales') && can('sales.quotation.read') && can('sales.quotation.create') && link('#/wholesale', 'Bán buôn', route.name === 'wholesale-sales-desk', 'list')}
+    {meta.modules.some((module) => module.id === 'sales') && can('sales.quotation.read') && can('sales.quotation.create') && link('#/sales', 'Bán hàng và báo giá', route.name === 'wholesale-sales-desk', 'list')}
     {meta.modules.some((module) => module.id === 'inventory') && meta.modules.some((module) => module.id === 'quality') && can('inventory.stock_move.read') && can('quality.inspection.read') && link('#/reports/inventory/quality-holds', 'Hàng giữ QC', route.name === 'inventory-quality-holds', 'list')}
     {meta.modules.some((module) => module.id === 'budget') && can('budget.budget.read') && link('#/reports/budget/variance', 'Thực hiện ngân sách', route.name === 'budget-variance', 'list')}
     {meta.modules.some((module) => module.id === 'crm') && can('crm.deal.read') && link('#/reports/crm/pipeline', 'Pipeline bán hàng', route.name === 'crm-pipeline', 'list')}

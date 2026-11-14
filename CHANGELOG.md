@@ -23,6 +23,7 @@
 - Split accounting payment persistence validation behind its existing facade into invoice/bill settlement, refunds, source payments, and default-account checks while retaining Decimal validation and kernel transaction ownership.
 
 ### Added
+- Sending a sales quotation now queues a customer email with quoted products, line totals, tax, total including tax, and validity date when the communication module is enabled; the shared sales desk reports the queued state accurately.
 - Added database-independent HTTP and Decimal/domain regression suites. Updated PostgreSQL flows for receipt/QC inventory, POS sessions, production acceptance, subscription renewal, strict HTTP import/bulk actions, and list contracts for all 177 entities across 49 modules and 22 industry packs.
 - Added `npm run test:container` for an isolated Linux Compose deployment, transactional sales smoke test and real PostgreSQL backup/restore rehearsal; test credentials and resources are scoped to a unique disposable project.
 - Added tenant-authorized ISO 20022 CAMT.053 statement-file imports through Rust, with bounded XML parsing, currency/date checks, idempotent references, and OpenAPI documentation.
