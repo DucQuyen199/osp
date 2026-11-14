@@ -64,7 +64,14 @@ async fn validate_leave_allocation(
     }
     let used_days_text: String = tx
         .query_one_row(
-            "SELECT COALESCE(SUM((SELECT count(*)::numeric FROM generate_series(GREATEST(lr.start_date, make_date($3, 1, 1))::timestamp, LEAST(lr.end_date, make_date($3, 12, 31))::timestamp, interval '1 day') AS leave_day(work_date) WHERE EXTRACT(ISODOW FROM leave_day.work_date) <= 5 AND NOT EXISTS (SELECT 1 FROM hrm__holiday h WHERE h.tenant_id = lr.tenant_id AND h.date = leave_day.work_date::date)) * CASE WHEN lr.partial_day IN ('morning', 'afternoon') THEN 0.5::numeric ELSE 1::numeric END), 0)::text FROM hrm__leave_request lr WHERE lr.tenant_id = $1 AND lr.employee = $2 AND lr.kind = $4 AND lr.status IN ('submitted', 'approved') AND lr.start_date <= make_date($3, 12, 31) AND lr.end_date >= make_date($3, 1, 1)",
+            "SELECT COALESCE(SUM((SELECT count(*)::numeric FROM generate_series(GREATEST(lr.start_date, make_date($3, 1, 1))::timestamp, LEAST(lr.end_date, make_date($3, 12, 31))::timestamp, interval '1 day') AS leave_day(work_date) \
+               JOIN hrm__employee e ON e.tenant_id = lr.tenant_id AND e.id = lr.employee \
+               LEFT JOIN hrm__work_schedule_entry ws ON ws.tenant_id = e.tenant_id AND ws.employee = e.id AND ws.work_date = leave_day.work_date::date \
+               WHERE CASE WHEN ws.id IS NULL THEN EXTRACT(ISODOW FROM leave_day.work_date)::int IN (SELECT value::int FROM jsonb_array_elements_text(COALESCE(e.work_weekdays, '[1,2,3,4,5]'::jsonb)) AS selected(value)) ELSE ws.is_working END \
+                 AND NOT EXISTS (SELECT 1 FROM hrm__holiday h WHERE h.tenant_id = lr.tenant_id AND h.date = leave_day.work_date::date)) \
+               * CASE WHEN lr.partial_day IN ('morning', 'afternoon') THEN 0.5::numeric ELSE 1::numeric END), 0)::text \
+             FROM hrm__leave_request lr WHERE lr.tenant_id = $1 AND lr.employee = $2 AND lr.kind = $4 AND lr.status IN ('submitted', 'approved') \
+               AND lr.start_date <= make_date($3, 12, 31) AND lr.end_date >= make_date($3, 1, 1)",
             &[&tenant.id, &employee, &year, &kind],
         )
         .await?
@@ -107,7 +114,23 @@ async fn validate_leave_entitlement(
     };
     let rows = tx
         .query(
-            "SELECT allocation.year::int, allocation.entitled_days::text, (SELECT count(*)::numeric FROM generate_series(GREATEST($7::date, make_date(allocation.year::int, 1, 1))::timestamp, LEAST($8::date, make_date(allocation.year::int, 12, 31))::timestamp, interval '1 day') AS requested(work_date) WHERE EXTRACT(ISODOW FROM requested.work_date) <= 5 AND NOT EXISTS (SELECT 1 FROM hrm__holiday h WHERE h.tenant_id = allocation.tenant_id AND h.date = requested.work_date::date)) * CASE WHEN $9::text IN ('morning', 'afternoon') THEN 0.5::numeric ELSE 1::numeric END)::text, (SELECT COALESCE(SUM((SELECT count(*)::numeric FROM generate_series(GREATEST(lr.start_date, make_date(allocation.year::int, 1, 1))::timestamp, LEAST(lr.end_date, make_date(allocation.year::int, 12, 31))::timestamp, interval '1 day') AS reserved(work_date) WHERE EXTRACT(ISODOW FROM reserved.work_date) <= 5 AND NOT EXISTS (SELECT 1 FROM hrm__holiday h WHERE h.tenant_id = allocation.tenant_id AND h.date = reserved.work_date::date)) * CASE WHEN lr.partial_day IN ('morning', 'afternoon') THEN 0.5::numeric ELSE 1::numeric END), 0)::text FROM hrm__leave_request lr WHERE lr.tenant_id = allocation.tenant_id AND lr.employee = allocation.employee AND lr.kind = allocation.kind AND lr.status IN ('submitted', 'approved') AND lr.id <> $4 AND lr.start_date <= make_date(allocation.year::int, 12, 31) AND lr.end_date >= make_date(allocation.year::int, 1, 1)) FROM hrm__leave_allocation allocation WHERE allocation.tenant_id = $1 AND allocation.employee = $2 AND allocation.kind = $3 AND allocation.year::int BETWEEN $5 AND $6 ORDER BY allocation.year",
+            "SELECT allocation.year::int, allocation.entitled_days::text, \
+               (SELECT count(*)::numeric FROM generate_series(GREATEST($7::date, make_date(allocation.year::int, 1, 1))::timestamp, LEAST($8::date, make_date(allocation.year::int, 12, 31))::timestamp, interval '1 day') AS requested(work_date) \
+                JOIN hrm__employee e ON e.tenant_id = allocation.tenant_id AND e.id = allocation.employee \
+                LEFT JOIN hrm__work_schedule_entry ws ON ws.tenant_id = e.tenant_id AND ws.employee = e.id AND ws.work_date = requested.work_date::date \
+                WHERE CASE WHEN ws.id IS NULL THEN EXTRACT(ISODOW FROM requested.work_date)::int IN (SELECT value::int FROM jsonb_array_elements_text(COALESCE(e.work_weekdays, '[1,2,3,4,5]'::jsonb)) AS selected(value)) ELSE ws.is_working END \
+                  AND NOT EXISTS (SELECT 1 FROM hrm__holiday h WHERE h.tenant_id = allocation.tenant_id AND h.date = requested.work_date::date)) \
+                * CASE WHEN $9::text IN ('morning', 'afternoon') THEN 0.5::numeric ELSE 1::numeric END)::text, \
+               (SELECT COALESCE(SUM((SELECT count(*)::numeric FROM generate_series(GREATEST(lr.start_date, make_date(allocation.year::int, 1, 1))::timestamp, LEAST(lr.end_date, make_date(allocation.year::int, 12, 31))::timestamp, interval '1 day') AS reserved(work_date) \
+                   JOIN hrm__employee e ON e.tenant_id = lr.tenant_id AND e.id = lr.employee \
+                   LEFT JOIN hrm__work_schedule_entry ws ON ws.tenant_id = e.tenant_id AND ws.employee = e.id AND ws.work_date = reserved.work_date::date \
+                   WHERE CASE WHEN ws.id IS NULL THEN EXTRACT(ISODOW FROM reserved.work_date)::int IN (SELECT value::int FROM jsonb_array_elements_text(COALESCE(e.work_weekdays, '[1,2,3,4,5]'::jsonb)) AS selected(value)) ELSE ws.is_working END \
+                     AND NOT EXISTS (SELECT 1 FROM hrm__holiday h WHERE h.tenant_id = allocation.tenant_id AND h.date = reserved.work_date::date)) \
+                   * CASE WHEN lr.partial_day IN ('morning', 'afternoon') THEN 0.5::numeric ELSE 1::numeric END), 0)::text \
+                FROM hrm__leave_request lr WHERE lr.tenant_id = allocation.tenant_id AND lr.employee = allocation.employee AND lr.kind = allocation.kind \
+                  AND lr.status IN ('submitted', 'approved') AND lr.id <> $4 AND lr.start_date <= make_date(allocation.year::int, 12, 31) AND lr.end_date >= make_date(allocation.year::int, 1, 1)) \
+             FROM hrm__leave_allocation allocation WHERE allocation.tenant_id = $1 AND allocation.employee = $2 AND allocation.kind = $3 \
+               AND allocation.year::int BETWEEN $5 AND $6 ORDER BY allocation.year",
             &[
                 &tenant.id,
                 &employee,

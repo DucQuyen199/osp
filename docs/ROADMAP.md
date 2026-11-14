@@ -72,10 +72,10 @@ Các module CRM/Marketing, bán hàng, mua hàng, loyalty, logistics, field serv
 - Mỗi tính năng cần kiểm thử luồng và tài liệu.
 - Không cam kết tuân thủ pháp lý trước khi có tư vấn chuyên môn.
 
-- Payroll cho phép chốt bộ ngày làm việc ISO 1–7 theo từng kỳ (mặc định thứ Hai–thứ Sáu); công, phép hưởng lương, ngày lễ, mẫu số lương và kiểm tra phiếu lương dùng cùng lịch đã lưu. Lịch ca xoay theo từng nhân viên vẫn cần phát triển.
+- Payroll cho phép chốt bộ ngày làm việc ISO 1–7 theo từng kỳ (mặc định thứ Hai–thứ Sáu); công, phép hưởng lương, ngày lễ, mẫu số lương và kiểm tra phiếu lương dùng cùng lịch đã lưu.
 
-- Nhân sự và payroll hỗ trợ lịch tuần ISO cùng giờ chuẩn riêng theo từng nhân viên, kế thừa mặc định của kỳ lương khi không cấu hình; lịch này được dùng xuyên suốt cho ngày công, phép hưởng lương, ngày lễ và tăng ca. Ca xoay theo ngày cụ thể vẫn cần phát triển.
+- Nhân sự và payroll hỗ trợ lịch tuần ISO cùng giờ chuẩn riêng theo từng nhân viên, kế thừa mặc định của kỳ lương khi không cấu hình; lịch này được dùng xuyên suốt cho ngày công, phép hưởng lương, ngày lễ, hạn mức nghỉ và tăng ca.
 
 - Mỗi phiếu lương lưu lại bộ ngày trong tuần và giờ chuẩn đã dùng để tính, giúp kiểm toán lịch áp dụng sau khi hồ sơ nhân sự thay đổi.
 
-- Lịch nhân sự có ngoại lệ theo ngày: ca bắt đầu/kết thúc, giờ nghỉ không tính lương, ca qua đêm và ngày nghỉ ghi đè lịch tuần; payroll dùng cùng lịch và khóa sửa sau khi có phiếu lương. Còn thiếu bộ tạo lịch xoay lặp tự động và lịch mẫu/đội ca.
+- Lịch nhân sự có ngoại lệ theo ngày: ca bắt đầu/kết thúc, giờ nghỉ không tính lương, ca qua đêm và ngày nghỉ ghi đè lịch tuần; payroll dùng cùng lịch và khóa sửa sau khi có phiếu lương. Lịch luân phiên vẫn cần bộ tạo chu kỳ tự động và mẫu/đội ca.
