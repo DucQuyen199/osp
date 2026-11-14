@@ -55,6 +55,18 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
     {
         errors.push("Approval threshold must be a finite non-negative amount".into());
     }
+    if document.get("variance_tolerance").is_some_and(|tolerance| {
+        !money::decimal(tolerance).is_some_and(|tolerance| tolerance >= Decimal::ZERO)
+    }) {
+        errors.push("Variance tolerance must be a finite non-negative amount".into());
+    }
+    if document
+        .get("variance_tolerance")
+        .is_some_and(|tolerance| !tolerance.is_null())
+        && document.get("entity").and_then(Value::as_str) != Some("purchasing.supplier_invoice")
+    {
+        errors.push("Variance tolerance can only be configured for supplier invoices".into());
+    }
     if !document.get("approvers").is_some_and(valid_approvers) {
         errors.push("Approvers must be a non-empty list of user IDs or role names".into());
     }

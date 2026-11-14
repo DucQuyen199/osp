@@ -107,6 +107,11 @@
      "required": false
     },
     {
+     "name": "variance_tolerance",
+     "type": "money",
+     "required": false
+    },
+    {
      "name": "approvers",
      "type": "json",
      "required": true

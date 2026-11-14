@@ -67,9 +67,47 @@ pub async fn handle_source_event(
     }
     if let Some(request) = domain::request_for_event(event_type, document) {
         let entity = kernel.ent(tenant, "workflow-approval.approval_request")?;
-        kernel
+        let created = kernel
             .create_in(tx, &Actor::System, tenant, &entity, request, &opts)
             .await?;
+        if event_type == "purchasing.supplier_invoice.submitted"
+            && let (Some(total), Some(variance)) = (
+                document.get("total").and_then(crate::money::decimal),
+                document
+                    .get("price_variance")
+                    .and_then(crate::money::decimal),
+            )
+        {
+            let amount_text = total.normalize().to_string();
+            let rule = tx
+                .query_opt(
+                    "SELECT variance_tolerance::text FROM workflow_approval__approval_rule WHERE tenant_id=$1 AND entity='purchasing.supplier_invoice' AND (min_amount IS NULL OR min_amount <= $2::text::numeric) ORDER BY min_amount DESC NULLS LAST, id LIMIT 1 FOR SHARE",
+                    &[&tenant.id, &amount_text],
+                )
+                .await?;
+            let tolerance = rule
+                .and_then(|row| row.get::<_, Option<String>>(0))
+                .and_then(|value| crate::money::decimal_str(&value));
+            if tolerance.is_some_and(|tolerance| variance.abs() <= tolerance) {
+                let request_id = created.get("id").and_then(Value::as_str).ok_or_else(|| {
+                    crate::error::ApiError::validation(
+                        event_type,
+                        vec!["Created approval request is missing its id".into()],
+                    )
+                })?;
+                kernel
+                    .act_in(
+                        tx,
+                        &Actor::System,
+                        tenant,
+                        &entity,
+                        request_id,
+                        "approved",
+                        &opts,
+                    )
+                    .await?;
+            }
+        }
         return Ok(true);
     }
 

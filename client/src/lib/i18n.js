@@ -31,7 +31,7 @@ const FIELDS = {
   job: 'Vị trí', candidate: 'Ứng viên', candidate_name: 'Tên ứng viên', headcount: 'Số lượng cần tuyển',
   course: 'Khóa học', lesson: 'Bài học', required: 'Bắt buộc', learner: 'Học viên', progress: 'Tiến độ (%)', content: 'Nội dung', objective: 'Mục tiêu', target: 'Chỉ tiêu', current: 'Hiện tại',
   score: 'Điểm', comment: 'Nhận xét', project: 'Dự án', task: 'Công việc', hours: 'Số giờ', entity: 'Đối tượng', record_id: 'Mã bản ghi',
-  min_amount: 'Số tiền tối thiểu', approvers: 'Người duyệt', folder: 'Thư mục', file_url: 'Tệp', version: 'Phiên bản', tags: 'Thẻ',
+  min_amount: 'Số tiền tối thiểu', variance_tolerance: 'Dung sai chênh lệch HĐ', approvers: 'Người duyệt', folder: 'Thư mục', file_url: 'Tệp', version: 'Phiên bản', tags: 'Thẻ',
   signer_email: 'Email người ký', signer_name: 'Tên người ký', clause: 'Điều khoản', value: 'Giá trị', recipient: 'Người nhận',
   widgets: 'Thành phần', query: 'Truy vấn', schedule: 'Lịch chạy', formula: 'Công thức', config: 'Cấu hình', enabled: 'Bật', events: 'Sự kiện', secret: 'Khóa bí mật',
   key: 'Khóa', scopes: 'Phạm vi', dob: 'Ngày sinh', gender: 'Giới tính', blood_type: 'Nhóm máu', allergies: 'Dị ứng', insurance_no: 'Số bảo hiểm',

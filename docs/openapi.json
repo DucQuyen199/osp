@@ -15855,6 +15855,9 @@
             "format": "date-time",
             "readOnly": true,
             "type": "string"
+          },
+          "variance_tolerance": {
+            "type": "number"
           }
         },
         "type": "object"
@@ -15874,6 +15877,9 @@
           },
           "name": {
             "type": "string"
+          },
+          "variance_tolerance": {
+            "type": "number"
           }
         },
         "required": [
