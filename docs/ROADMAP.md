@@ -15,6 +15,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Nhật ký audit được RLS `FORCE` theo tenant; trigger PostgreSQL chặn cập nhật, xóa trực tiếp và `TRUNCATE` trong luồng DB thông thường.
 - RBAC, Argon2id, phiên và API token, rate limiting, OpenAPI 3.1.
 - React/Vite, giao diện quản trị, timeline liên module, responsive; design system và rà axe-core.
+- Bàn vận hành hóa đơn điện tử: hàng đợi theo trạng thái, liên kết hóa đơn kế toán, xem lỗi/phản hồi/lịch sử gọi provider, thử lại và yêu cầu hủy có lý do. Phát hành thật vẫn cần ánh xạ hợp đồng và thông tin xác thực từ provider được chọn.
 - Docker image Linux đã build và chạy qua Compose test riêng; đã diễn tập pg_dump/pg_restore, restart, RLS, phiên đăng nhập và luồng bán hàng sau khôi phục. Vẫn cần xác minh vận hành/tải/HA trên hạ tầng production thực tế.
 
 ## Còn thiếu
