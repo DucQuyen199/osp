@@ -115,6 +115,11 @@
      "system": true
     },
     {
+     "name": "prescription",
+     "type": "string",
+     "required": false
+    },
+    {
      "name": "lines",
      "type": "json",
      "required": false

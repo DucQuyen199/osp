@@ -42,9 +42,13 @@
  },
  "roles": {
   "loan_officer": {
-   "name": "Cán bộ tín dụng",
+   "name": "Cán bộ tín dụng / Thu nợ",
    "permissions": [
-    "lending.*",
+    "lending.loan.read",
+    "lending.loan.create",
+    "lending.loan.update",
+    "lending.loan.delete",
+    "lending.repayment.*",
     "crm.*",
     "document.*"
    ]
@@ -52,9 +56,41 @@
   "underwriter": {
    "name": "Thẩm định",
    "permissions": [
-    "lending.loan.*",
-    "insurance.*",
+    "lending.loan.read",
+    "lending.loan.approved",
+    "lending.loan.rejected",
+    "insurance.policy.read",
+    "insurance.claim.read",
+    "insurance.claim.update",
+    "insurance.claim.approved",
+    "insurance.claim.rejected",
     "workflow-approval.*"
+   ]
+  },
+  "disbursement_officer": {
+   "name": "Giải ngân / Chi trả",
+   "permissions": [
+    "lending.loan.read",
+    "lending.loan.disbursed",
+    "lending.loan.closed",
+    "lending.loan.defaulted",
+    "lending.repayment.read",
+    "insurance.policy.read",
+    "insurance.claim.read",
+    "insurance.claim.update",
+    "insurance.claim.paid"
+   ]
+  },
+  "insurance_agent": {
+   "name": "Tư vấn bảo hiểm",
+   "permissions": [
+    "insurance.policy.create",
+    "insurance.policy.read",
+    "insurance.policy.update",
+    "insurance.policy.activated",
+    "insurance.policy.cancelled",
+    "insurance.claim.read",
+    "insurance.claim.create"
    ]
   }
  },

@@ -15,6 +15,8 @@ export default function PosTerminalPage() {
   const [accounts, setAccounts] = useState(new Map());
   const [sessions, setSessions] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [prescriptions, setPrescriptions] = useState([]);
+  const [prescriptionId, setPrescriptionId] = useState('');
   const [cashMovements, setCashMovements] = useState([]);
   const [sessionId, setSessionId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
@@ -39,11 +41,13 @@ export default function PosTerminalPage() {
     setError('');
     if (!keepNotice) setNotice('');
     try {
-      const [warehouseMap, branchMap, productMap, partyMap, taxMap, accountMap, sessionResponse, orderResponse, movementResponse] = await Promise.all([
+      const pharmacyEnabled = app.meta?.modules?.some((module) => module.id === 'pharmacy');
+      const [warehouseMap, branchMap, productMap, partyMap, taxMap, accountMap, sessionResponse, orderResponse, movementResponse, prescriptionResponse] = await Promise.all([
         loadRefs('inventory.warehouse'), loadRefs('master-data.branch'),
         loadRefs('master-data.product'), loadRefs('master-data.party'), loadRefs('master-data.tax'),
         loadRefs('accounting.account'), api(`${dataPath('pos.pos_session')}?limit=1000`),
         api(`${dataPath('pos.pos_order')}?limit=1000`), api(`${dataPath('pos.cash_movement')}?limit=1000`),
+        pharmacyEnabled ? api(`${dataPath('pharmacy.prescription')}?limit=1000`) : Promise.resolve({ items: [] }),
       ]);
       setWarehouses(warehouseMap);
       setBranches(branchMap);
@@ -56,6 +60,7 @@ export default function PosTerminalPage() {
       setSessions(nextSessions);
       setOrders(nextOrders);
       setCashMovements(readItems(movementResponse).filter((item) => item.status === 'draft').sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))));
+      setPrescriptions(readItems(prescriptionResponse).filter((item) => item.status === 'verified').sort((a, b) => String(a.valid_until || '').localeCompare(String(b.valid_until || ''))));
       setSessionId((current) => nextSessions.some((item) => item.id === current) ? current : nextSessions[0]?.id || '');
     } catch (reason) {
       setError(reason.message || 'Không tải được dữ liệu quầy POS.');
@@ -70,6 +75,8 @@ export default function PosTerminalPage() {
   }, [load]);
 
   const activeSession = sessions.find((item) => item.id === sessionId) || null;
+  const pharmacyEnabled = app.meta?.modules?.some((module) => module.id === 'pharmacy');
+  const rxRequired = cart.some(({ product }) => product.requires_prescription === true);
   const activeWarehouse = activeSession ? warehouses.get(activeSession.warehouse) : null;
   const sessionOrders = useMemo(() => orders.filter((item) => item.session === sessionId), [orders, sessionId]);
   const cart = useMemo(() => Object.entries(quantities).map(([id, qty]) => ({ product: products.get(id), qty: Number(qty) })).filter((row) => row.product && row.qty > 0), [quantities, products]);
@@ -109,10 +116,10 @@ export default function PosTerminalPage() {
       const created = await api(dataPath('pos.pos_order'), { method: 'POST', body: {
         session: activeSession.id, warehouse: activeSession.warehouse,
         ...(activeSession.branch ? { branch: activeSession.branch } : {}),
-        ...(partyId ? { party: partyId } : {}), method,
+        ...(partyId ? { party: partyId } : {}), ...(prescriptionId ? { prescription: prescriptionId } : {}), method,
         lines: cart.map(({ product, qty }) => ({ product: product.id, qty, price: displayPrice(product) })),
       } });
-      setQuantities({}); setPartyId('');
+      setQuantities({}); setPartyId(''); setPrescriptionId('');
       let completionError = '';
       try {
         await api(dataPath('pos.pos_order', created.id, 'completed'), { method: 'POST' });
@@ -219,7 +226,8 @@ export default function PosTerminalPage() {
           {!filteredProducts.length && <div className="empty">Không có sản phẩm phù hợp.</div>}
         </section>
         <aside className="card pos-cart"><h2>Đơn hàng</h2>{cart.length ? <div className="pos-cart-lines">{cart.map(({ product, qty }) => <div className="pos-cart-line" key={product.id}><div><strong>{product.name}</strong><div className="small muted">{fmtMoney(displayPrice(product))} / sp</div></div><div className="pos-qty"><button className="btn btn-ghost btn-sm" type="button" aria-label={`Giảm ${product.name}`} onClick={() => setQty(product.id, qty - 1)}>−</button><input className="input num" type="number" min="0" step="any" aria-label={`Số lượng ${product.name}`} value={qty} onChange={(event) => setQty(product.id, event.target.value)} /><button className="btn btn-ghost btn-sm" type="button" aria-label={`Tăng ${product.name}`} onClick={() => setQty(product.id, qty + 1)}>+</button></div><strong className="num">{fmtMoney(displayPrice(product) * qty)}</strong></div>)}</div> : <div className="empty">Chọn sản phẩm để thêm vào đơn.</div>}
-          <label className="field"><span className="label">Khách hàng (tùy chọn)</span><select className="select" value={partyId} onChange={(event) => setPartyId(event.target.value)}><option value="">Khách lẻ</option>{[...parties.values()].filter((item) => item.active !== false && item.is_customer !== false).map((item) => <option key={item.id} value={item.id}>{recordLabel('master-data.party', item)}</option>)}</select></label>
+          <label className="field"><span className="label">Khách hàng {rxRequired ? '*' : '(tùy chọn)'}</span><select className="select" required={rxRequired} value={partyId} onChange={(event) => setPartyId(event.target.value)}><option value="">Khách lẻ</option>{[...parties.values()].filter((item) => item.active !== false && item.is_customer !== false).map((item) => <option key={item.id} value={item.id}>{recordLabel('master-data.party', item)}</option>)}</select></label>
+          {pharmacyEnabled && <label className="field"><span className="label">Đơn thuốc {rxRequired ? '*' : '(nếu có)'}</span><select className="select" required={rxRequired} value={prescriptionId} onChange={(event) => { const id = event.target.value; setPrescriptionId(id); const rx = prescriptions.find((item) => item.id === id); if (rx?.party) setPartyId(rx.party); }}><option value="">Chọn đơn đã xác minh</option>{prescriptions.filter((item) => !item.valid_until || item.valid_until >= new Date().toISOString().slice(0, 10)).map((item) => <option key={item.id} value={item.id}>{item.prescription_no} · hết hạn {item.valid_until}</option>)}</select>{rxRequired && <small className="muted">Thuốc kê đơn chỉ được bán theo đơn còn hạn, đã xác minh và đúng khách hàng.</small>}</label>}
           <label className="field"><span className="label">Thanh toán</span><select className="select" value={method} onChange={(event) => setMethod(event.target.value)}><option value="cash">Tiền mặt</option><option value="card">Thẻ</option><option value="transfer">Chuyển khoản</option><option value="ewallet">Ví điện tử</option></select></label>
           <div className="pos-total"><span>Tạm tính</span><span>Tiền hàng <strong className="num">{fmtMoney(subtotal)}</strong></span><span>Thuế ước tính <strong className="num">{fmtMoney(estimatedTax)}</strong></span><strong className="num">{fmtMoney(total)}</strong><small>Thuế và số tiền chính thức do máy chủ tính theo danh mục khi tạo đơn.</small></div>
           <button className="btn btn-primary pos-checkout" type="button" disabled={busy || !cart.length || !can('pos.pos_order.create')} onClick={checkout}>{busy ? 'Đang xử lý…' : `Tạo đơn & thanh toán · ${fmtMoney(total)}`}</button>

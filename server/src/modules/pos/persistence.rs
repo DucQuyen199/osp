@@ -1,5 +1,7 @@
 //! Tenant-scoped POS session and warehouse checks.
+use crate::money;
 use crate::{db::Tx, error::R, kernel::Tenant};
+use rust_decimal::Decimal;
 use serde_json::Value;
 use uuid::Uuid;
 pub async fn validate_persistence(
@@ -218,6 +220,104 @@ pub async fn validate_persistence(
                     "lines[{}].product không tồn tại trong tenant",
                     index + 1
                 ));
+            }
+        }
+    }
+    // Pharmacy checks are activated only for prescriptions linked to the
+    // dedicated pharmacy module. The prescription row lock serializes checkout
+    // attempts so the same prescription cannot be dispensed twice.
+    if tenant.has_module("pharmacy") {
+        let prescription_id = document
+            .get("prescription")
+            .and_then(Value::as_str)
+            .and_then(|v| Uuid::parse_str(v).ok());
+        let mut rx_required = Vec::<(Uuid, Decimal)>::new();
+        if let Some(lines) = document.get("lines").and_then(Value::as_array) {
+            for line in lines {
+                let Some(pid) = line
+                    .get("product")
+                    .and_then(Value::as_str)
+                    .and_then(|v| Uuid::parse_str(v).ok())
+                else {
+                    continue;
+                };
+                let row = tx.query_opt("SELECT custom FROM master_data__product WHERE tenant_id=$1 AND id=$2 FOR SHARE", &[&tenant.id, &pid]).await?;
+                if let Some(row) = row {
+                    let custom: Value = row.get(0);
+                    if custom
+                        .get("requires_prescription")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false)
+                    {
+                        rx_required.push((
+                            pid,
+                            line.get("qty")
+                                .and_then(money::decimal)
+                                .unwrap_or(Decimal::ZERO),
+                        ));
+                    }
+                }
+            }
+        }
+        if !rx_required.is_empty() && prescription_id.is_none() {
+            errors.push("Bán thuốc kê đơn cần gắn đơn thuốc đã xác minh".into());
+        }
+        if rx_required.is_empty() && prescription_id.is_some() {
+            errors.push("Chỉ gắn đơn thuốc khi giỏ hàng có thuốc cần đơn".into());
+        }
+        if let Some(rx_id) = prescription_id {
+            let rx = tx.query_opt("SELECT party, status, valid_until, items FROM pharmacy__prescription WHERE tenant_id=$1 AND id=$2 FOR UPDATE", &[&tenant.id, &rx_id]).await?;
+            if let Some(rx) = rx {
+                let rx_party: Uuid = rx.get(0);
+                let status: String = rx.get(1);
+                let valid_until: Option<chrono::NaiveDate> = rx.get(2);
+                let rx_items: Value = rx.get(3);
+                if status != "verified" {
+                    errors.push("Chỉ dùng đơn thuốc đã xác minh và chưa cấp".into());
+                }
+                if valid_until.is_none_or(|date| date < chrono::Utc::now().date_naive()) {
+                    errors.push("Đơn thuốc đã hết hạn".into());
+                }
+                let order_party = document
+                    .get("party")
+                    .and_then(Value::as_str)
+                    .and_then(|v| Uuid::parse_str(v).ok());
+                if order_party != Some(rx_party) {
+                    errors.push("Khách hàng trên đơn POS phải trùng với đơn thuốc".into());
+                }
+                let mut required_totals = std::collections::BTreeMap::<Uuid, Decimal>::new();
+                for (pid, qty) in &rx_required {
+                    *required_totals.entry(*pid).or_default() += *qty;
+                }
+                for (pid, qty) in &required_totals {
+                    let allowed = rx_items
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter(|item| {
+                            item.get("product")
+                                .and_then(Value::as_str)
+                                .and_then(|v| Uuid::parse_str(v).ok())
+                                == Some(*pid)
+                        })
+                        .filter_map(|item| item.get("qty").and_then(money::decimal))
+                        .fold(Decimal::ZERO, |sum, value| sum + value);
+                    if allowed < *qty {
+                        errors.push(
+                            "Đơn thuốc không bao gồm đủ số lượng của thuốc kê đơn trong giỏ".into(),
+                        );
+                    }
+                }
+                if action == "completed" && errors.is_empty() {
+                    let already = tx.query_opt("SELECT id FROM pos__pos_order WHERE tenant_id=$1 AND prescription=$2::text AND status='completed' LIMIT 1", &[&tenant.id, &rx_id]).await?.is_some();
+                    if already {
+                        errors.push("Đơn thuốc đã được dùng cho giao dịch khác".into());
+                    } else {
+                        tx.execute("UPDATE pharmacy__prescription SET status='dispensed', dispensed_at=now() WHERE tenant_id=$1 AND id=$2 AND status='verified'", &[&tenant.id, &rx_id]).await?;
+                    }
+                }
+            } else {
+                errors.push("Không tìm thấy đơn thuốc trong doanh nghiệp".into());
             }
         }
     }

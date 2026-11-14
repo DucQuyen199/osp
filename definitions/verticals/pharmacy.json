@@ -4,6 +4,7 @@
  "description": "Nhà thuốc, chuỗi nhà thuốc, thiết bị y tế.",
  "modules": [
   "pos",
+  "pharmacy",
   "inventory",
   "purchasing",
   "loyalty",
@@ -47,6 +48,7 @@
    "name": "Dược sĩ",
    "permissions": [
     "pos.*",
+      "pharmacy.*",
     "inventory.*",
     "master-data.*"
    ]

@@ -15,7 +15,7 @@ pub(crate) fn scheduled_jobs() -> Vec<crate::defs::JobSpec> {
             "lease",
             "active",
             "next_rent_date",
-            "lte",
+            "lt",
             "rent_due",
         ),
         crate::modules::scheduled_job(
@@ -26,6 +26,15 @@ pub(crate) fn scheduled_jobs() -> Vec<crate::defs::JobSpec> {
             "end_date",
             "lt",
             "terminated",
+        ),
+        crate::modules::scheduled_job(
+            "reservation-expire",
+            "Release held properties after reservation expiry",
+            "reservation",
+            "reserved",
+            "expires_on",
+            "lte",
+            "expired",
         ),
     ]
 }

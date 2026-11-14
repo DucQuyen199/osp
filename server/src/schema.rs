@@ -410,6 +410,21 @@ pub async fn migrate(client: &mut Client, reg: &Registry) -> Result<(), String> 
                 }
             }
             // CHECK cho enum/trạng thái: tạo lại để theo kịp danh sách giá trị
+            if def.qname() == "construction.boq" {
+                // Promote existing estimates to the first controlled baseline revision.
+                tx.execute(
+                    "UPDATE construction__boq SET revision = 1 WHERE revision IS NULL",
+                    &[],
+                )
+                .await
+                .map_err(e)?;
+                tx.execute(
+                    "UPDATE construction__boq SET number = 'BOQ-' || substr(project::text, 1, 8) || '-R' || revision::text WHERE number IS NULL",
+                    &[],
+                )
+                .await
+                .map_err(e)?;
+            }
             for f in def.fields.iter().filter(|f| f.ty == "enum") {
                 let name = short_name("ck_", &format!("{table}_{}", f.name));
                 let opts = f

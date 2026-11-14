@@ -127,7 +127,14 @@ pub async fn handle_source_event(
                     data.insert("source".into(), json!("crm_deal"));
                 }
                 "sales.quotation.accepted" => {
-                    for field in ["party", "warehouse", "price_list", "lines", "total"] {
+                    for field in [
+                        "party",
+                        "warehouse",
+                        "shipping_address",
+                        "price_list",
+                        "lines",
+                        "total",
+                    ] {
                         put(field, field);
                     }
                     data.insert("source".into(), json!("quotation"));

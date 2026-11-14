@@ -11,16 +11,143 @@ pub async fn validate_persistence(
     document: &Value,
 ) -> R<Vec<String>> {
     match (entity, action) {
+        (
+            "reservation",
+            "created" | "updated" | "reserved" | "converted" | "cancelled" | "expired",
+        ) => validate_reservation(tx, tenant, action, document).await,
         ("lease", "activated") => validate_lease_activation(tx, tenant, document).await,
         ("lease", "rent_due") => validate_rent_due(tx, tenant, document).await,
         ("lease", "terminated") => validate_lease_termination(tx, tenant, document).await,
         ("property", "leased") => validate_property_has_active_lease(tx, tenant, document).await,
+        ("property", "reserved") => validate_property_has_reservation(tx, tenant, document).await,
+        ("property", "sold") => validate_property_sale(tx, tenant, document).await,
         ("property", "released") => {
             validate_property_has_no_active_lease(tx, tenant, document).await
         }
         ("viewing", "created" | "updated") => validate_viewing(tx, tenant, document).await,
         _ => Ok(Vec::new()),
     }
+}
+
+async fn validate_reservation(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    action: &str,
+    document: &Value,
+) -> R<Vec<String>> {
+    let (Some(property), Some(party)) =
+        (parse_id(document, "property"), parse_id(document, "party"))
+    else {
+        return Ok(vec![
+            "Reservation requires a property and a tenant-owned customer".into(),
+        ]);
+    };
+    let Some(property_row) = tx
+        .query_opt(
+            "SELECT status FROM real_estate__property WHERE tenant_id=$1 AND id=$2 FOR UPDATE",
+            &[&tenant.id, &property],
+        )
+        .await?
+    else {
+        return Ok(vec![
+            "Reservation property was not found in this company".into(),
+        ]);
+    };
+    let property_status: String = property_row.get(0);
+    let mut errors = Vec::new();
+    if tx
+        .query_opt(
+            "SELECT id FROM master_data__party WHERE tenant_id=$1 AND id=$2 FOR SHARE",
+            &[&tenant.id, &party],
+        )
+        .await?
+        .is_none()
+    {
+        errors.push("Reservation customer was not found in this company".into());
+    }
+    let number = document
+        .get("number")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .trim();
+    tx.query_one_row(
+        "SELECT pg_advisory_xact_lock(hashtextextended('real-estate:reservation:' || $1::text || ':' || lower(btrim($2)), 0))",
+        &[&tenant.id, &number],
+    ).await?;
+    let current_id = parse_id(document, "id");
+    if tx.query_opt(
+        "SELECT id FROM real_estate__reservation WHERE tenant_id=$1 AND lower(btrim(number))=lower($2) AND ($3::uuid IS NULL OR id<>$3) LIMIT 1 FOR UPDATE",
+        &[&tenant.id, &number, &current_id],
+    ).await?.is_some() {
+        errors.push("Reservation number already exists in this company".into());
+    }
+    if matches!(action, "created" | "updated") && property_status != "available" {
+        errors.push("A new reservation draft can only be created for an available property".into());
+    }
+    if matches!(action, "reserved" | "converted") {
+        if !matches!(property_status.as_str(), "available" | "reserved") {
+            errors.push("Only an available or held property can be reserved or converted".into());
+        }
+        if tx.query_opt(
+            "SELECT id FROM real_estate__reservation WHERE tenant_id=$1 AND property=$2 AND status='reserved' AND ($3::uuid IS NULL OR id<>$3) LIMIT 1 FOR UPDATE",
+            &[&tenant.id, &property, &current_id],
+        ).await?.is_some() {
+            errors.push("The property already has an active reservation".into());
+        }
+    }
+    if action == "converted" && property_status != "reserved" {
+        errors.push("A reservation can be converted only while its property is held".into());
+    }
+    if action == "expired" {
+        let expires_on = document.get("expires_on").and_then(Value::as_str);
+        if expires_on
+            .is_none_or(|date| date >= chrono::Utc::now().date_naive().to_string().as_str())
+        {
+            errors.push("A reservation expires only after its expiry date has passed".into());
+        }
+    }
+    if action == "converted" {
+        let expires_on = document.get("expires_on").and_then(Value::as_str);
+        if expires_on.is_none_or(|date| date < chrono::Utc::now().date_naive().to_string().as_str())
+        {
+            errors.push("An expired reservation cannot be converted to a sale".into());
+        }
+    }
+    Ok(errors)
+}
+
+async fn validate_property_has_reservation(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    document: &Value,
+) -> R<Vec<String>> {
+    let Some(property) = parse_id(document, "id") else {
+        return Ok(vec!["Property hold requires a valid record".into()]);
+    };
+    let has_reservation = tx.query_opt(
+        "SELECT id FROM real_estate__reservation WHERE tenant_id=$1 AND property=$2 AND status='reserved' LIMIT 1 FOR UPDATE",
+        &[&tenant.id, &property],
+    ).await?.is_some();
+    Ok(if has_reservation {
+        Vec::new()
+    } else {
+        vec!["A property can be marked reserved only through an active reservation record".into()]
+    })
+}
+
+async fn validate_property_sale(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<Vec<String>> {
+    let Some(property) = parse_id(document, "id") else {
+        return Ok(vec!["Property sale requires a valid record".into()]);
+    };
+    let held = tx.query_opt(
+        "SELECT id FROM real_estate__reservation WHERE tenant_id=$1 AND property=$2 AND status='reserved' LIMIT 1 FOR UPDATE",
+        &[&tenant.id, &property],
+    ).await?.is_some();
+    Ok(if held {
+        vec!["Convert or cancel the active reservation before selling the property".into()]
+    } else {
+        Vec::new()
+    })
 }
 
 async fn validate_rent_due(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<Vec<String>> {
@@ -113,6 +240,17 @@ async fn validate_property_has_no_active_lease(
             "A property with an active lease cannot be released".into(),
         ]);
     }
+    if document.get("status").and_then(Value::as_str) == Some("reserved") {
+        let Some(property) = parse_id(document, "id") else {
+            return Ok(vec!["Property release requires a valid record".into()]);
+        };
+        if tx.query_opt(
+            "SELECT id FROM real_estate__reservation WHERE tenant_id=$1 AND property=$2 AND status='reserved' LIMIT 1 FOR UPDATE",
+            &[&tenant.id, &property],
+        ).await?.is_some() {
+            return Ok(vec!["Cancel or expire the reservation before releasing its property".into()]);
+        }
+    }
     Ok(Vec::new())
 }
 
@@ -148,6 +286,12 @@ async fn validate_lease_activation(
     let mut errors = Vec::new();
     if !matches!(property_status.as_str(), "available" | "reserved") {
         errors.push("Only an available or reserved property can be leased".into());
+    }
+    if tx.query_opt(
+        "SELECT id FROM real_estate__reservation WHERE tenant_id=$1 AND property=$2 AND status='reserved' LIMIT 1 FOR UPDATE",
+        &[&tenant.id, &property],
+    ).await?.is_some() {
+        errors.push("Cancel or expire the active reservation before activating a lease".into());
     }
 
     let overlap = tx

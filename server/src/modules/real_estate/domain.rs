@@ -40,6 +40,18 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                 }
             }
         }
+        "reservation" => {
+            if document
+                .get("number")
+                .and_then(Value::as_str)
+                .is_none_or(|value| value.trim().is_empty())
+            {
+                errors.push("Reservation number is required".into());
+            }
+            if date(document, "expires_on").is_none() {
+                errors.push("Reservation expiry date must be valid".into());
+            }
+        }
         _ => {}
     }
     errors
@@ -47,8 +59,46 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
     match (entity, action) {
-        ("property", "sold") if document.get("buyer").and_then(Value::as_str).is_none() => {
-            vec!["Property sale requires a recorded buyer".into()]
+        ("property", "sold") => {
+            let mut errors = Vec::new();
+            if document.get("buyer").and_then(Value::as_str).is_none() {
+                errors.push("Property sale requires a recorded buyer".into());
+            }
+            if !document
+                .get("sale_price")
+                .and_then(money::decimal)
+                .is_some_and(|price| price > Decimal::ZERO)
+            {
+                errors.push("Property sale requires a positive agreed sale price".into());
+            }
+            errors
+        }
+        ("reservation", "reserved") => {
+            let mut errors = Vec::new();
+            if date(document, "expires_on")
+                .is_none_or(|expiry| expiry < chrono::Utc::now().date_naive())
+            {
+                errors.push("A reservation must expire today or on a future date".into());
+            }
+            if !document
+                .get("agreed_price")
+                .and_then(money::decimal)
+                .is_some_and(|price| price > Decimal::ZERO)
+            {
+                errors.push("A reservation requires a positive agreed sale price".into());
+            }
+            errors
+        }
+        ("reservation", "converted") => {
+            if !document
+                .get("agreed_price")
+                .and_then(money::decimal)
+                .is_some_and(|price| price > Decimal::ZERO)
+            {
+                vec!["Reservation conversion requires a positive agreed sale price".into()]
+            } else {
+                Vec::new()
+            }
         }
         ("lease", "activated") => {
             let mut errors = Vec::new();
@@ -82,6 +132,14 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
 }
 
 pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<String> {
+    if entity == "reservation" {
+        if patch.get("status").is_some() {
+            return vec!["Reservation status can only change through its workflow actions".into()];
+        }
+        if current.get("status").and_then(Value::as_str) != Some("draft") {
+            return vec!["A confirmed or completed reservation cannot be edited".into()];
+        }
+    }
     let immutable = match entity {
         "lease" if current.get("status").and_then(Value::as_str) != Some("draft") => &[
             "property",
@@ -102,6 +160,9 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
 
 pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
     match entity {
+        "reservation" if document.get("status").and_then(Value::as_str) != Some("draft") => {
+            vec!["Confirmed reservation history cannot be deleted".into()]
+        }
         "rent_cycle" => {
             vec!["Billed rent cycles are retained as immutable financial history".into()]
         }

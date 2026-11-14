@@ -40,6 +40,7 @@ pub mod master_data;
 pub mod payments;
 pub mod payroll;
 pub mod performance;
+pub mod pharmacy;
 pub mod pos;
 pub mod project;
 pub mod purchasing;

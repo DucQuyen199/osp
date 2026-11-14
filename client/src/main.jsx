@@ -44,6 +44,10 @@ const ClinicWorkbenchPage = lazy(() => import('./ClinicWorkbenchPage.jsx'));
 const EcommerceOrderDeskPage = lazy(() => import('./EcommerceOrderDeskPage.jsx'));
 const AgricultureOperationsPage = lazy(() => import('./AgricultureOperationsPage.jsx'));
 const HotelFrontDeskPage = lazy(() => import('./HotelFrontDeskPage.jsx'));
+const AutoServiceWorkshopPage = lazy(() => import('./AutoServiceWorkshopPage.jsx'));
+const RestaurantServicePage = lazy(() => import('./RestaurantServicePage.jsx'));
+const WholesaleSalesDeskPage = lazy(() => import('./WholesaleSalesDeskPage.jsx'));
+const PharmacyWorkbenchPage = lazy(() => import('./PharmacyWorkbenchPage.jsx'));
 
 function parseRoute(hash = location.hash) {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
@@ -58,9 +62,13 @@ function parseRoute(hash = location.hash) {
   if (a === 'events') return { name: 'events' };
   if (a === 'pos') return { name: 'pos-terminal' };
   if (a === 'clinic') return { name: 'clinic-workbench' };
+  if (a === 'pharmacy') return { name: 'pharmacy-workbench' };
   if (a === 'ecommerce') return { name: 'ecommerce-order-desk' };
   if (a === 'agriculture') return { name: 'agriculture-operations' };
   if (a === 'hotel') return { name: 'hotel-frontdesk' };
+  if (a === 'workshop') return { name: 'auto-service-workshop' };
+  if (a === 'restaurant') return { name: 'restaurant-service' };
+  if (a === 'wholesale') return { name: 'wholesale-sales-desk' };
   if (a === 'reports' && b === 'accounting') return { name: 'accounting-reports' };
   if (a === 'reports' && b === 'bi' && c === 'dashboard' && d) return { name: 'bi-reports', view: 'dashboard', id: d };
   if (a === 'reports' && b === 'bi' && c === 'report' && d) return { name: 'bi-reports', view: 'report', id: d };
@@ -141,9 +149,13 @@ function Sidebar({ meta, route, onNavigate, open }) {
     {meta.modules.some((module) => module.id === 'hotel') && can('hotel.room.read') && link('#/reports/hotel/housekeeping-board', 'Buồng phòng', route.name === 'hotel-housekeeping-board', 'list')}
     {meta.modules.some((module) => module.id === 'pos') && can('pos.pos_session.read') && can('pos.pos_order.create') && link('#/pos', 'Quầy bán hàng POS', route.name === 'pos-terminal', 'list')}
     {meta.modules.some((module) => module.id === 'clinic') && can('clinic.encounter.read') && can('clinic.encounter.create') && link('#/clinic', 'Điều phối phòng khám', route.name === 'clinic-workbench', 'list')}
+    {meta.modules.some((module) => module.id === 'pharmacy') && can('pharmacy.prescription.read') && link('#/pharmacy', 'Đơn thuốc nhà thuốc', route.name === 'pharmacy-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'ecommerce') && can('ecommerce.web_order.read') && link('#/ecommerce', 'Đơn hàng online', route.name === 'ecommerce-order-desk', 'list')}
     {meta.modules.some((module) => module.id === 'agriculture') && can('agriculture.crop_cycle.read') && link('#/agriculture', 'Điều hành mùa vụ', route.name === 'agriculture-operations', 'list')}
     {meta.modules.some((module) => module.id === 'hotel') && can('hotel.reservation.read') && link('#/hotel', 'Lễ tân khách sạn', route.name === 'hotel-frontdesk', 'list')}
+    {meta.modules.some((module) => module.id === 'auto-service') && can('auto-service.repair_order.read') && link('#/workshop', 'Xưởng sửa chữa', route.name === 'auto-service-workshop', 'list')}
+    {meta.modules.some((module) => module.id === 'restaurant') && can('restaurant.table_order.read') && can('restaurant.table_order.create') && link('#/restaurant', 'Order nhà hàng', route.name === 'restaurant-service', 'list')}
+    {meta.modules.some((module) => module.id === 'sales') && can('sales.quotation.read') && can('sales.quotation.create') && link('#/wholesale', 'Bán buôn', route.name === 'wholesale-sales-desk', 'list')}
     {meta.modules.some((module) => module.id === 'inventory') && meta.modules.some((module) => module.id === 'quality') && can('inventory.stock_move.read') && can('quality.inspection.read') && link('#/reports/inventory/quality-holds', 'Hàng giữ QC', route.name === 'inventory-quality-holds', 'list')}
     {meta.modules.some((module) => module.id === 'budget') && can('budget.budget.read') && link('#/reports/budget/variance', 'Thực hiện ngân sách', route.name === 'budget-variance', 'list')}
     {meta.modules.some((module) => module.id === 'crm') && can('crm.deal.read') && link('#/reports/crm/pipeline', 'Pipeline bán hàng', route.name === 'crm-pipeline', 'list')}
@@ -321,9 +333,13 @@ function App() {
         : route.name === 'hotel-housekeeping-board' ? <HotelHousekeepingBoardPage />
         : route.name === 'pos-terminal' ? <PosTerminalPage />
         : route.name === 'clinic-workbench' ? <ClinicWorkbenchPage />
+        : route.name === 'pharmacy-workbench' ? <PharmacyWorkbenchPage />
         : route.name === 'ecommerce-order-desk' ? <EcommerceOrderDeskPage />
         : route.name === 'agriculture-operations' ? <AgricultureOperationsPage />
         : route.name === 'hotel-frontdesk' ? <HotelFrontDeskPage />
+        : route.name === 'auto-service-workshop' ? <AutoServiceWorkshopPage />
+        : route.name === 'restaurant-service' ? <RestaurantServicePage />
+        : route.name === 'wholesale-sales-desk' ? <WholesaleSalesDeskPage />
         : route.name === 'budget-variance' ? <BudgetVariancePage />
         : route.name === 'crm-pipeline' ? <CrmPipelinePage />
         : route.name === 'marketing-campaign-performance' ? <MarketingCampaignPerformancePage />

@@ -41,21 +41,30 @@
    "permissions": [
     "restaurant.table_order.*",
     "restaurant.table.read",
-    "restaurant.menu_item.read"
+    "restaurant.menu_item.read",
+    "restaurant.kitchen_ticket.read",
+    "master-data.product.read",
+    "inventory.warehouse.read"
    ]
   },
   "kitchen": {
    "name": "Bếp",
    "permissions": [
     "restaurant.kitchen_ticket.*",
-    "restaurant.recipe.read"
+    "restaurant.recipe.read",
+    "master-data.product.read"
    ]
   },
   "cashier": {
    "name": "Thu ngân",
    "permissions": [
     "pos.*",
-    "restaurant.table_order.*"
+    "restaurant.table_order.*",
+    "restaurant.table.read",
+    "restaurant.menu_item.read",
+    "restaurant.kitchen_ticket.read",
+    "master-data.product.read",
+    "inventory.warehouse.read"
    ]
   }
  },

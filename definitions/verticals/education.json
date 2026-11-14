@@ -43,6 +43,8 @@
     "school.grade.*",
     "school.class_enrollment.read",
     "school.course_class.read",
+    "school.class_session.*",
+    "school.attendance.*",
     "lms.*"
    ]
   },

@@ -1,0 +1,42 @@
+{
+  "id": "pharmacy",
+  "name": "Nhà thuốc",
+  "description": "Quản lý đơn thuốc bán lẻ, xác minh dược sĩ và cấp phát gắn với giao dịch POS.",
+  "category": "industry",
+  "version": "0.1.0",
+  "depends": ["master-data", "inventory", "pos"],
+  "core": false,
+  "entities": [
+    {
+      "name": "prescription",
+      "label": "Đơn thuốc",
+      "fields": [
+        { "name": "prescription_no", "type": "string", "required": true },
+        { "name": "party", "type": "ref", "required": true, "ref": "master-data.party" },
+        { "name": "prescriber", "type": "string", "required": true },
+        { "name": "prescriber_license", "type": "string", "required": false },
+        { "name": "issued_at", "type": "date", "required": true },
+        { "name": "valid_until", "type": "date", "required": true },
+        { "name": "items", "type": "json", "required": true },
+        { "name": "dispensed_at", "type": "datetime", "required": false, "system": true },
+        { "name": "status", "type": "enum", "required": false, "options": ["draft", "verified", "dispensed", "cancelled"] },
+        { "name": "notes", "type": "text", "required": false }
+      ],
+      "states": {
+        "field": "status",
+        "initial": "draft",
+        "actions": {
+          "verified": { "from": ["draft"], "to": "verified" },
+          "dispensed": { "from": ["verified"], "to": "dispensed" },
+          "cancelled": { "from": ["draft", "verified"], "to": "cancelled" }
+        }
+      },
+      "computed": {},
+      "constraints": []
+    }
+  ],
+  "rules": [],
+  "seeds": [],
+  "publishes": [],
+  "jobs": []
+}

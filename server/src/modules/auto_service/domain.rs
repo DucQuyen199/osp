@@ -62,17 +62,39 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
         return Vec::new();
     }
     if document
-        .get("total")
-        .and_then(money::decimal)
-        .is_some_and(|amount| amount > Decimal::ZERO)
+        .get("lines")
+        .and_then(Value::as_array)
+        .is_some_and(|lines| !lines.is_empty())
+        && document
+            .get("total")
+            .and_then(money::decimal)
+            .is_some_and(|amount| amount >= Decimal::ZERO)
     {
         Vec::new()
     } else {
-        vec!["Tổng tiền sửa chữa phải lớn hơn 0 trước khi hoàn tất và lập hóa đơn".into()]
+        vec![
+            "Lệnh phải có ít nhất một dòng công việc với tổng tiền hợp lệ trước khi hoàn tất"
+                .into(),
+        ]
     }
 }
 
 pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<String> {
+    if entity == "repair_order"
+        && matches!(
+            current.get("status").and_then(Value::as_str),
+            Some("approved" | "in_progress")
+        )
+        && patch.as_object().is_some_and(|fields| {
+            ["lines", "warehouse", "complaint"]
+                .iter()
+                .any(|field| fields.contains_key(*field))
+        })
+    {
+        return vec![
+            "Báo giá đã được duyệt hoặc xe đã vào sửa; không thể thay đổi nội dung sửa chữa".into(),
+        ];
+    }
     if entity == "repair_order"
         && matches!(
             current.get("status").and_then(Value::as_str),

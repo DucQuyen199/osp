@@ -48,6 +48,11 @@
      "required": false
     },
     {
+     "name": "sale_price",
+     "type": "money",
+     "required": false
+    },
+    {
      "name": "buyer",
      "type": "ref",
      "required": false,
@@ -91,10 +96,36 @@
      },
      "released": {
       "from": [
-       "leased"
+          "leased",
+          "reserved"
       ],
       "to": "available"
      }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "reservation",
+   "label": "Phiếu giữ chỗ",
+   "fields": [
+    { "name": "number", "type": "string", "required": true },
+    { "name": "property", "type": "ref", "required": true, "ref": "real-estate.property" },
+    { "name": "party", "type": "ref", "required": true, "ref": "master-data.party" },
+    { "name": "agreed_price", "type": "money", "required": false },
+    { "name": "expires_on", "type": "date", "required": true },
+    { "name": "notes", "type": "text", "required": false },
+    { "name": "status", "type": "enum", "required": false, "options": ["draft", "reserved", "converted", "cancelled", "expired"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "reserved": { "from": ["draft"], "to": "reserved" },
+     "converted": { "from": ["reserved"], "to": "converted" },
+     "cancelled": { "from": ["draft", "reserved"], "to": "cancelled" },
+     "expired": { "from": ["reserved"], "to": "expired" }
     }
    },
    "computed": {},

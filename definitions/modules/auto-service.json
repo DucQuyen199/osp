@@ -95,6 +95,7 @@
      "required": false,
      "options": [
       "intake",
+      "approved",
       "in_progress",
       "completed",
       "delivered"
@@ -105,9 +106,15 @@
     "field": "status",
     "initial": "intake",
     "actions": {
-     "started": {
+     "approved": {
       "from": [
        "intake"
+      ],
+      "to": "approved"
+     },
+     "started": {
+      "from": [
+       "approved"
       ],
       "to": "in_progress"
      },

@@ -21,6 +21,29 @@
           "ref": "project.project"
         },
         {
+          "name": "number",
+          "type": "string",
+          "required": false,
+          "system": true
+        },
+        {
+          "name": "revision",
+          "type": "number",
+          "required": false,
+          "system": true
+        },
+        {
+          "name": "supersedes",
+          "type": "ref",
+          "required": false,
+          "ref": "construction.boq"
+        },
+        {
+          "name": "revision_reason",
+          "type": "text",
+          "required": false
+        },
+        {
           "name": "items",
           "type": "json",
           "required": false
@@ -29,9 +52,22 @@
           "name": "total",
           "type": "money",
           "required": false
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "required": false,
+          "options": ["draft", "approved", "superseded"]
         }
       ],
-      "states": null,
+      "states": {
+        "field": "status",
+        "initial": "draft",
+        "actions": {
+          "approved": { "from": ["draft"], "to": "approved" },
+          "superseded": { "from": ["approved"], "to": "superseded" }
+        }
+      },
       "computed": {},
       "constraints": []
     },

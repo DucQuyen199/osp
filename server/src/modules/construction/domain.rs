@@ -15,6 +15,17 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
     let mut errors = Vec::new();
     match entity {
         "boq" => {
+            if !document
+                .get("revision")
+                .and_then(money::decimal)
+                .is_some_and(|revision| {
+                    revision >= Decimal::ONE
+                        && revision.fract() == Decimal::ZERO
+                        && revision <= Decimal::from(1000)
+                })
+            {
+                errors.push("Sá»‘ phiÃªn báº£n BOQ pháº£i lÃ  sá»‘ nguyÃªn dÆ°Æ¡ng".into());
+            }
             let Some(items) = document.get("items").and_then(Value::as_array) else {
                 return vec!["BOQ cần danh sách hạng mục".into()];
             };
@@ -76,6 +87,22 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
+    if entity == "boq" && action == "approved" {
+        let revision = document
+            .get("revision")
+            .and_then(money::decimal)
+            .unwrap_or(Decimal::ONE);
+        if revision > Decimal::ONE
+            && document
+                .get("revision_reason")
+                .and_then(Value::as_str)
+                .is_none_or(|reason| reason.trim().is_empty())
+        {
+            return vec![
+                "PhiÃªn báº£n BOQ Ä‘iá»u chá»‰nh cáº§n nÃªu lÃ½ do trÆ°á»›c khi duyá»‡t".into(),
+            ];
+        }
+    }
     if entity == "subcontract" && action == "signed" && !positive(document, "value") {
         return vec!["Chỉ ký hợp đồng thầu phụ có giá trị lớn hơn 0".into()];
     }
@@ -84,6 +111,26 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
 
 pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<String> {
     if !patch.as_object().is_some_and(|patch| !patch.is_empty()) {
+        return Vec::new();
+    }
+    if entity == "boq" {
+        if patch.get("status").is_some() {
+            return vec![
+                "Tráº¡ng thÃ¡i BOQ chá»‰ Ä‘Æ°á»£c thay Ä‘á»•i qua thao tÃ¡c quy trÃ¬nh".into(),
+            ];
+        }
+        if ["project", "revision", "supersedes"]
+            .iter()
+            .any(|field| patch.get(*field).is_some())
+        {
+            return vec!["CÃ´ng trÃ¬nh, sá»‘ phiÃªn báº£n vÃ  BOQ gá»‘c khÃ´ng thá»ƒ Ä‘á»•i sau khi táº¡o báº£n nhÃ¡p".into()];
+        }
+        if current.get("status").and_then(Value::as_str) != Some("draft") {
+            return vec![
+                "BOQ Ä‘Ã£ duyá»‡t khÃ´ng Ä‘Æ°á»£c sá»­a; hÃ£y táº¡o phiÃªn báº£n Ä‘iá»u chá»‰nh"
+                    .into(),
+            ];
+        }
         return Vec::new();
     }
     if entity == "site_diary" {
@@ -97,6 +144,9 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
 
 pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
     match (entity, document.get("status").and_then(Value::as_str)) {
+        ("boq", Some("approved" | "superseded")) => {
+            vec!["BOQ Ä‘Ã£ duyá»‡t pháº£i Ä‘Æ°á»£c giá»¯ lÃ m lá»‹ch sá»­ phiÃªn báº£n".into()]
+        }
         ("site_diary", _) => vec!["Nhật ký công trường không thể xóa khỏi lịch sử".into()],
         ("subcontract", Some("signed" | "completed")) => {
             vec!["Hợp đồng thầu phụ đã ký không thể xóa khỏi lịch sử".into()]

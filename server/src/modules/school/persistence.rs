@@ -20,10 +20,143 @@ pub async fn validate_persistence(
         "student" => validate_student(tx, tenant, action, document).await,
         "course_class" => validate_class(tx, tenant, action, document).await,
         "class_enrollment" => validate_enrollment(tx, tenant, action, document).await,
+        "class_session" => validate_class_session(tx, tenant, action, document).await,
+        "attendance" => validate_attendance(tx, tenant, action, document).await,
         "grade" => validate_grade(tx, tenant, action, document).await,
         "fee" => validate_fee(tx, tenant, action, document).await,
         _ => Ok(Vec::new()),
     }
+}
+
+async fn validate_class_session(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    action: &str,
+    document: &Value,
+) -> R<Vec<String>> {
+    let Some(class) = parse_id(document, "class") else {
+        return Ok(vec!["Buổi học cần lớp hợp lệ".into()]);
+    };
+    let Some(row) = tx.query_opt(
+        "SELECT start_date::text FROM school__course_class WHERE tenant_id=$1 AND id=$2 FOR UPDATE",
+        &[&tenant.id, &class],
+    ).await? else {
+        return Ok(vec!["Lớp của buổi học không tồn tại trong doanh nghiệp".into()]);
+    };
+    let class_start: Option<String> = row.get(0);
+    let starts_at = document
+        .get("starts_at")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let ends_at = document
+        .get("ends_at")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let id = parse_id(document, "id");
+    let mut errors = Vec::new();
+    if class_start
+        .as_deref()
+        .is_some_and(|date| starts_at.get(..10).is_some_and(|start| start < date))
+    {
+        errors.push("Buổi học không thể nằm trước ngày bắt đầu lớp".into());
+    }
+    if matches!(action, "created" | "updated")
+        && tx.query_opt(
+            "SELECT id FROM school__class_session WHERE tenant_id=$1 AND \"class\"=$2 AND status<>'cancelled' AND starts_at<$4::timestamptz AND ends_at>$3::timestamptz AND ($5::uuid IS NULL OR id<>$5) LIMIT 1 FOR UPDATE",
+            &[&tenant.id, &class, &starts_at, &ends_at, &id],
+        ).await?.is_some()
+    {
+        errors.push("Buổi học bị trùng giờ với buổi khác của cùng lớp".into());
+    }
+    if action == "completed" {
+        let Some(session_id) = id else {
+            return Ok(vec!["Không xác định được buổi học cần kết thúc".into()]);
+        };
+        let missing: i64 = tx.query_one_row(
+            "SELECT count(*) FROM school__class_enrollment e WHERE e.tenant_id=$1 AND e.\"class\"=$2 AND e.status='active' AND NOT EXISTS (SELECT 1 FROM school__attendance a WHERE a.tenant_id=e.tenant_id AND a.session=$3 AND a.enrollment=e.id)",
+            &[&tenant.id, &class, &session_id],
+        ).await?.get(0);
+        if missing > 0 {
+            errors.push(format!(
+                "Còn {missing} học viên đang học chưa được điểm danh"
+            ));
+        }
+    }
+    if matches!(action, "cancelled" | "removed") {
+        if let Some(session_id) = id {
+            if tx.query_opt(
+                "SELECT id FROM school__attendance WHERE tenant_id=$1 AND session=$2 LIMIT 1 FOR UPDATE",
+                &[&tenant.id, &session_id],
+            ).await?.is_some() {
+                errors.push("Không thể hủy hoặc xóa buổi học đã có điểm danh".into());
+            }
+        }
+    }
+    if action == "removed" && document.get("status").and_then(Value::as_str) != Some("scheduled") {
+        errors.push("Chỉ được xóa buổi học đang lên lịch".into());
+    }
+    Ok(errors)
+}
+
+async fn validate_attendance(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    action: &str,
+    document: &Value,
+) -> R<Vec<String>> {
+    let (Some(session), Some(enrollment)) = (
+        parse_id(document, "session"),
+        parse_id(document, "enrollment"),
+    ) else {
+        return Ok(vec!["Điểm danh cần buổi học và ghi danh hợp lệ".into()]);
+    };
+    let Some(session_row) = tx.query_opt(
+        "SELECT \"class\", status, starts_at FROM school__class_session WHERE tenant_id=$1 AND id=$2 FOR UPDATE",
+        &[&tenant.id, &session],
+    ).await? else {
+        return Ok(vec!["Buổi học không tồn tại trong doanh nghiệp".into()]);
+    };
+    let session_class: Uuid = session_row.get(0);
+    let session_status: String = session_row.get(1);
+    let starts_at: chrono::DateTime<chrono::Utc> = session_row.get(2);
+    let Some(enrollment_row) = tx.query_opt(
+        "SELECT \"class\", status FROM school__class_enrollment WHERE tenant_id=$1 AND id=$2 FOR UPDATE",
+        &[&tenant.id, &enrollment],
+    ).await? else {
+        return Ok(vec!["Ghi danh không tồn tại trong doanh nghiệp".into()]);
+    };
+    let enrollment_class: Uuid = enrollment_row.get(0);
+    let enrollment_status: String = enrollment_row.get(1);
+    let mut errors = Vec::new();
+    if enrollment_class != session_class {
+        errors.push("Học viên không thuộc lớp của buổi học này".into());
+    }
+    if enrollment_status != "active" {
+        errors.push("Chỉ điểm danh học viên đang ghi danh".into());
+    }
+    if session_status == "cancelled" {
+        errors.push("Không thể điểm danh buổi học đã hủy".into());
+    }
+    if action == "created" && session_status == "completed" {
+        errors.push("Cannot add attendance to a completed session".into());
+    }
+    if matches!(action, "created" | "updated") && starts_at > chrono::Utc::now() {
+        errors.push("Chỉ điểm danh từ thời điểm buổi học bắt đầu".into());
+    }
+    if action == "updated" && session_status != "scheduled" {
+        errors.push("Điểm danh của buổi đã kết thúc không thể sửa".into());
+    }
+    let id = parse_id(document, "id");
+    if tx.query_opt(
+        "SELECT id FROM school__attendance WHERE tenant_id=$1 AND session=$2 AND enrollment=$3 AND ($4::uuid IS NULL OR id<>$4) LIMIT 1 FOR UPDATE",
+        &[&tenant.id, &session, &enrollment, &id],
+    ).await?.is_some() {
+        errors.push("Học viên đã được điểm danh trong buổi học này".into());
+    }
+    if action == "removed" && session_status != "scheduled" {
+        errors.push("Điểm danh của buổi đã kết thúc phải được giữ làm lịch sử".into());
+    }
+    Ok(errors)
 }
 
 async fn validate_student(
@@ -126,11 +259,21 @@ async fn validate_class(
                 errors.push("Không thể giảm sức chứa thấp hơn số học viên đang ghi danh".into());
             }
         }
+        if let (Some(id), Some(start_date)) =
+            (id, document.get("start_date").and_then(Value::as_str))
+        {
+            if tx.query_opt(
+                "SELECT id FROM school__class_session WHERE tenant_id=$1 AND \"class\"=$2 AND status<>'cancelled' AND starts_at::date < $3::date LIMIT 1 FOR UPDATE",
+                &[&tenant.id, &id, &start_date],
+            ).await?.is_some() {
+                errors.push("Cannot move class start date past a scheduled session".into());
+            }
+        }
     }
     if action == "removed" {
         if let Some(id) = id {
             if tx.query_opt(
-                "SELECT id FROM school__class_enrollment WHERE tenant_id = $1 AND \"class\" = $2 LIMIT 1 FOR UPDATE",
+                "SELECT 1 WHERE EXISTS (SELECT 1 FROM school__class_enrollment WHERE tenant_id = $1 AND \"class\" = $2) OR EXISTS (SELECT 1 FROM school__class_session WHERE tenant_id = $1 AND \"class\" = $2)",
                 &[&tenant.id, &id],
             ).await?.is_some() {
                 errors.push("Lớp học đã có ghi danh nên không thể xóa".into());

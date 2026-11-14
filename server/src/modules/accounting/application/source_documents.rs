@@ -174,12 +174,12 @@ pub(super) fn source_document(event_type: &str) -> Option<SourceDocument> {
         ),
         "real-estate.property.sold" => (
             Target::Invoice,
-            "price",
+            "sale_price",
             Some("buyer"),
             None,
             "property",
             None,
-            Condition::PartyAndPositive("buyer", "price"),
+            Condition::PartyAndPositive("buyer", "sale_price"),
             true,
         ),
         "real-estate.rent_cycle.created" => (

@@ -10,6 +10,13 @@ fn positive_integer(value: Option<&Value>) -> bool {
         .is_some_and(|value| value >= 1)
 }
 
+fn datetime(document: &Value, field: &str) -> Option<chrono::DateTime<chrono::FixedOffset>> {
+    document
+        .get(field)
+        .and_then(Value::as_str)
+        .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
+}
+
 pub fn validate(entity: &str, document: &Value) -> Vec<String> {
     let mut errors = Vec::new();
     match entity {
@@ -79,6 +86,30 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                 }
             }
         }
+        "class_session" => {
+            if document
+                .get("topic")
+                .and_then(Value::as_str)
+                .is_none_or(|topic| topic.trim().is_empty())
+            {
+                errors.push("Buổi học cần có nội dung hoặc chủ đề".into());
+            }
+            match (
+                datetime(document, "starts_at"),
+                datetime(document, "ends_at"),
+            ) {
+                (Some(start), Some(end)) if end > start => {}
+                _ => errors.push("Buổi học cần giờ kết thúc sau giờ bắt đầu".into()),
+            }
+        }
+        "attendance" => {
+            if !matches!(
+                document.get("status").and_then(Value::as_str),
+                Some("present" | "absent" | "late" | "excused")
+            ) {
+                errors.push("Trạng thái điểm danh không hợp lệ".into());
+            }
+        }
         "fee" => {
             if !document
                 .get("amount")
@@ -104,6 +135,11 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
+    if entity == "class_session" && action == "completed" {
+        if datetime(document, "ends_at").is_none_or(|end| end > chrono::Utc::now()) {
+            return vec!["Chỉ xác nhận buổi học đã kết thúc theo lịch".into()];
+        }
+    }
     if entity == "fee" && action == "issued" {
         return if document
             .get("amount")
@@ -123,6 +159,26 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
         return Vec::new();
     }
     match entity {
+        "class_session" => {
+            if patch.get("class").is_some() {
+                return vec!["Không thể chuyển buổi học sang lớp khác sau khi tạo".into()];
+            }
+            if current.get("status").and_then(Value::as_str) != Some("scheduled") {
+                return vec!["Buổi học đã kết thúc hoặc hủy không thể sửa".into()];
+            }
+            Vec::new()
+        }
+        "attendance" => {
+            if ["session", "enrollment"]
+                .iter()
+                .any(|field| patch.get(*field).is_some())
+            {
+                return vec![
+                    "Không thể chuyển bản ghi điểm danh sang buổi hoặc ghi danh khác".into(),
+                ];
+            }
+            Vec::new()
+        }
         "class_enrollment" => {
             vec!["Ghi danh chỉ được thay đổi qua action hoàn tất hoặc thôi học".into()]
         }
@@ -135,6 +191,9 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
 
 pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
     match (entity, document.get("status").and_then(Value::as_str)) {
+        ("class_session", Some("completed" | "cancelled")) => {
+            vec!["Buổi học đã xử lý phải được giữ trong lịch sử".into()]
+        }
         ("class_enrollment", _) => vec!["Ghi danh phải được giữ làm lịch sử đào tạo".into()],
         ("fee", Some("issued" | "paid")) => {
             vec!["Học phí đã phát hành không thể xóa khỏi lịch sử".into()]

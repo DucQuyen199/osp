@@ -131,6 +131,7 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
             &[
                 "party",
                 "warehouse",
+                "shipping_address",
                 "price_list",
                 "lines",
                 "total",
@@ -192,6 +193,16 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
+    if entity == "quotation" && matches!(action, "sent" | "accepted") {
+        if let Some(value) = document.get("valid_until").and_then(Value::as_str) {
+            let Some(valid_until) = NaiveDate::parse_from_str(value, "%Y-%m-%d").ok() else {
+                return vec!["Quotation valid_until must be a valid calendar date".into()];
+            };
+            if valid_until < Utc::now().date_naive() {
+                return vec!["An expired quotation cannot be sent or accepted".into()];
+            }
+        }
+    }
     if entity == "quotation" && action == "expired" {
         let Some(valid_until) = document
             .get("valid_until")

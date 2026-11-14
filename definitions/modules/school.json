@@ -128,6 +128,40 @@
       "constraints": []
     },
     {
+      "name": "class_session",
+      "label": "Buổi học",
+      "fields": [
+        { "name": "class", "type": "ref", "required": true, "ref": "school.course_class" },
+        { "name": "topic", "type": "string", "required": true },
+        { "name": "starts_at", "type": "datetime", "required": true },
+        { "name": "ends_at", "type": "datetime", "required": true },
+        { "name": "status", "type": "enum", "required": false, "options": ["scheduled", "completed", "cancelled"] }
+      ],
+      "states": {
+        "field": "status",
+        "initial": "scheduled",
+        "actions": {
+          "completed": { "from": ["scheduled"], "to": "completed" },
+          "cancelled": { "from": ["scheduled"], "to": "cancelled" }
+        }
+      },
+      "computed": {},
+      "constraints": []
+    },
+    {
+      "name": "attendance",
+      "label": "Điểm danh",
+      "fields": [
+        { "name": "session", "type": "ref", "required": true, "ref": "school.class_session" },
+        { "name": "enrollment", "type": "ref", "required": true, "ref": "school.class_enrollment" },
+        { "name": "status", "type": "enum", "required": true, "options": ["present", "absent", "late", "excused"] },
+        { "name": "note", "type": "text", "required": false }
+      ],
+      "states": null,
+      "computed": {},
+      "constraints": []
+    },
+    {
       "name": "grade",
       "label": "Điểm",
       "fields": [

@@ -25,6 +25,35 @@ pub async fn validate_persistence(
     action: &str,
     document: &Value,
 ) -> R<Vec<String>> {
+    if entity == "table_order" && matches!(action, "created" | "updated") {
+        if let Some(table) = document
+            .get("table")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+        {
+            let lock_key = format!("restaurant.table:{}:{}", tenant.id, table);
+            tx.query_opt(
+                "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                &[&lock_key],
+            )
+            .await?;
+            let current_id = document
+                .get("id")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+                .unwrap_or(Uuid::nil());
+            if tx
+                .query_opt(
+                    "SELECT id FROM restaurant__table_order WHERE tenant_id = $1 AND \"table\" = $2 AND id <> $3 AND status IN ('open', 'sent', 'served') LIMIT 1 FOR UPDATE",
+                    &[&tenant.id, &table, &current_id],
+                )
+                .await?
+                .is_some()
+            {
+                return Ok(vec!["Bàn đang có order chưa thanh toán hoặc chưa hủy".into()]);
+            }
+        }
+    }
     if entity == "table_order" && matches!(action, "served" | "completed") {
         let order_id = document
             .get("id")

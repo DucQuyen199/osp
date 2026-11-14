@@ -28,6 +28,11 @@
      "ref": "inventory.warehouse"
     },
     {
+     "name": "shipping_address",
+     "type": "string",
+     "required": false
+    },
+    {
      "name": "price_list",
      "type": "ref",
      "required": false,

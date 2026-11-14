@@ -135,6 +135,12 @@
      "system": true
     },
     {
+     "name": "tax_total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
      "name": "consumptions",
      "type": "json",
      "required": false,
@@ -177,8 +183,7 @@
      },
      "cancelled": {
       "from": [
-       "open",
-       "sent"
+        "open"
       ],
       "to": "cancelled"
      }

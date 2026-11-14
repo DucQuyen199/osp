@@ -40,13 +40,20 @@
    "permissions": [
     "auto-service.*",
     "booking.*",
-    "crm.*"
+    "crm.*",
+    "master-data.party.read",
+    "master-data.product.read",
+    "inventory.warehouse.read"
    ]
   },
   "mechanic": {
    "name": "Kỹ thuật viên",
    "permissions": [
-    "auto-service.repair_order.*"
+    "auto-service.repair_order.*",
+    "auto-service.vehicle.read",
+    "master-data.party.read",
+    "master-data.product.read",
+    "inventory.warehouse.read"
    ]
   }
  },

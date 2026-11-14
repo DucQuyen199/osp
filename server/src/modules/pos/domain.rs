@@ -82,6 +82,7 @@ pub fn validate_update(current: &Value, patch: &Value) -> Vec<String> {
         "branch",
         "warehouse",
         "session",
+        "prescription",
         "lines",
         "total",
         "method",

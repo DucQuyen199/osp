@@ -41,7 +41,10 @@
   "site_manager": {
    "name": "Chỉ huy công trường",
    "permissions": [
-    "construction.*",
+    "construction.site.*",
+    "construction.site_diary.*",
+    "construction.subcontract.*",
+    "construction.boq.read",
     "project.*",
     "inventory.stock_move.*"
    ]
@@ -49,7 +52,18 @@
   "estimator": {
    "name": "Dự toán",
    "permissions": [
-    "construction.boq.*",
+    "construction.boq.create",
+    "construction.boq.read",
+    "construction.boq.update",
+    "construction.boq.delete",
+    "project.project.read"
+   ]
+  },
+  "project_controller": {
+   "name": "Quản lý dự án",
+   "permissions": [
+    "construction.boq.read",
+    "construction.boq.approved",
     "project.project.read"
    ]
   }

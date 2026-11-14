@@ -48,7 +48,10 @@
     "workflow-approval.*",
     "master-data.*",
     "inventory.warehouse.read",
-    "inventory.stock_level.read"
+    "inventory.stock_level.read",
+    "logistics.shipment.read",
+    "accounting.invoice.read",
+    "accounting.credit_note.read"
    ]
   },
   "dispatcher": {

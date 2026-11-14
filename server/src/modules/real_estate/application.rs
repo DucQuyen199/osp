@@ -18,6 +18,16 @@ pub async fn handle_source_event(
     event_id: Uuid,
     depth: u32,
 ) -> R<bool> {
+    if matches!(
+        event_type,
+        "real-estate.reservation.reserved"
+            | "real-estate.reservation.cancelled"
+            | "real-estate.reservation.expired"
+            | "real-estate.reservation.converted"
+    ) {
+        return handle_reservation_event(kernel, tx, tenant, event_type, document, event_id, depth)
+            .await;
+    }
     let lease_activated = event_type == domain::LEASE_ACTIVATED_EVENT;
     let lease_terminated = event_type == domain::LEASE_TERMINATED_EVENT;
     let rent_due = event_type == domain::LEASE_RENT_DUE_EVENT;
@@ -131,6 +141,131 @@ pub async fn handle_source_event(
             },
         )
         .await?;
+    Ok(true)
+}
+
+async fn handle_reservation_event(
+    kernel: &Kernel,
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    event_type: &str,
+    document: &Value,
+    event_id: Uuid,
+    depth: u32,
+) -> R<bool> {
+    let property = document
+        .get("property")
+        .and_then(Value::as_str)
+        .and_then(|id| Uuid::parse_str(id).ok())
+        .ok_or_else(|| {
+            crate::error::ApiError::validation(
+                event_type,
+                vec!["Reservation event requires a valid property".into()],
+            )
+        })?;
+    let property_status = persistence::lock_property_status(tx, tenant, property)
+        .await?
+        .ok_or_else(|| {
+            crate::error::ApiError::validation(
+                event_type,
+                vec!["Reservation property was not found for this tenant".into()],
+            )
+        })?;
+    let property_entity = kernel.ent(tenant, "real-estate.property")?;
+    let opts = Opts {
+        depth: Some(depth + 1),
+        causation: Some(event_id),
+        silent: false,
+    };
+    match event_type {
+        "real-estate.reservation.reserved" if property_status == "available" => {
+            kernel
+                .act_in(
+                    tx,
+                    &Actor::System,
+                    tenant,
+                    &property_entity,
+                    &property.to_string(),
+                    "reserved",
+                    &opts,
+                )
+                .await?;
+        }
+        "real-estate.reservation.reserved" if property_status == "reserved" => {}
+        "real-estate.reservation.converted" => {
+            if property_status != "reserved" {
+                return Err(crate::error::ApiError::validation(
+                    event_type,
+                    vec![
+                        "Only a held property can be converted from a reservation to a sale".into(),
+                    ],
+                ));
+            }
+            let buyer = document
+                .get("party")
+                .and_then(Value::as_str)
+                .and_then(|id| Uuid::parse_str(id).ok())
+                .ok_or_else(|| {
+                    crate::error::ApiError::validation(
+                        event_type,
+                        vec!["Reservation conversion requires a buyer".into()],
+                    )
+                })?;
+            let agreed_price = document.get("agreed_price").cloned().ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    event_type,
+                    vec!["Reservation conversion requires an agreed sale price".into()],
+                )
+            })?;
+            kernel
+                .update_in(
+                    tx,
+                    &Actor::System,
+                    tenant,
+                    &property_entity,
+                    &property.to_string(),
+                    Map::from_iter([
+                        ("buyer".into(), json!(buyer)),
+                        ("sale_price".into(), agreed_price),
+                    ]),
+                    &opts,
+                )
+                .await?;
+            kernel
+                .act_in(
+                    tx,
+                    &Actor::System,
+                    tenant,
+                    &property_entity,
+                    &property.to_string(),
+                    "sold",
+                    &opts,
+                )
+                .await?;
+        }
+        "real-estate.reservation.cancelled" | "real-estate.reservation.expired"
+            if property_status == "reserved" =>
+        {
+            kernel
+                .act_in(
+                    tx,
+                    &Actor::System,
+                    tenant,
+                    &property_entity,
+                    &property.to_string(),
+                    "released",
+                    &opts,
+                )
+                .await?;
+        }
+        "real-estate.reservation.cancelled" if property_status == "available" => {}
+        _ => {
+            return Err(crate::error::ApiError::validation(
+                event_type,
+                vec!["Property status does not match the reservation transition".into()],
+            ));
+        }
+    }
     Ok(true)
 }
 

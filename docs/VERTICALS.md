@@ -39,7 +39,7 @@ Nhà thầu, thi công, thiết kế - nội thất.
 - **Module (16):** `master-data`, `hrm`, `accounting`, `inventory`, `asset`, `bi`, `project`, `construction`, `contract`, `document`, `einvoice`, `maintenance`, `quality`, `payroll`, `purchasing`, `workflow-approval`
 - **Thuật ngữ:** `master-data.party` = Chủ đầu tư/Khách hàng; `master-data.product` = Vật tư xây dựng; `project.project` = Công trình
 - **Trường mở rộng:** `master-data.product`: norm_code, brand
-- **Vai trò riêng:** Dự toán, Chỉ huy công trường
+- **Vai trò riêng:** Dự toán, Quản lý dự án, Chỉ huy công trường
 - **KPI:** Tiến độ so với kế hoạch; Chi phí thực tế vs dự toán; Công nợ thầu phụ; Vật tư hao hụt
 
 ## Thương mại điện tử (`ecommerce`)
@@ -75,7 +75,7 @@ Công ty tài chính tiêu dùng, tín dụng vi mô, đại lý bảo hiểm.
 - **Module (15):** `master-data`, `hrm`, `accounting`, `inventory`, `bi`, `communication`, `contract`, `sales`, `crm`, `document`, `einvoice`, `insurance`, `lending`, `payroll`, `workflow-approval`
 - **Thuật ngữ:** `crm.deal` = Hồ sơ vay/BH; `master-data.party` = Khách hàng vay/Người mua BH; `master-data.product` = Sản phẩm tài chính
 - **Trường mở rộng:** `master-data.party`: national_id, monthly_income, credit_score
-- **Vai trò riêng:** Cán bộ tín dụng, Thẩm định
+- **Vai trò riêng:** Giải ngân / Chi trả, Tư vấn bảo hiểm, Cán bộ tín dụng / Thu nợ, Thẩm định
 - **KPI:** Dư nợ; Tỷ lệ nợ xấu (NPL); Tỷ lệ phê duyệt; Tỷ lệ bồi thường
 
 ## Nhà hàng - Quán cà phê (F&B) (`fnb`)
@@ -144,7 +144,7 @@ NGO, quỹ từ thiện, hiệp hội, đơn vị hành chính sự nghiệp.
 ## Nhà thuốc (`pharmacy`)
 Nhà thuốc, chuỗi nhà thuốc, thiết bị y tế.
 
-- **Module (13):** `master-data`, `hrm`, `accounting`, `inventory`, `bi`, `sales`, `crm`, `einvoice`, `loyalty`, `quality`, `payroll`, `pos`, `purchasing`
+- **Module (14):** `master-data`, `hrm`, `accounting`, `inventory`, `bi`, `sales`, `crm`, `einvoice`, `loyalty`, `quality`, `payroll`, `pos`, `pharmacy`, `purchasing`
 - **Thuật ngữ:** `master-data.party` = Khách hàng; `master-data.product` = Thuốc/Vật tư y tế
 - **Trường mở rộng:** `master-data.product`: active_ingredient, registration_no, requires_prescription, storage_condition
 - **Vai trò riêng:** Dược sĩ

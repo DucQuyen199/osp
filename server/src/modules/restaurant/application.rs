@@ -89,8 +89,176 @@ pub async fn prepare_order(
     document: &mut Map<String, Value>,
     refresh: bool,
 ) -> R<Vec<String>> {
+    let mut price_errors = Vec::new();
+    if refresh {
+        if let Some(lines) = document.get_mut("lines").and_then(Value::as_array_mut) {
+            let mut order_total = Decimal::ZERO;
+            let mut tax_total = Decimal::ZERO;
+            for (index, line) in lines.iter_mut().enumerate() {
+                let prefix = format!("Món ở dòng {}", index + 1);
+                let Some(line) = line.as_object_mut() else {
+                    price_errors.push(format!("{prefix} không hợp lệ"));
+                    continue;
+                };
+                let Some(product_id) = line
+                    .get("product")
+                    .and_then(Value::as_str)
+                    .and_then(|value| Uuid::parse_str(value).ok())
+                else {
+                    price_errors.push(format!("{prefix} cần sản phẩm hợp lệ"));
+                    continue;
+                };
+                if !line
+                    .get("qty")
+                    .and_then(money::decimal)
+                    .is_some_and(|qty| qty > Decimal::ZERO)
+                {
+                    price_errors.push(format!("{prefix} cần số lượng lớn hơn 0"));
+                    continue;
+                }
+                let Some(menu_item) = tx
+                    .query_opt(
+                        "SELECT available FROM restaurant__menu_item WHERE tenant_id = $1 AND product = $2 LIMIT 1 FOR SHARE",
+                        &[&tenant.id, &product_id],
+                    )
+                    .await?
+                else {
+                    price_errors.push(format!("{prefix} chưa được khai báo trong thực đơn"));
+                    continue;
+                };
+                if menu_item.get::<_, Option<bool>>(0) == Some(false) {
+                    price_errors.push(format!("{prefix} hiện không được bán"));
+                    continue;
+                }
+                let Some(product) = tx
+                    .query_opt(
+                        "SELECT price::text, active, name, tax FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                        &[&tenant.id, &product_id],
+                    )
+                    .await?
+                else {
+                    price_errors.push(format!("{prefix} không tồn tại trong doanh nghiệp"));
+                    continue;
+                };
+                if product.get::<_, Option<bool>>(1) == Some(false) {
+                    price_errors.push(format!("{prefix} đã ngừng kinh doanh"));
+                    continue;
+                }
+                let price_text: Option<String> = product.get(0);
+                let Some(price) = price_text
+                    .as_deref()
+                    .and_then(money::decimal_str)
+                    .filter(|price| *price >= Decimal::ZERO)
+                else {
+                    price_errors.push(format!("{prefix} chưa có đơn giá hợp lệ"));
+                    continue;
+                };
+                let name: String = product.get(2);
+                let tax_id: Option<Uuid> = product.get(3);
+                let (tax_rate, tax_name) = if let Some(tax_id) = tax_id {
+                    let Some(tax) = tx
+                        .query_opt(
+                            "SELECT name, rate::text FROM master_data__tax WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                            &[&tenant.id, &tax_id],
+                        )
+                        .await?
+                    else {
+                        price_errors.push(format!("{prefix}: tax is missing from this tenant"));
+                        continue;
+                    };
+                    let name: String = tax.get(0);
+                    let rate_text: String = tax.get(1);
+                    let Some(rate) = money::decimal_str(&rate_text)
+                        .filter(|rate| (Decimal::ZERO..=Decimal::ONE_HUNDRED).contains(rate))
+                    else {
+                        price_errors.push(format!("{prefix}: tax rate is invalid"));
+                        continue;
+                    };
+                    (rate, Some(name))
+                } else {
+                    (Decimal::ZERO, None)
+                };
+                let qty = line.get("qty").and_then(money::decimal).unwrap_or_default();
+                let Some((discount, net, line_tax, line_total)) =
+                    money::line_amounts(qty, price, Decimal::ZERO, tax_rate)
+                else {
+                    price_errors.push(format!("{prefix}: amount exceeds supported limits"));
+                    continue;
+                };
+                let (
+                    Some(price_value),
+                    Some(rate_value),
+                    Some(discount_value),
+                    Some(net_value),
+                    Some(tax_value),
+                    Some(total_value),
+                ) = (
+                    money::json_number(price),
+                    money::json_number(tax_rate),
+                    money::json_number(discount),
+                    money::json_number(net),
+                    money::json_number(line_tax),
+                    money::json_number(line_total),
+                )
+                else {
+                    price_errors.push(format!("{prefix}: amounts cannot be represented"));
+                    continue;
+                };
+                for field in [
+                    "discount_amount",
+                    "net_amount",
+                    "tax_rate",
+                    "tax_name",
+                    "tax_amount",
+                    "line_total",
+                ] {
+                    line.remove(field);
+                }
+                line.insert("price".into(), price_value);
+                line.insert("product_name".into(), Value::String(name));
+                line.insert("discount_pct".into(), Value::from(0));
+                line.insert("discount_amount".into(), discount_value);
+                line.insert("net_amount".into(), net_value);
+                line.insert("tax_rate".into(), rate_value);
+                line.insert("tax_amount".into(), tax_value);
+                line.insert("line_total".into(), total_value);
+                if let Some(tax_id) = tax_id {
+                    line.insert("tax".into(), Value::String(tax_id.to_string()));
+                } else {
+                    line.remove("tax");
+                }
+                if let Some(tax_name) = tax_name {
+                    line.insert("tax_name".into(), Value::String(tax_name));
+                }
+                let Some(next_total) = order_total.checked_add(line_total) else {
+                    price_errors.push("Order total exceeds supported limits".into());
+                    continue;
+                };
+                let Some(next_tax) = tax_total.checked_add(line_tax) else {
+                    price_errors.push("Order tax exceeds supported limits".into());
+                    continue;
+                };
+                order_total = next_total;
+                tax_total = next_tax;
+            }
+            if price_errors.is_empty() {
+                if let (Some(total), Some(tax)) = (
+                    money::json_number(order_total),
+                    money::json_number(tax_total),
+                ) {
+                    document.insert("total".into(), total);
+                    document.insert("tax_total".into(), tax);
+                } else {
+                    price_errors.push("Order total cannot be represented".into());
+                }
+            }
+        }
+    }
+    if !price_errors.is_empty() {
+        return Ok(price_errors);
+    }
     if let Some(lines) = document.get("lines").and_then(Value::as_array) {
-        let Some(total) = money::sum_line_totals(lines).and_then(money::json_number) else {
+        let Some(total) = restaurant_total(lines).and_then(money::json_number) else {
             document.remove("total");
             return Ok(vec!["Tổng tiền đơn nhà hàng không hợp lệ".into()]);
         };
@@ -238,6 +406,20 @@ pub async fn prepare_order(
     }
     document.insert("consumptions".into(), Value::Array(consumptions));
     Ok(errors)
+}
+
+fn restaurant_total(lines: &[Value]) -> Option<Decimal> {
+    lines.iter().try_fold(Decimal::ZERO, |total, line| {
+        let line_total = line
+            .get("line_total")
+            .and_then(money::decimal)
+            .or_else(|| {
+                let qty = line.get("qty").and_then(money::decimal)?;
+                let price = line.get("price").and_then(money::decimal)?;
+                money::amount(qty, price)
+            })?;
+        total.checked_add(line_total)
+    })
 }
 
 async fn append_tracked_product(

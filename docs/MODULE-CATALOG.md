@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **49 module**, **177 loại dữ liệu**, **777 sự kiện**.
+Tổng: **50 module**, **181 loại dữ liệu**, **801 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -47,6 +47,7 @@ Tổng: **49 module**, **177 loại dữ liệu**, **777 sự kiện**.
 | [`payroll`](#payroll) — Tính lương | Nhân sự | `hrm`, `accounting` |
 | [`performance`](#performance) — Đánh giá hiệu suất (OKR) | Nhân sự | `hrm` |
 | [`pos`](#pos) — POS - Bán lẻ tại quầy | Bán hàng & khách hàng | `master-data`, `inventory`, `accounting` |
+| [`pharmacy`](#pharmacy) — Nhà thuốc | Module chuyên ngành | `master-data`, `inventory`, `pos` |
 | [`purchasing`](#purchasing) — Mua hàng | Chuỗi cung ứng | `master-data`, `inventory`, `quality`, `accounting`, `hrm` |
 | [`real-estate`](#real-estate) — Bất động sản | Module chuyên ngành | `master-data`, `accounting`, `contract` |
 | [`recruitment`](#recruitment) — Tuyển dụng | Nhân sự | `hrm` |
@@ -427,7 +428,7 @@ Tổng: **49 module**, **177 loại dữ liệu**, **777 sự kiện**.
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
 | `vehicle` Xe | — |
-| `repair_order` Lệnh sửa chữa | `intake` → **completed** (in_progress→completed), **delivered** (completed→delivered), **started** (intake→in_progress) |
+| `repair_order` Lệnh sửa chữa | `intake` → **approved** (intake→approved), **completed** (in_progress→completed), **delivered** (completed→delivered), **started** (approved→in_progress) |
 
 ### case-management
 **Quản lý hồ sơ vụ việc** — Hồ sơ/vụ việc, ghi chú, chấm giờ tính phí. Dùng cho luật, tư vấn, kế toán dịch vụ, cơ quan nhà nước, tổ chức phi lợi nhuận.
@@ -463,7 +464,7 @@ Tổng: **49 module**, **177 loại dữ liệu**, **777 sự kiện**.
 
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
-| `boq` Dự toán (BOQ) | — |
+| `boq` Dự toán (BOQ) | `draft` → **approved** (draft→approved), **superseded** (approved→superseded) |
 | `site` Công trường | — |
 | `subcontract` Thầu phụ | `draft` → **completed** (signed→completed), **signed** (draft→signed) |
 | `site_diary` Nhật ký thi công | — |
@@ -502,12 +503,20 @@ Tổng: **49 module**, **177 loại dữ liệu**, **777 sự kiện**.
 | `loan` Khoản vay | `applied` → **approved** (applied→approved), **closed** (disbursed→closed), **defaulted** (disbursed→defaulted), **disbursed** (approved→disbursed), **rejected** (applied→rejected) |
 | `repayment` Kỳ trả nợ | `due` → **overdue** (due→overdue), **paid** (due/overdue→paid) |
 
+### pharmacy
+**Nhà thuốc** — Quản lý đơn thuốc bán lẻ, xác minh dược sĩ và cấp phát gắn với giao dịch POS.
+
+| Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
+|---|---|
+| `prescription` Đơn thuốc | `draft` → **cancelled** (draft/verified→cancelled), **dispensed** (verified→dispensed), **verified** (draft→verified) |
+
 ### real-estate
 **Bất động sản** — Bất động sản, lịch xem, hợp đồng thuê. Bán xong tự lập hóa đơn; kích hoạt thuê tự tạo hợp đồng.
 
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
-| `property` Bất động sản | `available` → **leased** (available/reserved→leased), **released** (leased→available), **reserved** (available→reserved), **sold** (available/reserved→sold) |
+| `property` Bất động sản | `available` → **leased** (available/reserved→leased), **released** (leased/reserved→available), **reserved** (available→reserved), **sold** (available/reserved→sold) |
+| `reservation` Phiếu giữ chỗ | `draft` → **cancelled** (draft/reserved→cancelled), **converted** (reserved→converted), **expired** (reserved→expired), **reserved** (draft→reserved) |
 | `viewing` Lịch xem | — |
 | `lease` Hợp đồng thuê | `draft` → **activated** (draft→active), **rent_due** (active→active), **terminated** (active→terminated) |
 | `rent_cycle` Kỳ thu tiền thuê | — |
@@ -520,7 +529,7 @@ Tổng: **49 module**, **177 loại dữ liệu**, **777 sự kiện**.
 | `table` Bàn | — |
 | `menu_item` Món | — |
 | `recipe` Công thức | — |
-| `table_order` Order bàn | `open` → **cancelled** (open/sent→cancelled), **completed** (served→completed), **sent** (open→sent), **served** (sent→served) |
+| `table_order` Order bàn | `open` → **cancelled** (open→cancelled), **completed** (served→completed), **sent** (open→sent), **served** (sent→served) |
 | `kitchen_ticket` Phiếu bếp | `queued` → **preparing** (queued→preparing), **ready** (preparing→ready) |
 
 ### school
@@ -531,6 +540,8 @@ Tổng: **49 module**, **177 loại dữ liệu**, **777 sự kiện**.
 | `student` Học viên | — |
 | `course_class` Lớp học | — |
 | `class_enrollment` Ghi danh lớp | `active` → **completed** (active→completed), **dropped** (active→dropped) |
+| `class_session` Buổi học | `scheduled` → **cancelled** (scheduled→cancelled), **completed** (scheduled→completed) |
+| `attendance` Điểm danh | — |
 | `grade` Điểm | — |
 | `fee` Học phí | `draft` → **issued** (draft→issued), **paid** (issued→paid) |
 
