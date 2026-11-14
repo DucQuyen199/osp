@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel } from './lib/i18n.js';
 import { app, can, loadRefs, recordLabel } from './lib/state.js';
 import { recordHref } from './lib/routes.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
-const today = () => new Date().toISOString().slice(0, 10);
+const today = localDate;
 const nextDay = (value) => {
   if (!value) return '';
   const date = new Date(`${value}T00:00:00Z`);

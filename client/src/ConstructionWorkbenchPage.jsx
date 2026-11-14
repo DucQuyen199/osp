@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtMoney, statusLabel } from './lib/i18n.js';
 import { can, loadRefs, recordLabel } from './lib/state.js';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = localDate;
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const runAction = (entity, row, action) => api(dataPath(entity, row.id, action), { method: 'POST' });
 const lineValue = (line) => (Number(line.qty) || 0) * (Number(line.unit_price) || 0);

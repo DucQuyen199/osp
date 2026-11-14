@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, statusLabel } from './lib/i18n.js';
 import { can, loadRefs, recordLabel } from './lib/state.js';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = localDate;
 const money = (value) => Number(value || 0).toLocaleString('vi-VN', { maximumFractionDigits: 2 });
 const actions = async (qname, row, action) => api(dataPath(qname, row.id, action), { method: 'POST' });
 

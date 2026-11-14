@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { localDate } from './lib/dates.js';
 import { api, dataPath, session, tenantPath } from './lib/api.js';
 import { fmtDate, fmtMoney, statusLabel } from './lib/i18n.js';
 import { can, loadRefs, recordLabel } from './lib/state.js';
@@ -15,7 +16,7 @@ async function listAll(qname) {
   }
   return rows;
 }
-const today = () => new Date().toISOString().slice(0, 10);
+const today = localDate;
 const num = (value) => Number(value || 0);
 const storageKey = `osp.adjustment-refund-requests:${session.current()?.tenantId || 'tenant'}`;
 const readRequests = () => { try { return JSON.parse(sessionStorage.getItem(storageKey) || '{}'); } catch { return {}; } };

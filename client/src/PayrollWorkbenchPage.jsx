@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { localMonth } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtMoney, statusLabel } from './lib/i18n.js';
 import { app, can, loadRefs, recordLabel } from './lib/state.js';
@@ -13,7 +14,7 @@ export default function PayrollWorkbenchPage() {
   const [employees, setEmployees] = useState(new Map());
   const [approvalRequests, setApprovalRequests] = useState([]);
   const [selectedId, setSelectedId] = useState('');
-  const [form, setForm] = useState({ period: new Date().toISOString().slice(0, 7), hours_per_day: '8', payment_date: '', payment_method: 'bank' });
+  const [form, setForm] = useState({ period: localMonth(), hours_per_day: '8', payment_date: '', payment_method: 'bank' });
   const [busy, setBusy] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { localDate } from './lib/dates.js';
 import { api, dataPath, tenantPath } from './lib/api.js';
 import { fmtDate, fmtMoney, statusLabel } from './lib/i18n.js';
 import { app, can, loadRefs, recordLabel } from './lib/state.js';
@@ -18,7 +19,7 @@ async function listAll(qname, filters = {}) {
   }
   return rows;
 }
-const today = () => new Date().toISOString().slice(0, 10);
+const today = localDate;
 const shiftDate = (value, days) => { const date = new Date(`${value}T00:00:00Z`); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0, 10); };
 const money = (value) => Number(value || 0);
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });

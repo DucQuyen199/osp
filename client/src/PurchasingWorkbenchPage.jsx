@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtMoney, statusLabel } from './lib/i18n.js';
 import { app, can, loadRefs, recordLabel } from './lib/state.js';
@@ -38,7 +39,7 @@ export default function PurchasingWorkbenchPage() {
   const [receiptOrderId, setReceiptOrderId] = useState('');
   const [receiptLines, setReceiptLines] = useState([]);
   const [receiptNote, setReceiptNote] = useState('');
-  const [supplierInvoiceForm, setSupplierInvoiceForm] = useState({ invoice_number: '', issue_date: new Date().toISOString().slice(0, 10), due_date: '', dispute_reason: '', currency: '' });
+  const [supplierInvoiceForm, setSupplierInvoiceForm] = useState({ invoice_number: '', issue_date: localDate(), due_date: '', dispute_reason: '', currency: '' });
   const [invoiceDisputeReasons, setInvoiceDisputeReasons] = useState({});
   const [invoiceResolutionNotes, setInvoiceResolutionNotes] = useState({});
   const [invoiceQuantities, setInvoiceQuantities] = useState({});

@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtMoney, statusLabel } from './lib/i18n.js';
 import { app, can } from './lib/state.js';
 import { recordHref } from './lib/routes.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
-const today = () => new Date().toISOString().slice(0, 10);
+const today = localDate;
 const monthStart = () => `${today().slice(0, 7)}-01`;
 const monthEnd = () => new Date(Date.UTC(Number(today().slice(0, 4)), Number(today().slice(5, 7)), 0)).toISOString().slice(0, 10);
 

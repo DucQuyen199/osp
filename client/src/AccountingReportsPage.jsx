@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { localDate } from './lib/dates.js';
 import { api, tenantPath } from './lib/api.js';
 import { fmtMoney } from './lib/i18n.js';
 import { can } from './lib/state.js';
 import AccountingChartTemplateDialog from './AccountingChartTemplateDialog.jsx';
 
-const today = () => new Date().toISOString().slice(0, 10);
-const yearStart = () => `${new Date().getUTCFullYear()}-01-01`;
+const today = localDate;
+const yearStart = () => `${new Date().getFullYear()}-01-01`;
 const forecastEnd = (start) => {
   const date = new Date(`${start}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() + 90);

@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDateTime, statusLabel } from './lib/i18n.js';
 import { can, loadRefs, recordLabel } from './lib/state.js';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = localDate;
 const newLine = () => ({ product: '', qty: '1', dosage: '' });
 
 export default function PharmacyWorkbenchPage() {

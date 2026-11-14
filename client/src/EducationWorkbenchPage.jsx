@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { localDate as formatLocalDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel } from './lib/i18n.js';
 import { can, loadRefs, recordLabel } from './lib/state.js';
@@ -8,11 +9,7 @@ const localDateTime = (value) => {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? '' : new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 };
-const localDate = () => {
-  const date = new Date();
-  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-  return date.toISOString().slice(0, 10);
-};
+const localDate = formatLocalDate;
 const attendanceLabels = { present: 'Có mặt', absent: 'Vắng', late: 'Đi muộn', excused: 'Có phép' };
 const sessionDate = () => localDateTime(new Date(Date.now() + 60 * 60 * 1000).toISOString());
 

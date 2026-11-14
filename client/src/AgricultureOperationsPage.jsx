@@ -1,14 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtMoney, fmtNumber, statusLabel } from './lib/i18n.js';
 import { app, can, loadRefs, recordLabel } from './lib/state.js';
 import { recordHref } from './lib/routes.js';
 
 const listItems = (response) => Array.isArray(response?.items) ? response.items : [];
-const today = () => {
-  const now = new Date();
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-};
+const today = localDate;
 
 export default function AgricultureOperationsPage() {
   const [farms, setFarms] = useState([]);

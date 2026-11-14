@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { localDate } from './lib/dates.js';
 import { api, tenantPath } from './lib/api.js';
 import { fmtMoney, statusLabel } from './lib/i18n.js';
 import { can, loadRefs } from './lib/state.js';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = localDate;
 const qty = (value) => Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 3 });
 
 export default function ManufacturingWipPage() {
