@@ -105,6 +105,7 @@ export default function BiReportsPage({ route }) {
   const [draftFilter, setDraftFilter] = useState('');
   const [draftFilterValue, setDraftFilterValue] = useState('');
   const [draftSchedule, setDraftSchedule] = useState('');
+  const [draftRecipients, setDraftRecipients] = useState('');
   const [reportRuns, setReportRuns] = useState([]);
   const [selectedRun, setSelectedRun] = useState(null);
   const [creatingDashboard, setCreatingDashboard] = useState(false);
@@ -196,8 +197,9 @@ export default function BiReportsPage({ route }) {
     setSavingReport(true);
     setError('');
     try {
-      const created = await api(dataPath('bi.report'), { method: 'POST', body: { name: draftName.trim(), query, ...(draftSchedule ? { schedule: draftSchedule } : {}) } });
-      setDraftName(''); setDraftSchedule(''); setCreating(false);
+      const emailRecipients = draftRecipients.split(/[\n,;]/).map((email) => email.trim()).filter(Boolean);
+      const created = await api(dataPath('bi.report'), { method: 'POST', body: { name: draftName.trim(), query, ...(draftSchedule ? { schedule: draftSchedule } : {}), ...(emailRecipients.length ? { email_recipients: emailRecipients } : {}) } });
+      setDraftName(''); setDraftSchedule(''); setDraftRecipients(''); setCreating(false);
       await load();
       if (created?.id) window.location.hash = `#/reports/bi/report/${encodeURIComponent(created.id)}`;
     } catch (reason) {
@@ -285,6 +287,7 @@ export default function BiReportsPage({ route }) {
         {draftOperation !== 'rows' && <label className="field"><span>Nhóm theo (không bắt buộc)</span><select className="input" value={draftGroup} onChange={(event) => setDraftGroup(event.target.value)}><option value="">Không nhóm</option>{groupFields.map((field) => <option key={field.name} value={field.name}>{field.label || field.name}</option>)}</select></label>}
         <label className="field"><span>Tìm kiếm văn bản (không bắt buộc)</span><input className="input" value={draftSearch} onChange={(event) => setDraftSearch(event.target.value)} /></label>
         <label className="field"><span>Lịch chạy snapshot</span><select className="input" value={draftSchedule} onChange={(event) => setDraftSchedule(event.target.value)}><option value="">Chạy thủ công</option><option value="daily">Hằng ngày</option><option value="weekly">Hằng tuần</option></select><span className="small muted">Lịch dùng UTC; snapshot tiếp theo chạy sau một chu kỳ.</span></label>
+        <label className="field"><span>Email nhận báo cáo (không bắt buộc)</span><textarea className="input" rows="3" value={draftRecipients} onChange={(event) => setDraftRecipients(event.target.value)} placeholder="name@example.com, team@example.com" disabled={!draftSchedule} /><span className="small muted">Gửi CSV trong nội dung email sau mỗi lần chạy theo lịch; cần cấu hình SMTP.</span></label>
         <label className="field"><span>Lọc theo trường (không bắt buộc)</span><select className="input" value={draftFilter} onChange={(event) => setDraftFilter(event.target.value)}><option value="">Không lọc</option>{sourceFields.filter((field) => field.type !== 'json').map((field) => <option key={field.name} value={field.name}>{field.label || field.name}</option>)}</select></label>
         {draftFilter && <label className="field"><span>Giá trị lọc chính xác</span><input className="input" value={draftFilterValue} onChange={(event) => setDraftFilterValue(event.target.value)} /></label>}
       </div>

@@ -4,7 +4,7 @@
  "description": "Dashboard, báo cáo, KPI. Khung để đọc dữ liệu chéo mọi module.",
  "category": "platform",
  "version": "0.2.0",
- "depends": [],
+ "depends": ["communication"],
  "core": false,
  "entities": [
   {
@@ -37,6 +37,11 @@
     },
     {
      "name": "query",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "email_recipients",
      "type": "json",
      "required": false
     },

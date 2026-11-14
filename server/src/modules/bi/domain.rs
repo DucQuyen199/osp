@@ -60,6 +60,43 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                     errors.extend(query_errors);
                 }
             }
+            if let Some(recipients) = document.get("email_recipients") {
+                let Some(recipients) = recipients.as_array() else {
+                    errors.push("Report email recipients must be a JSON array".into());
+                    return errors;
+                };
+                if recipients.len() > 20 {
+                    errors.push("A report can email at most 20 recipients".into());
+                }
+                let mut normalized = std::collections::HashSet::new();
+                for recipient in recipients {
+                    let Some(address) = recipient.as_str().map(str::trim) else {
+                        errors.push("Report email recipients must be email addresses".into());
+                        continue;
+                    };
+                    let mut parts = address.split('@');
+                    let local = parts.next().unwrap_or_default();
+                    let domain = parts.next().unwrap_or_default();
+                    if local.is_empty()
+                        || domain.is_empty()
+                        || parts.next().is_some()
+                        || !domain.contains('.')
+                        || address.chars().any(char::is_whitespace)
+                    {
+                        errors.push(format!("Invalid report email recipient: {address}"));
+                    } else if !normalized.insert(address.to_ascii_lowercase()) {
+                        errors.push(format!("Duplicate report email recipient: {address}"));
+                    }
+                }
+                if !recipients.is_empty()
+                    && !matches!(
+                        document.get("schedule").and_then(Value::as_str),
+                        Some("daily" | "weekly")
+                    )
+                {
+                    errors.push("Email delivery requires a daily or weekly report schedule".into());
+                }
+            }
         }
         "kpi" => {
             if document

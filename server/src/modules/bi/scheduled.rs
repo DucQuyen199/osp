@@ -8,6 +8,59 @@ use chrono::{DateTime, Duration, Utc};
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
+fn csv_cell(value: &Value) -> String {
+    let is_text = value.is_string();
+    let mut text = match value {
+        Value::Null => String::new(),
+        Value::String(value) => value.clone(),
+        _ => value.to_string(),
+    };
+    if is_text
+        && text
+            .trim_start()
+            .chars()
+            .next()
+            .is_some_and(|character| matches!(character, '=' | '+' | '-' | '@'))
+    {
+        text.insert(0, '\'');
+    }
+    format!("\"{}\"", text.replace('"', "\"\""))
+}
+
+fn report_csv(result: &Value) -> String {
+    let Some(rows) = result.get("items").and_then(Value::as_array) else {
+        return format!(
+            "Kết quả tổng hợp: {}",
+            result.get("total").unwrap_or(&Value::Null)
+        );
+    };
+    let Some(first) = rows.first().and_then(Value::as_object) else {
+        return "Báo cáo không có dòng dữ liệu.".into();
+    };
+    let columns = first.keys().collect::<Vec<_>>();
+    let mut output = columns
+        .iter()
+        .map(|column| csv_cell(&json!(column)))
+        .collect::<Vec<_>>()
+        .join(",");
+    output.push('\n');
+    for row in rows {
+        let Some(row) = row.as_object() else { continue };
+        let line = columns
+            .iter()
+            .map(|column| csv_cell(row.get(*column).unwrap_or(&Value::Null)))
+            .collect::<Vec<_>>()
+            .join(",");
+        if output.len() + line.len() + 1 > 60_000 {
+            output.push_str("\n[CSV content truncated at 60 KB]\n");
+            break;
+        }
+        output.push_str(&line);
+        output.push('\n');
+    }
+    output
+}
+
 fn cadence(report: &Value) -> R<Duration> {
     match report.get("schedule").and_then(Value::as_str) {
         Some("daily") => Ok(Duration::days(1)),
@@ -141,7 +194,7 @@ pub async fn handle_source_event(
             );
             run.insert("result".into(), result);
             run.insert("status".into(), json!("completed"));
-            kernel
+            let saved_run = kernel
                 .create_in(
                     tx,
                     &Actor::System,
@@ -155,6 +208,52 @@ pub async fn handle_source_event(
                     },
                 )
                 .await?;
+            if let Some(recipients) = report.get("email_recipients").and_then(Value::as_array) {
+                let run_id = saved_run
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                let csv = report_csv(saved_run.get("result").unwrap_or(&Value::Null));
+                for recipient in recipients.iter().filter_map(Value::as_str) {
+                    let address = recipient.trim();
+                    if address.is_empty() {
+                        continue;
+                    }
+                    let mut message = Map::new();
+                    message.insert("channel".into(), json!("email"));
+                    message.insert("recipient".into(), json!(address));
+                    message.insert(
+                        "subject".into(),
+                        json!(format!(
+                            "{} — báo cáo định kỳ",
+                            report
+                                .get("name")
+                                .and_then(Value::as_str)
+                                .unwrap_or("Báo cáo BI")
+                        )),
+                    );
+                    message.insert(
+                        "body".into(),
+                        json!(format!(
+                            "Báo cáo: {}\nThời điểm: {}\nSố dòng: {}\n\n{csv}",
+                            report
+                                .get("name")
+                                .and_then(Value::as_str)
+                                .unwrap_or("Báo cáo BI"),
+                            saved_run
+                                .get("run_at")
+                                .and_then(Value::as_str)
+                                .unwrap_or(""),
+                            saved_run.get("row_count").unwrap_or(&Value::Null)
+                        )),
+                    );
+                    let key = format!("bi.report_run:{run_id}:{}", address.to_ascii_lowercase());
+                    crate::modules::communication::enqueue_message_with_key(
+                        kernel, tx, tenant, message, &key, event_id, depth,
+                    )
+                    .await?;
+                }
+            }
             let next = next_due(&report, Utc::now())?;
             kernel
                 .update_in(

@@ -6,7 +6,7 @@ mod worker;
 
 pub use application::handle_source_event;
 pub use domain::{validate, validate_action, validate_remove, validate_update};
-pub use persistence::validate_persistence;
+pub use persistence::{enqueue_message_with_key, validate_persistence};
 pub use worker::run_once;
 
 pub(crate) fn scheduled_jobs() -> Vec<crate::defs::JobSpec> {

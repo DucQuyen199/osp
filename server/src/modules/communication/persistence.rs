@@ -45,21 +45,42 @@ pub async fn enqueue_message(
     kernel: &Kernel,
     tx: &Tx<'_>,
     tenant: &Tenant,
+    message: Map<String, serde_json::Value>,
+    event_id: Uuid,
+    depth: u32,
+) -> R<()> {
+    enqueue_message_with_key(
+        kernel,
+        tx,
+        tenant,
+        message,
+        &event_id.to_string(),
+        event_id,
+        depth,
+    )
+    .await
+}
+
+pub async fn enqueue_message_with_key(
+    kernel: &Kernel,
+    tx: &Tx<'_>,
+    tenant: &Tenant,
     mut message: Map<String, serde_json::Value>,
+    idempotency_key: &str,
     event_id: Uuid,
     depth: u32,
 ) -> R<()> {
     let existing = tx
         .query_opt(
             "SELECT 1 FROM communication__message_log WHERE tenant_id = $1 AND source_event = $2 LIMIT 1",
-            &[&tenant.id, &event_id.to_string()],
+            &[&tenant.id, &idempotency_key],
         )
         .await?
         .is_some();
     if existing {
         return Ok(());
     }
-    message.insert("source_event".into(), serde_json::json!(event_id));
+    message.insert("source_event".into(), serde_json::json!(idempotency_key));
     message.insert("status".into(), serde_json::json!("queued"));
     message.insert("attempts".into(), serde_json::json!(0));
     let entity = kernel.ent(tenant, "communication.message_log")?;
