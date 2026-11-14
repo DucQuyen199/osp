@@ -275,6 +275,37 @@ pub async fn validate_persistence(
             {
                 errors.push("Không tìm thấy tài xế trong doanh nghiệp".into());
             }
+            // A dispatched trip has no planned end time, so its driver and
+            // vehicle stay reserved until the shipment is delivered or failed.
+            // Serialize dispatch attempts by resource to prevent two concurrent
+            // requests from assigning the same resource at once.
+            let mut resource_locks = [
+                format!("logistics-dispatch:{}:vehicle:{vehicle}", tenant.id),
+                format!("logistics-dispatch:{}:driver:{driver}", tenant.id),
+            ];
+            resource_locks.sort_unstable();
+            for lock_key in resource_locks {
+                tx.query_opt(
+                    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                    &[&lock_key],
+                )
+                .await?;
+            }
+            if tx
+                .query_opt(
+                    "SELECT id FROM logistics__shipment WHERE tenant_id = $1 AND status = 'dispatched' AND id <> $2 AND (vehicle = $3 OR driver = $4) LIMIT 1 FOR UPDATE",
+                    &[
+                        &tenant.id,
+                        &id(document, "id").unwrap_or(Uuid::nil()),
+                        &vehicle,
+                        &driver,
+                    ],
+                )
+                .await?
+                .is_some()
+            {
+                errors.push("A vehicle or driver is already assigned to an active shipment".into());
+            }
             if document.get("source").and_then(Value::as_str) == Some("sales_order") {
                 if !tenant.has_module("sales") {
                     errors.push("Module bán hàng phải được bật để giao vận đơn bán hàng".into());
