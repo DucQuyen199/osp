@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import EntityListPage from './EntityListPage.jsx';
 import EntityDetailPage from './EntityDetailPage.jsx';
@@ -39,6 +39,12 @@ import { CATEGORY_ORDER, categoryLabel } from './lib/i18n.js';
 import { app, can, entityLabel, isAdmin, loadMeta, loadSummary, resetCaches } from './lib/state.js';
 import { listHref } from './lib/routes.js';
 
+const PosTerminalPage = lazy(() => import('./PosTerminalPage.jsx'));
+const ClinicWorkbenchPage = lazy(() => import('./ClinicWorkbenchPage.jsx'));
+const EcommerceOrderDeskPage = lazy(() => import('./EcommerceOrderDeskPage.jsx'));
+const AgricultureOperationsPage = lazy(() => import('./AgricultureOperationsPage.jsx'));
+const HotelFrontDeskPage = lazy(() => import('./HotelFrontDeskPage.jsx'));
+
 function parseRoute(hash = location.hash) {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
   const [a, b, c, d] = parts;
@@ -50,6 +56,11 @@ function parseRoute(hash = location.hash) {
   if (a === 'm' && b) return { name: 'module', module: b };
   if (a === 'e' && b && c) return { name: 'entity', qname: `${b}.${c}`, id: d };
   if (a === 'events') return { name: 'events' };
+  if (a === 'pos') return { name: 'pos-terminal' };
+  if (a === 'clinic') return { name: 'clinic-workbench' };
+  if (a === 'ecommerce') return { name: 'ecommerce-order-desk' };
+  if (a === 'agriculture') return { name: 'agriculture-operations' };
+  if (a === 'hotel') return { name: 'hotel-frontdesk' };
   if (a === 'reports' && b === 'accounting') return { name: 'accounting-reports' };
   if (a === 'reports' && b === 'bi' && c === 'dashboard' && d) return { name: 'bi-reports', view: 'dashboard', id: d };
   if (a === 'reports' && b === 'bi' && c === 'report' && d) return { name: 'bi-reports', view: 'report', id: d };
@@ -128,6 +139,11 @@ function Sidebar({ meta, route, onNavigate, open }) {
     {meta.modules.some((module) => module.id === 'restaurant') && can('restaurant.kitchen_ticket.read') && link('#/reports/restaurant/kitchen-board', 'Màn hình bếp', route.name === 'restaurant-kitchen-board', 'list')}
     {meta.modules.some((module) => module.id === 'logistics') && can('logistics.shipment.read') && link('#/reports/logistics/delivery-board', 'Điều phối giao hàng', route.name === 'logistics-delivery-board', 'list')}
     {meta.modules.some((module) => module.id === 'hotel') && can('hotel.room.read') && link('#/reports/hotel/housekeeping-board', 'Buồng phòng', route.name === 'hotel-housekeeping-board', 'list')}
+    {meta.modules.some((module) => module.id === 'pos') && can('pos.pos_session.read') && can('pos.pos_order.create') && link('#/pos', 'Quầy bán hàng POS', route.name === 'pos-terminal', 'list')}
+    {meta.modules.some((module) => module.id === 'clinic') && can('clinic.encounter.read') && can('clinic.encounter.create') && link('#/clinic', 'Điều phối phòng khám', route.name === 'clinic-workbench', 'list')}
+    {meta.modules.some((module) => module.id === 'ecommerce') && can('ecommerce.web_order.read') && link('#/ecommerce', 'Đơn hàng online', route.name === 'ecommerce-order-desk', 'list')}
+    {meta.modules.some((module) => module.id === 'agriculture') && can('agriculture.crop_cycle.read') && link('#/agriculture', 'Điều hành mùa vụ', route.name === 'agriculture-operations', 'list')}
+    {meta.modules.some((module) => module.id === 'hotel') && can('hotel.reservation.read') && link('#/hotel', 'Lễ tân khách sạn', route.name === 'hotel-frontdesk', 'list')}
     {meta.modules.some((module) => module.id === 'inventory') && meta.modules.some((module) => module.id === 'quality') && can('inventory.stock_move.read') && can('quality.inspection.read') && link('#/reports/inventory/quality-holds', 'Hàng giữ QC', route.name === 'inventory-quality-holds', 'list')}
     {meta.modules.some((module) => module.id === 'budget') && can('budget.budget.read') && link('#/reports/budget/variance', 'Thực hiện ngân sách', route.name === 'budget-variance', 'list')}
     {meta.modules.some((module) => module.id === 'crm') && can('crm.deal.read') && link('#/reports/crm/pipeline', 'Pipeline bán hàng', route.name === 'crm-pipeline', 'list')}
@@ -283,6 +299,7 @@ function App() {
       </header>
       <Sidebar meta={meta} route={route} open={navOpen} onNavigate={() => setNavOpen(false)} />
       <main className="main" id="main" tabIndex="-1">
+      <Suspense fallback={<div className="card-pad"><div className="skeleton" data-h="row" /></div>}>
       {route.name === 'entity'
         ? <>
           <EntityListPage key={route.qname} qname={route.qname} />
@@ -302,6 +319,11 @@ function App() {
         : route.name === 'restaurant-kitchen-board' ? <RestaurantKitchenBoardPage />
         : route.name === 'logistics-delivery-board' ? <LogisticsDeliveryBoardPage />
         : route.name === 'hotel-housekeeping-board' ? <HotelHousekeepingBoardPage />
+        : route.name === 'pos-terminal' ? <PosTerminalPage />
+        : route.name === 'clinic-workbench' ? <ClinicWorkbenchPage />
+        : route.name === 'ecommerce-order-desk' ? <EcommerceOrderDeskPage />
+        : route.name === 'agriculture-operations' ? <AgricultureOperationsPage />
+        : route.name === 'hotel-frontdesk' ? <HotelFrontDeskPage />
         : route.name === 'budget-variance' ? <BudgetVariancePage />
         : route.name === 'crm-pipeline' ? <CrmPipelinePage />
         : route.name === 'marketing-campaign-performance' ? <MarketingCampaignPerformancePage />
@@ -321,6 +343,7 @@ function App() {
         : route.name === 'settings' && route.tab === 'data' ? <DataSettingsPage />
         : route.name === 'settings' ? <UsersSettingsPage />
         : <HomePage summary={app.summary} />}
+      </Suspense>
       </main>
     </div>
     {navOpen && <button className="scrim" type="button" aria-label="Đóng menu" onClick={() => setNavOpen(false)} />}

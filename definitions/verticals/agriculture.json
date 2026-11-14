@@ -38,7 +38,9 @@
    "name": "Quản lý trang trại",
    "permissions": [
     "agriculture.*",
-    "inventory.*.read"
+    "inventory.*.read",
+    "master-data.party.read",
+    "master-data.product.read"
    ]
   }
  },

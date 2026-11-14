@@ -176,10 +176,18 @@ pub async fn seed(k: &Kernel, t: &Tenant) {
         .await;
     }
     if has("pos") {
-        let session = mk(k, t, "pos.pos_session", json!({ "opening_cash": 500000 })).await;
-        for (c, p, q) in [(0, 0, 2), (1, 1, 1), (2, 4, 3)] {
-            let o = mk(k, t, "pos.pos_order", json!({ "party": cid(c), "warehouse": warehouse, "session": session, "method": "cash", "lines": [{ "product": pid(p), "qty": q, "price": 100000 }] })).await;
-            act(k, t, "pos.pos_order", &o, "completed").await;
+        if let Some(warehouse_id) = &warehouse {
+            let session = mk(
+                k,
+                t,
+                "pos.pos_session",
+                json!({ "warehouse": warehouse_id, "cashier": "Demo", "opening_cash": 500000 }),
+            )
+            .await;
+            for (c, p, q) in [(0, 0, 2), (1, 1, 1), (2, 4, 3)] {
+                let o = mk(k, t, "pos.pos_order", json!({ "party": cid(c), "warehouse": warehouse_id, "session": session, "method": "cash", "lines": [{ "product": pid(p), "qty": q, "price": 100000 }] })).await;
+                act(k, t, "pos.pos_order", &o, "completed").await;
+            }
         }
     }
     if has("purchasing") {

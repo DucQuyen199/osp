@@ -11366,6 +11366,11 @@
             "format": "date-time",
             "readOnly": true,
             "type": "string"
+          },
+          "warehouse": {
+            "description": "Tham chiếu tới inventory.warehouse",
+            "format": "uuid",
+            "type": "string"
           }
         },
         "type": "object"
@@ -11395,9 +11400,16 @@
           },
           "opening_cash": {
             "type": "number"
+          },
+          "warehouse": {
+            "description": "Tham chiếu tới inventory.warehouse",
+            "format": "uuid",
+            "type": "string"
           }
         },
-        "required": [],
+        "required": [
+          "warehouse"
+        ],
         "type": "object"
       },
       "project_project": {

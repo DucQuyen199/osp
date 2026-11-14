@@ -173,6 +173,30 @@ pub async fn validate_persistence(
     if !session.is_some_and(|row| row.get::<_, String>(0) == "open") {
         errors.push("Chỉ được tạo hoặc cập nhật đơn trong ca POS đang mở".into());
     }
+    let session_location = tx
+        .query_opt(
+            "SELECT warehouse, branch FROM pos__pos_session WHERE tenant_id = $1 AND id = $2",
+            &[&tenant.id, &session_id],
+        )
+        .await?;
+    if let Some(session_location) = session_location {
+        let session_warehouse: Option<Uuid> = session_location.get(0);
+        let session_branch: Option<Uuid> = session_location.get(1);
+        let order_warehouse = document
+            .get("warehouse")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok());
+        let order_branch = document
+            .get("branch")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok());
+        if session_warehouse.is_none() || order_warehouse != session_warehouse {
+            errors.push("Kho của đơn POS phải trùng với kho của ca bán hàng".into());
+        }
+        if order_branch != session_branch {
+            errors.push("Chi nhánh của đơn POS phải trùng với chi nhánh của ca bán hàng".into());
+        }
+    }
     if let Some(lines) = document.get("lines").and_then(Value::as_array) {
         for (index, line) in lines.iter().enumerate() {
             let product_id = line

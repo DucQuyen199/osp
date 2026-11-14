@@ -48,7 +48,7 @@ Shop online, thương hiệu D2C, bán trên sàn.
 - **Module (18):** `master-data`, `hrm`, `accounting`, `inventory`, `bi`, `communication`, `sales`, `crm`, `ecommerce`, `einvoice`, `helpdesk`, `logistics`, `loyalty`, `quality`, `marketing`, `payments`, `payroll`, `purchasing`
 - **Thuật ngữ:** `ecommerce.web_order` = Đơn online; `master-data.party` = Khách hàng; `master-data.product` = Sản phẩm
 - **Trường mở rộng:** `master-data.product`: seo_title, weight_g, marketplace_sku
-- **Vai trò riêng:** CSKH, Đóng gói - Giao hàng
+- **Vai trò riêng:** CSKH, Đóng gói - Giao hàng, Vận hành đơn online
 - **KPI:** Tỷ lệ chuyển đổi; AOV; Tỷ lệ hoàn trả; Chi phí thu hút khách hàng
 
 ## Giáo dục - Đào tạo (`education`)

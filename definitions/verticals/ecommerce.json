@@ -49,8 +49,23 @@
    "name": "Đóng gói - Giao hàng",
    "permissions": [
     "logistics.*",
+    "ecommerce.web_order.read",
     "inventory.*",
     "sales.sales_order.read"
+   ]
+  },
+  "order_manager": {
+   "name": "Vận hành đơn online",
+   "permissions": [
+    "ecommerce.web_order.read",
+    "ecommerce.web_order.create",
+    "ecommerce.web_order.placed",
+    "ecommerce.web_order.cancelled",
+    "ecommerce.storefront.read",
+    "master-data.party.read",
+    "master-data.product.read",
+    "sales.sales_order.read",
+    "logistics.shipment.read"
    ]
   },
   "cs": {
