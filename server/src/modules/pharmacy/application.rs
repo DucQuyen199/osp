@@ -30,7 +30,8 @@ async fn dispensed_quantities(
                 continue;
             };
             let qty = line
-                .get("qty")
+                .get("base_qty")
+                .or_else(|| line.get("qty"))
                 .and_then(crate::money::decimal)
                 .unwrap_or_default();
             let current = quantities.get(&product).copied().unwrap_or_default();

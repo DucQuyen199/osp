@@ -11,6 +11,7 @@ export default function PosTerminalPage() {
   const [warehouses, setWarehouses] = useState(new Map());
   const [branches, setBranches] = useState(new Map());
   const [products, setProducts] = useState(new Map());
+  const [units, setUnits] = useState(new Map());
   const [taxes, setTaxes] = useState(new Map());
   const [parties, setParties] = useState(new Map());
   const [accounts, setAccounts] = useState(new Map());
@@ -32,6 +33,7 @@ export default function PosTerminalPage() {
   const [cashReason, setCashReason] = useState('');
   const [query, setQuery] = useState('');
   const [quantities, setQuantities] = useState({});
+  const [selectedUnits, setSelectedUnits] = useState({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -43,9 +45,9 @@ export default function PosTerminalPage() {
     if (!keepNotice) setNotice('');
     try {
       const pharmacyEnabled = app.meta?.modules?.some((module) => module.id === 'pharmacy');
-      const [warehouseMap, branchMap, productMap, partyMap, taxMap, accountMap, sessionResponse, orderResponse, movementResponse, prescriptionResponse] = await Promise.all([
+      const [warehouseMap, branchMap, productMap, unitMap, partyMap, taxMap, accountMap, sessionResponse, orderResponse, movementResponse, prescriptionResponse] = await Promise.all([
         loadRefs('inventory.warehouse'), loadRefs('master-data.branch'),
-        loadRefs('master-data.product'), loadRefs('master-data.party'), loadRefs('master-data.tax'),
+        loadRefs('master-data.product'), can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()), loadRefs('master-data.party'), loadRefs('master-data.tax'),
         loadRefs('accounting.account'), api(`${dataPath('pos.pos_session')}?limit=1000`),
         api(`${dataPath('pos.pos_order')}?limit=1000`), api(`${dataPath('pos.cash_movement')}?limit=1000`),
         pharmacyEnabled ? api(`${dataPath('pharmacy.prescription')}?limit=1000`) : Promise.resolve({ items: [] }),
@@ -53,6 +55,7 @@ export default function PosTerminalPage() {
       setWarehouses(warehouseMap);
       setBranches(branchMap);
       setProducts(productMap);
+      setUnits(unitMap);
       setParties(partyMap);
       setTaxes(taxMap);
       setAccounts(accountMap);
@@ -77,12 +80,17 @@ export default function PosTerminalPage() {
 
   const activeSession = sessions.find((item) => item.id === sessionId) || null;
   const pharmacyEnabled = app.meta?.modules?.some((module) => module.id === 'pharmacy');
-  const rxRequired = cart.some(({ product }) => product.requires_prescription === true);
   const activeWarehouse = activeSession ? warehouses.get(activeSession.warehouse) : null;
   const sessionOrders = useMemo(() => orders.filter((item) => item.session === sessionId), [orders, sessionId]);
-  const cart = useMemo(() => Object.entries(quantities).map(([id, qty]) => ({ product: products.get(id), qty: Number(qty) })).filter((row) => row.product && row.qty > 0), [quantities, products]);
-  const subtotal = cart.reduce((sum, row) => sum + displayPrice(row.product) * row.qty, 0);
-  const estimatedTax = cart.reduce((sum, row) => sum + displayPrice(row.product) * row.qty * ((Number(taxes.get(row.product.tax)?.rate) || 0) / 100), 0);
+  const cart = useMemo(() => Object.entries(quantities).map(([id, qty]) => ({ product: products.get(id), uom: selectedUnits[id] || products.get(id)?.uom || '', qty: Number(qty) })).filter((row) => row.product && row.qty > 0), [quantities, products, selectedUnits]);
+  const unitsFor = (product) => product?.uom ? [...units.values()].filter((unit) => unit.id === product.uom || unit.base_uom === product.uom) : [];
+  const priceFor = (product, uomId) => {
+    const unit = units.get(uomId);
+    return displayPrice(product) * (unit?.base_uom ? Number(unit.ratio || 0) : 1);
+  };
+  const rxRequired = cart.some(({ product }) => product.requires_prescription === true);
+  const subtotal = cart.reduce((sum, row) => sum + priceFor(row.product, row.uom) * row.qty, 0);
+  const estimatedTax = cart.reduce((sum, row) => sum + priceFor(row.product, row.uom) * row.qty * ((Number(taxes.get(row.product.tax)?.rate) || 0) / 100), 0);
   const total = Math.round((subtotal + estimatedTax + Number.EPSILON) * 100) / 100;
   const filteredProducts = [...products.values()].filter((product) => product.active !== false && (!query || `${product.name} ${product.sku || ''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()))).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
 
@@ -118,9 +126,9 @@ export default function PosTerminalPage() {
         session: activeSession.id, warehouse: activeSession.warehouse,
         ...(activeSession.branch ? { branch: activeSession.branch } : {}),
         ...(partyId ? { party: partyId } : {}), ...(prescriptionId ? { prescription: prescriptionId } : {}), method,
-        lines: cart.map(({ product, qty }) => ({ product: product.id, qty, price: displayPrice(product) })),
+        lines: cart.map(({ product, uom, qty }) => ({ product: product.id, uom: uom || undefined, qty, price: priceFor(product, uom) })),
       } });
-      setQuantities({}); setPartyId(''); setPrescriptionId('');
+      setQuantities({}); setSelectedUnits({}); setPartyId(''); setPrescriptionId('');
       let completionError = '';
       try {
         await api(dataPath('pos.pos_order', created.id, 'completed'), { method: 'POST' });
@@ -222,10 +230,10 @@ export default function PosTerminalPage() {
       </section>
       {!activeSession ? <div className="empty card-pad">Chọn một ca đang mở hoặc mở ca mới để sử dụng quầy.</div> : !activeSession.warehouse ? <div className="alert warning">Ca này được tạo trước khi bắt buộc chọn kho. Hãy chốt ca cũ và mở ca mới để tiếp tục bán.<form className="pos-close-form" onSubmit={closeSession}><label className="field"><span className="label">Tiền mặt thực đếm để chốt ca</span><input className="input num" type="number" min="0" step="any" required value={closingCash} onChange={(event) => setClosingCash(event.target.value)} /></label><button className="btn btn-secondary" type="submit" disabled={busy || !can('pos.pos_session.update') || !can('pos.pos_session.closed')}>Chốt ca cũ</button></form></div> : <div className="pos-layout">
         <section className="pos-products-panel"><div className="row wrap"><h2>Sản phẩm</h2><span className="grow" /><input className="input pos-search" type="search" placeholder="Tìm tên hoặc mã hàng" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
-          <div className="pos-products">{filteredProducts.map((product) => <button className={`card pos-product${quantities[product.id] ? ' selected' : ''}`} key={product.id} type="button" disabled={!can('pos.pos_order.create')} onClick={() => setQty(product.id, (Number(quantities[product.id]) || 0) + 1)}><strong>{product.name}</strong><span className="small muted">{product.sku || 'Không mã'}</span><span className="num">{fmtMoney(displayPrice(product))}</span>{product.tracked !== false && <span className="small faint">Quản lý tồn kho</span>}</button>)}</div>
+          <div className="pos-products">{filteredProducts.map((product) => { const uom = selectedUnits[product.id] || product.uom || ''; return <button className={`card pos-product${quantities[product.id] ? ' selected' : ''}`} key={product.id} type="button" disabled={!can('pos.pos_order.create')} onClick={() => setQty(product.id, (Number(quantities[product.id]) || 0) + 1)}><strong>{product.name}</strong><span className="small muted">{product.sku || 'Không mã'}</span><span className="num">{fmtMoney(priceFor(product, uom))}{units.get(uom)?.name ? ` / ${units.get(uom).name}` : ''}</span>{product.tracked !== false && <span className="small faint">Quản lý tồn kho</span>}</button>; })}</div>
           {!filteredProducts.length && <div className="empty">Không có sản phẩm phù hợp.</div>}
         </section>
-        <aside className="card pos-cart"><h2>Đơn hàng</h2>{cart.length ? <div className="pos-cart-lines">{cart.map(({ product, qty }) => <div className="pos-cart-line" key={product.id}><div><strong>{product.name}</strong><div className="small muted">{fmtMoney(displayPrice(product))} / sp</div></div><div className="pos-qty"><button className="btn btn-ghost btn-sm" type="button" aria-label={`Giảm ${product.name}`} onClick={() => setQty(product.id, qty - 1)}>−</button><input className="input num" type="number" min="0" step="any" aria-label={`Số lượng ${product.name}`} value={qty} onChange={(event) => setQty(product.id, event.target.value)} /><button className="btn btn-ghost btn-sm" type="button" aria-label={`Tăng ${product.name}`} onClick={() => setQty(product.id, qty + 1)}>+</button></div><strong className="num">{fmtMoney(displayPrice(product) * qty)}</strong></div>)}</div> : <div className="empty">Chọn sản phẩm để thêm vào đơn.</div>}
+        <aside className="card pos-cart"><h2>Đơn hàng</h2>{cart.length ? <div className="pos-cart-lines">{cart.map(({ product, uom, qty }) => <div className="pos-cart-line" key={product.id}><div><strong>{product.name}</strong>{unitsFor(product).length > 1 && <select className="select" aria-label={`Đơn vị bán ${product.name}`} value={uom} onChange={(event) => setSelectedUnits((current) => ({ ...current, [product.id]: event.target.value }))}>{unitsFor(product).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` · ${unit.ratio} × đơn vị gốc` : ' · đơn vị gốc'}</option>)}</select>}<div className="small muted">{fmtMoney(priceFor(product, uom))} / {units.get(uom)?.name || 'sp'}</div></div><div className="pos-qty"><button className="btn btn-ghost btn-sm" type="button" aria-label={`Giảm ${product.name}`} onClick={() => setQty(product.id, qty - 1)}>−</button><input className="input num" type="number" min="0" step="any" aria-label={`Số lượng ${product.name}`} value={qty} onChange={(event) => setQty(product.id, event.target.value)} /><button className="btn btn-ghost btn-sm" type="button" aria-label={`Tăng ${product.name}`} onClick={() => setQty(product.id, qty + 1)}>+</button></div><strong className="num">{fmtMoney(priceFor(product, uom) * qty)}</strong></div>)}</div> : <div className="empty">Chọn sản phẩm để thêm vào đơn.</div>}
           <label className="field"><span className="label">Khách hàng {rxRequired ? '*' : '(tùy chọn)'}</span><select className="select" required={rxRequired} value={partyId} onChange={(event) => setPartyId(event.target.value)}><option value="">Khách lẻ</option>{[...parties.values()].filter((item) => item.active !== false && item.is_customer !== false).map((item) => <option key={item.id} value={item.id}>{recordLabel('master-data.party', item)}</option>)}</select></label>
           {pharmacyEnabled && <label className="field"><span className="label">Đơn thuốc {rxRequired ? '*' : '(nếu có)'}</span><select className="select" required={rxRequired} value={prescriptionId} onChange={(event) => { const id = event.target.value; setPrescriptionId(id); const rx = prescriptions.find((item) => item.id === id); if (rx?.party) setPartyId(rx.party); }}><option value="">Chọn đơn còn thuốc được kê</option>{prescriptions.filter((item) => !item.valid_until || item.valid_until >= localDate()).map((item) => <option key={item.id} value={item.id}>{item.prescription_no} · {item.status === 'partially_dispensed' ? 'cấp một phần' : 'đã xác minh'} · hết hạn {item.valid_until}</option>)}</select>{rxRequired && <small className="muted">Thuốc kê đơn chỉ được bán theo đơn còn hạn, đúng khách hàng; số lượng bán cộng dồn không vượt số lượng kê.</small>}</label>}
           <label className="field"><span className="label">Thanh toán</span><select className="select" value={method} onChange={(event) => setMethod(event.target.value)}><option value="cash">Tiền mặt</option><option value="card">Thẻ</option><option value="transfer">Chuyển khoản</option><option value="ewallet">Ví điện tử</option></select></label>

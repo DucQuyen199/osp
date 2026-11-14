@@ -111,6 +111,9 @@ pub async fn prepare_document(
             errors.push(format!("POS line {} must be an object", index + 1));
             continue;
         };
+        for field in ["base_qty", "uom_name", "uom_ratio", "base_uom"] {
+            line.remove(field);
+        }
         let Some(product_id) = line
             .get("product")
             .and_then(Value::as_str)
@@ -120,7 +123,7 @@ pub async fn prepare_document(
         };
         let product = tx
             .query_opt(
-                "SELECT kind, tracked, active, price::text, tax FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                "SELECT kind, tracked, active, price::text, tax, uom FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
                 &[&tenant.id, &product_id],
             )
             .await?;
@@ -136,6 +139,7 @@ pub async fn prepare_document(
         let active: Option<bool> = product.get(2);
         let price_text: Option<String> = product.get(3);
         let tax_id: Option<Uuid> = product.get(4);
+        let base_unit_id: Option<Uuid> = product.get(5);
         if active == Some(false) && is_open {
             errors.push(format!("POS product on line {} is inactive", index + 1));
         }
@@ -156,6 +160,54 @@ pub async fn prepare_document(
             .filter(|qty| *qty > Decimal::ZERO)
         else {
             errors.push(format!("POS line {} needs a positive quantity", index + 1));
+            continue;
+        };
+        let selected_unit = match line.get("uom") {
+            Some(Value::String(value)) => match Uuid::parse_str(value) {
+                Ok(unit) => Some(unit),
+                Err(_) => {
+                    errors.push(format!(
+                        "POS unit on line {} must be a valid reference",
+                        index + 1
+                    ));
+                    continue;
+                }
+            },
+            Some(value) if !value.is_null() => {
+                errors.push(format!(
+                    "POS unit on line {} must be a valid reference",
+                    index + 1
+                ));
+                continue;
+            }
+            _ => None,
+        };
+        let unit = match crate::modules::master_data::unit_conversion::resolve(
+            tx,
+            tenant,
+            product_id,
+            selected_unit,
+        )
+        .await?
+        {
+            Ok(unit) => unit,
+            Err(message) => {
+                errors.push(format!("POS unit on line {}: {message}", index + 1));
+                continue;
+            }
+        };
+        let Some(base_qty) = unit.base_quantity(qty).and_then(money::json_number) else {
+            errors.push(format!(
+                "POS base quantity on line {} exceeds the supported range",
+                index + 1
+            ));
+            continue;
+        };
+        let Some(unit_price) = price.checked_mul(unit.ratio) else {
+            errors.push(format!(
+                "POS price on line {} exceeds the supported range",
+                index + 1
+            ));
             continue;
         };
         let (tax_rate, tax_name) = if let Some(tax_id) = tax_id {
@@ -182,7 +234,7 @@ pub async fn prepare_document(
             (Decimal::ZERO, None)
         };
         let Some((discount, net, line_tax, line_total)) =
-            money::line_amounts(qty, price, Decimal::ZERO, tax_rate)
+            money::line_amounts(qty, unit_price, Decimal::ZERO, tax_rate)
         else {
             errors.push(format!(
                 "POS line {} exceeds supported amount limits",
@@ -198,7 +250,7 @@ pub async fn prepare_document(
             Some(tax_value),
             Some(total_value),
         ) = (
-            money::json_number(price),
+            money::json_number(unit_price),
             money::json_number(tax_rate),
             money::json_number(discount),
             money::json_number(net),
@@ -223,6 +275,17 @@ pub async fn prepare_document(
             line.remove(field);
         }
         line.insert("price".into(), price_value);
+        line.insert("base_qty".into(), base_qty);
+        line.insert("uom_ratio".into(), json!(unit.ratio));
+        if let Some(unit_id) = unit.unit_id {
+            line.insert("uom".into(), json!(unit_id));
+        }
+        if let Some(unit_name) = unit.unit_name {
+            line.insert("uom_name".into(), json!(unit_name));
+        }
+        if let Some(base_unit_id) = unit.base_unit_id.or(base_unit_id) {
+            line.insert("base_uom".into(), json!(base_unit_id));
+        }
         line.insert("discount_pct".into(), json!(0));
         line.insert("discount_amount".into(), discount_value);
         line.insert("net_amount".into(), net_value);

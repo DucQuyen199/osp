@@ -251,7 +251,8 @@ pub async fn validate_persistence(
                     {
                         rx_required.push((
                             pid,
-                            line.get("qty")
+                            line.get("base_qty")
+                                .or_else(|| line.get("qty"))
                                 .and_then(money::decimal)
                                 .unwrap_or(Decimal::ZERO),
                         ));
@@ -352,7 +353,8 @@ async fn dispensed_quantities_for_prescription(
                 continue;
             };
             let qty = line
-                .get("qty")
+                .get("base_qty")
+                .or_else(|| line.get("qty"))
                 .and_then(money::decimal)
                 .unwrap_or(Decimal::ZERO);
             let current = totals.get(&product_id).copied().unwrap_or(Decimal::ZERO);
