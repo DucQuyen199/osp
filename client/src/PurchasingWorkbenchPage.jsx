@@ -25,7 +25,7 @@ export default function PurchasingWorkbenchPage() {
   const [editingId, setEditingId] = useState('');
   const [orderForm, setOrderForm] = useState({ supplier: '', warehouse: '', expected_date: '' });
   const [lines, setLines] = useState([{ product: '', qty: '1', price: '', tax: '' }]);
-  const [requisitionForm, setRequisitionForm] = useState({ supplier: '', warehouse: '', requested_by: '', reason: '' });
+  const [requisitionForm, setRequisitionForm] = useState({ supplier: '', sourcing_method: 'direct', warehouse: '', requested_by: '', reason: '' });
   const [requisitionLines, setRequisitionLines] = useState([{ product: '', qty: '1' }]);
   const [editingRequisitionId, setEditingRequisitionId] = useState('');
   const [receiptOrderId, setReceiptOrderId] = useState('');
@@ -101,7 +101,8 @@ export default function PurchasingWorkbenchPage() {
   async function saveRequisition(event) {
     event.preventDefault();
     const payload = {
-      supplier: requisitionForm.supplier || undefined,
+      supplier: requisitionForm.sourcing_method === 'direct' ? requisitionForm.supplier || undefined : undefined,
+      sourcing_method: requisitionForm.sourcing_method,
       warehouse: requisitionForm.warehouse,
       requested_by: requisitionForm.requested_by.trim() || undefined,
       reason: requisitionForm.reason.trim() || undefined,
@@ -115,7 +116,7 @@ export default function PurchasingWorkbenchPage() {
 
   function editRequisition(row) {
     setEditingRequisitionId(row.id);
-    setRequisitionForm({ supplier: row.supplier || '', warehouse: row.warehouse || '', requested_by: row.requested_by || '', reason: row.reason || '' });
+    setRequisitionForm({ supplier: row.supplier || '', sourcing_method: row.sourcing_method || 'direct', warehouse: row.warehouse || '', requested_by: row.requested_by || '', reason: row.reason || '' });
     setRequisitionLines((row.lines || []).map((line) => ({ product: line.product || '', qty: String(line.qty || 1) })));
   }
 
@@ -178,12 +179,14 @@ export default function PurchasingWorkbenchPage() {
   return <div className="page">
 
     <div className="page-head"><div><h1>Mua hàng và nhận hàng</h1><p className="sub">Lập đơn mua, gửi duyệt, nhận đủ hoặc từng phần vào kho và theo dõi hóa đơn nhà cung cấp.</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>Làm mới</button></div>
+    {can('purchasing.rfq.read') && <div className="row" style={{ justifyContent: 'flex-end', marginBottom: 10 }}><a className="btn btn-secondary btn-sm" href="#/sourcing">RFQ và so sánh báo giá</a></div>}
     {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
     <div className="stats" style={{ marginBottom: 16 }}><div className="card stat"><span className="stat-label">Nháp / bị trả</span><strong className="stat-value">{totals.draft}</strong></div><div className="card stat"><span className="stat-label">Chờ duyệt</span><strong className="stat-value">{totals.awaitingApproval}</strong></div><div className="card stat"><span className="stat-label">Đang nhận hàng</span><strong className="stat-value">{totals.receiving}</strong></div><div className="card stat"><span className="stat-label">Đã nhận đủ</span><strong className="stat-value">{totals.received}</strong></div></div>
 
     {can('purchasing.purchase_requisition.read') && <section className="card card-pad" style={{ marginBottom: 16 }}><div className="row wrap"><h2>{editingRequisitionId ? 'Sửa đề nghị mua nháp' : 'Đề nghị mua nội bộ'}</h2><span className="grow"/>{editingRequisitionId && <button className="btn btn-ghost btn-sm" type="button" onClick={() => { setEditingRequisitionId(''); setRequisitionLines([{ product: [...products.keys()][0] || '', qty: '1' }]); }}>Thoát chỉnh sửa</button>}</div><p className="small muted">Ghi nhu cầu hàng hóa và kho nhận. Sau khi phê duyệt, hệ thống sinh đơn mua nháp có liên kết nguồn; đơn mua vẫn cần giá và phê duyệt riêng trước khi đặt hàng.</p>
       {can('purchasing.purchase_requisition.create') && <><form onSubmit={saveRequisition}><div className="form-grid">
-        <label className="field"><span className="label">Nhà cung cấp *</span><select className="select" required value={requisitionForm.supplier} onChange={(event) => setRequisitionForm((current) => ({ ...current, supplier: event.target.value }))}><option value="">Chọn nhà cung cấp</option>{[...suppliers.values()].map((row) => <option key={row.id} value={row.id}>{recordLabel('master-data.party', row)}</option>)}</select></label>
+<label className="field"><span className="label">Phương thức mua *</span><select className="select" value={requisitionForm.sourcing_method} onChange={(event) => setRequisitionForm((current) => ({ ...current, sourcing_method: event.target.value, supplier: event.target.value === 'competitive' ? '' : current.supplier }))}><option value="direct">Mua trực tiếp</option><option value="competitive">So sánh báo giá nhà cung cấp</option></select></label>
+                <label className="field"><span className="label">Nhà cung cấp *</span><select className="select" required={requisitionForm.sourcing_method === 'direct'} disabled={requisitionForm.sourcing_method === 'competitive'} value={requisitionForm.supplier} onChange={(event) => setRequisitionForm((current) => ({ ...current, supplier: event.target.value }))}><option value="">Chọn nhà cung cấp</option>{[...suppliers.values()].map((row) => <option key={row.id} value={row.id}>{recordLabel('master-data.party', row)}</option>)}</select></label>
         <label className="field"><span className="label">Kho nhận *</span><select className="select" required value={requisitionForm.warehouse} onChange={(event) => setRequisitionForm((current) => ({ ...current, warehouse: event.target.value }))}><option value="">Chọn kho</option>{[...warehouses.values()].filter((row) => row.active !== false).map((row) => <option key={row.id} value={row.id}>{recordLabel('inventory.warehouse', row)}</option>)}</select></label>
         <label className="field"><span className="label">Người yêu cầu</span><input className="input" maxLength="160" value={requisitionForm.requested_by} onChange={(event) => setRequisitionForm((current) => ({ ...current, requested_by: event.target.value }))}/></label>
         <label className="field"><span className="label">Lý do / mục đích</span><input className="input" maxLength="500" value={requisitionForm.reason} onChange={(event) => setRequisitionForm((current) => ({ ...current, reason: event.target.value }))}/></label>

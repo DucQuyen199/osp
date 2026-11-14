@@ -60,6 +60,7 @@ const CharityWorkbenchPage = lazy(() => import('./CharityWorkbenchPage.jsx'));
 const ProfessionalServicesWorkbenchPage = lazy(() => import('./ProfessionalServicesWorkbenchPage.jsx'));
 const WellnessBookingPage = lazy(() => import('./WellnessBookingPage.jsx'));
 const PurchasingWorkbenchPage = lazy(() => import('./PurchasingWorkbenchPage.jsx'));
+const PurchasingSourcingWorkbenchPage = lazy(() => import('./PurchasingSourcingWorkbenchPage.jsx'));
 const MaintenanceWorkbenchPage = lazy(() => import('./MaintenanceWorkbenchPage.jsx'));
 const RecruitmentWorkbenchPage = lazy(() => import('./RecruitmentWorkbenchPage.jsx'));
 const PayrollWorkbenchPage = lazy(() => import('./PayrollWorkbenchPage.jsx'));
@@ -98,6 +99,7 @@ function parseRoute(hash = location.hash) {
   if (a === 'cases') return { name: 'professional-services-workbench' };
   if (a === 'wellness') return { name: 'wellness-booking-workbench' };
   if (a === 'purchasing') return { name: 'purchasing-workbench' };
+  if (a === 'sourcing') return { name: 'purchasing-sourcing-workbench' };
   if (a === 'maintenance') return { name: 'maintenance-workbench' };
   if (a === 'recruitment') return { name: 'recruitment-workbench' };
   if (a === 'payroll') return { name: 'payroll-workbench' };
@@ -209,6 +211,7 @@ function Sidebar({ meta, route, onNavigate, open }) {
     {meta.modules.some((module) => module.id === 'case-management') && can('case-management.case.read') && link('#/cases', 'Hồ sơ dịch vụ', route.name === 'professional-services-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'booking') && !meta.modules.some((module) => module.id === 'clinic') && can('booking.booking.read') && link('#/wellness', 'Lịch dịch vụ', route.name === 'wellness-booking-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'purchasing') && can('purchasing.purchase_order.read') && link('#/purchasing', 'Mua hàng và nhận hàng', route.name === 'purchasing-workbench', 'list')}
+    {meta.modules.some((module) => module.id === 'purchasing') && can('purchasing.rfq.read') && link('#/sourcing', 'RFQ và so sánh báo giá', route.name === 'purchasing-sourcing-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'maintenance') && can('maintenance.maintenance_request.read') && link('#/maintenance', 'Bảo trì tài sản', route.name === 'maintenance-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'recruitment') && can('recruitment.application.read') && link('#/recruitment', 'Tuyển dụng', route.name === 'recruitment-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'payroll') && can('payroll.payroll_run.read') && link('#/payroll', 'Điều hành bảng lương', route.name === 'payroll-workbench', 'list')}
@@ -416,6 +419,7 @@ function App() {
         : route.name === 'professional-services-workbench' ? <ProfessionalServicesWorkbenchPage />
         : route.name === 'wellness-booking-workbench' ? <WellnessBookingPage />
         : route.name === 'purchasing-workbench' ? <PurchasingWorkbenchPage />
+        : route.name === 'purchasing-sourcing-workbench' ? <PurchasingSourcingWorkbenchPage />
         : route.name === 'maintenance-workbench' ? <MaintenanceWorkbenchPage />
         : route.name === 'recruitment-workbench' ? <RecruitmentWorkbenchPage />
         : route.name === 'payroll-workbench' ? <PayrollWorkbenchPage />

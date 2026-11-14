@@ -88,7 +88,9 @@ pub(super) async fn dispatch(
     }
     // An approved internal requisition becomes a draft purchase order in
     // the same PostgreSQL transaction and keeps a traceable source link.
-    if event.ty == "purchasing.purchase_requisition.approved" {
+    if event.ty == "purchasing.purchase_requisition.approved"
+        && event.payload.get("sourcing_method").and_then(Value::as_str) != Some("competitive")
+    {
         crate::modules::purchasing::create_order_from_requisition(
             kernel,
             tx,

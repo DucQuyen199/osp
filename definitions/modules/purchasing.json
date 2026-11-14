@@ -24,6 +24,12 @@
      "ref": "master-data.party"
     },
     {
+     "name": "purchase_requisition",
+     "type": "ref",
+     "required": false,
+     "ref": "purchasing.purchase_requisition"
+    },
+    {
      "name": "warehouse",
      "type": "ref",
      "required": true,
@@ -41,6 +47,26 @@
      "required": false
     },
     {
+     "name": "quote_lines",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "quote_reference",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "valid_until",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "response_due",
+     "type": "date",
+     "required": false
+    },
+    {
      "name": "note",
      "type": "text",
      "required": false
@@ -53,7 +79,9 @@
       "draft",
       "sent",
       "quoted",
-      "accepted"
+      "accepted",
+      "rejected",
+      "cancelled"
      ]
     }
    ],
@@ -78,6 +106,20 @@
        "quoted"
       ],
       "to": "accepted"
+     },
+     "rejected": {
+      "from": [
+       "sent",
+       "quoted"
+      ],
+      "to": "rejected"
+     },
+     "cancelled": {
+      "from": [
+       "draft",
+       "sent"
+      ],
+      "to": "cancelled"
      }
     }
    },
@@ -284,6 +326,12 @@
      "ref": "master-data.party"
     },
     {
+     "name": "sourcing_method",
+     "type": "enum",
+     "required": false,
+     "options": ["direct", "competitive"]
+    },
+    {
      "name": "warehouse",
      "type": "ref",
      "required": false,
@@ -318,7 +366,8 @@
       "draft",
       "rejected",
       "submitted",
-      "approved"
+      "approved",
+      "sourced"
      ]
     }
    ],
@@ -344,6 +393,12 @@
        "submitted"
       ],
       "to": "rejected"
+     },
+     "sourced": {
+      "from": [
+       "approved"
+      ],
+      "to": "sourced"
      }
     }
    },

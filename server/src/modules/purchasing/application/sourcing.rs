@@ -260,14 +260,22 @@ async fn create_order_from_source(
     }
     let entity = kernel.ent(tenant, "purchasing.purchase_order")?;
     let mut order = Map::new();
-    for field in ["supplier", "warehouse", "department", "lines"] {
+    for field in ["supplier", "warehouse", "department"] {
         if let Some(value) = source.get(field) {
             order.insert(field.to_string(), value.clone());
         }
     }
+    let lines_field = if source_type == "rfq" {
+        "quote_lines"
+    } else {
+        "lines"
+    };
+    if let Some(lines) = source.get(lines_field) {
+        order.insert("lines".into(), lines.clone());
+    }
     order.insert("source".into(), Value::String(source_type.into()));
     order.insert("source_id".into(), Value::String(source_id.to_string()));
-    kernel
+    let created = kernel
         .create_in(
             tx,
             &Actor::System,
@@ -280,5 +288,54 @@ async fn create_order_from_source(
                 silent: false,
             },
         )
-        .await
+        .await?;
+    if source_type == "rfq"
+        && let Some(requisition_id) = source
+            .get("purchase_requisition")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+    {
+        let requisition_entity = kernel.ent(tenant, "purchasing.purchase_requisition")?;
+        kernel
+            .act_in(
+                tx,
+                &Actor::System,
+                tenant,
+                &requisition_entity,
+                &requisition_id.to_string(),
+                "sourced",
+                &Opts {
+                    depth: Some(depth + 1),
+                    causation: Some(event_id),
+                    silent: false,
+                },
+            )
+            .await?;
+        let rfq_entity = kernel.ent(tenant, "purchasing.rfq")?;
+        let competing_quotes = tx
+            .query(
+                "SELECT id FROM purchasing__rfq WHERE tenant_id = $1 AND purchase_requisition = $2 AND id <> $3 AND status IN ('sent', 'quoted') ORDER BY id FOR UPDATE",
+                &[&tenant.id, &requisition_id, &source_id],
+            )
+            .await?;
+        for quote in competing_quotes {
+            let quote_id: Uuid = quote.get(0);
+            kernel
+                .act_in(
+                    tx,
+                    &Actor::System,
+                    tenant,
+                    &rfq_entity,
+                    &quote_id.to_string(),
+                    "rejected",
+                    &Opts {
+                        depth: Some(depth + 1),
+                        causation: Some(event_id),
+                        silent: false,
+                    },
+                )
+                .await?;
+        }
+    }
+    Ok(created)
 }

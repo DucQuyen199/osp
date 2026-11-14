@@ -20,9 +20,91 @@ pub async fn handle_source_event(
     if !tenant.has_module("communication") {
         return Ok(false);
     }
-    let Some(message) = domain::message_for(event_type, document) else {
+    let message = if event_type == "purchasing.rfq.sent" {
+        supplier_rfq_message(tx, tenant, document).await?
+    } else {
+        domain::message_for(event_type, document)
+    };
+    let Some(message) = message else {
         return Ok(false);
     };
     persistence::enqueue_message(kernel, tx, tenant, message, event_id, depth).await?;
     Ok(true)
+}
+
+async fn supplier_rfq_message(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    document: &Value,
+) -> R<Option<serde_json::Map<String, Value>>> {
+    let Some(recipient) = document.get("supplier").filter(|value| !value.is_null()) else {
+        return Ok(None);
+    };
+    let Some(lines) = document.get("lines").and_then(Value::as_array) else {
+        return Ok(None);
+    };
+
+    let mut requested_items = Vec::with_capacity(lines.len());
+    for line in lines {
+        let Some(product_id) = line
+            .get("product")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+        else {
+            continue;
+        };
+        let row = tx
+            .query_opt(
+                "SELECT sku, name FROM master_data__product WHERE tenant_id = $1 AND id = $2",
+                &[&tenant.id, &product_id],
+            )
+            .await?;
+        let label = row
+            .map(|row| {
+                let sku: Option<String> = row.get(0);
+                let name: String = row.get(1);
+                sku.filter(|sku| !sku.trim().is_empty())
+                    .map(|sku| format!("{sku} — {name}"))
+                    .unwrap_or(name)
+            })
+            .unwrap_or_else(|| "Requested item".to_owned());
+        let quantity = line
+            .get("qty")
+            .or_else(|| line.get("quantity"))
+            .map(Value::to_string)
+            .unwrap_or_else(|| "unspecified quantity".to_owned());
+        requested_items.push(format!("• {label}: {quantity}"));
+    }
+
+    let reference = document
+        .get("number")
+        .or_else(|| document.get("id"))
+        .and_then(Value::as_str)
+        .unwrap_or("RFQ");
+    let response_due = document
+        .get("response_due")
+        .and_then(Value::as_str)
+        .map(|value| format!("Please respond by {value}.\n"))
+        .unwrap_or_default();
+    let request = requested_items.join("\n");
+    let mut message = serde_json::Map::new();
+    message.insert("channel".into(), serde_json::json!("email"));
+    message.insert("recipient".into(), recipient.clone());
+    message.insert(
+        "subject".into(),
+        serde_json::json!(format!(
+            "Request for quotation {reference} — {}",
+            tenant.name
+        )),
+    );
+    message.insert(
+        "body".into(),
+        serde_json::json!(format!(
+            "{} is requesting a quotation for RFQ {reference}.\n\nRequested items:\n{}\n\n{}Please provide unit prices, applicable taxes, lead time, and quotation validity.",
+            tenant.name,
+            if request.is_empty() { "See the attached or linked request details." } else { &request },
+            response_due
+        )),
+    );
+    Ok(Some(message))
 }

@@ -54,7 +54,7 @@ const STATUS = {
   contacted: 'Đã liên hệ', qualified: 'Đủ điều kiện', disqualified: 'Không đạt', converted: 'Đã chuyển đổi', won: 'Thắng', lost: 'Thua',
   qualification: 'Sơ tuyển', discovery: 'Tìm hiểu nhu cầu', proposal: 'Đề xuất / báo giá', negotiation: 'Thương lượng', unclassified: 'Chưa phân loại',
   sent: 'Đã gửi', accepted: 'Đã chấp nhận', rejected: 'Bị từ chối', confirmed: 'Đã xác nhận', partially_delivered: 'Đã giao một phần', delivered: 'Đã giao', cancelled: 'Đã hủy', completed: 'Hoàn tất',
-  refunded: 'Đã hoàn', placed: 'Đã đặt', approved: 'Đã duyệt', received: 'Đã nhận', posted: 'Đã ghi sổ', reversed: 'Đã đảo bút toán', paid: 'Đã thanh toán', void: 'Đã hủy bỏ',
+  refunded: 'Đã hoàn', placed: 'Đã đặt', approved: 'Đã duyệt', sourced: 'Đã chọn nhà cung cấp', received: 'Đã nhận', posted: 'Đã ghi sổ', reversed: 'Đã đảo bút toán', paid: 'Đã thanh toán', void: 'Đã hủy bỏ',
   in_progress: 'Đang thực hiện', doing: 'Đang làm', done: 'Xong', closed: 'Đã đóng', resolved: 'Đã xử lý', launched: 'Đang chạy', paused: 'Tạm dừng',
   dispatched: 'Đã xuất phát', failed: 'Thất bại', issued: 'Đã phát hành', signed: 'Đã ký', sold: 'Đã bán', leased: 'Đã cho thuê', terminated: 'Đã chấm dứt',
   superseded: 'Đã thay thế',

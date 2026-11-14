@@ -1,5 +1,6 @@
 mod receipts;
 mod returns;
+mod rfqs;
 
 use crate::{db::Tx, error::R, kernel::Tenant, money};
 use rust_decimal::Decimal;
@@ -34,6 +35,9 @@ pub async fn validate_persistence(
     action: &str,
     document: &Value,
 ) -> R<Vec<String>> {
+    if entity == "rfq" {
+        return rfqs::validate(tx, tenant, action, document).await;
+    }
     if entity == "purchase_receipt" && action == "received" {
         return receipts::validate_receipt_received(tx, tenant, document).await;
     }
@@ -92,8 +96,10 @@ pub async fn validate_persistence(
         }
     }
     if (entity == "purchase_order" && matches!(action, "submitted" | "approved" | "received"))
-        || (entity == "purchase_requisition" && matches!(action, "submitted" | "approved"))
-        || (entity == "rfq" && matches!(action, "sent" | "accepted"))
+        || (entity == "purchase_requisition"
+            && matches!(action, "submitted" | "approved")
+            && document.get("sourcing_method").and_then(Value::as_str) != Some("competitive"))
+        || (entity == "rfq" && matches!(action, "sent" | "quoted" | "accepted"))
     {
         let Some(supplier_id) = document
             .get("supplier")

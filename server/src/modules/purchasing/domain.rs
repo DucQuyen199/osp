@@ -48,6 +48,14 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
             errors.push(format!("{prefix}.price cannot be negative"));
         }
     }
+    if entity == "rfq"
+        && document
+            .get("quote_lines")
+            .and_then(Value::as_array)
+            .is_some_and(|lines| !lines.is_empty())
+    {
+        errors.extend(validate_quote_lines(document));
+    }
     if entity == "purchase_return" {
         if let Some(lines) = document.get("lines").and_then(Value::as_array) {
             for (index, line) in lines.iter().enumerate() {
@@ -62,6 +70,38 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                     ));
                 }
             }
+        }
+    }
+    errors
+}
+
+fn validate_quote_lines(document: &Value) -> Vec<String> {
+    let Some(requested) = document.get("lines").and_then(Value::as_array) else {
+        return vec!["RFQ must contain requested lines before a supplier quote is entered".into()];
+    };
+    let Some(quotes) = document.get("quote_lines").and_then(Value::as_array) else {
+        return vec!["Supplier quote lines must be an array".into()];
+    };
+    if requested.is_empty() || requested.len() != quotes.len() {
+        return vec!["Supplier quote must cover every requested line exactly once".into()];
+    }
+    let mut errors = Vec::new();
+    for (index, (request, quote)) in requested.iter().zip(quotes).enumerate() {
+        let prefix = format!("quote_lines[{}]", index + 1);
+        let same_product = request.get("product").and_then(Value::as_str)
+            == quote.get("product").and_then(Value::as_str);
+        let same_qty = request.get("qty").and_then(decimal) == quote.get("qty").and_then(decimal);
+        if !same_product || !same_qty {
+            errors.push(format!(
+                "{prefix} must keep the requested product and quantity"
+            ));
+        }
+        if !quote
+            .get("price")
+            .and_then(decimal)
+            .is_some_and(|price| price > Decimal::ZERO)
+        {
+            errors.push(format!("{prefix}.price must be greater than zero"));
         }
     }
     errors
@@ -94,8 +134,25 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
                 Some("draft" | "rejected")
             ) =>
         {
-            &["requested_by", "supplier", "warehouse", "lines", "reason"]
+            &[
+                "requested_by",
+                "supplier",
+                "sourcing_method",
+                "warehouse",
+                "lines",
+                "reason",
+            ]
         }
+        "rfq" if current.get("status").and_then(Value::as_str) == Some("sent") => &[
+            "supplier",
+            "purchase_requisition",
+            "warehouse",
+            "department",
+            "lines",
+            "note",
+            "response_due",
+        ],
+        "rfq" if current.get("status").and_then(Value::as_str) != Some("draft") => &["*"],
         "purchase_return"
             if !matches!(
                 current.get("status").and_then(Value::as_str),
@@ -113,7 +170,7 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
         }
         _ => return Vec::new(),
     };
-    if protected.iter().any(|field| patch.get(*field).is_some()) {
+    if protected.contains(&"*") || protected.iter().any(|field| patch.get(*field).is_some()) {
         vec!["Submitted purchasing documents cannot change their lines or warehouse".into()]
     } else {
         Vec::new()
@@ -123,7 +180,7 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
     if !matches!(
         (entity, action),
-        ("rfq", "accepted")
+        ("rfq", "sent" | "quoted" | "accepted")
             | (
                 "purchase_order",
                 "submitted" | "approved" | "partially_received" | "received"
@@ -135,8 +192,18 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
         return Vec::new();
     }
     let mut errors = Vec::new();
+    if entity == "rfq"
+        && action == "sent"
+        && document
+            .get("response_due")
+            .and_then(Value::as_str)
+            .and_then(|value| chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").ok())
+            .is_some_and(|due| due < chrono::Utc::now().date_naive())
+    {
+        errors.push("RFQ response deadline cannot be in the past".into());
+    }
     if entity == "purchase_requisition" && matches!(action, "submitted" | "approved") {
-        for field in ["supplier", "warehouse"] {
+        for field in ["warehouse"] {
             if document
                 .get(field)
                 .and_then(Value::as_str)
@@ -145,6 +212,15 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
             {
                 errors.push("Choose a valid supplier and warehouse before approval".into());
             }
+        }
+        if document.get("sourcing_method").and_then(Value::as_str) != Some("competitive")
+            && document
+                .get("supplier")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+                .is_none()
+        {
+            errors.push("Choose a supplier for a direct purchase requisition".into());
         }
     }
     if entity == "purchase_order"
@@ -194,17 +270,23 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
     {
         errors.push("Purchase receipt total must be greater than zero".into());
     }
+    if entity == "rfq" && matches!(action, "quoted" | "accepted") {
+        errors.extend(validate_quote_lines(document));
+    }
     if matches!(
         (entity, action),
-        ("rfq", "accepted")
-            | (
-                "purchase_order",
-                "submitted" | "approved" | "partially_received" | "received"
-            )
-            | ("purchase_return", "submitted" | "approved" | "dispatched")
+        (
+            "purchase_order",
+            "submitted" | "approved" | "partially_received" | "received"
+        ) | ("purchase_return", "submitted" | "approved" | "dispatched")
             | ("purchase_receipt", "received")
     ) {
-        if let Some(lines) = document.get("lines").and_then(Value::as_array) {
+        let lines_field = if entity == "rfq" {
+            "quote_lines"
+        } else {
+            "lines"
+        };
+        if let Some(lines) = document.get(lines_field).and_then(Value::as_array) {
             for (index, line) in lines.iter().enumerate() {
                 if !line
                     .get("price")
