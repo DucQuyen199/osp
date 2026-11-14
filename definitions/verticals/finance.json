@@ -15,6 +15,7 @@
   "hrm",
   "recruitment",
   "payroll",
+  "expense",
   "bi"
 ],
  "terminology": {
@@ -261,6 +262,32 @@
       "hrm.salary_revision.submitted",
       "hrm.salary_revision.approved",
       "hrm.salary_revision.rejected",
+      "workflow-approval.approval_request.read",
+      "workflow-approval.approval_request.approved",
+      "workflow-approval.approval_request.rejected"
+    ]
+  },
+  "expense_clerk": {
+    "name": "Chuy?n vi?n ?? ngh? chi",
+    "permissions": [
+      "expense.expense_claim.read",
+      "expense.expense_claim.create",
+      "expense.expense_claim.update",
+      "expense.expense_claim.submitted",
+      "hrm.employee.read",
+      "accounting.account.read"
+    ]
+  },
+  "expense_approver": {
+    "name": "Qu?n l? duy?t v? chi ph?",
+    "permissions": [
+      "expense.expense_claim.read",
+      "expense.expense_claim.approved",
+      "expense.expense_claim.rejected",
+      "expense.expense_claim.paid",
+      "hrm.employee.read",
+      "accounting.account.read",
+      "accounting.payment.read",
       "workflow-approval.approval_request.read",
       "workflow-approval.approval_request.approved",
       "workflow-approval.approval_request.rejected"
