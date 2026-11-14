@@ -278,6 +278,35 @@
       "accounting.account.read",
       "accounting.payment.read"
     ]
+  },
+  "sales_return_operator": {
+    "name": "Nhân viên xử lý trả hàng",
+    "permissions": [
+      "sales.sales_order.read",
+      "sales.sales_return.read",
+      "sales.sales_return.create",
+      "sales.sales_return.update",
+      "sales.sales_return.submitted",
+      "sales.sales_return.received",
+      "sales.sales_return.cancelled",
+      "master-data.party.read",
+      "master-data.product.read",
+      "inventory.warehouse.read",
+      "accounting.invoice.read",
+      "accounting.credit_note.read",
+      "logistics.shipment.read"
+    ]
+  },
+  "sales_return_approver": {
+    "name": "Quản lý duyệt trả hàng",
+    "permissions": [
+      "sales.sales_order.read",
+      "sales.sales_return.read",
+      "master-data.party.read",
+      "master-data.product.read",
+      "sales.sales_return.approved",
+      "sales.sales_return.rejected"
+    ]
   }
 },
  "kpis": [
