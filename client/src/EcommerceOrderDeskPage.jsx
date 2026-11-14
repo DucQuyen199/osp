@@ -13,6 +13,7 @@ export default function EcommerceOrderDeskPage() {
   const [orders, setOrders] = useState([]);
   const [salesOrders, setSalesOrders] = useState([]);
   const [shipments, setShipments] = useState([]);
+  const [invoices, setInvoices] = useState([]);
   const [party, setParty] = useState('');
   const [storefront, setStorefront] = useState('');
   const [channel, setChannel] = useState('web');
@@ -28,14 +29,15 @@ export default function EcommerceOrderDeskPage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const logisticsEnabled = app.meta?.modules?.some((module) => module.id === 'logistics') && can('logistics.shipment.read');
-      const [storefrontMap, partyMap, productMap, orderResponse, salesResponse, shipmentResponse] = await Promise.all([
+      const [storefrontMap, partyMap, productMap, orderResponse, salesResponse, shipmentResponse, invoiceResponse] = await Promise.all([
         loadRefs('ecommerce.storefront'), loadRefs('master-data.party'), loadRefs('master-data.product'),
         api(`${dataPath('ecommerce.web_order')}?limit=1000`), can('sales.sales_order.read') ? api(`${dataPath('sales.sales_order')}?limit=1000`) : Promise.resolve({ items: [] }),
         logisticsEnabled ? api(`${dataPath('logistics.shipment')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('accounting.invoice.read') ? api(`${dataPath('accounting.invoice')}?limit=1000`) : Promise.resolve({ items: [] }),
       ]);
       setStorefronts(storefrontMap); setParties(partyMap); setProducts(productMap);
       setOrders(itemsOf(orderResponse).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))));
-      setSalesOrders(itemsOf(salesResponse)); setShipments(itemsOf(shipmentResponse));
+      setSalesOrders(itemsOf(salesResponse)); setShipments(itemsOf(shipmentResponse)); setInvoices(itemsOf(invoiceResponse));
     } catch (reason) { setError(reason.message || 'Không tải được danh sách đơn online.'); }
     finally { if (!quiet) setLoading(false); }
   }, []);
@@ -50,7 +52,8 @@ export default function EcommerceOrderDeskPage() {
   const cartLines = useMemo(() => Object.entries(quantities).map(([id, qty]) => ({ product: products.get(id), qty: Number(qty) })).filter((line) => line.product && line.qty > 0), [quantities, products]);
   const filteredProducts = [...products.values()].filter((item) => item.active !== false && (!query || `${item.name} ${item.sku || ''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()))).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
   const relatedSalesOrder = (webOrderId) => salesOrders.find((item) => item.source === 'ecommerce' && item.source_id === webOrderId);
-  const relatedShipment = (salesOrderId) => shipments.find((item) => item.source === 'sales_order' && item.source_id === salesOrderId);
+  const relatedShipments = (salesOrderId) => shipments.filter((item) => item.source === 'sales_order' && item.source_id === salesOrderId);
+  const relatedInvoice = (salesOrderId) => invoices.find((item) => item.source === 'sales_order' && item.source_id === salesOrderId);
   const setQty = (id, value) => setQuantities((current) => {
     const next = { ...current }; const qty = Math.max(0, Number(value) || 0);
     if (qty > 0) next[id] = qty; else delete next[id];
@@ -76,14 +79,15 @@ export default function EcommerceOrderDeskPage() {
     try {
       await api(dataPath('ecommerce.web_order', order.id, action), { method: 'POST' });
       await load(true);
-      setNotice(action === 'placed' ? 'Đơn đã được đặt; hệ thống tạo đơn bán, hóa đơn và ghi nhận xuất kho theo cấu hình.' : 'Đã hủy giỏ hàng.');
+      setNotice(action === 'placed' ? 'Đơn đã được chuyển sang bán hàng. Tồn kho và hóa đơn được cập nhật theo luồng giao hàng của đơn.' : 'Đã hủy giỏ hàng.');
     } catch (reason) { setError(reason.message || (action === 'placed' ? 'Không đặt được đơn. Kiểm tra giá, kho và tồn khả dụng.' : 'Không hủy được giỏ hàng.')); await load(true); }
     finally { setBusy(''); }
   };
 
   const renderOrder = (order) => {
     const sale = relatedSalesOrder(order.id);
-    const shipment = sale && relatedShipment(sale.id);
+    const orderShipments = sale ? relatedShipments(sale.id) : [];
+    const invoice = sale && relatedInvoice(sale.id);
     return <article className="card ecommerce-order" key={order.id}>
       <header className="card-head"><div><strong>{recordLabel('master-data.party', parties.get(order.party))}</strong><div className="small muted">{storefronts.get(order.storefront)?.name || 'Gian hàng'} · {order.channel || 'web'} · {fmtDateTime(order.created_at)}</div></div><span className={`badge ${order.status === 'placed' ? 'success' : order.status === 'cancelled' ? 'plain' : 'warning'}`}>{statusLabel(order.status)}</span></header>
       <ul className="ecommerce-order-lines">{(order.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{products.get(line.product)?.name || 'Sản phẩm'} × {line.qty}</span><strong className="num">{fmtMoney(line.line_total ?? (Number(line.price || 0) * Number(line.qty || 0)))}</strong></li>)}</ul>
@@ -91,7 +95,8 @@ export default function EcommerceOrderDeskPage() {
       {order.shipping_address && <div className="small muted ecommerce-address">Giao đến: {order.shipping_address}</div>}
       <footer className="row wrap ecommerce-order-footer">
         {sale && can('sales.sales_order.read') && <a className="small" href={recordHref('sales.sales_order', sale.id)}>Đơn bán {sale.number || String(sale.id).slice(0, 8)} · {statusLabel(sale.status)}</a>}
-        {shipment && can('logistics.shipment.read') && <a className="small" href={recordHref('logistics.shipment', shipment.id)}>Vận đơn · {statusLabel(shipment.status)}</a>}
+        {orderShipments.map((shipment) => can('logistics.shipment.read') && <a className="small" key={shipment.id} href={recordHref('logistics.shipment', shipment.id)}>Vận đơn {shipment.tracking_number || String(shipment.id).slice(0, 8)} · {statusLabel(shipment.status)}</a>)}
+        {invoice && can('accounting.invoice.read') && <a className="small" href={recordHref('accounting.invoice', invoice.id)}>Hóa đơn · {statusLabel(invoice.status)}</a>}
         <span className="grow" />
         {order.status === 'cart' && can('ecommerce.web_order.placed') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => transition(order, 'placed')}>{busy === `${order.id}:placed` ? 'Đang đặt…' : 'Xác nhận đặt đơn'}</button>}
         {order.status === 'cart' && can('ecommerce.web_order.cancelled') && <button className="btn btn-secondary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => transition(order, 'cancelled')}>{busy === `${order.id}:cancelled` ? 'Đang hủy…' : 'Hủy giỏ'}</button>}
@@ -105,7 +110,7 @@ export default function EcommerceOrderDeskPage() {
   const cancelledOrders = orders.filter((order) => order.status === 'cancelled');
 
   return <div className="page ecommerce-page">
-    <div className="page-head"><div><h1>Điều phối đơn online</h1><p className="sub">Giá đơn được lấy từ gian hàng và bảng giá. Xác nhận đặt sẽ chuyển đơn sang bán hàng, kế toán và kho trong cùng luồng nghiệp vụ.</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{loading ? 'Đang tải…' : 'Làm mới'}</button></div>
+    <div className="page-head"><div><h1>Điều phối đơn online</h1><p className="sub">Giá đơn được lấy từ gian hàng và bảng giá. Đơn có vận đơn ghi nhận tồn kho theo từng lần giao và lập hóa đơn sau khi giao đủ; đơn bán trực tiếp tuân theo luồng bán hàng chuẩn.</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{loading ? 'Đang tải…' : 'Làm mới'}</button></div>
     <div className="row wrap ecommerce-summary"><span className="badge warning">Giỏ chờ đặt: {draftCarts.length}</span><span className="badge success">Đã đặt: {placedOrders.length}</span><span className="badge plain">Đã hủy: {cancelledOrders.length}</span></div>
     {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
     {loading && !orders.length ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <>
