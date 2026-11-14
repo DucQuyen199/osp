@@ -1,7 +1,7 @@
 {
   "id": "construction",
   "name": "Xây dựng",
-  "description": "Dự toán (BOQ), công trường, thầu phụ, nhật ký thi công. Ký thầu phụ tự ghi nhận công nợ.",
+  "description": "Dự toán (BOQ), công trường, thầu phụ, cam kết chi phí và nhật ký thi công.",
   "category": "industry",
   "version": "0.1.0",
   "depends": [

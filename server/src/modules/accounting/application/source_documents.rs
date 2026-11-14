@@ -192,16 +192,6 @@ pub(super) fn source_document(event_type: &str) -> Option<SourceDocument> {
             Condition::Positive("amount"),
             true,
         ),
-        "construction.subcontract.signed" => (
-            Target::Bill,
-            "value",
-            None,
-            Some("vendor"),
-            "subcontract",
-            None,
-            Condition::Positive("value"),
-            true,
-        ),
         "lending.repayment.paid" => (
             Target::Payment,
             "amount",
