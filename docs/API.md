@@ -38,6 +38,8 @@ Các endpoint `/api/t/{tenantId}/auth/mfa/*` chỉ tác động tới người d
 
 Tenant admin có thể gọi `POST /api/t/{tenantId}/auth/mfa/users/{userId}/reset` với lý do 10–500 ký tự để đặt lại MFA và thu hồi toàn bộ phiên/token của người dùng. Bí mật TOTP chỉ lưu dạng ciphertext AES-256-GCM; máy chủ cần `OSP_TOTP_ENCRYPTION_KEY` là Base64 của 32 byte ổn định giữa các lần khởi động.
 
+`GET /api/t/{tenantId}/auth/sessions` liệt kê các phiên trình duyệt đang hoạt động của người gọi và đánh dấu phiên hiện tại. `POST /api/t/{tenantId}/auth/sessions/revoke-others` thu hồi mọi phiên trình duyệt khác của chính người gọi; API token không bị ảnh hưởng.
+
 ## 2. Công khai (không cần token)
 
 | Endpoint | Mô tả |

@@ -17382,6 +17382,122 @@
         ]
       }
     },
+    "/api/t/{tenantId}/auth/sessions": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session ids, labels, creation/expiry times, and the current-session flag"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the current user's active browser sessions",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/auth/sessions/revoke-others": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Other sessions revoked; current browser session remains active"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke all other browser sessions for the current user",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/t/{tenantId}/business/preview": {
       "post": {
         "description": "Validates and calculates document lines using tenant-scoped product, tax, price list and source document data. This endpoint does not persist changes.",

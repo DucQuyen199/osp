@@ -11,10 +11,17 @@ export default function MfaSettingsPage() {
   const [code, setCode] = useState('');
   const [setup, setSetup] = useState(null);
   const [recoveryCodes, setRecoveryCodes] = useState([]);
+  const [sessions, setSessions] = useState([]);
 
   const reload = useCallback(async () => {
     setError('');
-    try { setStatus(await api(tenantPath('/auth/mfa/status'))); }
+    try {
+      const [nextStatus, nextSessions] = await Promise.all([
+        api(tenantPath('/auth/mfa/status')),
+        api(tenantPath('/auth/sessions')),
+      ]);
+      setStatus(nextStatus); setSessions(nextSessions);
+    }
     catch (reason) { setError(reason.message || 'Không tải được trạng thái bảo mật.'); }
   }, []);
 
@@ -37,6 +44,7 @@ export default function MfaSettingsPage() {
       setStatus({ enabled: true, recoveryCodesRemaining: result.recoveryCodes?.length || 0 });
       app.user.mfaEnabled = true;
       setNotice('Đã bật xác thực hai lớp. Hãy lưu các mã khôi phục ở nơi an toàn.');
+      await reload();
     } catch (reason) { setError(reason.message || 'Mã xác thực không đúng.'); }
     finally { setBusy(false); }
   };
@@ -48,7 +56,19 @@ export default function MfaSettingsPage() {
       setPassword(''); setCode(''); setRecoveryCodes([]); setStatus({ enabled: false, recoveryCodesRemaining: 0 });
       app.user.mfaEnabled = false;
       setNotice('Đã tắt xác thực hai lớp. Các phiên và API token khác đã bị thu hồi.');
+      await reload();
     } catch (reason) { setError(reason.message || 'Không tắt được xác thực hai lớp.'); }
+    finally { setBusy(false); }
+  };
+
+  const revokeOtherSessions = async () => {
+    if (!window.confirm('Đăng xuất các phiên trình duyệt khác của tài khoản này?')) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const result = await api(tenantPath('/auth/sessions/revoke-others'), { method: 'POST' });
+      setNotice(`Đã đăng xuất ${result.revokedCount || 0} phiên khác.`);
+      await reload();
+    } catch (reason) { setError(reason.message || 'Không thu hồi được các phiên khác.'); }
     finally { setBusy(false); }
   };
 
@@ -61,6 +81,19 @@ export default function MfaSettingsPage() {
     <div className="page-head"><div><h1>Bảo mật tài khoản</h1><p className="sub">Thêm mã xác thực cho lần đăng nhập bằng mật khẩu. Mã khôi phục chỉ dùng một lần.</p></div></div>
     {error && <div className="alert danger" role="alert">{error}</div>}
     {notice && <div className="alert success" role="status">{notice}</div>}
+    <section className="card stack">
+      <div className="card-head"><h2>Phiên đăng nhập</h2><span className="badge plain">{sessions.length} phiên</span></div>
+      <p className="muted">Xem các phiên trình duyệt đang hoạt động. Khi thu hồi, phiên khác sẽ bị đăng xuất ở yêu cầu tiếp theo.</p>
+      {!sessions.length ? <p className="small muted">Không có phiên trình duyệt đang hoạt động.</p> : <div className="table-wrap"><table className="table">
+        <thead><tr><th>Phiên</th><th>Bắt đầu</th><th>Hết hạn</th></tr></thead>
+        <tbody>{sessions.map((item) => <tr key={item.id}>
+          <td>{item.current ? <span className="badge success">Thiết bị này</span> : <span className="badge plain">{item.label || 'Trình duyệt'}</span>}</td>
+          <td>{new Date(item.createdAt).toLocaleString()}</td>
+          <td>{item.expiresAt ? new Date(item.expiresAt).toLocaleString() : 'Không hết hạn'}</td>
+        </tr>)}</tbody>
+      </table></div>}
+      {sessions.some((item) => !item.current) && <div><button className="btn btn-secondary" type="button" disabled={busy} onClick={revokeOtherSessions}>Đăng xuất các phiên khác</button></div>}
+    </section>
     {!status ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <section className="card stack">
       <div className="card-head"><h2>Xác thực hai lớp</h2><span className={`badge ${status.enabled ? 'success' : 'plain'}`}>{status.enabled ? 'Đang bật' : 'Đang tắt'}</span></div>
       {status.enabled && <p className="muted">Còn {status.recoveryCodesRemaining} mã khôi phục. Bật MFA sẽ thu hồi các phiên khác và API token.</p>}

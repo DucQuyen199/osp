@@ -14,7 +14,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Webhook outbox được ghi cùng transaction phát event; worker Rust claim có lease, gửi HTTPS có kiểm tra SSRF và HMAC, retry có giới hạn, dead-letter cùng API quản trị retry/đóng delivery.
 - Nhật ký audit được RLS `FORCE` theo tenant; trigger PostgreSQL chặn cập nhật, xóa trực tiếp và `TRUNCATE` trong luồng DB thông thường.
 - RBAC, Argon2id, phiên và API token, rate limiting, OpenAPI 3.1.
-- MFA TOTP tùy chọn theo tài khoản, bí mật được mã hóa AES-256-GCM bằng khóa triển khai, mã khôi phục dùng một lần, chống phát lại mã, giới hạn thử và quản trị viên có thể đặt lại MFA với lý do kiểm toán.
+- MFA TOTP tùy chọn theo tài khoản, bí mật được mã hóa AES-256-GCM bằng khóa triển khai, mã khôi phục dùng một lần, chống phát lại mã, giới hạn thử, quản trị viên đặt lại MFA với lý do kiểm toán và người dùng tự xem/thu hồi phiên trình duyệt khác.
 - React/Vite, giao diện quản trị, timeline liên module, responsive; design system và rà axe-core.
 - Bàn vận hành hóa đơn điện tử: hàng đợi theo trạng thái, liên kết hóa đơn kế toán, xem lỗi/phản hồi/lịch sử gọi provider, thử lại và yêu cầu hủy có lý do. Phát hành thật vẫn cần ánh xạ hợp đồng và thông tin xác thực từ provider được chọn.
 - Phụ lục hợp đồng được lập, gửi duyệt, áp dụng theo ngày hiệu lực và ghi snapshot lịch sử; hỗ trợ đổi tên, điều khoản, giá trị và ngày kết thúc trên hợp đồng đang hiệu lực.

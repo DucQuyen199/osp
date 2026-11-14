@@ -424,6 +424,62 @@ impl Kernel {
         ))
     }
 
+    pub async fn list_my_sessions(
+        &self,
+        t: &Tenant,
+        actor: &Actor,
+        current_token: &str,
+    ) -> R<Value> {
+        let user_id = match actor {
+            Actor::User { id, .. } => id,
+            Actor::System => return Err(ApiError::forbidden("auth.sessions.user")),
+        };
+        let current_hash = hash_token(current_token);
+        let conn = self.pool.get().await?;
+        let rows = conn
+            .query(
+                "SELECT jsonb_build_object('id', substr(hash, 1, 12), 'label', COALESCE(label, 'Browser session'), 'current', hash = $3, 'createdAt', created_at, 'expiresAt', expires_at) \\
+                 FROM osp_sessions WHERE tenant_id = $1 AND user_id = $2 AND kind = 'session' AND (expires_at IS NULL OR expires_at > now()) ORDER BY created_at DESC",
+                &[&t.id, user_id, &current_hash],
+            )
+            .await?;
+        Ok(Value::Array(
+            rows.into_iter().map(|row| row.get::<_, Value>(0)).collect(),
+        ))
+    }
+
+    pub async fn revoke_other_sessions(
+        &self,
+        t: &Tenant,
+        actor: &Actor,
+        current_token: &str,
+    ) -> R<u64> {
+        let user_id = match actor {
+            Actor::User { id, .. } => id,
+            Actor::System => return Err(ApiError::forbidden("auth.sessions.user")),
+        };
+        let current_hash = hash_token(current_token);
+        let mut conn = self.pool.get().await?;
+        let tx = Tx::begin(&mut conn, &t.id, true).await?;
+        let revoked = tx
+            .execute(
+                "DELETE FROM osp_sessions WHERE tenant_id = $1 AND user_id = $2 AND kind = 'session' AND hash <> $3",
+                &[&t.id, user_id, &current_hash],
+            )
+            .await?;
+        self.audit_raw(
+            &tx,
+            &t.id,
+            user_id,
+            "auth.sessions.revoke_others",
+            None,
+            Some(revoked.to_string()),
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(revoked)
+    }
+
     pub async fn revoke_token_by_id(&self, t: &Tenant, id: &str) -> R<bool> {
         if id.len() < 8 {
             return Ok(false);

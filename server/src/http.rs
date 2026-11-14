@@ -576,6 +576,20 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
     };
 
     match (&method, rest.as_slice()) {
+        (&Method::GET, ["auth", "sessions"]) => {
+            return json_ok(k.list_my_sessions(&t, &actor, &token).await?);
+        }
+        (&Method::POST, ["auth", "sessions", "revoke-others"]) => {
+            if !st.auth_limiter.take(ip) {
+                return Err(ApiError::new(
+                    429,
+                    "RATE_LIMITED",
+                    "Quá nhiều yêu cầu, thử lại sau",
+                ));
+            }
+            let revoked = k.revoke_other_sessions(&t, &actor, &token).await?;
+            return json_ok(json!({ "revokedCount": revoked }));
+        }
         (&Method::GET, ["auth", "mfa", "status"]) => {
             return json_ok(crate::kernel::auth::mfa::status(k, &t, &actor).await?);
         }

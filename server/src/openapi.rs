@@ -307,6 +307,22 @@ pub fn build(reg: &Registry) -> Value {
         } }),
     );
     paths.insert(
+        "/api/t/{tenantId}/auth/sessions".into(),
+        json!({ "get": {
+            "tags": ["auth"], "summary": "List the current user's active browser sessions", "security": sec,
+            "parameters": [tid],
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Session ids, labels, creation/expiry times, and the current-session flag" }))]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/auth/sessions/revoke-others".into(),
+        json!({ "post": {
+            "tags": ["auth"], "summary": "Revoke all other browser sessions for the current user", "security": sec,
+            "parameters": [tid],
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Other sessions revoked; current browser session remains active" }))]))
+        } }),
+    );
+    paths.insert(
         "/api/t/{tenantId}/auth/mfa/status".into(),
         json!({ "get": {
             "tags": ["auth"], "summary": "Read the current user's MFA status and remaining recovery-code count", "security": sec,
