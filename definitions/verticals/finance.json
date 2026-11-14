@@ -50,7 +50,8 @@
     "lending.loan.delete",
     "lending.repayment.*",
     "crm.*",
-    "document.*"
+    "document.*",
+    "master-data.party.read"
    ]
   },
   "underwriter": {
@@ -64,7 +65,8 @@
     "insurance.claim.update",
     "insurance.claim.approved",
     "insurance.claim.rejected",
-    "workflow-approval.*"
+    "workflow-approval.*",
+    "master-data.party.read"
    ]
   },
   "disbursement_officer": {
@@ -78,7 +80,9 @@
     "insurance.policy.read",
     "insurance.claim.read",
     "insurance.claim.update",
-    "insurance.claim.paid"
+    "insurance.claim.paid",
+    "accounting.account.read",
+    "master-data.party.read"
    ]
   },
   "insurance_agent": {
@@ -90,7 +94,9 @@
     "insurance.policy.activated",
     "insurance.policy.cancelled",
     "insurance.claim.read",
-    "insurance.claim.create"
+    "insurance.claim.create",
+    "accounting.invoice.read",
+    "master-data.party.read"
    ]
   }
  },
