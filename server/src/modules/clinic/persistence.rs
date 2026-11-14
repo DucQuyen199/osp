@@ -156,6 +156,9 @@ async fn validate_prescription(
     };
     let status: String = row.get(0);
     let mut errors = Vec::new();
+    if matches!(action, "created" | "updated") && status != "open" {
+        errors.push("Chỉ có thể tạo hoặc sửa đơn thuốc khi lượt khám còn mở".into());
+    }
     if action == "dispensed" && status != "completed" {
         errors.push("Chỉ phát thuốc sau khi lượt khám đã hoàn tất".into());
     }

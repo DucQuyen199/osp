@@ -141,6 +141,12 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
     if !patch.as_object().is_some_and(|patch| !patch.is_empty()) {
         return Vec::new();
     }
+    if matches!(entity, "prescription" | "lab_order") && patch.get("encounter").is_some() {
+        return vec!["Không thể chuyển chỉ định sang lượt khám khác sau khi đã ghi nhận".into()];
+    }
+    if entity == "lab_order" && patch.get("test").is_some() {
+        return vec!["Không thể thay đổi xét nghiệm đã được chỉ định; hãy tạo chỉ định mới".into()];
+    }
     match (entity, current.get("status").and_then(Value::as_str)) {
         ("encounter", Some("completed")) => {
             vec!["Lượt khám hoàn tất không thể sửa".into()]
