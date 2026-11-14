@@ -1,0 +1,137 @@
+{
+ "id": "lms",
+ "name": "Đào tạo (LMS)",
+ "description": "Khóa học, bài học, ghi danh và tiến độ học.",
+ "category": "people",
+ "version": "0.1.0",
+ "depends": [
+  "master-data"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "course",
+   "label": "Khóa học",
+   "fields": [
+    {
+     "name": "title",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "description",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": ["draft", "published", "archived"]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "published": {"from": ["draft"], "to": "published"},
+     "archived": {"from": ["published"], "to": "archived"}
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "lesson",
+   "label": "Bài học",
+   "fields": [
+    {
+     "name": "course",
+     "type": "ref",
+     "required": true,
+     "ref": "lms.course"
+    },
+    {
+     "name": "title",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "content",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "required",
+     "type": "bool",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "enrollment",
+   "label": "Ghi danh",
+   "fields": [
+    {
+     "name": "course",
+     "type": "ref",
+     "required": true,
+     "ref": "lms.course"
+    },
+    {
+     "name": "learner",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "progress",
+     "type": "number",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "active",
+      "completed"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "active",
+    "actions": {
+     "completed": {
+      "from": [
+       "active"
+      ],
+      "to": "completed"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "lesson_progress",
+   "label": "Hoàn thành bài học",
+   "fields": [
+    {"name": "enrollment", "type": "ref", "required": true, "ref": "lms.enrollment"},
+    {"name": "lesson", "type": "ref", "required": true, "ref": "lms.lesson"}
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

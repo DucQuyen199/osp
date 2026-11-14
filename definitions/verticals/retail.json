@@ -1,0 +1,75 @@
+{
+ "id": "retail",
+ "name": "Bán lẻ",
+ "description": "Cửa hàng, chuỗi bán lẻ, siêu thị mini, thời trang, điện máy.",
+ "modules": [
+  "pos",
+  "sales",
+  "inventory",
+  "purchasing",
+  "loyalty",
+  "crm",
+  "marketing",
+  "ecommerce",
+  "communication",
+  "accounting",
+  "einvoice",
+  "hrm",
+  "payroll",
+  "bi"
+ ],
+ "terminology": {
+  "master-data.party": "Khách hàng",
+  "master-data.product": "Hàng hóa",
+  "master-data.branch": "Cửa hàng"
+ },
+ "customFields": {
+  "master-data.product": [
+   {
+    "name": "brand",
+    "type": "string",
+    "required": false
+   },
+   {
+    "name": "barcode",
+    "type": "string",
+    "required": false
+   },
+   {
+    "name": "size",
+    "type": "string",
+    "required": false
+   },
+   {
+    "name": "color",
+    "type": "string",
+    "required": false
+   }
+  ]
+ },
+ "roles": {
+  "cashier": {
+   "name": "Thu ngân",
+   "permissions": [
+    "pos.*",
+    "master-data.*.read",
+    "loyalty.member.*",
+    "inventory.stock_level.read"
+   ]
+  },
+  "stock_keeper": {
+   "name": "Thủ kho",
+   "permissions": [
+    "inventory.*",
+    "purchasing.*.read",
+    "master-data.*.read"
+   ]
+  }
+ },
+ "kpis": [
+  "Doanh thu theo cửa hàng",
+  "Giá trị đơn trung bình",
+  "Vòng quay tồn kho",
+  "Tỷ lệ khách quay lại"
+ ]
+}

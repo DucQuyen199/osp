@@ -1,0 +1,217 @@
+{
+  "id": "events",
+  "name": "Sự kiện & bán vé",
+  "description": "Sự kiện, vé, check-in. Giá vé công bố đã gồm thuế theo cấu hình của sự kiện; bán vé tự ghi nhận thu và thuế.",
+  "category": "industry",
+  "version": "0.1.0",
+  "depends": [
+    "master-data",
+    "accounting"
+  ],
+  "core": false,
+  "entities": [
+    {
+      "name": "event",
+      "label": "Sự kiện",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "venue",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "starts_at",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "name": "capacity",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "reservation_minutes",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "draft",
+            "published",
+            "closed"
+          ]
+        },
+        {
+          "name": "ticket_price",
+          "type": "money",
+          "required": true
+        },
+        {
+          "name": "ticket_tax",
+          "type": "ref",
+          "required": false,
+          "ref": "master-data.tax"
+        },
+        {
+          "name": "ticket_tax_rate",
+          "type": "number",
+          "required": false,
+          "system": true
+        },
+        {
+          "name": "ticket_tax_name",
+          "type": "string",
+          "required": false,
+          "system": true
+        }
+      ],
+      "states": {
+        "field": "status",
+        "initial": "draft",
+        "actions": {
+          "published": {
+            "from": [
+              "draft"
+            ],
+            "to": "published"
+          },
+          "closed": {
+            "from": [
+              "published"
+            ],
+            "to": "closed"
+          }
+        }
+      },
+      "computed": {},
+      "constraints": []
+    },
+    {
+      "name": "ticket",
+      "label": "Vé",
+      "fields": [
+        {
+          "name": "event",
+          "type": "ref",
+          "required": true,
+          "ref": "events.event"
+        },
+        {
+          "name": "party",
+          "type": "ref",
+          "required": false,
+          "ref": "master-data.party"
+        },
+        {
+          "name": "price",
+          "type": "money",
+          "required": false,
+          "system": true
+        },
+        {
+          "name": "tax_rate",
+          "type": "number",
+          "required": false,
+          "system": true
+        },
+        {
+          "name": "tax_name",
+          "type": "string",
+          "required": false,
+          "system": true
+        },
+        {
+          "name": "tax_amount",
+          "type": "money",
+          "required": false,
+          "system": true
+        },
+        {
+          "name": "net_amount",
+          "type": "money",
+          "required": false,
+          "system": true
+        },
+        {
+          "name": "method",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "cash",
+            "card",
+            "transfer",
+            "ewallet",
+            "bank"
+          ]
+        },
+        {
+          "name": "refund_reason",
+          "type": "text",
+          "required": false
+        },
+        {
+          "name": "reservation_expires_at",
+          "type": "datetime",
+          "required": false,
+          "system": true
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "reserved",
+            "sold",
+            "checked_in",
+            "cancelled",
+            "refunded"
+          ]
+        }
+      ],
+      "states": {
+        "field": "status",
+        "initial": "reserved",
+        "actions": {
+          "sold": {
+            "from": [
+              "reserved"
+            ],
+            "to": "sold"
+          },
+          "checked_in": {
+            "from": [
+              "sold"
+            ],
+            "to": "checked_in"
+          },
+          "cancelled": {
+            "from": [
+              "reserved"
+            ],
+            "to": "cancelled"
+          },
+          "refunded": {
+            "from": [
+              "sold"
+            ],
+            "to": "refunded"
+          }
+        }
+      },
+      "computed": {},
+      "constraints": []
+    }
+  ],
+  "rules": [],
+  "seeds": [],
+  "publishes": [],
+  "jobs": []
+}

@@ -1,0 +1,128 @@
+{
+ "id": "field-service",
+ "name": "Dịch vụ hiện trường",
+ "description": "Lệnh công việc, điều phối kỹ thuật viên, vật tư sử dụng. Hoàn tất sẽ tự trừ kho và lập hóa đơn.",
+ "category": "sales",
+ "version": "0.2.0",
+ "depends": [
+  "master-data",
+  "inventory",
+  "accounting",
+    "helpdesk",
+    "hrm"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "work_order",
+   "label": "Lệnh công việc",
+   "fields": [
+    {
+     "name": "party",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "source_ticket",
+     "type": "ref",
+     "required": false,
+     "ref": "helpdesk.ticket"
+    },
+    {
+     "name": "title",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "address",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "technician",
+     "label": "Kỹ thuật viên bên ngoài",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "technician_employee",
+     "label": "Nhân viên phụ trách",
+     "type": "ref",
+     "required": false,
+     "ref": "hrm.employee"
+    },
+    {
+     "name": "scheduled_at",
+     "type": "datetime",
+     "required": false
+    },
+    {
+     "name": "scheduled_end",
+     "label": "Kết thúc dự kiến",
+     "type": "datetime",
+     "required": false
+    },
+    {
+     "name": "warehouse",
+     "type": "ref",
+     "required": false,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "lines",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "open",
+      "dispatched",
+      "done",
+      "cancelled"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "open",
+    "actions": {
+     "dispatched": {
+      "from": [
+       "open"
+      ],
+      "to": "dispatched"
+     },
+     "done": {
+      "from": [
+       "dispatched"
+      ],
+      "to": "done"
+     },
+     "cancelled": {
+      "from": [
+       "open",
+       "dispatched"
+      ],
+      "to": "cancelled"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

@@ -1,0 +1,239 @@
+{
+  "id": "school",
+  "name": "Trường học / Trung tâm đào tạo",
+  "description": "Học viên, lớp học, ghi danh, điểm số, học phí. Phát hành học phí tự lập hóa đơn; thu tiền cập nhật ngược trạng thái học phí.",
+  "category": "industry",
+  "version": "0.1.0",
+  "depends": [
+    "master-data",
+    "accounting"
+  ],
+  "core": false,
+  "entities": [
+    {
+      "name": "student",
+      "label": "Học viên",
+      "fields": [
+        {
+          "name": "party",
+          "type": "ref",
+          "required": true,
+          "ref": "master-data.party"
+        },
+        {
+          "name": "student_code",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "dob",
+          "type": "date",
+          "required": false
+        },
+        {
+          "name": "guardian",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "states": null,
+      "computed": {},
+      "constraints": []
+    },
+    {
+      "name": "course_class",
+      "label": "Lớp học",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "subject",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "teacher",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "start_date",
+          "type": "date",
+          "required": false
+        },
+        {
+          "name": "capacity",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "tuition",
+          "type": "money",
+          "required": false
+        }
+      ],
+      "states": null,
+      "computed": {},
+      "constraints": []
+    },
+    {
+      "name": "class_enrollment",
+      "label": "Ghi danh lớp",
+      "fields": [
+        {
+          "name": "student",
+          "type": "ref",
+          "required": true,
+          "ref": "school.student"
+        },
+        {
+          "name": "class",
+          "type": "ref",
+          "required": true,
+          "ref": "school.course_class"
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "active",
+            "dropped",
+            "completed"
+          ]
+        }
+      ],
+      "states": {
+        "field": "status",
+        "initial": "active",
+        "actions": {
+          "dropped": {
+            "from": [
+              "active"
+            ],
+            "to": "dropped"
+          },
+          "completed": {
+            "from": [
+              "active"
+            ],
+            "to": "completed"
+          }
+        }
+      },
+      "computed": {},
+      "constraints": []
+    },
+    {
+      "name": "grade",
+      "label": "Điểm",
+      "fields": [
+        {
+          "name": "enrollment",
+          "type": "ref",
+          "required": true,
+          "ref": "school.class_enrollment"
+        },
+        {
+          "name": "term",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "subject",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "score",
+          "type": "number",
+          "required": false
+        }
+      ],
+      "states": null,
+      "computed": {},
+      "constraints": []
+    },
+    {
+      "name": "fee",
+      "label": "Học phí",
+      "fields": [
+        {
+          "name": "student",
+          "type": "ref",
+          "required": true,
+          "ref": "school.student"
+        },
+        {
+          "name": "party",
+          "type": "ref",
+          "required": true,
+          "ref": "master-data.party"
+        },
+        {
+          "name": "amount",
+          "type": "money",
+          "required": true
+        },
+        {
+          "name": "due_date",
+          "type": "date",
+          "required": false
+        },
+        {
+          "name": "note",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "draft",
+            "issued",
+            "paid"
+          ]
+        },
+        {
+          "name": "enrollment",
+          "type": "ref",
+          "required": false,
+          "ref": "school.class_enrollment"
+        },
+        {
+          "name": "period",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "states": {
+        "field": "status",
+        "initial": "draft",
+        "actions": {
+          "issued": {
+            "from": [
+              "draft"
+            ],
+            "to": "issued"
+          },
+          "paid": {
+            "from": [
+              "issued"
+            ],
+            "to": "paid"
+          }
+        }
+      },
+      "computed": {},
+      "constraints": []
+    }
+  ],
+  "rules": [],
+  "seeds": [],
+  "publishes": [],
+  "jobs": []
+}

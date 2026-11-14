@@ -1,0 +1,348 @@
+{
+ "id": "hrm",
+ "name": "Nhân sự",
+ "description": "Hồ sơ nhân viên, phòng ban, chức danh, nghỉ phép, chấm công.",
+ "category": "people",
+ "version": "0.4.0",
+ "depends": [
+  "master-data"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "department",
+   "label": "Phòng ban",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "parent",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "parent_department",
+     "type": "ref",
+     "required": false,
+     "ref": "hrm.department"
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "position",
+   "label": "Chức danh",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "department",
+     "type": "ref",
+     "required": false,
+     "ref": "hrm.department"
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "employee",
+   "label": "Nhân viên",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "code",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "department",
+     "type": "ref",
+     "required": false,
+     "ref": "hrm.department"
+    },
+    {
+     "name": "position",
+     "type": "ref",
+     "required": false,
+     "ref": "hrm.position"
+    },
+    {
+     "name": "email",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "phone",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "hire_date",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "termination_date",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "tax_residency",
+     "type": "enum",
+     "required": false,
+     "options": ["resident", "nonresident", "exempt"]
+    },
+    {
+     "name": "dependent_count",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "contribution_exempt",
+     "type": "bool",
+     "required": false
+    },
+    {
+     "name": "base_salary",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "source",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "source_id",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "active",
+      "terminated"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "active",
+    "actions": {
+     "terminated": {
+      "from": [
+       "active"
+      ],
+      "to": "terminated"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "salary_revision",
+   "label": "Äiá»u chá»‰nh lÆ°Æ¡ng",
+   "fields": [
+    { "name": "employee", "type": "ref", "required": true, "ref": "hrm.employee" },
+    { "name": "effective_from", "type": "date", "required": true },
+    { "name": "base_salary", "type": "money", "required": true },
+    { "name": "reason", "type": "text", "required": true },
+    { "name": "status", "type": "enum", "required": false, "options": ["draft", "submitted", "approved", "rejected"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "submitted": { "from": ["draft", "rejected"], "to": "submitted" },
+     "approved": { "from": ["submitted"], "to": "approved" },
+     "rejected": { "from": ["submitted"], "to": "rejected" }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "leave_request",
+   "label": "Đơn nghỉ phép",
+   "fields": [
+    {
+     "name": "employee",
+     "type": "ref",
+     "required": true,
+     "ref": "hrm.employee"
+    },
+    {
+     "name": "start_date",
+     "type": "date",
+     "required": true
+    },
+    {
+     "name": "end_date",
+     "type": "date",
+     "required": true
+    },
+    {
+     "name": "partial_day",
+     "type": "enum",
+     "required": false,
+     "options": ["full", "morning", "afternoon"]
+    },
+    {
+     "name": "kind",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "annual",
+      "sick",
+      "unpaid",
+      "maternity",
+      "other"
+     ]
+    },
+    {
+     "name": "pay_treatment",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "paid",
+      "unpaid"
+     ]
+    },
+    {
+     "name": "reason",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "rejected",
+      "submitted",
+      "approved"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "submitted": {
+      "from": [
+       "draft",
+       "rejected"
+      ],
+      "to": "submitted"
+     },
+     "approved": {
+      "from": [
+       "submitted"
+      ],
+      "to": "approved"
+     },
+     "rejected": {
+      "from": [
+       "submitted"
+      ],
+      "to": "rejected"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": [
+    {
+     "type": "noDateOverlap",
+     "scope": "employee",
+     "start": "start_date",
+     "end": "end_date",
+     "ignoreStates": [
+      "draft",
+      "rejected"
+     ],
+     "message": "Nhân viên đã có đơn nghỉ trùng khoảng thời gian này"
+    }
+   ]
+  },
+  {
+   "name": "leave_allocation",
+   "label": "Hạn mức nghỉ",
+   "fields": [
+    { "name": "employee", "type": "ref", "required": true, "ref": "hrm.employee" },
+    { "name": "year", "type": "number", "required": true },
+    { "name": "kind", "type": "enum", "required": true, "options": ["annual", "sick", "unpaid", "maternity", "other"] },
+    { "name": "entitled_days", "type": "number", "required": true },
+    { "name": "reason", "type": "text", "required": false }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "holiday",
+   "label": "Ngày lễ doanh nghiệp",
+   "fields": [
+    { "name": "name", "type": "string", "required": true },
+    { "name": "date", "type": "date", "required": true },
+    { "name": "pay_treatment", "type": "enum", "required": false, "options": ["paid", "unpaid"] }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "attendance",
+   "label": "Chấm công",
+   "fields": [
+    {
+     "name": "employee",
+     "type": "ref",
+     "required": true,
+     "ref": "hrm.employee"
+    },
+    {
+     "name": "date",
+     "type": "date",
+     "required": true
+    },
+    {
+     "name": "check_in",
+     "type": "datetime",
+     "required": false
+    },
+    {
+     "name": "check_out",
+     "type": "datetime",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

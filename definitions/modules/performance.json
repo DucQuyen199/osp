@@ -1,0 +1,123 @@
+{
+ "id": "performance",
+ "name": "Đánh giá hiệu suất (OKR)",
+ "description": "Mục tiêu, kết quả then chốt, đánh giá định kỳ.",
+ "category": "people",
+ "version": "0.1.0",
+ "depends": [
+  "hrm"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "objective",
+   "label": "Mục tiêu",
+   "fields": [
+    {
+     "name": "title",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "owner",
+     "type": "ref",
+     "required": false,
+     "ref": "hrm.employee"
+    },
+    {
+     "name": "period",
+     "type": "string",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "key_result",
+   "label": "Kết quả then chốt",
+   "fields": [
+    {
+     "name": "objective",
+     "type": "ref",
+     "required": true,
+     "ref": "performance.objective"
+    },
+    {
+     "name": "title",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "target",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "current",
+     "type": "number",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "review",
+   "label": "Đánh giá",
+   "fields": [
+    {
+     "name": "employee",
+     "type": "ref",
+     "required": true,
+     "ref": "hrm.employee"
+    },
+    {
+     "name": "reviewer",
+     "label": "Người đánh giá",
+     "type": "ref",
+     "required": false,
+     "ref": "hrm.employee"
+    },
+    {
+     "name": "period",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "score",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "comment",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": ["draft", "submitted", "returned", "acknowledged"]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "submitted": {"from": ["draft", "returned"], "to": "submitted"},
+     "returned": {"from": ["submitted"], "to": "returned"},
+     "acknowledged": {"from": ["submitted"], "to": "acknowledged"}
+    }
+   },
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

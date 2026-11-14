@@ -1,0 +1,156 @@
+{
+  "id": "construction",
+  "name": "Xây dựng",
+  "description": "Dự toán (BOQ), công trường, thầu phụ, nhật ký thi công. Ký thầu phụ tự ghi nhận công nợ.",
+  "category": "industry",
+  "version": "0.1.0",
+  "depends": [
+    "project",
+    "accounting"
+  ],
+  "core": false,
+  "entities": [
+    {
+      "name": "boq",
+      "label": "Dự toán (BOQ)",
+      "fields": [
+        {
+          "name": "project",
+          "type": "ref",
+          "required": true,
+          "ref": "project.project"
+        },
+        {
+          "name": "items",
+          "type": "json",
+          "required": false
+        },
+        {
+          "name": "total",
+          "type": "money",
+          "required": false
+        }
+      ],
+      "states": null,
+      "computed": {},
+      "constraints": []
+    },
+    {
+      "name": "site",
+      "label": "Công trường",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "project",
+          "type": "ref",
+          "required": false,
+          "ref": "project.project"
+        },
+        {
+          "name": "address",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "states": null,
+      "computed": {},
+      "constraints": []
+    },
+    {
+      "name": "subcontract",
+      "label": "Thầu phụ",
+      "fields": [
+        {
+          "name": "project",
+          "type": "ref",
+          "required": true,
+          "ref": "project.project"
+        },
+        {
+          "name": "vendor",
+          "type": "ref",
+          "required": true,
+          "ref": "master-data.party"
+        },
+        {
+          "name": "value",
+          "type": "money",
+          "required": true
+        },
+        {
+          "name": "scope",
+          "type": "text",
+          "required": false
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "draft",
+            "signed",
+            "completed"
+          ]
+        }
+      ],
+      "states": {
+        "field": "status",
+        "initial": "draft",
+        "actions": {
+          "signed": {
+            "from": [
+              "draft"
+            ],
+            "to": "signed"
+          },
+          "completed": {
+            "from": [
+              "signed"
+            ],
+            "to": "completed"
+          }
+        }
+      },
+      "computed": {},
+      "constraints": []
+    },
+    {
+      "name": "site_diary",
+      "label": "Nhật ký thi công",
+      "fields": [
+        {
+          "name": "site",
+          "type": "ref",
+          "required": true,
+          "ref": "construction.site"
+        },
+        {
+          "name": "date",
+          "type": "date",
+          "required": true
+        },
+        {
+          "name": "weather",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false
+        }
+      ],
+      "states": null,
+      "computed": {},
+      "constraints": []
+    }
+  ],
+  "rules": [],
+  "seeds": [],
+  "publishes": [],
+  "jobs": []
+}

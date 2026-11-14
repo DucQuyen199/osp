@@ -1,0 +1,1070 @@
+{
+ "id": "accounting",
+ "name": "Kế toán",
+ "description": "Hệ thống tài khoản, hóa đơn, chứng từ điều chỉnh giảm, thanh toán và bút toán cân bằng cho nghiệp vụ liên module.",
+ "category": "finance",
+ "version": "0.1.0",
+ "depends": [
+  "master-data",
+  "hrm"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "account",
+   "label": "Tài khoản kế toán",
+   "fields": [
+    {
+     "name": "code",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "parent",
+     "type": "ref",
+     "required": false,
+     "ref": "accounting.account"
+    },
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "kind",
+     "type": "enum",
+     "required": true,
+     "options": [
+      "asset",
+      "liability",
+      "equity",
+      "revenue",
+      "expense",
+      "clearing"
+     ]
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "period",
+   "label": "Kỳ kế toán",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "start_date",
+     "type": "date",
+     "required": true
+    },
+    {
+     "name": "end_date",
+     "type": "date",
+     "required": true
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "open",
+      "period_closed"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "open",
+    "actions": {
+     "closed": {
+      "from": [
+       "open"
+      ],
+       "to": "period_closed"
+     },
+     "reopened": {
+      "from": [
+       "period_closed"
+      ],
+      "to": "open"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "invoice",
+   "label": "Hóa đơn bán",
+   "fields": [
+    {
+     "name": "party",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "currency",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.currency"
+    },
+    {
+     "name": "exchange_rate",
+     "type": "number",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "exchange_rate_date",
+     "type": "date",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "base_total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "base_tax_total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "total",
+     "type": "money",
+     "required": true
+    },
+    {
+     "name": "tax_total",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "lines",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "paid_amount",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "adjustment_amount",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "balance_due",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "issue_date",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "due_date",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "source",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "source_id",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "posted",
+      "partially_paid",
+      "partially_settled",
+      "paid",
+      "settled",
+      "void"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "posted": {
+      "from": [
+       "draft"
+      ],
+      "to": "posted"
+     },
+     "partially_paid": {
+      "from": [
+       "posted",
+       "paid",
+       "partially_paid",
+       "partially_settled",
+       "settled"
+      ],
+      "to": "partially_paid"
+     },
+     "partially_settled": {
+      "from": [
+       "posted",
+       "paid",
+       "partially_paid",
+       "partially_settled",
+       "settled"
+      ],
+      "to": "partially_settled"
+     },
+     "paid": {
+      "from": [
+       "posted",
+       "partially_paid",
+       "partially_settled",
+       "settled"
+      ],
+      "to": "paid"
+     },
+     "reopened": {
+      "from": [
+       "paid",
+       "partially_paid",
+       "partially_settled",
+       "settled"
+      ],
+      "to": "posted"
+     },
+     "settled": {
+      "from": [
+       "posted",
+       "partially_paid",
+       "partially_settled",
+       "paid"
+      ],
+      "to": "settled"
+     },
+     "void": {
+      "from": [
+       "draft",
+       "posted",
+       "partially_paid",
+       "partially_settled"
+      ],
+      "to": "void"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "bill",
+   "label": "Hóa đơn mua",
+   "fields": [
+    {
+     "name": "supplier",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "currency",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.currency"
+    },
+    {
+     "name": "exchange_rate",
+     "type": "number",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "exchange_rate_date",
+     "type": "date",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "base_total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "base_tax_total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+   {
+    "name": "department",
+    "type": "ref",
+    "required": false,
+    "ref": "hrm.department"
+   },
+    {
+     "name": "total",
+     "type": "money",
+     "required": true
+    },
+   {
+    "name": "tax_total",
+    "type": "money",
+    "required": false
+   },
+   {
+    "name": "lines",
+    "type": "json",
+    "required": false
+   },
+    {
+     "name": "paid_amount",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "adjustment_amount",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "balance_due",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "issue_date",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "due_date",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "source",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "source_id",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "posted",
+      "partially_paid",
+      "partially_settled",
+      "paid",
+      "settled",
+      "void"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "posted": {
+      "from": [
+       "draft"
+      ],
+      "to": "posted"
+     },
+     "partially_paid": {
+      "from": [
+       "posted",
+       "paid",
+       "partially_paid",
+       "partially_settled",
+       "settled"
+      ],
+      "to": "partially_paid"
+     },
+     "partially_settled": {
+      "from": [
+       "posted",
+       "paid",
+       "partially_paid",
+       "partially_settled",
+       "settled"
+      ],
+      "to": "partially_settled"
+     },
+     "paid": {
+      "from": [
+       "posted",
+       "partially_paid",
+       "partially_settled",
+       "settled"
+      ],
+      "to": "paid"
+     },
+     "reopened": {
+      "from": [
+       "paid",
+       "partially_paid",
+       "partially_settled",
+       "settled"
+      ],
+      "to": "posted"
+     },
+     "settled": {
+      "from": [
+       "posted",
+       "partially_paid",
+       "partially_settled",
+       "paid"
+      ],
+      "to": "settled"
+     },
+     "void": {
+      "from": [
+       "draft",
+       "posted",
+       "partially_paid",
+       "partially_settled"
+      ],
+      "to": "void"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "credit_note",
+   "label": "Hóa đơn điều chỉnh giảm",
+   "systemManaged": true,
+   "fields": [
+    {
+     "name": "invoice",
+     "type": "ref",
+     "required": true,
+     "ref": "accounting.invoice",
+     "system": true
+    },
+    {
+     "name": "currency",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.currency",
+     "system": true
+    },
+    {
+     "name": "exchange_rate",
+     "type": "number",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "exchange_rate_date",
+     "type": "date",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "base_total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "base_tax_total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "total",
+     "type": "money",
+     "required": true,
+     "system": true
+    },
+    {
+     "name": "tax_total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "lines",
+     "type": "json",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "source",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "source_id",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "posted"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "posted": {
+      "from": [
+       "draft"
+      ],
+      "to": "posted"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "debit_note",
+   "label": "Điều chỉnh giảm công nợ phải trả",
+   "systemManaged": true,
+   "fields": [
+    {
+     "name": "bill",
+     "type": "ref",
+     "required": true,
+     "ref": "accounting.bill",
+     "system": true
+    },
+    {
+     "name": "currency",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.currency",
+     "system": true
+    },
+    {
+     "name": "exchange_rate",
+     "type": "number",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "exchange_rate_date",
+     "type": "date",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "base_total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "base_tax_total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+   {
+    "name": "department",
+    "type": "ref",
+    "required": false,
+    "ref": "hrm.department",
+    "system": true
+   },
+    {
+     "name": "total",
+     "type": "money",
+     "required": true,
+     "system": true
+    },
+   {
+    "name": "tax_total",
+    "type": "money",
+    "required": false,
+    "system": true
+   },
+   {
+    "name": "lines",
+    "type": "json",
+    "required": false,
+    "system": true
+   },
+    {
+     "name": "source",
+     "type": "string",
+    "required": false,
+    "system": true
+    },
+    {
+     "name": "source_id",
+     "type": "string",
+    "required": false,
+    "system": true
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "posted"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "posted": {
+      "from": [
+       "draft"
+      ],
+      "to": "posted"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "payment",
+   "label": "Thanh toán",
+   "fields": [
+    {
+     "name": "party",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "amount",
+     "type": "money",
+     "required": true
+    },
+    {
+     "name": "currency",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.currency",
+     "system": true
+    },
+    {
+     "name": "exchange_rate",
+     "type": "number",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "exchange_rate_date",
+     "type": "date",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "base_amount",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "applied_base_amount",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "base_tax_amount",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "principal_component",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "interest_component",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "method",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "cash",
+      "card",
+      "transfer",
+      "ewallet",
+      "bank"
+     ]
+    },
+    {
+     "name": "payment_date",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "tax_rate",
+     "type": "number",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "tax_name",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "tax_amount",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "invoice",
+     "type": "ref",
+     "required": false,
+     "ref": "accounting.invoice"
+    },
+    {
+     "name": "bill",
+     "type": "ref",
+     "required": false,
+     "ref": "accounting.bill"
+    },
+    {
+     "name": "source",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "expense_account",
+     "type": "ref",
+     "required": false,
+     "ref": "accounting.account",
+     "system": true
+    },
+    {
+     "name": "source_id",
+     "type": "string",
+     "required": false,
+     "system": true
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "journal_entry",
+   "label": "Bút toán",
+   "fields": [
+    {
+     "name": "memo",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "amount",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "posting_date",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "lines",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "source",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "source_id",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "posted",
+      "reversed"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "posted": {
+      "from": [
+       "draft"
+      ],
+      "to": "posted"
+     },
+     "reversed": {
+      "from": [
+       "posted"
+      ],
+      "to": "reversed"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "bank_statement",
+   "label": "Sao kê ngân hàng",
+   "fields": [
+    { "name": "account", "type": "ref", "required": true, "ref": "accounting.account" },
+    { "name": "currency", "type": "ref", "required": false, "ref": "master-data.currency" },
+    { "name": "statement_number", "type": "string", "required": true },
+    { "name": "start_date", "type": "date", "required": true },
+    { "name": "end_date", "type": "date", "required": true },
+    { "name": "opening_balance", "type": "money", "required": true },
+    { "name": "closing_balance", "type": "money", "required": true },
+    { "name": "status", "type": "enum", "required": false, "options": ["draft", "reconciled", "cancelled"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "reconciled": { "from": ["draft"], "to": "reconciled" },
+     "cancelled": { "from": ["draft"], "to": "cancelled" }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "bank_statement_line",
+   "label": "Dòng sao kê ngân hàng",
+   "fields": [
+    { "name": "statement", "type": "ref", "required": true, "ref": "accounting.bank_statement" },
+    { "name": "transaction_date", "type": "date", "required": true },
+    { "name": "reference", "type": "string", "required": false },
+    { "name": "description", "type": "string", "required": false },
+    { "name": "direction", "type": "enum", "required": true, "options": ["credit", "debit"] },
+    { "name": "amount", "type": "money", "required": true },
+    { "name": "base_amount", "type": "money", "required": false, "system": true },
+    { "name": "exchange_rate", "type": "number", "required": false, "system": true },
+    { "name": "exchange_rate_date", "type": "date", "required": false, "system": true },
+    { "name": "payment", "type": "ref", "required": false, "ref": "accounting.payment" },
+    { "name": "journal_entry", "type": "ref", "required": false, "ref": "accounting.journal_entry" },
+      { "name": "ignore_reason", "type": "text", "required": false },
+    { "name": "status", "type": "enum", "required": false, "options": ["unmatched", "matched", "ignored"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "unmatched",
+    "actions": {
+     "matched": { "from": ["unmatched"], "to": "matched" },
+     "ignored": { "from": ["unmatched"], "to": "ignored" }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [
+  {
+   "entity": "account",
+   "data": {
+    "code": "138",
+    "name": "Phải thu cho vay",
+    "kind": "asset"
+   }
+  },
+  {
+   "entity": "account",
+   "data": {
+    "code": "515",
+    "name": "Doanh thu hoạt động tài chính - lãi cho vay",
+    "kind": "revenue"
+   }
+  },
+  {
+   "entity": "account",
+   "data": {
+    "code": "111",
+    "name": "Tiền mặt",
+    "kind": "asset"
+   }
+  },
+  {
+   "entity": "account",
+   "data": {
+    "code": "112",
+    "name": "Tiền gửi ngân hàng",
+    "kind": "asset"
+   }
+  },
+  {
+   "entity": "account",
+   "data": {
+    "code": "131",
+    "name": "Phải thu của khách hàng",
+    "kind": "asset"
+   }
+  },
+  {
+   "entity": "account",
+   "data": {
+    "code": "154",
+    "name": "Chi phí sản xuất, kinh doanh dở dang",
+    "kind": "asset"
+   }
+  },
+  {
+   "entity": "account",
+   "data": {
+    "code": "156",
+    "name": "Hàng hóa",
+    "kind": "asset"
+   }
+  },
+  {
+   "entity": "account",
+   "data": {
+    "code": "211",
+    "name": "Tài sản cố định hữu hình",
+    "kind": "asset"
+   }
+  },
+  {
+   "entity": "account",
+   "data": {
+    "code": "214",
+    "name": "Hao mòn tài sản cố định",
+    "kind": "asset"
+   }
+  },
+  {
+   "entity": "account",
+   "data": {
+    "code": "331",
+    "name": "Phải trả cho người bán",
+    "kind": "liability"
+   }
+  },
+  {
+   "entity": "account",
+   "data": {
+    "code": "GRNI",
+    "name": "Hàng đã nhận chưa có hóa đơn",
+    "kind": "liability"
+   }
+  },
+  {
+   "entity": "account",
+   "data": {
+    "code": "3331",
+    "name": "Thuế giá trị gia tăng phải nộp",
+    "kind": "liability"
+   }
+  },
+  {
+   "entity": "account",
+   "data": {
+    "code": "334",
+    "name": "Phải trả người lao động",
+    "kind": "liability"
+   }
+  },
+  {
+   "entity": "account",
+   "data": {
+    "code": "411",
+    "name": "Vốn chủ sở hữu",
+    "kind": "equity"
+   }
+  },
+  {
+   "entity": "account",
+   "data": {
+    "code": "511",
+    "name": "Doanh thu bán hàng và cung cấp dịch vụ",
+    "kind": "revenue"
+   }
+  },
+  {
+   "entity": "account",
+   "data": {
+    "code": "711",
+    "name": "Thu nhập khác - tài trợ và quyên góp",
+    "kind": "revenue"
+   }
+  },
+  {
+   "entity": "account",
+   "data": {
+    "code": "632",
+    "name": "Giá vốn hàng bán",
+    "kind": "expense"
+   }
+  },
+  {
+   "entity": "account",
+   "data": {
+    "code": "642",
+    "name": "Chi phí quản lý doanh nghiệp",
+    "kind": "expense"
+   }
+  }
+ ],
+ "publishes": [],
+ "jobs": []
+}

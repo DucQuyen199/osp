@@ -1,0 +1,173 @@
+{
+  "id": "case-management",
+  "name": "Quản lý hồ sơ vụ việc",
+  "description": "Hồ sơ/vụ việc, ghi chú, chấm giờ tính phí. Dùng cho luật, tư vấn, kế toán dịch vụ, cơ quan nhà nước, tổ chức phi lợi nhuận.",
+  "category": "industry",
+  "version": "0.1.0",
+  "depends": [
+    "master-data",
+    "accounting"
+  ],
+  "core": false,
+  "entities": [
+    {
+      "name": "case",
+      "label": "Vụ việc",
+      "fields": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "party",
+          "type": "ref",
+          "required": true,
+          "ref": "master-data.party"
+        },
+        {
+          "name": "kind",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "owner",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "opened_on",
+          "type": "date",
+          "required": false
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "open",
+            "on_hold",
+            "closed"
+          ]
+        }
+      ],
+      "states": {
+        "field": "status",
+        "initial": "open",
+        "actions": {
+          "on_hold": {
+            "from": [
+              "open"
+            ],
+            "to": "on_hold"
+          },
+          "resumed": {
+            "from": [
+              "on_hold"
+            ],
+            "to": "open"
+          },
+          "closed": {
+            "from": [
+              "open",
+              "on_hold"
+            ],
+            "to": "closed"
+          }
+        }
+      },
+      "computed": {},
+      "constraints": []
+    },
+    {
+      "name": "case_note",
+      "label": "Ghi chú",
+      "fields": [
+        {
+          "name": "case",
+          "type": "ref",
+          "required": true,
+          "ref": "case-management.case"
+        },
+        {
+          "name": "body",
+          "type": "text",
+          "required": true
+        }
+      ],
+      "states": null,
+      "computed": {},
+      "constraints": []
+    },
+    {
+      "name": "time_entry",
+      "label": "Giờ công",
+      "fields": [
+        {
+          "name": "case",
+          "type": "ref",
+          "required": true,
+          "ref": "case-management.case"
+        },
+        {
+          "name": "party",
+          "type": "ref",
+          "required": true,
+          "ref": "master-data.party"
+        },
+        {
+          "name": "who",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "hours",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "rate",
+          "type": "money",
+          "required": true
+        },
+        {
+          "name": "amount",
+          "type": "money",
+          "required": false
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "recorded",
+            "billed"
+          ]
+        },
+        {
+          "name": "date",
+          "type": "date",
+          "required": false
+        }
+      ],
+      "states": {
+        "field": "status",
+        "initial": "recorded",
+        "actions": {
+          "billed": {
+            "from": [
+              "recorded"
+            ],
+            "to": "billed"
+          }
+        }
+      },
+      "computed": {},
+      "constraints": []
+    }
+  ],
+  "rules": [],
+  "seeds": [],
+  "publishes": [],
+  "jobs": []
+}

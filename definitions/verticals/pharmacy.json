@@ -1,0 +1,61 @@
+{
+ "id": "pharmacy",
+ "name": "Nhà thuốc",
+ "description": "Nhà thuốc, chuỗi nhà thuốc, thiết bị y tế.",
+ "modules": [
+  "pos",
+  "inventory",
+  "purchasing",
+  "loyalty",
+  "crm",
+  "accounting",
+  "einvoice",
+  "hrm",
+  "payroll",
+  "bi"
+ ],
+ "terminology": {
+  "master-data.party": "Khách hàng",
+  "master-data.product": "Thuốc/Vật tư y tế"
+ },
+ "customFields": {
+  "master-data.product": [
+   {
+    "name": "active_ingredient",
+    "type": "string",
+    "required": false
+   },
+   {
+    "name": "registration_no",
+    "type": "string",
+    "required": false
+   },
+   {
+    "name": "requires_prescription",
+    "type": "bool",
+    "required": false
+   },
+   {
+    "name": "storage_condition",
+    "type": "string",
+    "required": false
+   }
+  ]
+ },
+ "roles": {
+  "pharmacist": {
+   "name": "Dược sĩ",
+   "permissions": [
+    "pos.*",
+    "inventory.*",
+    "master-data.*"
+   ]
+  }
+ },
+ "kpis": [
+  "Hàng cận date",
+  "Doanh thu theo nhóm thuốc",
+  "Biên lợi nhuận",
+  "Tồn kho an toàn"
+ ]
+}

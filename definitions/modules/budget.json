@@ -1,0 +1,121 @@
+{
+ "id": "budget",
+ "name": "Ngân sách",
+ "description": "Lập ngân sách theo kỳ/phòng ban và theo dõi thực hiện.",
+ "category": "finance",
+ "version": "0.1.0",
+ "depends": [
+  "accounting",
+  "hrm"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "budget",
+   "label": "Ngân sách",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "period",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "adjustment_of",
+     "type": "ref",
+     "required": false,
+     "ref": "budget.budget"
+    },
+    {
+     "name": "amount",
+     "type": "money",
+     "required": true
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "approved",
+      "closed",
+      "superseded"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "approved": {
+      "from": [
+       "draft"
+      ],
+      "to": "approved"
+     },
+     "closed": {
+      "from": [
+       "approved"
+      ],
+      "to": "closed"
+     },
+     "superseded": {
+      "from": [
+       "approved",
+       "closed"
+      ],
+      "to": "superseded"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "budget_line",
+   "label": "Dòng ngân sách",
+   "fields": [
+    {
+     "name": "budget",
+     "type": "ref",
+     "required": true,
+     "ref": "budget.budget"
+    },
+    {
+     "name": "account",
+     "type": "ref",
+     "required": true,
+     "ref": "accounting.account"
+    },
+     {
+      "name": "department",
+      "type": "ref",
+      "required": false,
+      "ref": "hrm.department"
+     },
+    {
+     "name": "planned",
+     "type": "money",
+     "required": true
+    },
+    {
+     "name": "actual",
+     "type": "money",
+     "required": false,
+     "system": true
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

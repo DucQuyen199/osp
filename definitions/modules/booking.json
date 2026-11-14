@@ -1,0 +1,182 @@
+{
+ "id": "booking",
+ "name": "Đặt lịch & tài nguyên",
+ "description": "Đặt lịch hẹn cho phòng, nhân viên, thiết bị, bàn, sân. Dùng cho phòng khám, spa, gym, salon, dịch vụ...",
+ "category": "sales",
+ "version": "0.1.0",
+ "depends": [
+  "master-data",
+  "accounting"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "resource",
+   "label": "Tài nguyên",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "kind",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "room",
+      "staff",
+      "equipment",
+      "table",
+      "court"
+     ]
+    },
+    {
+     "name": "branch",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.branch"
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "service",
+   "label": "Dịch vụ",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "duration_min",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "price",
+     "type": "money",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "booking",
+   "label": "Lịch hẹn",
+   "fields": [
+    {
+     "name": "party",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "resource",
+     "type": "ref",
+     "required": true,
+     "ref": "booking.resource"
+    },
+    {
+     "name": "service",
+     "type": "ref",
+     "required": false,
+     "ref": "booking.service"
+    },
+    {
+     "name": "starts_at",
+     "type": "datetime",
+     "required": true
+    },
+    {
+     "name": "ends_at",
+     "type": "datetime",
+     "required": false
+    },
+    {
+     "name": "price",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "note",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "requested",
+      "confirmed",
+      "checked_in",
+      "completed",
+      "cancelled",
+      "no_show"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "requested",
+    "actions": {
+     "confirmed": {
+      "from": [
+       "requested"
+      ],
+      "to": "confirmed"
+     },
+     "checked_in": {
+      "from": [
+       "confirmed"
+      ],
+      "to": "checked_in"
+     },
+     "completed": {
+      "from": [
+       "checked_in"
+      ],
+      "to": "completed"
+     },
+     "cancelled": {
+      "from": [
+       "requested",
+       "confirmed"
+      ],
+      "to": "cancelled"
+     },
+     "no_show": {
+      "from": [
+       "confirmed"
+      ],
+      "to": "no_show"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": [
+    {
+     "type": "noOverlap",
+     "scope": "resource",
+     "start": "starts_at",
+     "end": "ends_at",
+     "ignoreStates": [
+      "cancelled",
+      "no_show"
+     ],
+     "message": "Tài nguyên đã có lịch hẹn khác trong khoảng thời gian này"
+    }
+   ]
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

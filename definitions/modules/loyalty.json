@@ -1,0 +1,117 @@
+{
+ "id": "loyalty",
+ "name": "Khách hàng thân thiết",
+ "description": "Thành viên, điểm thưởng, voucher. Tự cộng điểm khi mua hàng ở POS hoặc đơn bán xác nhận.",
+ "category": "sales",
+ "version": "0.1.0",
+ "depends": [
+  "master-data"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "member",
+   "label": "Thành viên",
+   "fields": [
+    {
+     "name": "party",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "tier",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "bronze",
+      "silver",
+      "gold",
+      "platinum"
+     ]
+    },
+    {
+     "name": "points",
+     "type": "number",
+     "required": false,
+     "system": true
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "point_txn",
+   "label": "Giao dịch điểm",
+   "fields": [
+    {
+     "name": "party",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party",
+     "system": true
+    },
+    {
+     "name": "points",
+     "type": "number",
+     "required": true,
+     "system": true
+    },
+    {
+     "name": "source",
+     "type": "string",
+     "required": true,
+     "system": true
+    },
+    {
+     "name": "source_id",
+     "type": "string",
+     "required": true,
+     "system": true
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "voucher",
+   "label": "Voucher",
+   "fields": [
+    {
+     "name": "code",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "percent",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "amount",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "valid_until",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "used",
+     "type": "bool",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

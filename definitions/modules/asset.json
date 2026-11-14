@@ -1,0 +1,211 @@
+{
+ "id": "asset",
+ "name": "Tài sản cố định",
+ "description": "Đăng ký, vốn hóa, tính khấu hao đường thẳng và thanh lý tài sản cố định.",
+ "category": "finance",
+ "version": "0.5.0",
+ "depends": [
+  "master-data",
+  "accounting"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "asset",
+   "label": "Tài sản cố định",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "code",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "category",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "purchase_date",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "in_service_date",
+     "type": "date",
+     "required": true
+    },
+    {
+     "name": "cost",
+     "type": "money",
+     "required": true
+    },
+    {
+     "name": "salvage_value",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "opening_accumulated_depreciation",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "useful_life_months",
+     "type": "number",
+     "required": true
+    },
+    {
+     "name": "depreciation_method",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "straight_line",
+      "declining_balance"
+     ]
+    },
+    {
+     "name": "declining_balance_factor",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "acquisition_method",
+     "type": "enum",
+     "required": true,
+     "options": [
+      "cash",
+      "bank",
+      "opening_balance"
+     ]
+    },
+    {
+     "name": "accumulated_depreciation",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "book_value",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "disposal_proceeds",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "disposal_method",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "cash",
+      "bank"
+     ]
+    },
+    {
+     "name": "location",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "active",
+      "disposed"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "activated": {
+      "from": [
+       "draft"
+      ],
+      "to": "active"
+     },
+     "opening_balance_recorded": {
+      "from": [
+       "active"
+      ],
+      "to": "active"
+     },
+     "disposed": {
+      "from": [
+       "active"
+      ],
+      "to": "disposed"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "depreciation",
+   "label": "Khấu hao tài sản",
+   "fields": [
+    {
+     "name": "asset",
+     "type": "ref",
+     "required": true,
+     "ref": "asset.asset"
+    },
+    {
+     "name": "period",
+     "type": "date",
+     "required": true
+    },
+    {
+     "name": "amount",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "source",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "posted"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "posted": {
+      "from": [
+       "draft"
+      ],
+      "to": "posted"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

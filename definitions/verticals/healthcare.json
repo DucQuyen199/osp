@@ -1,0 +1,80 @@
+{
+ "id": "healthcare",
+ "name": "Y tế - Phòng khám",
+ "description": "Phòng khám đa khoa/chuyên khoa, nha khoa, thẩm mỹ, xét nghiệm.",
+ "modules": [
+  "clinic",
+  "booking",
+  "inventory",
+  "communication",
+  "document",
+  "crm",
+  "accounting",
+  "einvoice",
+  "hrm",
+  "payroll",
+  "bi"
+ ],
+ "terminology": {
+  "master-data.party": "Bệnh nhân",
+  "master-data.product": "Thuốc/Dịch vụ y tế",
+  "master-data.branch": "Cơ sở khám"
+ },
+ "customFields": {
+  "master-data.party": [
+   {
+    "name": "national_id",
+    "type": "string",
+    "required": false
+   },
+   {
+    "name": "emergency_contact",
+    "type": "string",
+    "required": false
+   }
+  ],
+  "master-data.product": [
+   {
+    "name": "active_ingredient",
+    "type": "string",
+    "required": false
+   },
+   {
+    "name": "requires_prescription",
+    "type": "bool",
+    "required": false
+   }
+  ]
+ },
+ "roles": {
+  "doctor": {
+   "name": "Bác sĩ",
+   "permissions": [
+    "clinic.*",
+    "booking.booking.read",
+    "master-data.*.read"
+   ]
+  },
+  "receptionist": {
+   "name": "Lễ tân",
+   "permissions": [
+    "booking.*",
+    "clinic.patient.*",
+    "master-data.party.*"
+   ]
+  },
+  "pharmacist": {
+   "name": "Dược sĩ",
+   "permissions": [
+    "clinic.prescription.*",
+    "inventory.*"
+   ]
+  }
+ },
+ "kpis": [
+  "Lượt khám/ngày",
+  "Thời gian chờ trung bình",
+  "Doanh thu theo bác sĩ",
+  "Tỷ lệ tái khám"
+ ]
+}

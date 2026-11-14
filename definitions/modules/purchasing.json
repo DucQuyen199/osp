@@ -1,0 +1,463 @@
+{
+ "id": "purchasing",
+ "name": "Mua hàng",
+ "description": "Đề nghị mua, yêu cầu báo giá, đơn mua và trả hàng nhà cung cấp. Đơn mua nhận hàng vào kho và ghi công nợ; phiếu trả gửi kho và điều chỉnh bill gốc.",
+ "category": "supply",
+ "version": "0.1.0",
+ "depends": [
+  "master-data",
+  "inventory",
+  "quality",
+  "accounting",
+  "hrm"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "rfq",
+   "label": "Yêu cầu báo giá",
+   "fields": [
+    {
+     "name": "supplier",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "warehouse",
+     "type": "ref",
+     "required": true,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "department",
+     "type": "ref",
+     "required": false,
+     "ref": "hrm.department"
+    },
+    {
+     "name": "lines",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "note",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "sent",
+      "quoted",
+      "accepted"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "sent": {
+      "from": [
+       "draft"
+      ],
+      "to": "sent"
+     },
+     "quoted": {
+      "from": [
+       "sent"
+      ],
+      "to": "quoted"
+     },
+     "accepted": {
+      "from": [
+       "quoted"
+      ],
+      "to": "accepted"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "purchase_order",
+   "label": "Đơn mua hàng",
+   "fields": [
+    {
+     "name": "supplier",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "warehouse",
+     "type": "ref",
+     "required": true,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "department",
+     "type": "ref",
+     "required": false,
+     "ref": "hrm.department"
+    },
+    {
+     "name": "lines",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "tax_total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "expected_date",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "source",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "source_id",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "rejected",
+      "submitted",
+      "approved",
+      "partially_received",
+      "received",
+      "cancelled"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "submitted": {
+      "from": [
+       "draft",
+       "rejected"
+      ],
+      "to": "submitted"
+     },
+     "approved": {
+      "from": [
+       "submitted"
+      ],
+      "to": "approved"
+     },
+     "rejected": {
+      "from": [
+       "submitted"
+      ],
+      "to": "rejected"
+     },
+     "received": {
+      "from": [
+       "approved",
+       "partially_received"
+      ],
+      "to": "received"
+     },
+     "cancelled": {
+      "from": [
+       "draft",
+       "submitted",
+       "approved",
+       "rejected"
+      ],
+      "to": "cancelled"
+     },
+     "partially_received": {
+      "from": [
+       "approved"
+      ],
+      "to": "partially_received"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "purchase_receipt",
+   "label": "Phiếu nhận hàng mua",
+   "fields": [
+    {
+     "name": "purchase_order",
+     "type": "ref",
+     "required": true,
+     "ref": "purchasing.purchase_order"
+    },
+    {
+     "name": "warehouse",
+     "type": "ref",
+     "required": true,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "lines",
+     "type": "json",
+     "required": true
+    },
+    {
+     "name": "total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "tax_total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "note",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "received",
+      "cancelled"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "received": {
+      "from": [
+       "draft"
+      ],
+      "to": "received"
+     },
+     "cancelled": {
+      "from": [
+       "draft"
+      ],
+      "to": "cancelled"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "purchase_requisition",
+   "label": "Đề nghị mua",
+   "fields": [
+    {
+     "name": "supplier",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "warehouse",
+     "type": "ref",
+     "required": false,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "requested_by",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "department",
+     "type": "ref",
+     "required": false,
+     "ref": "hrm.department"
+    },
+    {
+     "name": "lines",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "reason",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "rejected",
+      "submitted",
+      "approved"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "submitted": {
+      "from": [
+       "draft",
+       "rejected"
+      ],
+      "to": "submitted"
+     },
+     "approved": {
+      "from": [
+       "submitted"
+      ],
+      "to": "approved"
+     },
+     "rejected": {
+      "from": [
+       "submitted"
+      ],
+      "to": "rejected"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "purchase_return",
+   "label": "Phiếu trả hàng mua",
+   "fields": [
+    {
+     "name": "purchase_order",
+     "type": "ref",
+     "required": true,
+     "ref": "purchasing.purchase_order"
+    },
+    {
+     "name": "inspection",
+     "type": "ref",
+     "required": false,
+     "ref": "quality.inspection"
+    },
+    {
+     "name": "department",
+     "type": "ref",
+     "required": false,
+     "ref": "hrm.department"
+    },
+    {
+     "name": "warehouse",
+     "type": "ref",
+     "required": false,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "lines",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "tax_total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "reason",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "rejected",
+      "submitted",
+      "approved",
+      "dispatched",
+      "cancelled"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "submitted": {
+      "from": [
+       "draft",
+       "rejected"
+      ],
+      "to": "submitted"
+     },
+     "approved": {
+      "from": [
+       "submitted"
+      ],
+      "to": "approved"
+     },
+     "rejected": {
+      "from": [
+       "submitted"
+      ],
+      "to": "rejected"
+     },
+     "dispatched": {
+      "from": [
+       "approved"
+      ],
+      "to": "dispatched"
+     },
+     "cancelled": {
+      "from": [
+       "draft",
+       "rejected"
+      ],
+      "to": "cancelled"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

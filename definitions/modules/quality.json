@@ -1,0 +1,188 @@
+{
+ "id": "quality",
+ "name": "Quản lý chất lượng",
+ "description": "Kiểm tra chất lượng đầu vào/thành phẩm, ghi nhận sự không phù hợp.",
+ "category": "supply",
+ "version": "0.1.0",
+ "depends": [
+  "master-data",
+  "inventory"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "inspection",
+   "label": "Phiếu kiểm tra",
+   "fields": [
+    {
+     "name": "product",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.product"
+    },
+    {
+     "name": "source",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "source_id",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "qty",
+     "type": "number",
+     "required": true
+    },
+    {
+     "name": "warehouse",
+     "type": "ref",
+     "required": true,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "lot",
+     "type": "ref",
+     "required": false,
+     "ref": "inventory.lot"
+    },
+    {
+     "name": "unit_cost",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "note",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "pending",
+      "passed",
+      "failed"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "pending",
+    "actions": {
+     "passed": {
+      "from": [
+       "pending"
+      ],
+      "to": "passed"
+     },
+     "failed": {
+      "from": [
+       "pending"
+      ],
+      "to": "failed"
+     },
+     "retest": {
+      "from": [
+       "failed"
+      ],
+      "to": "pending"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "inspection_disposition",
+   "label": "Giải phóng một phần hàng QC",
+   "fields": [
+    { "name": "inspection", "type": "ref", "required": true, "ref": "quality.inspection" },
+    { "name": "qty", "type": "number", "required": true },
+    { "name": "note", "type": "text", "required": true },
+    { "name": "status", "type": "enum", "required": false, "options": ["draft", "posted", "cancelled"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "posted": { "from": ["draft"], "to": "posted" },
+     "cancelled": { "from": ["draft"], "to": "cancelled" }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "nonconformance",
+   "label": "Sự không phù hợp",
+   "fields": [
+    {
+     "name": "title",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "severity",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "minor",
+      "major",
+      "critical"
+     ]
+    },
+    {
+     "name": "description",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "inspection",
+     "type": "ref",
+     "required": false,
+     "ref": "quality.inspection"
+    },
+    {
+     "name": "source",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "source_id",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "open",
+      "closed"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "open",
+    "actions": {
+     "closed": {
+      "from": [
+       "open"
+      ],
+      "to": "closed"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

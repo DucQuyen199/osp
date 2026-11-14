@@ -1,0 +1,126 @@
+{
+ "id": "document",
+ "name": "Quản lý tài liệu",
+ "description": "Thư mục, tài liệu có phiên bản, yêu cầu ký.",
+ "category": "platform",
+ "version": "0.1.0",
+ "depends": [],
+ "core": false,
+ "entities": [
+  {
+   "name": "folder",
+   "label": "Thư mục",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "parent",
+     "type": "string",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "document",
+   "label": "Tài liệu",
+   "fields": [
+    {
+     "name": "title",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "folder",
+     "type": "ref",
+     "required": false,
+     "ref": "document.folder"
+    },
+    {
+     "name": "file_url",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "version",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "owner",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "tags",
+     "type": "json",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "signature_request",
+   "label": "Yêu cầu ký",
+   "fields": [
+    {
+     "name": "document",
+     "type": "ref",
+     "required": true,
+     "ref": "document.document"
+    },
+    {
+     "name": "signer_email",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "signer_name",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "pending",
+      "signed",
+      "declined"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "pending",
+    "actions": {
+     "signed": {
+      "from": [
+       "pending"
+      ],
+      "to": "signed"
+     },
+     "declined": {
+      "from": [
+       "pending"
+      ],
+      "to": "declined"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

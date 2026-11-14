@@ -1,0 +1,61 @@
+{
+ "id": "events-media",
+ "name": "Sự kiện - Truyền thông",
+ "description": "Tổ chức sự kiện, hội nghị, rạp/phòng trà, agency truyền thông.",
+ "modules": [
+  "events",
+  "crm",
+  "marketing",
+  "booking",
+  "contract",
+  "project",
+  "communication",
+  "accounting",
+  "einvoice",
+  "hrm",
+  "payroll",
+  "bi"
+ ],
+ "terminology": {
+  "master-data.party": "Khách mời/Khách hàng",
+  "master-data.product": "Gói dịch vụ",
+  "events.ticket": "Vé"
+ },
+ "customFields": {
+  "master-data.party": [
+   {
+    "name": "company",
+    "type": "string",
+    "required": false
+   },
+   {
+    "name": "vip_level",
+    "type": "string",
+    "required": false
+   }
+  ]
+ },
+ "roles": {
+  "box_office": {
+   "name": "Bán vé",
+   "permissions": [
+    "events.ticket.*",
+    "events.event.read"
+   ]
+  },
+  "producer": {
+   "name": "Sản xuất sự kiện",
+   "permissions": [
+    "events.*",
+    "project.*",
+    "contract.*"
+   ]
+  }
+ },
+ "kpis": [
+  "Tỷ lệ lấp đầy sự kiện",
+  "Doanh thu vé",
+  "Chi phí/khách",
+  "Tỷ lệ check-in"
+ ]
+}

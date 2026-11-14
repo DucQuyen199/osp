@@ -1,0 +1,165 @@
+{
+ "id": "communication",
+ "name": "Truyền thông & thông báo",
+ "description": "Kênh (email/SMS/Zalo/push/webhook), mẫu tin, nhật ký gửi. Tự ghi thông báo cho các sự kiện chính.",
+ "category": "platform",
+ "version": "0.1.0",
+ "depends": [
+  "master-data"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "channel",
+   "label": "Kênh",
+   "fields": [
+    {
+     "name": "kind",
+     "type": "enum",
+     "required": true,
+     "options": [
+      "email",
+      "sms",
+      "zalo",
+      "push",
+      "webhook"
+     ]
+    },
+    {
+     "name": "name",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "config",
+     "type": "json",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "template",
+   "label": "Mẫu tin",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "channel",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "body",
+     "type": "text",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "reminder",
+   "label": "Nhắc việc",
+   "fields": [
+    { "name": "party", "type": "ref", "required": true, "ref": "master-data.party" },
+    { "name": "channel", "type": "enum", "required": true, "options": ["email", "sms"] },
+    { "name": "subject", "type": "string", "required": false },
+    { "name": "body", "type": "text", "required": true },
+    { "name": "send_at", "type": "datetime", "required": true },
+    { "name": "status", "type": "enum", "required": false, "options": ["pending", "queued", "cancelled"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "pending",
+    "actions": {
+     "queued": { "from": ["pending"], "to": "queued" },
+     "cancelled": { "from": ["pending"], "to": "cancelled" }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "message_log",
+   "label": "Nhật ký gửi",
+    "systemManaged": true,
+   "fields": [
+    {
+     "name": "channel",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "recipient",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "subject",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "body",
+     "type": "text",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "source_event",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "queued",
+      "processing",
+      "retry",
+      "sent",
+      "failed"
+     ],
+     "system": true
+    },
+    {
+     "name": "attempts",
+     "type": "number",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "available_at",
+     "type": "datetime",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "last_error",
+     "type": "text",
+     "required": false,
+     "system": true
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

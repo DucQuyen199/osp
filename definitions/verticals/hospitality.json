@@ -1,0 +1,60 @@
+{
+ "id": "hospitality",
+ "name": "Khách sạn - Du lịch lưu trú",
+ "description": "Khách sạn, resort, homestay, nhà nghỉ.",
+ "modules": [
+  "hotel",
+  "restaurant",
+  "booking",
+  "pos",
+  "inventory",
+  "loyalty",
+  "communication",
+  "accounting",
+  "einvoice",
+  "hrm",
+  "payroll",
+  "bi"
+ ],
+ "terminology": {
+  "master-data.party": "Khách lưu trú",
+  "master-data.product": "Dịch vụ/Vật tư",
+  "master-data.branch": "Cơ sở lưu trú"
+ },
+ "customFields": {
+  "master-data.party": [
+   {
+    "name": "passport_no",
+    "type": "string",
+    "required": false
+   },
+   {
+    "name": "nationality",
+    "type": "string",
+    "required": false
+   }
+  ]
+ },
+ "roles": {
+  "front_desk": {
+   "name": "Lễ tân",
+   "permissions": [
+    "hotel.*",
+    "booking.*",
+    "master-data.party.*"
+   ]
+  },
+  "housekeeping": {
+   "name": "Buồng phòng",
+   "permissions": [
+    "hotel.room.*"
+   ]
+  }
+ },
+ "kpis": [
+  "Công suất phòng (OCC)",
+  "ADR",
+  "RevPAR",
+  "Doanh thu dịch vụ phụ trợ"
+ ]
+}

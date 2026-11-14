@@ -1,0 +1,177 @@
+{
+ "id": "maintenance",
+ "name": "Bảo trì",
+ "description": "Kế hoạch bảo trì định kỳ và yêu cầu sửa chữa cho tài sản/thiết bị.",
+ "category": "supply",
+ "version": "0.1.0",
+ "depends": [
+  "asset",
+  "inventory"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "maintenance_request",
+   "label": "Yêu cầu bảo trì",
+   "fields": [
+    {
+     "name": "asset",
+     "type": "ref",
+     "required": true,
+     "ref": "asset.asset"
+    },
+    {
+     "name": "source_plan",
+     "type": "ref",
+     "required": false,
+     "system": true,
+     "ref": "maintenance.maintenance_plan"
+    },
+    {
+     "name": "scheduled_for",
+     "type": "date",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "description",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "priority",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "low",
+      "normal",
+      "high"
+     ]
+    },
+    {
+     "name": "requested_by",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "warehouse",
+     "type": "ref",
+     "required": false,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "parts",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "labor_hours",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "labor_rate",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "resolution",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "open",
+      "in_progress",
+      "done",
+      "cancelled"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "open",
+    "actions": {
+     "started": {
+      "from": [
+       "open"
+      ],
+      "to": "in_progress"
+     },
+     "done": {
+      "from": [
+       "in_progress"
+      ],
+      "to": "done"
+     },
+     "cancelled": {
+      "from": [
+       "open",
+       "in_progress"
+      ],
+      "to": "cancelled"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "maintenance_plan",
+   "label": "Kế hoạch bảo trì",
+   "fields": [
+    {
+     "name": "asset",
+     "type": "ref",
+     "required": true,
+     "ref": "asset.asset"
+    },
+    {
+     "name": "title",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "interval_days",
+     "type": "number",
+     "required": true
+    },
+    {
+     "name": "next_due",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "last_completed",
+     "type": "date",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": ["active", "paused"]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "active",
+    "actions": {
+     "paused": {"from": ["active"], "to": "paused"},
+     "resumed": {"from": ["paused"], "to": "active"},
+     "due": {"from": ["active"], "to": "active"}
+    }
+   },
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

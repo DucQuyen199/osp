@@ -1,0 +1,216 @@
+{
+ "id": "clinic",
+ "name": "Phòng khám / Y tế",
+ "description": "Bệnh nhân, lượt khám, đơn thuốc, chỉ định xét nghiệm. Khám xong tự lập hóa đơn; phát thuốc tự trừ kho.",
+ "category": "industry",
+ "version": "0.1.0",
+ "depends": [
+  "master-data",
+  "inventory",
+  "accounting"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "patient",
+   "label": "Bệnh nhân",
+   "fields": [
+    {
+     "name": "party",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "dob",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "gender",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "male",
+      "female",
+      "other"
+     ]
+    },
+    {
+     "name": "blood_type",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "allergies",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "insurance_no",
+     "type": "string",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "encounter",
+   "label": "Lượt khám",
+   "fields": [
+    {
+     "name": "patient",
+     "type": "ref",
+     "required": true,
+     "ref": "clinic.patient"
+    },
+    {
+     "name": "party",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "doctor",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "complaint",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "diagnosis",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "fee",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "open",
+      "completed"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "open",
+    "actions": {
+     "completed": {
+      "from": [
+       "open"
+      ],
+      "to": "completed"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "prescription",
+   "label": "Đơn thuốc",
+   "fields": [
+    {
+     "name": "encounter",
+     "type": "ref",
+     "required": true,
+     "ref": "clinic.encounter"
+    },
+    {
+     "name": "warehouse",
+     "type": "ref",
+     "required": false,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "items",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "dispensed"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "dispensed": {
+      "from": [
+       "draft"
+      ],
+      "to": "dispensed"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "lab_order",
+   "label": "Chỉ định xét nghiệm",
+   "fields": [
+    {
+     "name": "encounter",
+     "type": "ref",
+     "required": true,
+     "ref": "clinic.encounter"
+    },
+    {
+     "name": "test",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "result",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "ordered",
+      "resulted"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "ordered",
+    "actions": {
+     "resulted": {
+      "from": [
+       "ordered"
+      ],
+      "to": "resulted"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

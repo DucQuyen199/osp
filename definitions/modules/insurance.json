@@ -1,0 +1,182 @@
+{
+  "id": "insurance",
+  "name": "Bảo hiểm",
+  "description": "Hợp đồng bảo hiểm và bồi thường. Kích hoạt tự thu phí; chi bồi thường tự ghi bút toán.",
+  "category": "industry",
+  "version": "0.1.0",
+  "depends": [
+    "master-data",
+    "accounting"
+  ],
+  "core": false,
+  "entities": [
+    {
+      "name": "policy",
+      "label": "Hợp đồng bảo hiểm",
+      "fields": [
+        {
+          "name": "number",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "party",
+          "type": "ref",
+          "required": true,
+          "ref": "master-data.party"
+        },
+        {
+          "name": "product",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "premium",
+          "type": "money",
+          "required": true
+        },
+        {
+          "name": "coverage_limit",
+          "type": "money",
+          "required": true
+        },
+        {
+          "name": "start_date",
+          "type": "date",
+          "required": false
+        },
+        {
+          "name": "end_date",
+          "type": "date",
+          "required": false
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "quoted",
+            "active",
+            "lapsed",
+            "cancelled"
+          ]
+        }
+      ],
+      "states": {
+        "field": "status",
+        "initial": "quoted",
+        "actions": {
+          "activated": {
+            "from": [
+              "quoted"
+            ],
+            "to": "active"
+          },
+          "lapsed": {
+            "from": [
+              "active"
+            ],
+            "to": "lapsed"
+          },
+          "cancelled": {
+            "from": [
+              "quoted",
+              "active"
+            ],
+            "to": "cancelled"
+          }
+        }
+      },
+      "computed": {},
+      "constraints": []
+    },
+    {
+      "name": "claim",
+      "label": "Bồi thường",
+      "fields": [
+        {
+          "name": "number",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "policy",
+          "type": "ref",
+          "required": true,
+          "ref": "insurance.policy"
+        },
+        {
+          "name": "amount",
+          "type": "money",
+          "required": true
+        },
+        {
+          "name": "incident_date",
+          "type": "date",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false
+        },
+        {
+          "name": "expense_account",
+          "type": "ref",
+          "required": false,
+          "ref": "accounting.account"
+        },
+        {
+          "name": "method",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "cash",
+            "bank"
+          ]
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "submitted",
+            "approved",
+            "rejected",
+            "paid"
+          ]
+        }
+      ],
+      "states": {
+        "field": "status",
+        "initial": "submitted",
+        "actions": {
+          "approved": {
+            "from": [
+              "submitted"
+            ],
+            "to": "approved"
+          },
+          "rejected": {
+            "from": [
+              "submitted"
+            ],
+            "to": "rejected"
+          },
+          "paid": {
+            "from": [
+              "approved"
+            ],
+            "to": "paid"
+          }
+        }
+      },
+      "computed": {},
+      "constraints": []
+    }
+  ],
+  "rules": [],
+  "seeds": [],
+  "publishes": [],
+  "jobs": []
+}

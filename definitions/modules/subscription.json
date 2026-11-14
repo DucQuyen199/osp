@@ -1,0 +1,178 @@
+{
+ "id": "subscription",
+ "name": "Gói thuê bao & thu phí định kỳ",
+ "description": "Gói dịch vụ, thuê bao, chu kỳ thanh toán. Đến hạn thu phí sẽ tự lập hóa đơn.",
+ "category": "sales",
+ "version": "0.1.0",
+ "depends": [
+  "master-data",
+  "accounting"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "plan",
+   "label": "Gói dịch vụ",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "price",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "interval",
+     "type": "enum",
+     "required": true,
+     "options": [
+      "monthly",
+      "quarterly",
+      "yearly"
+     ]
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "subscription",
+   "label": "Thuê bao",
+   "fields": [
+    {
+     "name": "party",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "plan",
+     "type": "ref",
+     "required": true,
+     "ref": "subscription.plan"
+    },
+    {
+     "name": "start",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "active",
+      "paused",
+      "cancelled"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "active",
+    "actions": {
+     "paused": {
+      "from": [
+       "active"
+      ],
+      "to": "paused"
+     },
+     "resumed": {
+      "from": [
+       "paused"
+      ],
+      "to": "active"
+     },
+     "cancelled": {
+      "from": [
+       "active",
+       "paused"
+      ],
+      "to": "cancelled"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "billing_cycle",
+   "label": "Kỳ thanh toán",
+   "fields": [
+    {
+     "name": "subscription",
+     "type": "ref",
+     "required": true,
+     "ref": "subscription.subscription"
+    },
+    {
+     "name": "party",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "amount",
+     "type": "money",
+     "required": true
+    },
+    {
+     "name": "due_date",
+     "type": "date",
+      "required": true
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "pending",
+      "due",
+      "paid",
+      "cancelled"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "pending",
+    "actions": {
+     "due": {
+      "from": [
+       "pending"
+      ],
+      "to": "due"
+     },
+     "paid": {
+      "from": [
+       "due"
+      ],
+      "to": "paid"
+     },
+     "cancelled": {
+      "from": [
+       "pending"
+      ],
+      "to": "cancelled"
+     },
+     "reinstated": {
+      "from": [
+       "cancelled"
+      ],
+      "to": "pending"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

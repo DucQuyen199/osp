@@ -1,0 +1,158 @@
+{
+ "id": "recruitment",
+ "name": "Tuyển dụng",
+ "description": "Tin tuyển dụng, ứng viên, hồ sơ ứng tuyển. Trúng tuyển tự tạo hồ sơ nhân viên.",
+ "category": "people",
+ "version": "0.1.0",
+ "depends": [
+  "hrm"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "job_opening",
+   "label": "Vị trí tuyển",
+   "fields": [
+    {
+     "name": "title",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "department",
+     "type": "ref",
+     "required": false,
+     "ref": "hrm.department"
+    },
+    {
+     "name": "position",
+     "type": "ref",
+     "required": false,
+     "ref": "hrm.position"
+    },
+    {
+     "name": "headcount",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "open",
+      "closed"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "open",
+    "actions": {
+     "closed": {
+      "from": [
+       "open"
+      ],
+      "to": "closed"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "candidate",
+   "label": "Ứng viên",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "email",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "phone",
+     "type": "string",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "application",
+   "label": "Hồ sơ ứng tuyển",
+   "fields": [
+    {
+     "name": "job",
+     "type": "ref",
+     "required": true,
+     "ref": "recruitment.job_opening"
+    },
+    {
+     "name": "candidate",
+     "type": "ref",
+     "required": true,
+     "ref": "recruitment.candidate"
+    },
+    {
+     "name": "candidate_name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "stage",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "rejected",
+      "applied",
+      "hired"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "applied": {
+      "from": [
+       "draft",
+       "rejected"
+      ],
+      "to": "applied"
+     },
+     "hired": {
+      "from": [
+       "applied"
+      ],
+      "to": "hired"
+     },
+     "rejected": {
+      "from": [
+       "applied"
+      ],
+      "to": "rejected"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

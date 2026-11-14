@@ -1,0 +1,179 @@
+{
+ "id": "marketing",
+ "name": "Marketing",
+ "description": "Chiến dịch, phân khúc khách hàng, nội dung. Nền để gắn nguồn lead và đo hiệu quả theo chiến dịch.",
+ "category": "sales",
+ "version": "0.1.0",
+ "depends": [
+  "master-data",
+  "crm",
+  "accounting"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "campaign",
+   "label": "Chiến dịch",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "channel",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "email",
+      "sms",
+      "zalo",
+      "facebook",
+      "google",
+      "offline"
+     ]
+    },
+    {
+     "name": "budget",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "start",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "end",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "planned",
+      "launched",
+      "completed"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "planned",
+    "actions": {
+     "launched": {
+      "from": [
+       "planned"
+      ],
+      "to": "launched"
+     },
+     "completed": {
+      "from": [
+       "launched"
+      ],
+      "to": "completed"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "segment",
+   "label": "Phân khúc",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "criteria",
+     "type": "json",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "content_asset",
+   "label": "Nội dung",
+   "fields": [
+    {
+     "name": "title",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "kind",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "url",
+     "type": "string",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "campaign_member",
+   "label": "Lead thuộc chiến dịch",
+   "fields": [
+    {
+     "name": "campaign",
+     "type": "ref",
+     "required": true,
+     "ref": "marketing.campaign"
+    },
+    {
+     "name": "lead",
+     "type": "ref",
+     "required": true,
+     "ref": "crm.lead"
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "campaign_cost",
+   "label": "Chi phí chiến dịch",
+   "fields": [
+    {
+     "name": "campaign",
+     "type": "ref",
+     "required": true,
+     "ref": "marketing.campaign"
+    },
+    {
+     "name": "bill",
+     "type": "ref",
+     "required": true,
+     "ref": "accounting.bill"
+    },
+    {
+     "name": "allocated_amount",
+     "label": "Số tiền gốc phân bổ",
+     "type": "money",
+     "required": true
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

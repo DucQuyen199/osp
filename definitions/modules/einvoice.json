@@ -1,0 +1,174 @@
+{
+ "id": "einvoice",
+ "name": "Hóa đơn điện tử",
+ "description": "Tạo yêu cầu phát hành khi hóa đơn kế toán ghi sổ; worker Rust phát hành hoặc hủy qua provider HTTPS đã cấu hình và lưu kết quả trong PostgreSQL.",
+ "category": "finance",
+ "version": "0.1.0",
+ "depends": [
+  "accounting"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "einvoice",
+   "label": "Hóa đơn điện tử",
+   "fields": [
+    {
+     "name": "invoice",
+     "type": "ref",
+     "required": true,
+     "ref": "accounting.invoice",
+     "system": true
+    },
+    {
+     "name": "provider",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "serial",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "number",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "lookup_code",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "request_payload",
+     "type": "json",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "provider_reference",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "provider_error",
+     "type": "text",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "lease_until",
+     "type": "datetime",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "lease_token",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "operation",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "issue",
+      "cancel"
+     ],
+     "system": true
+    },
+    {
+     "name": "provider_response",
+     "type": "json",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "cancellation_response",
+     "type": "json",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "cancellation_reason",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "attempt_history",
+     "type": "json",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "attempts",
+     "type": "number",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "pending",
+      "cancellation_pending",
+      "issued",
+      "cancelled",
+      "failed"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "pending",
+    "actions": {
+     "issued": {
+      "from": [
+       "pending"
+      ],
+      "to": "issued"
+     },
+     "cancel_requested": {
+      "from": [
+       "issued"
+      ],
+      "to": "cancellation_pending"
+     },
+     "cancelled": {
+      "from": [
+       "cancellation_pending"
+      ],
+      "to": "cancelled"
+     },
+     "failed": {
+      "from": [
+       "pending",
+       "cancellation_pending"
+      ],
+      "to": "failed"
+     },
+     "retry": {
+      "from": [
+       "failed"
+      ],
+      "to": "pending"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

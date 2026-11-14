@@ -1,0 +1,189 @@
+{
+ "id": "pos",
+ "name": "POS - Bán lẻ tại quầy",
+ "description": "Ca bán hàng và đơn bán tại quầy. Hoàn tất đơn sẽ trừ kho, ghi nhận thanh toán và tích điểm khách hàng thân thiết.",
+ "category": "sales",
+ "version": "0.2.0",
+ "depends": [
+  "master-data",
+  "inventory",
+  "accounting"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "pos_session",
+   "label": "Ca bán hàng",
+   "fields": [
+    {
+     "name": "branch",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.branch"
+    },
+    {
+     "name": "cashier",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "opening_cash",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "closing_cash",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "expected_cash",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "cash_difference",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "open",
+      "closed"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "open",
+    "actions": {
+     "closed": {
+      "from": [
+       "open"
+      ],
+      "to": "closed"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "pos_order",
+   "label": "Đơn POS",
+   "fields": [
+    {
+     "name": "party",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "branch",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.branch"
+    },
+    {
+     "name": "warehouse",
+     "type": "ref",
+     "required": true,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "session",
+     "type": "ref",
+     "required": false,
+     "ref": "pos.pos_session"
+    },
+    {
+     "name": "refund_session",
+     "type": "ref",
+     "required": false,
+     "ref": "pos.pos_session",
+     "system": true
+    },
+    {
+     "name": "lines",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "total",
+     "type": "money",
+    "required": false,
+    "system": true
+    },
+    {
+     "name": "method",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "cash",
+      "card",
+      "transfer",
+      "ewallet"
+     ]
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "open",
+      "completed",
+      "refunded"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "open",
+    "actions": {
+     "completed": {
+      "from": [
+       "open"
+      ],
+      "to": "completed"
+     },
+     "refunded": {
+      "from": [
+       "completed"
+      ],
+      "to": "refunded"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "cash_movement",
+   "label": "Phiếu thu chi quỹ tiền mặt",
+   "fields": [
+    { "name": "session", "type": "ref", "required": true, "ref": "pos.pos_session" },
+    { "name": "direction", "type": "enum", "required": true, "options": ["cash_in", "cash_out"] },
+    { "name": "amount", "type": "money", "required": true },
+    { "name": "offset_account", "type": "ref", "required": true, "ref": "accounting.account" },
+    { "name": "reason", "type": "text", "required": true },
+    { "name": "status", "type": "enum", "required": false, "options": ["draft", "posted"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": { "posted": { "from": ["draft"], "to": "posted" } }
+   },
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

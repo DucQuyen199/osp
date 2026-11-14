@@ -1,0 +1,61 @@
+{
+ "id": "home-services",
+ "name": "Dịch vụ tại nhà - Sửa chữa",
+ "description": "Điện lạnh, sửa chữa, vệ sinh, bảo trì, lắp đặt tại nhà khách.",
+ "modules": [
+  "field-service",
+  "booking",
+  "helpdesk",
+  "crm",
+  "inventory",
+  "loyalty",
+  "communication",
+  "accounting",
+  "einvoice",
+  "hrm",
+  "payroll",
+  "bi"
+ ],
+ "terminology": {
+  "master-data.party": "Khách hàng",
+  "master-data.product": "Vật tư/Dịch vụ",
+  "field-service.work_order": "Lệnh công việc"
+ },
+ "customFields": {
+  "master-data.party": [
+   {
+    "name": "service_address",
+    "type": "string",
+    "required": false
+   },
+   {
+    "name": "access_note",
+    "type": "string",
+    "required": false
+   }
+  ]
+ },
+ "roles": {
+  "technician": {
+   "name": "Kỹ thuật viên",
+   "permissions": [
+    "field-service.work_order.*",
+    "inventory.stock_level.read"
+   ]
+  },
+  "dispatcher": {
+   "name": "Điều phối",
+   "permissions": [
+    "field-service.*",
+    "booking.*",
+    "helpdesk.*"
+   ]
+  }
+ },
+ "kpis": [
+  "Tỷ lệ xử lý lần đầu",
+  "Thời gian đến hiện trường",
+  "Doanh thu/kỹ thuật viên",
+  "Mức độ hài lòng"
+ ]
+}

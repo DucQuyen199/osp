@@ -1,0 +1,68 @@
+{
+ "id": "fnb",
+ "name": "Nhà hàng - Quán cà phê (F&B)",
+ "description": "Nhà hàng, quán cà phê, chuỗi đồ uống, bếp trung tâm.",
+ "modules": [
+  "restaurant",
+  "pos",
+  "inventory",
+  "purchasing",
+  "loyalty",
+  "booking",
+  "communication",
+  "accounting",
+  "einvoice",
+  "hrm",
+  "payroll",
+  "bi"
+ ],
+ "terminology": {
+  "master-data.party": "Thực khách",
+  "master-data.product": "Món/Nguyên liệu",
+  "restaurant.table_order": "Order bàn"
+ },
+ "customFields": {
+  "master-data.product": [
+   {
+    "name": "allergens",
+    "type": "string",
+    "required": false
+   },
+   {
+    "name": "prep_time_min",
+    "type": "number",
+    "required": false
+   }
+  ]
+ },
+ "roles": {
+  "waiter": {
+   "name": "Phục vụ",
+   "permissions": [
+    "restaurant.table_order.*",
+    "restaurant.table.read",
+    "restaurant.menu_item.read"
+   ]
+  },
+  "kitchen": {
+   "name": "Bếp",
+   "permissions": [
+    "restaurant.kitchen_ticket.*",
+    "restaurant.recipe.read"
+   ]
+  },
+  "cashier": {
+   "name": "Thu ngân",
+   "permissions": [
+    "pos.*",
+    "restaurant.table_order.*"
+   ]
+  }
+ },
+ "kpis": [
+  "Doanh thu theo ca",
+  "Thời gian lên món",
+  "Food cost %",
+  "Số lượt khách/bàn"
+ ]
+}

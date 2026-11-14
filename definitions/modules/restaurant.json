@@ -1,0 +1,251 @@
+{
+ "id": "restaurant",
+ "name": "Nhà hàng / F&B",
+ "description": "Bàn, thực đơn, công thức, order tại bàn, màn hình bếp. Gửi bếp tự tạo phiếu bếp; thanh toán tự trừ kho và ghi thu.",
+ "category": "industry",
+ "version": "0.2.0",
+ "depends": [
+  "master-data",
+  "inventory",
+  "accounting"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "table",
+   "label": "Bàn",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "seats",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "branch",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.branch"
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "menu_item",
+   "label": "Món",
+   "fields": [
+    {
+     "name": "product",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.product"
+    },
+    {
+     "name": "station",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "kitchen",
+      "bar"
+     ]
+    },
+    {
+     "name": "available",
+     "type": "bool",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "recipe",
+   "label": "Công thức",
+   "fields": [
+    {
+     "name": "product",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.product"
+    },
+    {
+     "name": "ingredients",
+     "type": "json",
+     "required": true
+    },
+    {
+     "name": "output_qty",
+     "type": "number",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "table_order",
+   "label": "Order bàn",
+   "fields": [
+    {
+     "name": "table",
+     "type": "ref",
+     "required": false,
+     "ref": "restaurant.table"
+    },
+    {
+     "name": "party",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "warehouse",
+     "type": "ref",
+     "required": false,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "method",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "cash",
+      "card",
+      "transfer",
+      "ewallet"
+     ]
+    },
+    {
+     "name": "lines",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "consumptions",
+     "type": "json",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "open",
+      "sent",
+      "served",
+      "completed",
+      "cancelled"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "open",
+    "actions": {
+     "sent": {
+      "from": [
+       "open"
+      ],
+      "to": "sent"
+     },
+     "served": {
+      "from": [
+       "sent"
+      ],
+      "to": "served"
+     },
+     "completed": {
+      "from": [
+       "served"
+      ],
+      "to": "completed"
+     },
+     "cancelled": {
+      "from": [
+       "open",
+       "sent"
+      ],
+      "to": "cancelled"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "kitchen_ticket",
+   "label": "Phiếu bếp",
+   "fields": [
+    {
+     "name": "order",
+     "type": "ref",
+     "required": true,
+     "ref": "restaurant.table_order"
+    },
+    {
+     "name": "station",
+     "type": "enum",
+     "required": true,
+     "options": [
+      "kitchen",
+      "bar"
+     ]
+    },
+    {
+     "name": "lines",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "queued",
+      "preparing",
+      "ready"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "queued",
+    "actions": {
+     "preparing": {
+      "from": [
+       "queued"
+      ],
+      "to": "preparing"
+     },
+     "ready": {
+      "from": [
+       "preparing"
+      ],
+      "to": "ready"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

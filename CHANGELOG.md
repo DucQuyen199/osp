@@ -1,0 +1,397 @@
+﻿# Changelog
+
+Định dạng theo [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/); phiên bản theo [SemVer](https://semver.org/lang/vi/). Design system có phiên bản riêng (hiện v1.0), ghi chung ở đây.
+
+## [Unreleased]
+### Changed
+- Replaced synchronous handwritten static serving, URL decoding, fixed-window IP counters, request IDs, security headers and request logging with Axum method routes, Tower/Tower HTTP streaming and middleware, `url`/`percent-encoding`, and concurrent Governor GCRA quotas. Public assets support gzip, HEAD, byte ranges and Last-Modified/304; authenticated data stays uncompressed and non-cacheable.
+- Unified null/omitted document validation across create and PostgreSQL lifecycle reads while preserving explicit null patches for immutable-field guards.
+- Made scheduler failure retries, attempt counts, audit records and resolved state atomic under the tenant transaction, including competing retry callers.
+- Aligned PostgreSQL session dates with UTC domain guards, defaulted omitted invoice tax to zero before currency snapshots, and posted invoice/bill journals using their issue date so closed periods cannot be bypassed by backdating.
+- Fixed manufacturing completion defaults and nullable product tracking, canonical UUID duplicate detection in bulk actions, strict date validation, and JSON imports that previously discarded non-object rows.
+- Fixed PostgreSQL payroll aggregation grouping so attendance and approved overtime can actually produce payslips. Added financial lifecycle scenarios for fixed assets, employee reimbursements and payroll, including balanced posting and duplicate-operation guards.
+- Updated demo orders, inventory warehouse links, POS sessions and purchasing submission to satisfy current Rust workflows; corrected UI test expectations and isolated Windows PostgreSQL teardown.
+- Reserved 8 MiB Tokio worker stacks for nested ERP workflows on Windows, boxed event composition boundaries, skipped missed background ticks and added graceful SIGTERM shutdown for Linux deployment.
+- Inventory replenishment now nets purchase-order quantities against each linked requisition by product and warehouse, preserving the residual demand when only part of a requisition is ordered.
+- Split accounting source-document ledger events into focused Rust invoice, bill, adjustment-note, journal-reversal, and return workflows behind the existing dispatcher.
+- Split inventory stock-movement preparation into source-specific costing and lot-availability workflows, while retaining one kernel transaction for stock locks, traceability, and valuation.
+- Split bank statement import into a small Rust application facade, CSV and CAMT.053 parsers, shared line model, and transactional persistence workflow.
+- Split the accounting application facade into focused account resolution, idempotent journal posting, and manufacturing scrap posting modules while preserving the existing context API and transaction ownership.
+- Split inventory event handling into focused transfer/count and source-stock workflows behind the existing application facade.
+- Split inventory preparation into tracked-line normalization and stock-movement valuation workflows, preserving the existing application facade.
+- Split the fixed-asset application layer into focused asset, depreciation, capitalization, disposal, and posting workflows behind its existing facade; accounting event handlers remain idempotent and use the caller transaction.
+- Split accounting payment persistence validation behind its existing facade into invoice/bill settlement, refunds, source payments, and default-account checks while retaining Decimal validation and kernel transaction ownership.
+
+### Added
+- Added database-independent HTTP and Decimal/domain regression suites. Updated PostgreSQL flows for receipt/QC inventory, POS sessions, production acceptance, subscription renewal, strict HTTP import/bulk actions, and list contracts for all 177 entities across 49 modules and 22 industry packs.
+- Added `npm run test:container` for an isolated Linux Compose deployment, transactional sales smoke test and real PostgreSQL backup/restore rehearsal; test credentials and resources are scoped to a unique disposable project.
+- Added tenant-authorized ISO 20022 CAMT.053 statement-file imports through Rust, with bounded XML parsing, currency/date checks, idempotent references, and OpenAPI documentation.
+- Added direct SMTP email delivery over implicit TLS or required STARTTLS for authentication and communication queues, while retaining the HTTP provider and separating raw account email recipients from tenant party lookup.
+- Added selectable Vietnam accounting chart templates for TT99/2025 and TT133/2016, with tenant-level standard locking, additive chart creation, existing-account preservation, accounting reports integration, API documentation, and 911 clearing-account handling.
+- Expanded TT99/2025 and TT133/2016 chart templates with annex-listed detail accounts, tenant-scoped parent links, additive application, and mismatch reporting while preserving existing accounts.
+- Split Quality persistence validation for partial inspection releases into its own focused workflow module, leaving the entity dispatcher as a small facade.
+- Added a Rust fixed-asset depreciation forecast report and React page for 1–36 months, sharing the posting calculation policy and creating no accounting documents.
+- Added atomic Rust bulk workflow actions for stateful entities, with action-level authorization and per-record business validation, tenant transaction rollback on any failure, a 100-record cap, generated OpenAPI, and selectable React list rows.
+- Split the cross-module event composition root into focused inventory/order, support, and finance/commerce dispatchers; removed a duplicate LMS progress handler so a lesson event is delivered once per transaction.
+- Saved BI reports now export all matching detail or aggregate rows to tenant-scoped CSV, with server-side read authorization, a 50,000-row cap, audit logging, and spreadsheet formula-injection protection.
+- Optional budget control now checks expense journal postings against approved monthly/yearly account and department allocations, using period locks to serialize concurrent postings; tenant admins can enable it in settings.
+- Bank statements now record their currency and each line's transaction-date exchange-rate snapshot and base-currency amount; reconciliation checks both the payment's foreign amount/currency and the posted journal's base-currency movement.
+- Audit rows now use tenant-enforced RLS and PostgreSQL append-only triggers; failed-login and export entries use tenant-scoped write transactions, and tenant deletion removes audit rows through an FK cascade.
+- Accounting journal invariants, source-document postings, refunds/reversals, manufacturing scrap valuation, trial balance, financial statements, aging, cash-flow forecasting, and FX revaluation now use checked Decimal arithmetic from validation through JSON output.
+- Accounting settlement journal preparation now uses Decimal end to end for payroll and expense accruals, contribution remittances, cash movements, loans, charity disbursements, and payment FX differences.
+- Accounting invoice, bill, adjustment-note and payment currency snapshots now load exchange rates as Decimal and convert source amounts without float arithmetic.
+- Accounting tax-register base/tax totals, exchange-rate conversions, rate buckets and exported document values now aggregate and serialize as Decimal.
+- Bank statement CSV import, matching/reconciliation, journal reversal validation and inventory valuation postings now use shared Rust decimal amounts instead of float-based money comparisons.
+- Accounting invoice, bill, and return-note posting checks now use Decimal for credit exposure, source-order lines, settlement coverage and adjustment caps; credit limits compare base-currency invoice totals consistently.
+- Accounting payment validation now compares PostgreSQL numeric balances and source-document amounts with Rust Decimal, including refunds, payroll payments, donations and order settlement.
+- Split accounting persistence validation into focused payment-source and posted-document modules while keeping the public facade and caller transaction unchanged.
+- Split Master Data persistence checks into focused credit-limit, product, uniqueness, currency-rate, and category-tree workflows; currency/tax values and credit exposure now use Decimal.
+- Split Sales application and persistence into focused document, fulfillment, order, price-list, and return workflows behind the existing bounded-context facade.
+- Split HRM persistence into attendance, employee/salary, leave, and organization/calendar workflows behind the existing module facade.
+- Split ledger settlement posting into focused disbursement, payroll/expense, and provider-payment event handlers behind the existing accounting event facade.
+- Maintenance plan intervals, service quantities, labor hours and labor rates now use Decimal; due-date scheduling reads PostgreSQL numeric values as text.
+- Case Management billable hours, rates, fees and daily-hour aggregates now use Decimal while retaining the existing two-decimal fee rounding policy.
+- Payment transaction amounts and provider refund postings now use checked Decimal values through accounting events.
+- Approval thresholds are validated and compared as PostgreSQL numeric values from exact Decimal input; duplicate thresholds use numeric equality.
+- Recruitment headcount limits and candidate-to-hire capacity checks now use exact integer-valued Decimal comparisons.
+- Document version increments now validate and compare through Decimal instead of floating-point values.
+- Shared computed expressions, rule increments, schema minimums, numeric imports, and BI KPI formulas now calculate with Decimal; accounting balance reconciliation and sales/purchasing previews no longer aggregate through float.
+- Notification retry counters now remain integer-valued end to end; API token lifetimes parse decimal day input into exact whole seconds.
+- Sales line discounts, tax, net, line totals and header totals now use base-10 decimal arithmetic with four-decimal rounding instead of binary floating-point calculations.
+- Purchasing order, receipt, and return line amounts, tax and document totals now use the same shared Rust decimal calculation as sales.
+- POS, ecommerce, restaurant, field-service, automotive repair, project timesheet and expense-claim totals now use shared decimal arithmetic.
+- POS expected cash and closing variance now use decimal amounts from PostgreSQL numeric aggregates rather than float8 sums.
+- Payroll monthly salary, overtime, tax, contributions, gross, deductions, net pay and payroll-run totals now use checked Decimal arithmetic; payroll calculation and payslip persistence checks live in focused modules.
+- Split payroll domain policy/lifecycle invariants and payroll-run/payslip persistence checks into focused modules behind the existing module facade.
+- Fixed-asset capitalization, monthly depreciation, disposal and book-value updates now use checked Decimal amounts through their accounting journal entries.
+- Sales credit exposure, stock commitments, delivered quantities, return eligibility and tax/price snapshots now use Decimal across application and persistence workflows.
+- Purchasing order/receipt progress, quality-inspection dispositions, supplier returns and source-price matching now use Decimal throughout application and persistence workflows.
+- Quality inspection quantities, partial releases, returned quantities, held stock and purchase-source matching now use Decimal with PostgreSQL numeric text parsing.
+- Inventory stock counts, availability and commitments, lot/FEFO allocation, FIFO layers, held-stock reconciliation, movement valuation and replenishment reports now use Decimal; the application layer is split into focused count, event, preparation, movement and valuation workflows.
+- Lending principal, rates, amortization schedules, repayment matching and persisted terms now use Decimal; annuity generation lives in the focused `domain/installments.rs` policy module.
+- Utility meter readings, consumption snapshots, rate capture, billing totals and prior-period comparison now use Decimal through domain validation, application preparation and persistence checks.
+- Manufacturing BOM ratios, planned/good/scrap quantities, work-center capacity, WIP valuation and ledger reconciliation now use Decimal across domain, application, persistence and reports.
+- Logistics shipment quantities, source-order reservations, vehicle capacity, captured product weights and shipment weight checks now use Decimal across application and persistence.
+- Ticket tax snapshots, published ticket prices, cash-session values and POS order validations use Decimal with checked JSON-number serialization.
+- Subscription plan prices and recurring billing-cycle snapshots now use Decimal from PostgreSQL numeric text through persistence matching and invoice-cycle creation.
+- Booking service prices and durations, plus insurance premiums, coverage limits and cumulative claim caps, now use Decimal without floating-point conversions.
+- Construction BOQ and subcontract budget checks now use Decimal, with persistence separated into BOQ, site/diary, and subcontract workflows.
+- Budget approval now reconciles planned lines with checked Decimal totals; the variance report calculates expense/revenue variance, utilization, and summaries in Rust Decimal.
+- CRM deal amounts, pipeline probabilities, weighted forecasts, and stage totals now use Decimal from PostgreSQL reads through report JSON.
+- HRM leave entitlement/reservation and salary-change checks now compare PostgreSQL numeric text with Decimal; year and dependent counts use integer values.
+- Hotel nightly rates, folio charges, reservation totals, and checkout updates now use Decimal through persistence, invoice event preparation, and JSON snapshots.
+- Restaurant recipe output ratios, order quantities, and inventory consumption snapshots now use checked Decimal arithmetic; menu pricing and order totals use the same exact-decimal pipeline.
+- Automotive repair validation now checks part quantities, prices, invoice totals, and monotonic odometer readings with Decimal across domain and tenant-scoped persistence.
+- Employee expense-item validation now uses Decimal consistently with the Rust claim-total preparation and accounting posting.
+- Project budgets, timesheet hours/rates, and derived amounts now validate with Decimal; School tuition, fees, grades, and capacity checks use exact decimals or integer counts; Loyalty earning and cumulative return reversals now use Decimal.
+- Performance key-result targets/current values and review scores now validate with Decimal ranges.
+- Charity donation receipts, program budgets, disbursement caps, and generated accounting payment amounts now use Decimal across domain, application, and tenant-scoped persistence; persistence is split by workflow and owns the paid-disbursement lookup.
+- Purchasing persistence now separates receipt/order matching and purchase-return inspection checks into focused workflow modules behind the existing facade.
+- Documented the bounded-context module contract, layer responsibilities, tenant-scoped persistence rules, Decimal policy, and use-case-based submodule structure.
+- Added deterministic bank-statement auto-matching when one unused posted journal uniquely matches transaction date, bank direction, and amount; ambiguous and unmatched lines still require an explicit selection.
+- Manufacturing orders now issue BOM-scaled materials when production starts; WIP reports include in-progress orders until QC passes and finished goods enter inventory.
+- Added tenant-scoped production work-center scheduling with per-day capacity enforcement, serialized load checks, capacity-reduction validation, and historical reference protection.
+- Moved purchasing order, receipt, and return totals from catalog expressions to Rust document preparation and marked totals as system-managed fields.
+- Moved sales quotation, order, and return totals into Rust document preparation; header totals are now system-managed and unavailable for client override.
+- Moved project timesheet amount calculation into Rust and marked the resulting amount as a system-managed field.
+- Moved employee expense-claim totals fully to Rust document preparation and removed the catalog expression that duplicated it.
+- Moved automotive repair-order totals into Rust preparation and marked the financial total as system-managed.
+- Moved POS and restaurant order totals plus payroll net pay into their Rust application workflows; removed duplicate catalog formulas and made order totals system-managed.
+- Moved fixed-asset book value into Rust asset preparation and depreciation posting so the stored value stays synchronized with accumulated depreciation.
+- Moved field-service work-order totals into Rust preparation for create, update, and action workflows; totals are system-managed and no longer calculated by the catalog.
+- Ecommerce cart preparation now prices product lines from the tenant storefront price list or product catalog, persists the server-derived total, and refreshes both on create, update, and placement.
+- Added an idempotent foreign-currency revaluation journal draft per accounting date, with closing-rate/amount snapshots on journal lines, carry-forward of active prior adjustments, closed-period checks, and posting through normal journal approval.
+- Added partial payroll contribution remittances with month/policy locking, outstanding-liability reservation and validation, cancellation of unpaid approvals, and idempotent accounting payments posting liability against cash or bank.
+- Added effective-dated payroll contribution policies with configurable bases, caps, employee/employer rates and accounting accounts; payslips snapshot each share, taxable-base treatment is configurable, and accrual journals post both employee liability and employer expense.
+- Added approved payroll overtime entries with tenant-serialized month locking, employment-date validation, salary-based weighted-hour valuation, and immutable payslip snapshots; payroll periods now capture configurable standard hours per workday.
+- Added tenant-configurable effective-dated payroll tax policies, resident progressive brackets, nonresident rates and allowances; employee tax profiles and payslip tax snapshots; payroll accruals now credit withholding to the configured liability account.
+- Added half-day HRM leave requests with same-day validation, approval and attendance coexistence rules, 0.5-day leave-allocation reservations, and fractional payroll paid-day snapshots.
+- Added effective HRM employee termination dates with tenant-transaction validation; payroll now includes final-period work, approved paid leave, and paid holidays only inside each employee's employment interval.
+- Added a Rust foreign-currency receivable/payable revaluation preview with as-of payment and adjustment balances, saved closing-rate lookup, carrying amounts, and proposed adjustment by asset/liability direction; the preview can now create an audited draft journal.
+- Added provider injection for the e-invoice worker, passing tenant identity to vendor adapters so credentials and routing can be selected per business.
+- Changed generated Rust module scaffolds to fail closed in domain, application, and persistence hooks until their business policies are implemented.
+- Added a durable Rust e-invoice worker with tenant-scoped PostgreSQL leases, idempotent HTTPS issue/cancellation calls, audited state transitions, runtime configuration, and bounded provider responses.
+- Added Rust booking action windows and a scheduled no-show transition: confirmation must precede the appointment, check-in is limited to the appointment interval, and a confirmed booking becomes no-show after its end time.
+- Added configurable event-ticket reservation expiry (5–60 minutes, 15-minute default), Rust scheduler release of expired holds, payment-time expiry enforcement, and a migration that assigns expiry to existing reservations.
+- Added a Rust scheduled job that lapses active insurance policies after their end date through the validated policy state transition.
+- Added transaction-scoped uniqueness locks for asset codes, product lot codes, and BI record names to prevent concurrent duplicates.
+- Serialized loyalty source idempotency checks by tenant and source key so simultaneous event retries cannot duplicate point changes.
+- Serialized accounting journal creation by tenant and source key before checking existing entries, preventing concurrent event retries from posting duplicate journals.
+- Made e-invoice identity, provider response, and retry history system-managed; an issuance action now requires a saved provider response.
+- Serialized sales-order source-link validation by tenant and source key so concurrent conversions cannot create duplicate orders from one quotation or CRM deal.
+- Added a Rust-owned performance-review lifecycle with one review per employee and period, same-tenant reviewer validation, self-review prevention, submission requirements, revision returns, final acknowledgment, and review-history retention.
+- Prevented cancellation of submitted purchase orders and stock counts while their shared approval requests are pending, so the approval queue cannot retain requests for cancelled documents.
+- Added published-course enrollment and lesson-level LMS completion records; Rust now derives progress from required lessons and completes an enrollment automatically at 100 percent.
+- Added helpdesk first-response tracking and a tenant-authorized SLA report for response/resolution deadlines, compliance counts, and recent ticket status.
+- Added HRM-linked field-service technician assignment with active-employee checks and transaction-serialized schedule overlap prevention for work orders.
+- Added tenant-scoped carrier tracking to shipments, with immutable tracking events, optional provider event IDs for duplicate suppression, and Rust validation that prevents events before dispatch.
+- Added first-touch, last-touch, and linear CRM-to-campaign attribution models, with a React report selector and weighted Rust reporting for multi-campaign journeys.
+- Added immutable partial campaign-cost allocations across campaigns from posted accounting bills, with transaction-locked amount limits, proportional debit-note cost reporting, and revenue-to-spend metrics.
+- Added first-touch marketing campaign attribution from CRM leads through tenant-locked campaign-member records, plus a Rust performance report for leads, conversions, won deals, and attributed revenue.
+- Added tenant-owned CRM pipeline-stage configuration for default probability and display name; forecast uses a deal override first, then the tenant value, then the standard fallback.
+- Added a CRM pipeline Kanban view with permission-gated stage updates through the Rust API, alongside the forecast list.
+- Added a Rust-owned CRM pipeline forecast with canonical stages, probability validation, expected close dates, stage summaries, and weighted opportunity values; legacy stage labels are mapped when recognized.
+- Added tenant-locked CRM activity associations to leads, deals, or customers; each new activity has one target and linked activity history cannot be detached.
+- Added utility-meter opening readings: first-period consumption now starts from a tenant-configured cumulative meter baseline, which becomes immutable after the meter has readings.
+- Added full budget replacement adjustments: an approved or closed budget can be replaced by a same-period draft linked with `adjustment_of`; approval supersedes the prior version transactionally, preserving audit history without double-counting actuals.
+- Extended budget planning to revenue accounts as well as expense accounts; Rust actuals now use each account's natural debit/credit balance, reports separate revenue and expense totals, and favorable variance exposes overspend or revenue shortfall consistently.
+- Added a charity beneficiary-disbursement workflow: program-scoped beneficiary requests require approval within the locked program budget, and payment creation plus expense/cash-or-bank journal posting happen atomically when the disbursement is paid.
+- Added Rust-managed sales quotation expiry: sent quotations move to an immutable `expired` state after `valid_until`, and the scheduler cannot expire them early or accept/send them after their validity has passed.
+- Added posting-time currency snapshots for accounting invoices, bills, and adjustment notes, plus settlement-date payment conversion and realized 515/635 FX differences; aging, cash forecasts, credit limits, and tax-register totals now use base-currency snapshots.
+- Added tenant base-currency configuration in Rust and React; the setting must reference a currency owned by the tenant and becomes immutable after any accounting document or journal exists.
+- Added tenant-scoped dated currency quotes to master data, with positive-rate/date validation, same-tenant currency references, and transaction-locked uniqueness for each directed currency pair and effective date.
+- Made RFQ/requisition-to-purchase-order conversion idempotent: the Rust transaction locks and validates the source document, then reuses its existing purchase order when a conversion event is delivered again.
+- Made duplicate purchase receipt events idempotent after verifying that the order is fully received, so delivery retries do not fail after the order has already advanced to `received`.
+- Added mandatory audit reasons when ignoring imported bank statement lines and restricted ignore decisions to draft statements.
+- Added Rust backed initial email verification for tenant signup, including single-use 24-hour tokens, guarded sessions/API authentication, resend flow, React verification screens, and shared email outbox delivery.
+- Added immutable partial quality dispositions for purchase inspections, with tenant/stock locking, cumulative quantity limits, held-stock release and remaining-quantity reconciliation across QC, purchasing and inventory.
+- Added Rust rent billing for real-estate leases: monthly/quarterly/yearly date-anchored cycles create immutable rent-cycle records and posted receivable invoices, with bounded overdue catch-up and lease-expiry guards.
+- Added account-level expense claim coding: submitted lines validate tenant-owned expense accounts, approval accrues each expense account against employee payable, and payment settles the payable through the selected cash/bank account.
+- Added POS cash refund session attribution: cash refunds post against an open shift for the same branch and cashier, shift-close cash expectations subtract those refunds even when the original sale shift has closed, and transaction locks prevent duplicate open shifts for the same cashier and branch.
+- Fixed purchase return tax snapshots to resolve the matching source order line by product and unit price, avoiding tax rates copied from a different priced line for the same product.
+- Added tenant-managed HRM holidays with paid/unpaid treatment; payroll includes paid weekdays in attendance credit, and holiday changes serialize with payroll calculation and are frozen once the period has payslips.
+- Added configurable HRM leave allocations per employee, leave type, and year; submitted and approved requests reserve weekdays excluding tenant holidays, and allocations cannot be reduced below usage.
+- Improved CRM lead conversion to reuse an existing tenant party with the same normalized email, serializing concurrent conversions and avoiding duplicate customer records.
+- Enforced case-insensitive employee-code uniqueness per tenant in HRM, with transaction locks protecting concurrent creates and updates.
+- Serialized fixed-asset depreciation generation, posting, and disposal on the asset row so concurrent periods cannot over-depreciate or post after disposal.
+
+### Changed
+- Split inventory application workflows into line preparation/valuation, stock posting, and count snapshot modules behind the existing context facade.
+- Split accounting event posting into refund, settlement, and source-document handlers while preserving the existing context dispatcher API.
+- Split accounting read models into focused balance, operational, and tax modules behind the existing Rust context facade.
+- Catalog lint now verifies that Rust domain, persistence, preparation, scheduled-job, and source-event hooks are exported and routed to the kernel dispatchers, preventing module behavior from compiling while remaining unreachable.
+- Tax-register detail rows now include server-calculated base-currency taxable and tax amounts; React renders the Rust report values without deriving financial amounts in the client.
+- Catalog lint now checks Rust bounded-context dependencies, requiring declared module dependencies and preventing direct imports of another context's application, domain, persistence, report, or worker internals.
+- Split accounting source-event adaptation into `accounting/application/source_events.rs`; the stable accounting application facade still exports the same event handler, while document routing stays separate from ledger posting and database policy.
+- Centralized provider and event-ticket refund journal reversal in `application/ledger/reversal.rs`; malformed source account IDs and non-finite or negative debit/credit amounts are rejected before posting.
+- Isolated accounting chart-of-accounts uniqueness and journal-retention checks in `accounting/persistence/accounts.rs` behind the persistence facade.
+- Moved cross-module validation dispatch into `server/src/modules/validation.rs`, leaving `modules/mod.rs` as the bounded-context registry and stable facade.
+- Split inventory transfer, stock-count, and source-document movement event handlers into `inventory/application/events.rs`, keeping the existing application exports intact.
+- Split accounting ledger event posting and payment journal generation into `application/ledger.rs`, reducing the application facade while preserving the public event handler.
+- Split bank statement creation, matching, ignored-line audit, reconciliation, and retention checks into `accounting/persistence/bank_statements.rs` behind the existing persistence facade.
+- Split accounting period calendar, date immutability, overlap and close safeguards into `persistence/periods.rs`; the public accounting persistence facade still owns dispatch.
+- Split accounting source-document routing, return-note creation, journal reference/refund checks, stock valuation posting, and inventory FEFO/FIFO allocation into focused submodules while preserving the modules' public facades and transaction boundaries.
+- Moved sales discount/VAT/line-total calculations into a focused Rust pricing submodule while retaining the kernel-facing recalculation API.
+
+### Fixed
+- Prevented cancellation of a purchase order with an open shared-approval request, avoiding orphaned approvals that would later attempt to approve a cancelled order.
+- Serialized case-insensitive insurance policy and claim number uniqueness checks by tenant with PostgreSQL advisory locks, preventing duplicate identifiers under concurrent writes.
+- Serialized case-management daily-hour validation with a tenant/date/person PostgreSQL advisory lock, preventing concurrent entries on separate matters from exceeding 24 hours; capped computed time-entry fees to the supported PostgreSQL money range.
+- Prevented Sales and Logistics delivery checks from merging distinct high-value unit prices when converting cents into an overflowing integer key.
+- Rejected overflowing purchase-line gross amounts and rounded document totals in Rust, preventing non-finite financial values from being serialized as JSON null.
+- Prevented date changes to accounting periods with journal or bank statement history and blocked removing periods that retain bank statement evidence.
+- Prevented accounting period closure while a bank statement in that period is still a draft, and serialized statement creation/reconciliation against the tenant period calendar.
+- Fixed bank statement CSV import to detect comma, semicolon, or tab delimiters and parse repeated thousands separators and mixed decimal/grouping conventions, including common Vietnamese exports such as `1.234.567`.
+- Fixed booking validation to reject malformed explicit end timestamps while still allowing Rust to derive the end time from a selected service duration.
+- Used checked date arithmetic when deriving a booking end time, rejecting service durations that exceed Chrono's supported date range instead of risking a server panic.
+- Coalesced repeated scheduled-job failures into a single open failure record per tenant/job/record and automatically resolve it when the job later succeeds.
+- Deduplicated payroll workdays when approved paid leave overlaps a complete attendance record, preventing the same weekday from being included twice in gross salary calculation.
+- Corrected POS cash-session reconciliation so a fully refunded cash order is excluded from expected cash instead of being subtracted a second time after its status leaves `completed`.
+
+### Added
+- Added a permission-gated WIP reconciliation draft workflow: the server recalculates the WIP/154 variance in a tenant write transaction, validates the selected contra account and accounting period, creates balanced idempotent journal drafts, and leaves posting to the standard accounting review flow.
+- Extended the manufacturing WIP report to compare the net operational balance per production order with posted account 154 at the selected cutoff date, including negative order balances for variance investigation and permission-gated ledger detail.
+- Added a tenant-authorized inventory quality-hold report and React page with warehouse/status filters, remaining held quantity after returns, held value, lot and source-layer traceability, and time in hold.
+- Added event-ticket VAT snapshots from tenant tax configuration: tax-inclusive ticket prices are split into revenue and VAT payable on sale, full refunds reverse the original lines, and the tax register includes ticket sales and refunds.
+- Added accounting payment effective dates: Rust carries `payment_date` from payroll/expense workflows into generated payments and posts the linked ledger journal on that date, subject to closed-period validation.
+- Added expense reimbursement payment methods: employee claims default to cash or can select bank transfer, and Rust posts the payment against account 111 or 112 respectively instead of writing an unsupported method value.
+- Added tenant-safe HRM department hierarchies with a typed parent reference, serialized cycle prevention, and retention checks for departments used by employees, positions, child departments, or accounting history; the legacy free-text parent field remains available during migration.
+- Added project task dependencies as a catalog-backed entity with tenant/project consistency, duplicate and cycle prevention, and a completion guard that requires all predecessor tasks to be done.
+- Added Rust password reset with generic account-safe responses, one-time hashed reset tokens, a 30-minute expiry, per-account request throttling, transactional password update and browser/API-token revocation, and retryable email outbox delivery through the configured provider.
+- Added full event-ticket refunds before event start: refund requires a reason, rejects checked-in tickets, releases capacity, records a negative payment, and reverses the original cash/bank journal in the same Rust transaction.
+- Completed event-ticket revenue posting: Rust requires a payment method at ticket sale, snapshots it with the ticket, and posts cash/bank receipts to account 111/112 against revenue 511 in the same tenant transaction.
+- Added the BI reports workspace: tenant-scoped saved reports and dashboards now have React pages for tabular results, aggregate numbers, line/bar charts, and pie charts; Rust validates saved-query safety and dashboard widget compatibility.
+- Documented the bounded-context module structure, layer responsibilities, transaction/security rules, and the BI reference implementation in `docs/MODULE-ARCHITECTURE.md`.
+- Strengthened purchase-order bill posting into line-level matching: bill lines must cover the same products and quantities and match each product's net amount, alongside existing supplier, receipt, total, tax, and duplicate-bill controls.
+- Extended physical inventory counts to lot/bin granularity: React captures the counted bin and lot, Rust snapshots the matching ledger balance at submission, and approval posts only that bin variance.
+- Added scheduled email/SMS reminders with Rust due-time validation, transactional enqueueing into the retryable communication queue, cancellation before dispatch, and immutable history after enqueue.
+- Added tenant-scoped warehouse bins with per-warehouse unique codes, bin selection on stock transfers, source-bin availability checks, destination-bin receipt tracking, and a Rust movement-derived inventory-by-location report.
+- Corrected receivables/payables aging and cash-flow forecasts after provider refunds: as-of balances now net the reversed original payment together with its linked negative refund row.
+- Added an accounting cash-flow forecast endpoint that projects open posted receivables/payables, unbilled approved purchase orders, and approved payroll/expense claims with payment dates; balances include recorded payments and notes as of the forecast start.
+- Added department attribution through purchase requisitions, RFQs, purchase orders, supplier bills and returns, and the related journal lines; purchasing documents inherit the source order dimension, and accounting validates HRM department references within the tenant.
+- Added department-level budget planning and variance: journal lines accept tenant-validated HRM department dimensions, actuals match the exact account/department pair, expense claims inherit the employee department, payroll expense is split by payslip department, and approval prevents overlapping approved budgets for the same pair and period.
+- Added transactional accounting reversal for successful payment-provider refunds: Rust reverses the original posted payment journal lines, retains the original evidence, and deduplicates by provider transaction within the tenant.
+- Added a Rust communication delivery worker with tenant-scoped leases, HTTPS email/SMS provider contracts, bounded retries/backoff, terminal failure history, and disabled-by-default delivery until an endpoint is configured.
+- Guarded optional Rust event subscribers when their module is disabled, so unrelated source transactions do not fail; queued communication messages now deduplicate by source event within a tenant.
+- Hardened Loyalty point accounting: Rust owns member balances and point-transaction records, POS refunds and partial Sales returns create idempotent negative history bounded by previously earned points, and members with point history cannot be deleted.
+- Closed fiscal periods now reject journal-entry creation and draft edits as well as posting, using the same tenant period-calendar lock as period close/reopen to serialize concurrent writes.
+- Added POS cash-in/cash-out vouchers linked to an open session and a tenant-owned offset account; posting creates a balanced accounting journal, and unposted cash vouchers block session close.
+- Added purchase-order bill matching at posting: tenant-scoped source order, full-receipt status, supplier identity, gross/tax totals, and one non-void bill per purchase order are revalidated within the accounting transaction.
+- Added POS cash-session reconciliation: sessions validate opening/count cash, completed orders require an open tenant session, and closing snapshots expected cash and the counted variance while serializing with concurrent order completion.
+- Expanded the Rust e-invoice bounded context with immutable posted-invoice request snapshots, provider issue/cancel result contracts, required evidence for issue/failure/cancellation actions, deduplicated external numbering, retained audit records, and a retry action with attempt tracking.
+- Fixed the accounting tax register so posted manual bills and credit/debit notes are included even when they are not linked to a purchasing document or sales/purchase return; linked return documents remain filtered until their source operation is completed.
+- Added tax-register document detail with accounting date, counterparty name/tax code, document totals, and expandable tax lines so accountants can trace rate totals to their source records.
+- Added product-level lot tracking for inventory: Rust requires tenant-owned, product-matched lots on every movement, locks the setting after any stock history exists, keeps FEFO issue allocation, snapshots count variances by lot, and resolves agricultural harvest lot codes into inventory lots in the same transaction.
+- Added transactional goods-received-not-invoiced accounting: tracked purchase receipts debit inventory and credit a GRNI clearing liability; the supplier bill clears the accrued balance, and older receipts without GRNI journals retain the existing inventory-debit path.
+- Added tenant-configurable FIFO inventory valuation alongside moving average. Rust persists per-issue receipt-layer allocations, carries original layer cost/date through warehouse transfers, locks the method after inventory activity, requires negative stock to remain disabled, and balances purchase-return debit notes to actual inventory cost with gain/loss variance entries.
+- Extended bank reconciliation so a statement line can match either a transfer/bank payment or a posted journal entry; Rust locks and validates the tenant-owned TK 112 net movement, amount, direction, and one-to-one matching again before statement closure.
+- Added a Rust tax register for posted invoices, customer credit notes, supplier bills, and supplier debit notes, grouped by tenant tax snapshot and accounting posting date, with legacy amounts reconciled into an unallocated bucket. Purchasing tax snapshots and recoverable input VAT journal lines now flow through the bill and return lifecycle; exposed through the accounting reports UI and OpenAPI.
+- Changed stock counts from hand-entered adjustment direction/quantity to physical counted quantities for new documents. Rust snapshots expected balances and locks counted SKU/warehouse pairs on submission, blocks concurrent stock moves through approval, and posts only the computed variance; old adjustment rows remain supported and finalized counts are retained.
+- Expanded the Real Estate bounded context with Rust property/lease validation, transaction-locked lease exclusivity and date-overlap checks, sold-property viewing protection, lease termination/expiry release, and historical record guards.
+- Made lease-generated legal contracts source-linked and idempotent; ending a lease now cancels its draft contract or terminates its active contract, and the generated contract is retained with lease history.
+- Standardized Master Data invariants across Rust domain/application/persistence layers: tenant-unique party tax codes, SKUs, branch/currency codes, unit/category/tax names; positive unit and exchange ratios; bounded tax rates; and cycle-safe product category trees.
+- Made product units/categories and category parents typed catalog references with PostgreSQL tenant-composite foreign keys and a startup migration that preserves unmatched legacy labels in custom metadata.
+- Added accepted/scrap quantity capture to manufacturing completion, reason-required scrap recording, QC for accepted output only, and good-unit costing that absorbs consumed material cost into accepted output.
+- Added a tenant-authorized Rust manufacturing WIP report, its OpenAPI contract and React page, comparing material issue value with accepted finished-goods receipts by cutoff date.
+- Added per-product/per-warehouse inventory reorder rules and a Rust replenishment report that nets QC-held stock and open approved PO quantities, with a React view and generated API contract.
+- Connected inventory replenishment to purchasing: Rust recalculates positive suggestions under a tenant write transaction, creates one draft purchase requisition per warehouse, and nets open requisitions and unreceived purchase orders from subsequent suggestions.
+- Added a Rust budget-versus-actual report for approved and closed plans, including ledger-derived variance and utilization by expense account, plus a React view and OpenAPI contract.
+- Added partial sales fulfillment across multiple logistics shipments: shipment line snapshots and quantities are locked against the source order, stock issues post on each delivered shipment, and the order closes only after physical goods are fully delivered.
+- Sales returns on logistics orders can now be submitted against already-delivered quantities while later shipments remain open; tenant-transactional checks cap cumulative returns at delivered units.
+- Sales orders now enter `partially_delivered` automatically after an incomplete first shipment; the transition is guarded by delivered quantity evidence in PostgreSQL.
+- Confirmed or cancelled sales orders are retained as business history and cannot be deleted through CRUD.
+- Added explicit paid/unpaid treatment to HR leave requests and included approved paid weekdays in Rust payroll calculation; employee-row locks serialize attendance/leave changes with a payroll snapshot, and changes to draft payroll source data are blocked until the run is canceled.
+- Added optional invoice and bill due dates plus Rust receivable/payable aging reports grouped by customer or supplier using remaining balances and configurable as-of date buckets; added both reports to the React accounting report screen.
+- Added Rust bank-statement reconciliation in Accounting: tenant-locked statements and lines, non-overlapping statement periods, one-time matching against transfer/bank payments and posted account-112 journal direction, ignored-line handling, and closing-balance verification before reconciliation. Direct bank-provider adapters remain outstanding.
+- Added atomic UTF-8 CSV import for draft bank statements through Rust, with date/amount validation, statement-period checks, duplicate-reference conflict detection, replay-safe row imports, and a tenant API, OpenAPI contract, and statement-detail control.
+- Added a Rust payroll-run calculation action that locks a draft run, derives gross base pay from completed attendance and approved paid leave versus weekdays in the selected month, and creates payslips with transactional total accumulation. The baseline deliberately leaves tax, insurance, overtime, and holiday calculations to explicit tenant policy.
+### Changed
+- Moved contract expiry, overdue repayment, maintenance-plan, lease, subscription-billing, and communication-reminder schedules into their Rust bounded contexts; catalog lint now rejects JSON scheduled jobs.
+- Clarified the bounded-context layer contract and write sequence in module authoring guidance, including tenant-scoped persistence, transaction ownership, concurrency locks, and Rust-owned calculated fields.
+- Removed the unused vanilla-JavaScript browser application and made the Rust server default to the built React/Vite client. Shared API, state, labels, event, route, and feedback helpers now live under `client/src/lib`.
+- Updated the E2E-only `puppeteer-core` dependency to a patched 25.x release; `npm audit` now reports zero vulnerabilities and the production Docker client build remains successful.
+- Fixed the production Docker client build to include the shared asset-sync tool and its React compatibility assets; validated the Rust release image, PostgreSQL image, and Compose configuration.
+- Added application normalization layers for Helpdesk, Charity, HRM, Master Data, and Project; canonicalized support/reference records before the shared Rust transaction and corrected nullable project budget/rate validation.
+- Added the Auto Service application layer to canonicalize plate/VIN identity and normalize repair-order notes before Rust domain and tenant persistence checks.
+- Added the BI Rust bounded context for tenant-unique dashboards, reports, and KPIs, validated widget/report links, and a saved-report API with tenant-authorized filters plus PostgreSQL count/sum/average/min/max aggregation; report configuration never accepts SQL.
+- Added the Document Rust bounded context for tenant-safe folder trees, versioned document metadata, signature requests, duplicate pending-signer prevention, and retained completed signature history.
+- Added the Performance Rust bounded context for tenant-checked objectives, key results, and employee reviews, with bounded numeric values, employee-period review uniqueness, immutable employee assignment, and retained review history.
+- Added the LMS Rust bounded context for tenant-checked courses, lessons, and learner enrollments, with course-locked duplicate prevention, monotonic progress, completion at 100 percent, and retained enrollment history.
+- Added the Marketing Rust bounded context for tenant-unique campaigns and audience segments, normalized reusable content, date/budget validation, launch-window checks, and protection for launched campaign history.
+- Added the School Rust bounded context with tenant-scoped students, capacity-locked class enrollment, immutable grading history, tuition derived from enrollment, and accounting-backed fee issuance and payment reconciliation.
+- Added a Case Management Rust bounded context for client cases, immutable notes, and billable time. Time entries derive the client and fee from the case, validate work dates/rates/hours, enforce a 24-hour daily limit, and can be invoiced once; a case cannot close with unbilled time.
+- Added an Events Rust bounded context with published event capacity, ticket-price snapshots, reservation/sale lifecycle, and time-windowed check-in. Event row locks prevent overselling, sold tickets cannot be canceled without a refund workflow, and ticket sales continue into accounting payments.
+- Added a Construction Rust bounded context for BOQ calculation, site management, subcontract lifecycle, and site diaries. Tenant-owned project/vendor links are checked, signing locks the project and enforces its remaining budget before the accounting bill event, and site logs are unique by day and immutable.
+- Added a Clinic Rust bounded context for tenant-scoped patient identity, encounter billing, prescription dispensing, and laboratory results. Patient/account identity is derived and protected, encounter completion requires a clinician/diagnosis/fee, dispensing requires a completed encounter and validated medication lines, and completed clinical records remain immutable while accounting and inventory handlers run transactionally.
+- Added an Agriculture Rust bounded context for farm, crop-cycle, harvest, and input-application records. Tenant-scoped product/warehouse checks and crop-window validation protect operations; harvest receipt and product-backed input consumption now generate inventory movements in the same transaction, with immutable field history.
+- Added an Insurance Rust bounded context for policy terms and claims: policies require tenant-unique numbers, valid premium/coverage/date terms, claim references and incident dates are verified against active coverage, approved/paid claims consume a policy's aggregate coverage limit under a policy-row lock, and processed records are protected from edits or deletion.
+- Added a Rust utilities bounded context for tenant-scoped meters, immutable period readings, rate/consumption snapshots, and bills derived from those readings. Bill issuance continues through accounting; a utility bill can be marked paid only after its linked accounting invoice is paid.
+- Added a Rust lending bounded context: approval locks loan terms, disbursement atomically generates a monthly declining-balance amortization schedule, overdue periods are scheduler-driven and remain payable, and closure/defaulting are guarded by schedule state. Disbursement and repayment now post balanced cash/bank, loan-receivable, and interest journals with source idempotency; schema migration preserves older repayment records without inventing historical interest.
+- Added an ecommerce Rust bounded context for tenant-scoped storefront and order validation. Web-order placement now derives product prices, discounts, and tax from the configured product, price list, and storefront tax policy, then converts exactly once into Sales; source links are unique and immutable.
+- Added the Rust auto-service bounded context for vehicle identity and repair-order lifecycle: tenant-unique plate/VIN, customer-to-owner matching, nondecreasing odometer, valid parts lines, positive billable completion, and historical protection after completion/delivery.
+- Added a Rust helpdesk bounded context: ticket resolution requires a recorded outcome, closed tickets remain immutable and undeletable, SLA windows are validated, and referenced policies cannot be changed or removed.
+- Completed field-service work-order lifecycle guards: ticket intake now stores its source ticket and is idempotent under replay, dispatch requires a technician, completion requires a billable total, tenant-owned party/warehouse/ticket references are checked, and terminal work orders stay immutable.
+- Split the e-invoice event workflow into domain, application, and persistence layers; it now accepts only tenant-owned posted invoices and safely reuses an existing issuance request when the source event is replayed.
+- Migrated the remaining audit, failed-event, outbox, custom-field, and tenant data administration screens to React, including safe CSV/JSON downloads and typed tenant-deletion confirmation.
+- Added transaction-locked FEFO allocation for outbound stock, lot/product/tenant and expiry validation, lot history immutability, and lot-preserving transfer receipt.
+- Split the accounting bounded context into a stable facade, pure domain validation, Rust application workflows, and tenant-scoped persistence/posting checks.
+- Added per-line sales VAT snapshots with discount-aware tax calculation, invoice tax summaries, and balanced revenue/tax-payable postings; sales returns now reverse both revenue and VAT through credit notes.
+- Moved the remaining CRM, field-service, e-invoice, payment-provider, logistics, restaurant, payroll, and invoice-settlement integrations into Rust handlers; removed the duplicate subscription invoice rule so billing-cycle events create one invoice with the due date.
+- Completed migration of accounting event rules to Rust: payroll and expense journals, POS/restaurant/card-bank/cash/donation/refund/payment journals, and loan/insurance draft journals now execute through the accounting context; `accounting.json` contains no business rules.
+- Moved sales/purchase return credit/debit-note creation and invoice, bill, credit-note, and debit-note journal posting into Rust with tenant-scoped source-document lookup and transactional ledger creation; removed six catalog rules.
+- Moved 21 source-to-accounting workflows into Rust, including invoice/bill issuance and operational payments across ERP and vertical modules; invoice and bill posting still invokes the existing journal pipeline in the same transaction.
+- Replaced 24 workflow-approval catalog rules with a Rust bounded context covering request creation for eight ERP document types and tenant-locked approve/reject dispatch to their source actions.
+- Moved helpdesk, sales, and booking notification creation into the Rust communication context; provider delivery is now available through the optional HTTPS worker described in deployment docs.
+- Moved loyalty point accrual and POS refund reversal into a Rust bounded context; POS/sales earn transactions and member balance updates now run with tenant-scoped row locking in the source transaction.
+- Moved hotel folio charge accumulation and check-in/check-out room state changes into a tenant-scoped Rust hotel bounded context; removed all three hotel catalog rules.
+- Moved lease activation integration out of JSON rules: Rust now creates the lease contract and changes the tenant-owned property to leased in the same transaction.
+- Moved fixed-asset capitalization, opening-balance recording, disposal entries, accumulated depreciation updates, and depreciation journals into a Rust asset bounded context; removed nine accounting rules and kept all journal posting inside the source transaction.
+- Moved hired-candidate conversion into the Rust recruitment context; it reads the hired application, candidate, and job under the same tenant transaction and creates the trace-linked HR employee record atomically.
+- Moved production and purchase inspection creation, purchase stock release after QC pass, and required nonconformance creation after QC failure into tenant-transactional Rust quality handlers; removed all four quality catalog rules.
+- Moved CRM deal conversion, accepted-quotation order creation, ecommerce order confirmation, and sales-order delivery synchronization from JSON rules into the Rust sales bounded context; ecommerce storefront lookup is tenant-scoped and shares the source event transaction.
+- Replaced thirteen catalog-driven inventory valuation journal rules with a Rust posting handler covering sales/service COGS, returns, production WIP, and count variances, with tenant-scoped account lookup and idempotency locking.
+- Moved stock-movement balance updates from four catalog rules into the Rust inventory application handler; quantity, value, and QC-held stock now update transactionally under the SKU/warehouse lock.
+- Moved stock transfers, count adjustments, purchase receipts, sales/POS/service consumption, returns, manufacturing BOM consumption, harvest receipts, maintenance parts, and production QC receipts into tenant-transactional Rust inventory handlers; removed their duplicate JSON rules.
+- Moved RFQ acceptance to draft purchase-order creation from the JSON catalog rule into the Rust purchasing application workflow, keeping the trace link and transaction causation.
+- Approved purchase requisitions now validate supplier/warehouse ownership and create a traceable draft purchase order in the same PostgreSQL transaction; submitted purchasing records are protected from hard deletion.
+- Moved the Rust inventory context into a bounded-context directory with separate domain validation, transactional preparation, persistence checks, and a stable kernel facade.
+- Added an administrator inventory policy screen for the existing tenant-level negative-stock setting; negative stock remains disabled by default and Rust enforces available stock under a per-SKU/warehouse transaction lock.
+- Removed the legacy TypeScript kernel, simulator, server, and TypeScript test harness. The Rust PostgreSQL server is now the only application runtime; the browser E2E runner starts it with an isolated embedded PostgreSQL instance.
+- Added layered Rust bounded contexts for payments and subscriptions, including payment reference idempotency, invoice reconciliation, billing-cycle validation, and due-cycle invoice posting.
+- Serialized booking writes on the resource row before applying the catalog overlap constraint, preventing concurrent double-bookings.
+- Routed `npm test` to the Rust suite and `npm run check` to Rust formatting/build and catalog lint. Removed TypeScript compiler configuration and dependencies.
+- HRM attendance now rejects entries on an approved leave day inside the same tenant transaction that locks the employee row, preventing concurrent leave/attendance writes from bypassing the rule.
+- HRM now preserves submitted/approved leave records, rejects edits to approved leave, and refuses leave approval when matching attendance already exists.
+- Scheduled Rust jobs now recheck their due condition while holding the tenant transaction and row lock, so concurrent server instances skip work another instance already completed instead of recording a false failure.
+- Maintenance plans can be paused/resumed; due plans now create one linked work order per scheduled date, advance the next due date transactionally, and record completion back on the plan.
+- PostgreSQL additive migrations now backfill newly introduced state columns to each entity's declared initial state, preserving behavior for existing tenant records.
+- Generic entity updates can no longer write lifecycle state fields directly; callers must use the declared transition action so transition validation and source workflows cannot be bypassed.
+- Migrated login/signup, user/role administration, module management, and inventory policy screens to React while keeping tenant authorization and writes on the Rust API.
+
+### Thêm
+- Hoàn thiện kiểm soát thanh toán kế toán: chọn đúng tài khoản tiền mặt/ngân hàng theo phương thức; đối chiếu payment POS/nhà hàng với order đã hoàn tất, đúng số tiền, đối tác và phương thức; khóa chứng từ nguồn để chống ghi nhận chi trùng payroll/hoàn ứng.
+- Đồng bộ trạng thái hóa đơn khi ghi nhận điều chỉnh sau khi đã thu/trả đủ; số dư phải thu/phải trả không âm sau khi cấn trừ credit/debit note.
+- Chuyển luồng nhận quyên góp sang bounded context Rust: yêu cầu phương thức thu tiền, xác thực người tặng/chương trình trong tenant, khóa chứng từ nguồn và ghi payment cùng bút toán Nợ 111/112, Có 711 trong cùng transaction.
+- Đưa catalog module/ngành thành JSON trung lập được Rust nạp trực tiếp; chuyển lệnh dev/start và lệnh chạy từng module sang máy chủ Rust; gỡ 71 nguồn TypeScript khai báo module/ngành.
+- Hoàn thiện bảo trì thiết bị: lệnh có vòng đời bắt đầu/hoàn tất/hủy, bắt buộc lưu kết quả, xác thực tài sản/kho/vật tư trong Rust và PostgreSQL, xuất vật tư theo dòng và tự ghi nhận giá vốn tồn kho khi hoàn tất.
+- Hoàn thiện sản xuất ERP lõi: xác thực định mức và nguyên liệu theo tenant, khóa phiên bản BOM đã dùng, ràng buộc lệnh với đúng thành phẩm/kho, tiêu hao theo sản lượng, tính giá thành từ giá vốn xuất và kết chuyển nguyên liệu/thành phẩm qua tài khoản 154/156.
+- Chặn phát hành thành phẩm sản xuất trước QC: tạo phiếu kiểm tra bắt buộc khi lệnh hoàn tất; chỉ thao tác `passed` mới nhập thành phẩm vào kho, `failed` giữ lô ngoài tồn khả dụng, `retest` mở lại phiếu lỗi; quyết định QC và nhập kho được tuần tự hóa theo lệnh.
+- Hoàn thiện QC đầu vào mua hàng: tồn nhận được giữ trong `held_qty` và bị loại khỏi số khả dụng; chỉ phiếu đạt mới giải phóng hàng, còn hàng trượt tạo hồ sơ không phù hợp và có thể trả đúng lô theo phiếu QC; thêm khóa theo SKU/kho cho định giá và xuất kho đồng thời.
+- Khép kín giao nhận đơn bán: chụp trọng lượng từ khối lượng hàng hóa trong danh mục, bắt buộc kiểm tra tải trọng xe, chặn vận đơn trùng và chỉ đánh dấu đơn có địa chỉ giao là đã giao sau khi vận đơn hoàn tất.
+- Ràng buộc luồng bán/mua theo kho: đơn bán phải chọn kho hợp lệ trước khi xác nhận; gian hàng web gắn kho xử lý và đơn web tự chuyển thành đơn bán tại kho đó; mua, bán và thương mại điện tử kéo theo kế toán để không bỏ qua hóa đơn/công nợ.
+- Hoàn thiện tuyển dụng: vòng đời hồ sơ ứng viên, kiểm tra headcount và hồ sơ trùng, xử lý hồ sơ chờ trước khi đóng tin, chuyển đổi bắt buộc sang nhân viên HRM kèm thông tin liên hệ/vị trí và nguồn gốc ứng viên.
+- Cứng hóa quản lý dự án: xác thực giờ công/đơn giá, khóa dự án khi ghi timesheet và công việc, kiểm tra công việc thuộc đúng dự án, chỉ hoàn tất khi mọi việc đã xong.
+- Hoàn thiện ngân sách: duyệt theo tổng dòng tài khoản chi phí, khóa kế hoạch sau duyệt, tính số thực hiện từ bút toán đã ghi sổ theo kỳ năm/tháng và chỉ cho đóng kỳ đã kết thúc.
+- Cứng hóa giao nhận bằng Rust: phân công xe/tài xế, kiểm tra tải trọng, lưu lý do giao thất bại, bảo vệ lịch sử đội xe và đồng bộ bắt buộc trạng thái giao hàng với đơn bán.
+- Thêm bất biến Rust cho hợp đồng: kiểm tra ngày/giá trị, xác thực thời điểm hết hạn, khóa điều khoản sau kích hoạt và giữ hồ sơ hợp đồng đã có hiệu lực.
+- Cứng hóa đề nghị chi nhân viên: phụ thuộc kế toán, bắt buộc có yêu cầu phê duyệt khi bật workflow, chỉ cho nhân viên đang làm việc gửi đề nghị, và giữ bất biến/hạn chế xóa hồ sơ sau khi gửi.
+- Khóa theo nhân viên trong giao dịch khi gửi/duyệt đơn nghỉ và ghi công; chặn đơn nghỉ trùng ngày đồng thời, yêu cầu nhân viên còn làm việc, và chống bản ghi chấm công trùng ngày khi có yêu cầu đồng thời.
+- Khóa đồng thời kỳ lương và nhân viên khi lập phiếu; từ chối gửi bảng lương rỗng, phiếu của nhân viên đã nghỉ việc và action duyệt/trả khi kế toán chưa bật.
+- Cho phép điền một lần metadata còn thiếu cho tài sản cũ đang hoạt động và ghi số dư đầu kỳ Nợ 211/Có 411 bằng action có kiểm soát, chống tạo trùng bút toán vốn hóa.
+- Hoàn thiện vòng đời tài sản cố định bằng Rust: vốn hóa khi kích hoạt, khấu hao đường thẳng theo tháng với giới hạn nguyên giá/giá trị thu hồi, bút toán 642/214, cập nhật giá trị còn lại và ghi giảm tài sản khi thanh lý không thu tiền.
+- Hoàn thiện định giá tồn kho bình quân di động và kế toán giá vốn: chụp giá nhập mua/đơn giá trả nhà cung cấp, chuyển giá trị giữa kho, hoàn nhập giá vốn trả hàng, ghi nhận giá vốn bán hàng/POS/dịch vụ và đối ứng chênh lệch kiểm kê.
+- Củng cố POS bằng Rust: bắt buộc gắn ca đang mở và kho, xác thực sản phẩm theo tenant, giữ bất biến đơn đã hoàn tất; ghi nhận doanh thu/thu tiền và bút toán đảo khi hoàn tiền.
+- Tính snapshot giá vốn bình quân di động cho phiếu kho bằng Rust; theo dõi giá trị tồn theo kho, bảo toàn giá chuyển kho, hoàn nhập giá vốn khi nhận hàng bán trả lại và tự ghi bút toán Nợ 632/Có 156 cho xuất bán trong cùng transaction.
+- Bổ sung báo cáo kế toán Rust: bảng cân đối phát sinh và sổ cái theo tài khoản, lọc ngày, số dư lũy kế và quyền `accounting.journal_entry.read`.
+- Định hình kiến trúc modular monolith Rust theo bounded context, cùng ADR và lộ trình port có tiêu chí phát hành rõ ràng.
+- Chuyển validation bất biến cho tồn kho, điều chuyển/kiểm kê, báo giá/đơn bán và RFQ/đơn mua vào Rust; validation chạy trong transaction PostgreSQL.
+- Khóa thay đổi kho/dòng hàng của điều chuyển sau khi xuất và khóa dữ liệu kiểm kê sau khi gửi.
+- Khóa sửa dòng/kho của đơn bán đã xác nhận, đơn mua đã duyệt và sổ tồn; đơn bán đã xác nhận cần luồng trả hàng thay vì hủy trực tiếp.
+- Hoàn thiện luồng đề nghị chi phí: kiểm tra khoản chi, gửi lại sau khi bị từ chối, ghi bút toán khi duyệt và payment khi chi trả.
+- Hoàn thiện luồng nghỉ phép gửi duyệt qua module phê duyệt chung; đơn bị từ chối gửi lại được và khoảng ngày được kiểm tra bằng Rust.
+- Củng cố kế toán Rust: hóa đơn/payment dương, chỉ thanh toán đủ hóa đơn đã ghi sổ, khóa sửa/xóa chứng từ tài chính, kiểm tra tài khoản tenant và bút toán Nợ/Có cân bằng; tự sinh bút toán cho hóa đơn, thanh toán và hoàn ứng.
+- Hoàn thiện vòng đời mua hàng: đơn mua chỉ gửi phê duyệt sau khi chốt giá, đề nghị mua và đơn mua đồng bộ trạng thái duyệt/từ chối, chứng từ bị từ chối có thể sửa và gửi lại; Rust kiểm tra dòng hàng, số lượng, đơn giá và tổng tiền trước khi gửi.
+- Củng cố bán hàng: báo giá đã gửi/đã chấp nhận bị khóa, báo giá hết hạn không thể chấp nhận, báo giá bị từ chối có thể cập nhật gửi lại; đơn bán phải có đơn giá hợp lệ trước khi xác nhận.
+- Khép kín bảng lương: phiếu lương bất biến để giữ tổng bảng chính xác, Rust đối chiếu tổng phiếu trước khi duyệt, luồng phê duyệt chung đồng bộ trạng thái, ghi sổ Nợ/Có và tạo payment cùng bút toán chi lương khi trả.
+- Kiểm soát chấm công trong Rust: giờ kết thúc phải sau giờ bắt đầu, chỉ nhân viên đang làm việc được chấm công và mỗi nhân viên có tối đa một bản ghi mỗi ngày.
+- Chuẩn hóa kiểm kê kho một đường ghi sổ: bỏ action `done` bỏ qua phê duyệt và rule ghi kho trùng; phiếu bị từ chối gửi lại được, còn khi bật phê duyệt chung Rust bắt buộc có quyết định duyệt trước khi điều chỉnh tồn.
+- Bổ sung luồng hàng bán bị trả: phiếu trả gắn đơn gốc, giới hạn lượng lũy kế theo giá bán, nhận về đúng kho, phê duyệt tùy chọn và đồng bộ nhập kho với credit note/bút toán giảm doanh thu trong cùng transaction.
+- Bổ sung luồng hàng mua trả nhà cung cấp: giới hạn lượng lũy kế theo đơn mua/đơn giá, gửi duyệt rồi xuất kho, và lập chứng từ giảm phải trả/giá trị hàng tồn theo hóa đơn mua gốc.
+- Hỗ trợ thu/chi hóa đơn nhiều đợt: mỗi payment bị giới hạn bởi số dư thực còn lại sau credit/debit note; hệ thống cập nhật paid amount, adjustment amount, balance due và trạng thái thanh toán/cấn trừ sau khi ghi sổ trong transaction.
+
+## [0.2.0] — 2026-11-10
+
+### Thêm
+- **Lưu trữ bền vững** bằng SQLite (`node:sqlite`): dữ liệu, doanh nghiệp, người dùng, phiên, nhật ký sự kiện và kiểm toán trong một tệp; migration có phiên bản.
+- **Giao dịch:** mỗi thao tác ghi chạy trong một giao dịch gồm cả các bước tự động; mỗi luật tích hợp trong savepoint; ghi tuần tự hóa.
+- **Xác thực thật:** mật khẩu (scrypt), phiên 12 giờ, API token (chỉ lưu băm SHA-256), giới hạn 5 lần sai/15 phút, thu hồi phiên khi đổi mật khẩu/khóa tài khoản, quản lý vai trò tùy chỉnh.
+- **Nhật ký kiểm toán** các thao tác của người dùng.
+- **Quyền dữ liệu:** xuất JSON/CSV, nhập CSV/JSON tất-cả-hoặc-không, xóa doanh nghiệp có xác nhận tên; chống CSV/formula injection.
+- **Sao lưu nóng** `npm run backup` (VACUUM INTO + kiểm toàn vẹn).
+- **API:** OpenAPI 3.1 tự sinh (`/api/openapi.json`), giới hạn tốc độ, `x-request-id`, log truy cập JSON, header bảo mật + CSP nghiêm, chống path traversal, chế độ dùng thử có dữ liệu mẫu.
+- **Giao diện web** (design system v1.0): đăng nhập/tạo doanh nghiệp theo ngành, trang chủ, danh sách, form sinh tự động (gồm bộ sửa dòng hàng), chi tiết bản ghi với hành động theo trạng thái, **timeline hệ quả liên module**, dòng sự kiện, cài đặt quản trị (người dùng, vai trò, module, trường mở rộng, dữ liệu, token, nhật ký), chế độ sáng/tối, responsive.
+- **Kiểm thử E2E** bằng Chrome thật + **axe-core** (WCAG 2.1 AA): `npm run e2e`.
+- **Tài liệu:** kiến trúc, design system, API, bảo mật, triển khai, hướng dẫn viết module, 6 ADR; bản đồ tích hợp, danh mục module, gói ngành và OpenAPI được sinh tự động.
+- Dockerfile (chưa build thử).
+
+### Thay đổi
+- `User` không còn trường `token`; token nằm trong bảng phiên và chỉ lưu băm. `addUser` vẫn trả `token` một lần khi tài khoản không có mật khẩu.
+- Danh sách/lọc dùng `Store.find` (SQL `json_extract` cho bản SQLite).
+- `POST /api/tenants` nhận thêm `admin: {name, email, password}` và trả `token` (phiên) bên cạnh `adminToken`.
+
+### Sửa
+- Tương phản không đạt chuẩn AA: chú thích `--text-faint` trên nền trang (4.42 → 4.96:1) và viền ô nhập liệu (1.81 → 3.40:1).
+- Lỗi accessibility do axe phát hiện: link trong đoạn văn chỉ phân biệt bằng màu; `<th>` rỗng; role ARIA sai ở bộ sửa dòng hàng.
+- Thông báo validate hiện tên trường thô ("name") → câu thân thiện ("Vui lòng nhập tên").
+
+## [0.1.0] — 2026-11-10
+
+### Thêm
+- Kernel (đa tenant, RBAC, validation, máy trạng thái, event bus, rule engine, registry + lint).
+- 49 module, 22 gói ngành, API HTTP, portal xem danh mục, 30 test.
+
+- Chụp loại sản phẩm và cờ theo dõi tồn vào dòng bán hàng/POS trong Rust; dịch vụ và sản phẩm số không tạo biến động kho, còn hoàn tiền vẫn giữ được dấu vết hàng hóa đã ngừng kinh doanh.
+
+- Bắt buộc chỉ định kho khi hoàn tất các luồng xuất kho dịch vụ hiện trường, nhà hàng, sửa xe và cấp phát thuốc; đồng bộ phụ thuộc kho/kế toán cho các module ngành có tích hợp tự động.
+
+- Nhà hàng trừ tồn theo snapshot nguyên liệu của công thức món thay vì trừ mã món; thêm trường hệ thống chỉ đọc/ẩn cho các kết quả workflow do Rust tính.
+
+- Khóa dòng hóa đơn/đơn mua trong transaction khi đối chiếu khoản thu, trả và điều chỉnh giảm, tránh hai giao dịch đồng thời vượt số dư; payment tạo thủ công phải gắn hóa đơn và không được giả mạo nguồn hệ thống.
+
+- Hoàn thiện đặt lịch: kiểm tra giờ kết thúc, tự tính thời lượng và giá từ dịch vụ, giữ nguyên dữ liệu lịch sau xác nhận và chỉ phát hóa đơn cho lịch có phí dương.
+
+- Hạn mức tín dụng khách hàng: kiểm tra công nợ hóa đơn hiện hành cộng đơn bán mới trong transaction khi xác nhận; ngăn hạ hạn mức thấp hơn công nợ.
+
+- Tự áp giá bảng giá/giá sản phẩm vào dòng báo giá và đơn bán khi chưa nhập giá; kiểm tra nội dung bảng giá theo tenant và loại đối tác khách hàng/nhà cung cấp khi xác nhận nghiệp vụ.
+
+

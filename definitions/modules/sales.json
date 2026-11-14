@@ -1,0 +1,338 @@
+{
+ "id": "sales",
+ "name": "Bán hàng",
+ "description": "Báo giá, đơn bán, bảng giá và trả hàng. Đơn có vận đơn chỉ xuất kho khi giao thành công; đơn bán trực tiếp xuất kho khi xác nhận.",
+ "category": "sales",
+ "version": "0.2.0",
+ "depends": [
+  "master-data",
+  "inventory",
+  "accounting"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "quotation",
+   "label": "Báo giá",
+   "fields": [
+    {
+     "name": "party",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "warehouse",
+     "type": "ref",
+     "required": false,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "price_list",
+     "type": "ref",
+     "required": false,
+     "ref": "sales.price_list"
+    },
+    {
+     "name": "lines",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "tax_total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "valid_until",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "note",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "rejected",
+      "sent",
+      "accepted",
+      "expired"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "sent": {
+      "from": [
+       "draft",
+       "rejected"
+      ],
+      "to": "sent"
+     },
+     "accepted": {
+      "from": [
+       "sent"
+      ],
+      "to": "accepted"
+     },
+     "rejected": {
+      "from": [
+       "sent"
+      ],
+      "to": "rejected"
+     },
+     "expired": {
+      "from": [
+       "sent"
+      ],
+      "to": "expired"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "sales_order",
+   "label": "Đơn bán hàng",
+   "fields": [
+    {
+     "name": "party",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "warehouse",
+     "type": "ref",
+     "required": false,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "price_list",
+     "type": "ref",
+     "required": false,
+     "ref": "sales.price_list"
+    },
+    {
+     "name": "lines",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "tax_total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "order_date",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "source",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "source_id",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "shipping_address",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "confirmed",
+      "partially_delivered",
+      "delivered",
+      "cancelled"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "confirmed": {
+      "from": [
+       "draft"
+      ],
+      "to": "confirmed"
+     },
+     "delivered": {
+      "from": [
+        "confirmed",
+        "partially_delivered"
+      ],
+      "to": "delivered"
+     },
+     "partially_delivered": {
+      "from": [
+       "confirmed"
+      ],
+      "to": "partially_delivered"
+     },
+     "cancelled": {
+      "from": [
+       "draft"
+      ],
+      "to": "cancelled"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "sales_return",
+   "label": "Phiếu trả hàng bán",
+   "fields": [
+    {
+     "name": "sales_order",
+     "type": "ref",
+     "required": true,
+     "ref": "sales.sales_order"
+    },
+    {
+     "name": "warehouse",
+     "type": "ref",
+     "required": false,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "lines",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "tax_total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "reason",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "rejected",
+      "submitted",
+      "approved",
+      "received",
+      "cancelled"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "submitted": {
+      "from": [
+       "draft",
+       "rejected"
+      ],
+      "to": "submitted"
+     },
+     "approved": {
+      "from": [
+       "submitted"
+      ],
+      "to": "approved"
+     },
+     "rejected": {
+      "from": [
+       "submitted"
+      ],
+      "to": "rejected"
+     },
+     "received": {
+      "from": [
+       "approved"
+      ],
+      "to": "received"
+     },
+     "cancelled": {
+      "from": [
+       "draft",
+       "rejected"
+      ],
+      "to": "cancelled"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "price_list",
+   "label": "Bảng giá",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "items",
+     "type": "json",
+     "required": true
+    },
+    {
+     "name": "currency",
+     "type": "string",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

@@ -1,0 +1,69 @@
+{
+ "id": "beauty-wellness",
+ "name": "Làm đẹp - Spa - Gym",
+ "description": "Spa, salon, thẩm mỹ, phòng gym, yoga, trung tâm thể thao.",
+ "modules": [
+  "booking",
+  "subscription",
+  "loyalty",
+  "pos",
+  "inventory",
+  "crm",
+  "marketing",
+  "communication",
+  "accounting",
+  "einvoice",
+  "hrm",
+  "payroll",
+  "bi"
+ ],
+ "terminology": {
+  "master-data.party": "Khách hàng/Hội viên",
+  "master-data.product": "Dịch vụ/Sản phẩm",
+  "subscription.plan": "Gói hội viên",
+  "booking.resource": "Kỹ thuật viên/Phòng"
+ },
+ "customFields": {
+  "master-data.party": [
+   {
+    "name": "skin_type",
+    "type": "string",
+    "required": false
+   },
+   {
+    "name": "health_note",
+    "type": "text",
+    "required": false
+   },
+   {
+    "name": "birthday",
+    "type": "date",
+    "required": false
+   }
+  ]
+ },
+ "roles": {
+  "therapist": {
+   "name": "Kỹ thuật viên",
+   "permissions": [
+    "booking.booking.*",
+    "booking.resource.read"
+   ]
+  },
+  "reception": {
+   "name": "Lễ tân",
+   "permissions": [
+    "booking.*",
+    "subscription.*",
+    "pos.*",
+    "loyalty.*"
+   ]
+  }
+ },
+ "kpis": [
+  "Tỷ lệ lấp đầy lịch",
+  "Tỷ lệ hội viên gia hạn",
+  "Doanh thu/kỹ thuật viên",
+  "Tỷ lệ no-show"
+ ]
+}

@@ -1,0 +1,145 @@
+{
+ "id": "charity",
+ "name": "Từ thiện / Phi lợi nhuận",
+ "description": "Chương trình, nhà tài trợ, người thụ hưởng. Nhận tiền ủng hộ tự ghi nhận thu.",
+ "category": "industry",
+ "version": "0.1.0",
+ "depends": [
+  "master-data",
+  "accounting"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "program",
+   "label": "Chương trình",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "budget",
+     "type": "money",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "donation",
+   "label": "Khoản ủng hộ",
+   "fields": [
+    {
+     "name": "donor",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "amount",
+     "type": "money",
+     "required": true
+    },
+    {
+     "name": "method",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "cash",
+      "card",
+      "transfer",
+      "ewallet",
+      "bank"
+     ]
+    },
+    {
+     "name": "program",
+     "type": "ref",
+     "required": false,
+     "ref": "charity.program"
+    },
+    {
+     "name": "note",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "pledged",
+      "received"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "pledged",
+    "actions": {
+     "received": {
+      "from": [
+       "pledged"
+      ],
+      "to": "received"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "disbursement",
+   "label": "Khoản hỗ trợ",
+   "fields": [
+    { "name": "beneficiary", "type": "ref", "required": true, "ref": "charity.beneficiary" },
+    { "name": "program", "type": "ref", "required": true, "ref": "charity.program" },
+    { "name": "expense_account", "type": "ref", "required": true, "ref": "accounting.account" },
+    { "name": "amount", "type": "money", "required": true },
+    { "name": "method", "type": "enum", "required": true, "options": ["cash", "card", "transfer", "ewallet", "bank"] },
+    { "name": "purpose", "type": "text", "required": true },
+    { "name": "status", "type": "enum", "required": false, "options": ["requested", "approved", "rejected", "paid"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "requested",
+    "actions": {
+     "approved": { "from": ["requested"], "to": "approved" },
+     "rejected": { "from": ["requested"], "to": "rejected" },
+     "paid": { "from": ["approved"], "to": "paid" }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "beneficiary",
+   "label": "Người thụ hưởng",
+   "fields": [
+    {
+     "name": "party",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "program",
+     "type": "ref",
+     "required": true,
+     "ref": "charity.program"
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

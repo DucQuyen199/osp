@@ -1,0 +1,67 @@
+{
+ "id": "finance",
+ "name": "Tài chính - Bảo hiểm",
+ "description": "Công ty tài chính tiêu dùng, tín dụng vi mô, đại lý bảo hiểm.",
+ "modules": [
+  "lending",
+  "insurance",
+  "crm",
+  "contract",
+  "document",
+  "workflow-approval",
+  "communication",
+  "accounting",
+  "einvoice",
+  "hrm",
+  "payroll",
+  "bi"
+ ],
+ "terminology": {
+  "master-data.party": "Khách hàng vay/Người mua BH",
+  "master-data.product": "Sản phẩm tài chính",
+  "crm.deal": "Hồ sơ vay/BH"
+ },
+ "customFields": {
+  "master-data.party": [
+   {
+    "name": "national_id",
+    "type": "string",
+    "required": false
+   },
+   {
+    "name": "monthly_income",
+    "type": "money",
+    "required": false
+   },
+   {
+    "name": "credit_score",
+    "type": "number",
+    "required": false
+   }
+  ]
+ },
+ "roles": {
+  "loan_officer": {
+   "name": "Cán bộ tín dụng",
+   "permissions": [
+    "lending.*",
+    "crm.*",
+    "document.*"
+   ]
+  },
+  "underwriter": {
+   "name": "Thẩm định",
+   "permissions": [
+    "lending.loan.*",
+    "insurance.*",
+    "workflow-approval.*"
+   ]
+  }
+ },
+ "kpis": [
+  "Dư nợ",
+  "Tỷ lệ nợ xấu (NPL)",
+  "Tỷ lệ phê duyệt",
+  "Tỷ lệ bồi thường"
+ ]
+}

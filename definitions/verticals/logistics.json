@@ -1,0 +1,56 @@
+{
+ "id": "logistics",
+ "name": "Vận tải - Logistics",
+ "description": "Công ty vận tải, giao nhận, kho vận, chuyển phát.",
+ "modules": [
+  "logistics",
+  "sales",
+  "crm",
+  "contract",
+  "asset",
+  "maintenance",
+  "inventory",
+  "accounting",
+  "einvoice",
+  "hrm",
+  "payroll",
+  "bi"
+ ],
+ "terminology": {
+  "master-data.party": "Chủ hàng",
+  "master-data.product": "Dịch vụ vận chuyển",
+  "logistics.shipment": "Vận đơn"
+ },
+ "customFields": {
+  "master-data.party": [
+   {
+    "name": "contract_rate_tier",
+    "type": "string",
+    "required": false
+   }
+  ]
+ },
+ "roles": {
+  "dispatcher": {
+   "name": "Điều độ",
+   "permissions": [
+    "logistics.*",
+    "sales.sales_order.read"
+   ]
+  },
+  "driver": {
+   "name": "Tài xế",
+   "permissions": [
+    "logistics.shipment.read",
+    "logistics.shipment.delivered",
+    "logistics.shipment.failed"
+   ]
+  }
+ },
+ "kpis": [
+  "Tỷ lệ giao đúng hẹn",
+  "Chi phí/km",
+  "Hiệu suất sử dụng xe",
+  "Số vận đơn/ngày"
+ ]
+}

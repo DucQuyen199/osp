@@ -1,0 +1,63 @@
+{
+ "id": "construction",
+ "name": "Xây dựng - Nội thất",
+ "description": "Nhà thầu, thi công, thiết kế - nội thất.",
+ "modules": [
+  "construction",
+  "project",
+  "purchasing",
+  "inventory",
+  "contract",
+  "document",
+  "workflow-approval",
+  "asset",
+  "maintenance",
+  "accounting",
+  "einvoice",
+  "hrm",
+  "payroll",
+  "bi"
+ ],
+ "terminology": {
+  "master-data.party": "Chủ đầu tư/Khách hàng",
+  "master-data.product": "Vật tư xây dựng",
+  "project.project": "Công trình"
+ },
+ "customFields": {
+  "master-data.product": [
+   {
+    "name": "norm_code",
+    "type": "string",
+    "required": false
+   },
+   {
+    "name": "brand",
+    "type": "string",
+    "required": false
+   }
+  ]
+ },
+ "roles": {
+  "site_manager": {
+   "name": "Chỉ huy công trường",
+   "permissions": [
+    "construction.*",
+    "project.*",
+    "inventory.stock_move.*"
+   ]
+  },
+  "estimator": {
+   "name": "Dự toán",
+   "permissions": [
+    "construction.boq.*",
+    "project.project.read"
+   ]
+  }
+ },
+ "kpis": [
+  "Tiến độ so với kế hoạch",
+  "Chi phí thực tế vs dự toán",
+  "Công nợ thầu phụ",
+  "Vật tư hao hụt"
+ ]
+}

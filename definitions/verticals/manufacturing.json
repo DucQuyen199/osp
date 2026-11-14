@@ -1,0 +1,74 @@
+{
+ "id": "manufacturing",
+ "name": "Sản xuất",
+ "description": "Nhà máy, xưởng sản xuất, gia công, lắp ráp.",
+ "modules": [
+  "manufacturing",
+  "quality",
+  "inventory",
+  "purchasing",
+  "sales",
+  "crm",
+  "asset",
+  "maintenance",
+  "workflow-approval",
+  "accounting",
+  "einvoice",
+  "hrm",
+  "payroll",
+  "bi"
+ ],
+ "terminology": {
+  "master-data.party": "Khách hàng",
+  "master-data.product": "Vật tư/Thành phẩm"
+ },
+ "customFields": {
+  "master-data.product": [
+   {
+    "name": "drawing_no",
+    "type": "string",
+    "required": false
+   },
+   {
+    "name": "spec",
+    "type": "text",
+    "required": false
+   },
+   {
+    "name": "shelf_life_days",
+    "type": "number",
+    "required": false
+   }
+  ]
+ },
+ "roles": {
+  "planner": {
+   "name": "Kế hoạch sản xuất",
+   "permissions": [
+    "manufacturing.*",
+    "inventory.*.read",
+    "sales.sales_order.read"
+   ]
+  },
+  "qc": {
+   "name": "QC",
+   "permissions": [
+    "quality.*",
+    "manufacturing.production_order.read"
+   ]
+  },
+  "technician": {
+   "name": "Kỹ thuật bảo trì",
+   "permissions": [
+    "maintenance.*",
+    "asset.*.read"
+   ]
+  }
+ },
+ "kpis": [
+  "OEE",
+  "Tỷ lệ phế phẩm",
+  "Tiến độ lệnh sản xuất",
+  "Giá thành đơn vị"
+ ]
+}

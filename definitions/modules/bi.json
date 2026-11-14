@@ -1,0 +1,88 @@
+{
+ "id": "bi",
+ "name": "Báo cáo & phân tích",
+ "description": "Dashboard, báo cáo, KPI. Khung để đọc dữ liệu chéo mọi module.",
+ "category": "platform",
+ "version": "0.2.0",
+ "depends": [],
+ "core": false,
+ "entities": [
+  {
+   "name": "dashboard",
+   "label": "Dashboard",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "widgets",
+     "type": "json",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "report",
+   "label": "Báo cáo",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "query",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "schedule",
+     "type": "string",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "kpi",
+   "label": "Chỉ tiêu KPI",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "report",
+     "type": "ref",
+     "required": false,
+     "ref": "bi.report"
+    },
+    {
+     "name": "formula",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "target",
+     "type": "number",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

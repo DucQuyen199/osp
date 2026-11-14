@@ -1,0 +1,62 @@
+{
+ "id": "professional-services",
+ "name": "Dịch vụ chuyên nghiệp",
+ "description": "Luật, kế toán - kiểm toán, tư vấn, agency, kiến trúc.",
+ "modules": [
+  "case-management",
+  "project",
+  "crm",
+  "contract",
+  "document",
+  "expense",
+  "communication",
+  "accounting",
+  "einvoice",
+  "hrm",
+  "payroll",
+  "bi"
+ ],
+ "terminology": {
+  "master-data.party": "Thân chủ/Khách hàng",
+  "master-data.product": "Dịch vụ",
+  "case-management.case": "Vụ việc/Hồ sơ"
+ },
+ "customFields": {
+  "master-data.party": [
+   {
+    "name": "industry",
+    "type": "string",
+    "required": false
+   },
+   {
+    "name": "engagement_partner",
+    "type": "string",
+    "required": false
+   }
+  ]
+ },
+ "roles": {
+  "consultant": {
+   "name": "Chuyên viên",
+   "permissions": [
+    "case-management.*",
+    "project.timesheet.*",
+    "document.*"
+   ]
+  },
+  "partner": {
+   "name": "Đối tác/Trưởng nhóm",
+   "permissions": [
+    "case-management.*",
+    "contract.*",
+    "crm.*"
+   ]
+  }
+ },
+ "kpis": [
+  "Tỷ lệ giờ tính phí",
+  "Doanh thu theo vụ việc",
+  "WIP chưa xuất hóa đơn",
+  "Doanh thu/nhân sự"
+ ]
+}

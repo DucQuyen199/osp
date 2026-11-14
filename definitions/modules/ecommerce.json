@@ -1,0 +1,135 @@
+{
+ "id": "ecommerce",
+ "name": "Thương mại điện tử",
+ "description": "Cửa hàng trực tuyến và đơn web/app/sàn. Đặt hàng sẽ tự tạo đơn bán, hóa đơn, xuất kho và vận đơn.",
+ "category": "sales",
+ "version": "0.2.0",
+ "depends": [
+  "master-data",
+  "inventory",
+  "sales"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "storefront",
+   "label": "Gian hàng",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "domain",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "currency",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "warehouse",
+     "type": "ref",
+     "required": true,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "price_list",
+     "type": "ref",
+     "required": false,
+     "ref": "sales.price_list"
+    },
+    {
+     "name": "tax",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.tax"
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "web_order",
+   "label": "Đơn online",
+   "fields": [
+    {
+     "name": "party",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "storefront",
+     "type": "ref",
+     "required": true,
+     "ref": "ecommerce.storefront"
+    },
+    {
+     "name": "lines",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "total",
+     "type": "money",
+    "required": false,
+    "system": true
+    },
+    {
+     "name": "channel",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "web",
+      "app",
+      "marketplace"
+     ]
+    },
+    {
+     "name": "shipping_address",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "cart",
+      "placed",
+      "cancelled"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "cart",
+    "actions": {
+     "placed": {
+      "from": [
+       "cart"
+      ],
+      "to": "placed"
+     },
+     "cancelled": {
+      "from": [
+       "cart"
+      ],
+      "to": "cancelled"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

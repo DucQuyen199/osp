@@ -1,0 +1,233 @@
+// Kiểm thử giao diện đầu-cuối bằng Chrome thật: luồng chức năng + kiểm tra accessibility (axe-core, WCAG 2.1 AA).
+//   npm run e2e            (cần Chrome/Edge; đặt CHROME_PATH nếu không ở vị trí mặc định)
+//   E2E_SHOTS=./shots npm run e2e   (lưu ảnh chụp các màn hình chính)
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { createServer } from 'node:net';
+import { dirname, join, relative, resolve, isAbsolute } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import puppeteer from 'puppeteer-core';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const CANDIDATES = [process.env.CHROME_PATH, 'C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+  '/usr/bin/google-chrome', '/usr/bin/chromium', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'].filter(Boolean);
+const chrome = CANDIDATES.find((p) => existsSync(p));
+if (!chrome) {
+  console.log('Bỏ qua E2E: không tìm thấy Chrome/Edge (đặt CHROME_PATH).');
+  process.exit(0);
+}
+
+const SHOTS = process.env.E2E_SHOTS;
+if (SHOTS) mkdirSync(SHOTS, { recursive: true });
+const axeSrc = readFileSync(join(ROOT, 'node_modules', 'axe-core', 'axe.min.js'), 'utf8');
+
+async function freePort() {
+  const socket = createServer();
+  await new Promise((resolve, reject) => socket.once('error', reject).listen(0, '127.0.0.1', resolve));
+  const { port } = socket.address();
+  await new Promise((resolve, reject) => socket.close((error) => error ? reject(error) : resolve()));
+  return port;
+}
+
+const appPort = await freePort();
+const postgresPort = await freePort();
+const pgDir = join(tmpdir(), `osp-e2e-${process.pid}`);
+const serverEnvironment = {
+  ...process.env,
+  OSP_ENV: 'test',
+  NODE_ENV: 'test',
+  OSP_DEFS: join(ROOT, 'definitions'),
+  OSP_PUBLIC: join(ROOT, 'client-dist'),
+  OSP_PORT: String(appPort),
+  OSP_PG_PORT: String(postgresPort),
+  OSP_PG_DIR: pgDir,
+  OSP_DEMO: '1',
+  OSP_SIGNUP: '1',
+  OSP_RATE_LIMIT: '100000',
+  OSP_JOBS_INTERVAL_SEC: '0',
+  OSP_OUTBOX_INTERVAL_SEC: '0',
+  OSP_COMM_INTERVAL_SEC: '0',
+  OSP_EINVOICE_INTERVAL_SEC: '0',
+};
+// Tests always own their temporary database, even if a developer has configured
+// DATABASE_URL in the parent environment.
+delete serverEnvironment.DATABASE_URL;
+const build = spawnSync('cargo', ['build', '--manifest-path', 'server/Cargo.toml', '--bin', 'osp-server'], {
+  cwd: ROOT,
+  stdio: 'inherit',
+});
+if (build.status !== 0) throw new Error(`Rust server build failed (${build.status ?? build.signal})`);
+const serverExecutable = join(ROOT, 'server', 'target', 'debug', process.platform === 'win32' ? 'osp-server.exe' : 'osp-server');
+const serverProcess = spawn(serverExecutable, [], {
+  cwd: ROOT,
+  env: serverEnvironment,
+  stdio: 'inherit',
+});
+let serverClosed = false;
+function assertOwnedDirectory() {
+  const resolved = resolve(pgDir);
+  const child = relative(resolve(tmpdir()), resolved);
+  if (!child || child.startsWith('..') || isAbsolute(child) || child !== `osp-e2e-${process.pid}`) {
+    throw new Error('Refusing to clean a path outside the owned E2E database directory');
+  }
+  return resolved;
+}
+function stopWindowsPostgres() {
+  if (process.platform !== 'win32') return;
+  const data = join(assertOwnedDirectory(), 'data');
+  if (!existsSync(join(data, 'postmaster.pid'))) return;
+  const options = readFileSync(join(data, 'postmaster.opts'), 'utf8');
+  const binary = options.match(/^(?:"([^"]+postgres(?:\.exe)?)"|(\S+postgres(?:\.exe)?))(?=\s|$)/i);
+  const executable = binary?.[1] || binary?.[2];
+  if (!executable) throw new Error('Cannot locate the owned PostgreSQL control binary');
+  const stop = spawnSync(join(dirname(executable), 'pg_ctl.exe'), ['stop', '-D', data, '-m', 'fast', '-w', '-t', '20'], {
+    stdio: 'pipe', windowsHide: true, timeout: 25_000,
+  });
+  if (stop.status !== 0) throw new Error(`Owned PostgreSQL shutdown failed (${stop.status})`);
+}
+process.once('exit', () => {
+  if (!serverClosed) {
+    try { stopWindowsPostgres(); } catch (error) { console.error(error.message); }
+    serverProcess.kill('SIGINT');
+  }
+});
+const BASE = `http://127.0.0.1:${appPort}`;
+const readyUntil = Date.now() + 120_000;
+while (Date.now() < readyUntil) {
+  if (serverProcess.exitCode !== null) throw new Error(`Rust server exited (${serverProcess.exitCode})`);
+  try {
+    const response = await fetch(`${BASE}/api/health`);
+    if (response.ok) break;
+  } catch {}
+  await new Promise((resolve) => setTimeout(resolve, 500));
+}
+if (Date.now() >= readyUntil) throw new Error('Rust server did not become healthy within 120 seconds');
+const browser = await puppeteer.launch({ executablePath: chrome, headless: 'new', args: ['--no-sandbox'] });
+const page = await browser.newPage();
+await page.setViewport({ width: 1440, height: 900 });
+
+const problems = [];
+page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
+page.on('console', (m) => { if (m.type() === 'error' && !/status of 4/.test(m.text())) problems.push(`console.error: ${m.text()}`); });
+page.on('response', (r) => { if (r.status() >= 400 && r.status() !== 422 && !r.url().includes('/auth/login')) problems.push(`http ${r.status()} ${r.url()}`); });
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const shot = (n) => (SHOTS ? page.screenshot({ path: join(SHOTS, `${n}.png`) }) : null);
+const clickText = (text, sel = 'button, a') => page.evaluate((t, s) => {
+  const el = [...document.querySelectorAll(s)].find((e) => e.textContent.trim().replace(/^[＋+]\s*/, '') === t && e.offsetParent !== null);
+  if (el) el.click();
+  return !!el;
+}, text, sel);
+let failed = 0;
+const step = async (label, fn) => {
+  try { await fn(); console.log('✔', label); } catch (e) { failed++; console.log('✖', label, '-', e.message); }
+};
+const must = (cond, msg) => { if (!cond) throw new Error(msg); };
+
+async function axe(label) {
+  await sleep(450); // chờ animation drawer/dialog kết thúc để đo màu đúng (độ mờ = 1)
+  await page.evaluate(axeSrc);
+  const v = await page.evaluate(async () => (await axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'] } }))
+    .violations.map((x) => `${x.id} (${x.impact}): ${x.nodes[0].target.join(' ')}`));
+  must(!v.length, `${label}: ${v.join(' | ')}`);
+}
+
+await step('đăng nhập + tạo doanh nghiệp: accessibility', async () => {
+  await page.goto(`${BASE}/#/login`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('.landing');
+  await axe('đăng nhập');
+  await clickText('Tạo doanh nghiệp', 'button.tab');
+  await sleep(200);
+  await axe('tạo doanh nghiệp');
+});
+
+await step('dùng thử -> trang chủ có số liệu', async () => {
+  await page.goto(`${BASE}/?demo=retail&go=/`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('.stat');
+  must((await page.$$('.stat')).length >= 4, 'thiếu thẻ số liệu');
+  await axe('trang chủ');
+  await shot('home');
+});
+
+await step('danh sách -> chi tiết -> xác nhận kéo theo luồng liên module', async () => {
+  await page.goto(`${BASE}/#/e/sales/sales_order`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('table.table');
+  await axe('danh sách');
+  await page.evaluate(() => [...document.querySelectorAll('tbody tr')].find((r) => r.textContent.includes('Nháp')).click());
+  await page.waitForSelector('dialog.drawer[open] .dl');
+  await axe('chi tiết');
+  must(await clickText('Xác nhận', 'dialog button'), 'không có nút Xác nhận');
+  await page.waitForSelector('.toast');
+  await sleep(700);
+  const text = await page.evaluate(() => document.querySelector('dialog.drawer').textContent);
+  must(/Kế toán/.test(text) && /Kho/.test(text), 'tab hệ quả thiếu Kế toán/Kho');
+  await shot('flow');
+});
+
+await step('form: validate thân thiện, tạo thành công', async () => {
+  await page.keyboard.press('Escape');
+  await page.goto(`${BASE}/#/e/master-data/party`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('table.table');
+  must(await clickText('Tạo khách hàng', 'button'), 'không có nút tạo khách hàng');
+  await page.waitForSelector('dialog.drawer[open] form');
+  await axe('form');
+  await clickText('Tạo mới', 'dialog button');
+  await sleep(500);
+  const err = await page.evaluate(() => document.querySelector('dialog .error-text:not(.hidden)')?.textContent || '');
+  must(/Vui lòng nhập|Thiếu trường bắt buộc: Tên/.test(err), `thông báo lỗi chưa thân thiện: "${err}"`);
+  await page.type('dialog input[type=text]', 'Khách E2E');
+  await clickText('Tạo mới', 'dialog button');
+  await page.waitForSelector('.toast');
+  await page.waitForFunction(() => document.querySelector('tbody')?.textContent.includes('Khách E2E'));
+});
+
+await step('cài đặt, dòng sự kiện: accessibility', async () => {
+  for (const [hash, sel, label] of [['#/settings/users', 'table.table', 'người dùng'], ['#/settings/modules', 'table.table', 'module'], ['#/settings/data', '.card', 'dữ liệu'], ['#/events', '.timeline', 'sự kiện']]) {
+    await page.goto(`${BASE}/${hash}`, { waitUntil: 'networkidle0' });
+    await page.waitForSelector(sel);
+    await axe(label);
+  }
+  await page.goto(`${BASE}/#/settings/audit`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('table.table');
+});
+
+await step('giao diện tối: accessibility', async () => {
+  await page.goto(`${BASE}/#/`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('h1');
+  await page.click('button[aria-label^="Chuyển sang giao diện tối"]');
+  await sleep(300);
+  await axe('trang chủ (tối)');
+  await shot('dark');
+});
+
+await step('di động 390px: không tràn ngang, mở được menu', async () => {
+  await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+  await page.goto(`${BASE}/#/e/master-data/product`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('table.table');
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+  must(!overflow, 'trang bị cuộn ngang');
+  await page.click('button[aria-controls="nav"]');
+  await sleep(350);
+  must(await page.evaluate(() => document.querySelector('.sidebar').classList.contains('open')), 'menu không mở');
+  await shot('mobile-nav');
+});
+
+await step('đăng xuất', async () => {
+  await page.setViewport({ width: 1440, height: 900 });
+  await page.goto(`${BASE}/#/`, { waitUntil: 'networkidle0' });
+  await page.click('.menu > button');
+  await clickText('Đăng xuất', 'button');
+  await page.waitForSelector('.landing');
+});
+
+await browser.close();
+stopWindowsPostgres();
+const exited = serverProcess.exitCode !== null ? Promise.resolve() : new Promise((resolve) => serverProcess.once('exit', resolve));
+serverClosed = true;
+serverProcess.kill('SIGINT');
+await exited;
+rmSync(assertOwnedDirectory(), { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+for (const p of [...new Set(problems)]) { failed++; console.log('✖', p); }
+console.log(failed ? `\n${failed} lỗi` : '\nE2E đạt: chức năng + accessibility (axe) không lỗi.');
+process.exit(failed ? 1 : 0);

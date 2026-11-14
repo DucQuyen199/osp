@@ -1,0 +1,51 @@
+[package]
+name = "osp-server"
+default-run = "osp-server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+argon2 = "0.6.0"
+async-recursion = "1.2.0"
+axum = { version = "0.8.9", features = ["macros"] }
+base64 = "0.23.1"
+bytes = "1.12.1"
+chrono = { version = "0.4.45", features = ["serde"] }
+csv = "1.4.0"
+deadpool-postgres = "0.14.2"
+futures = "0.3.34"
+hex = "0.4.3"
+hmac = "0.13.0"
+lettre = { version = "=0.11.23", default-features = false, features = ["builder", "pool", "smtp-transport", "tokio1-rustls-tls"] }
+reqwest = { version = "0.12.28", default-features = false, features = ["json", "rustls-tls"] }
+roxmltree = "0.21.1"
+postgresql_embedded = { version = "0.22.0", features = ["bundled", "tokio"], optional = true }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = { version = "1.0.154", features = ["arbitrary_precision"] }
+rust_decimal = "1.43.0"
+sha2 = "0.11.1"
+subtle = "2.6.1"
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", features = ["full"] }
+tokio-postgres = { version = "0.7.18", features = ["with-serde_json-1", "with-uuid-1", "with-chrono-0_4"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["json", "env-filter"] }
+uuid = { version = "1.29.2", features = ["v4", "serde", "v5"] }
+url = "2.5.8"
+tower-http = { version = "0.7.1", features = ["fs", "compression-gzip", "trace", "request-id", "set-header", "catch-panic"] }
+tower = { version = "0.5", features = ["util"] }
+governor = "0.10.4"
+percent-encoding = "2.3.2"
+
+[features]
+default = ["embedded-pg"]
+# PostgreSQL nhúng (tải binary chính thức) cho dev/demo/test; build production dùng --no-default-features
+embedded-pg = ["dep:postgresql_embedded"]
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[dev-dependencies]
+tempfile = "3.27.0"

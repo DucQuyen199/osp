@@ -1,0 +1,68 @@
+{
+ "id": "wholesale",
+ "name": "Bán buôn - Phân phối",
+ "description": "Nhà phân phối, đại lý, bán sỉ, FMCG.",
+ "modules": [
+  "crm",
+  "sales",
+  "purchasing",
+  "inventory",
+  "logistics",
+  "contract",
+  "workflow-approval",
+  "accounting",
+  "einvoice",
+  "hrm",
+  "payroll",
+  "bi"
+ ],
+ "terminology": {
+  "master-data.party": "Khách hàng/Đại lý",
+  "master-data.product": "Mặt hàng"
+ },
+ "customFields": {
+  "master-data.party": [
+   {
+    "name": "credit_limit",
+    "type": "money",
+    "required": false
+   },
+   {
+    "name": "payment_term_days",
+    "type": "number",
+    "required": false
+   },
+   {
+    "name": "sales_region",
+    "type": "string",
+    "required": false
+   }
+  ]
+ },
+ "roles": {
+  "sales_manager": {
+   "name": "Trưởng kinh doanh",
+   "permissions": [
+    "crm.*",
+    "sales.*",
+    "workflow-approval.*",
+    "master-data.*",
+    "inventory.warehouse.read",
+    "inventory.stock_level.read"
+   ]
+  },
+  "dispatcher": {
+   "name": "Điều phối giao hàng",
+   "permissions": [
+    "logistics.*",
+    "sales.sales_order.read"
+   ]
+  }
+ },
+ "kpis": [
+  "Doanh số theo khu vực/NVKD",
+  "Công nợ quá hạn",
+  "Tỷ lệ giao đúng hẹn",
+  "Tồn kho theo kho"
+ ]
+}

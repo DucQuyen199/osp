@@ -1,0 +1,235 @@
+{
+ "id": "real-estate",
+ "name": "Bất động sản",
+ "description": "Bất động sản, lịch xem, hợp đồng thuê. Bán xong tự lập hóa đơn; kích hoạt thuê tự tạo hợp đồng.",
+ "category": "industry",
+ "version": "0.1.0",
+ "depends": [
+  "master-data",
+  "accounting",
+  "contract"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "property",
+   "label": "Bất động sản",
+   "fields": [
+    {
+     "name": "title",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "kind",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "apartment",
+      "house",
+      "land",
+      "office",
+      "shop"
+     ]
+    },
+    {
+     "name": "address",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "area",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "price",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "buyer",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "available",
+      "reserved",
+      "sold",
+      "leased"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "available",
+    "actions": {
+     "reserved": {
+      "from": [
+       "available"
+      ],
+      "to": "reserved"
+     },
+     "sold": {
+      "from": [
+       "available",
+       "reserved"
+      ],
+      "to": "sold"
+     },
+     "leased": {
+      "from": [
+       "available",
+       "reserved"
+      ],
+      "to": "leased"
+     },
+     "released": {
+      "from": [
+       "leased"
+      ],
+      "to": "available"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "viewing",
+   "label": "Lịch xem",
+   "fields": [
+    {
+     "name": "property",
+     "type": "ref",
+     "required": true,
+     "ref": "real-estate.property"
+    },
+    {
+     "name": "party",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "at",
+     "type": "datetime",
+     "required": false
+    },
+    {
+     "name": "note",
+     "type": "text",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "lease",
+   "label": "Hợp đồng thuê",
+   "fields": [
+    {
+     "name": "property",
+     "type": "ref",
+     "required": true,
+     "ref": "real-estate.property"
+    },
+    {
+     "name": "tenant",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "rent",
+     "type": "money",
+     "required": true
+    },
+    {
+     "name": "billing_interval",
+     "type": "enum",
+     "required": false,
+     "options": ["monthly", "quarterly", "yearly"]
+    },
+    {
+     "name": "next_rent_date",
+     "type": "date",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "start_date",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "end_date",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "active",
+      "terminated"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "activated": {
+      "from": [
+       "draft"
+      ],
+      "to": "active"
+     },
+     "terminated": {
+      "from": [
+       "active"
+      ],
+      "to": "terminated"
+     },
+     "rent_due": {
+      "from": ["active"],
+      "to": "active"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "rent_cycle",
+   "label": "Kỳ thu tiền thuê",
+   "systemManaged": true,
+   "fields": [
+    { "name": "lease", "type": "ref", "required": true, "ref": "real-estate.lease", "system": true },
+    { "name": "party", "type": "ref", "required": true, "ref": "master-data.party", "system": true },
+    { "name": "period_start", "type": "date", "required": true, "system": true },
+    { "name": "period_end", "type": "date", "required": true, "system": true },
+    { "name": "amount", "type": "money", "required": true, "system": true },
+    { "name": "due_date", "type": "date", "required": true, "system": true },
+    { "name": "status", "type": "enum", "required": false, "options": ["invoiced"], "system": true }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

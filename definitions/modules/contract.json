@@ -1,0 +1,129 @@
+{
+ "id": "contract",
+ "name": "Hợp đồng",
+ "description": "Hợp đồng, điều khoản, vòng đời hiệu lực/hết hạn.",
+ "category": "operations",
+ "version": "0.1.0",
+ "depends": [
+  "master-data"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "contract",
+   "label": "Hợp đồng",
+   "fields": [
+    {
+     "name": "title",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "party",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "start_date",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "end_date",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "value",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "source",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "source_id",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "active",
+      "terminated",
+      "expired"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "activated": {
+      "from": [
+       "draft"
+      ],
+      "to": "active"
+     },
+     "terminated": {
+      "from": [
+       "active"
+      ],
+      "to": "terminated"
+     },
+     "cancelled": {
+      "from": [
+       "draft"
+      ],
+      "to": "terminated"
+     },
+     "expired": {
+      "from": [
+       "active"
+      ],
+      "to": "expired"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "clause",
+   "label": "Điều khoản",
+   "fields": [
+    {
+     "name": "contract",
+     "type": "ref",
+     "required": true,
+     "ref": "contract.contract"
+    },
+    {
+     "name": "title",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "body",
+     "type": "text",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

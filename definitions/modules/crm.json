@@ -1,0 +1,280 @@
+{
+ "id": "crm",
+ "name": "CRM - Quan hệ khách hàng",
+ "description": "Quản lý lead, cơ hội bán hàng, hoạt động chăm sóc. Thắng cơ hội sẽ tự sinh đơn hàng; chuyển đổi lead sẽ tự tạo khách hàng.",
+ "category": "sales",
+ "version": "0.1.0",
+ "depends": [
+  "master-data",
+  "sales"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "lead",
+   "label": "Lead",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "email",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "phone",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "company",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "source",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "owner",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "party",
+     "type": "ref",
+     "required": false,
+     "system": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "new",
+      "contacted",
+      "qualified",
+      "disqualified",
+      "converted"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "new",
+    "actions": {
+     "contacted": {
+      "from": [
+       "new"
+      ],
+      "to": "contacted"
+     },
+     "qualified": {
+      "from": [
+       "new",
+       "contacted"
+      ],
+      "to": "qualified"
+     },
+     "disqualified": {
+      "from": [
+       "new",
+       "contacted",
+       "qualified"
+      ],
+      "to": "disqualified"
+     },
+     "converted": {
+      "from": [
+       "qualified"
+      ],
+      "to": "converted"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "deal",
+   "label": "Cơ hội",
+   "fields": [
+    {
+     "name": "title",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "party",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "amount",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "stage",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "pipeline_stage",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "qualification",
+      "discovery",
+      "proposal",
+      "negotiation"
+     ]
+    },
+    {
+     "name": "probability",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "expected_close",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "owner",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "lead",
+     "type": "ref",
+     "required": false,
+     "ref": "crm.lead"
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "open",
+      "won",
+      "lost"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "open",
+    "actions": {
+     "won": {
+      "from": [
+       "open"
+      ],
+      "to": "won"
+     },
+     "lost": {
+      "from": [
+       "open"
+      ],
+      "to": "lost"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "pipeline_stage",
+   "label": "Cấu hình xác suất pipeline",
+   "fields": [
+    {
+     "name": "stage",
+     "type": "enum",
+     "required": true,
+     "options": [
+      "qualification",
+      "discovery",
+      "proposal",
+      "negotiation"
+     ]
+    },
+    {
+     "name": "name",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "probability",
+     "type": "number",
+     "required": true
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "activity",
+   "label": "Hoạt động",
+   "fields": [
+    {
+     "name": "subject",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "kind",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "call",
+      "meeting",
+      "email",
+      "task"
+     ]
+    },
+    {
+     "name": "due",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "deal",
+     "type": "ref",
+     "required": false,
+     "ref": "crm.deal"
+    },
+    {
+     "name": "lead",
+     "type": "ref",
+     "required": false,
+     "ref": "crm.lead"
+    },
+    {
+     "name": "party",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "done",
+     "type": "bool",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

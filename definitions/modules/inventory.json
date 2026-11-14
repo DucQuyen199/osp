@@ -1,0 +1,387 @@
+{
+ "id": "inventory",
+ "name": "Kho",
+ "description": "Kho đa địa điểm, phiếu nhập/xuất, tồn theo kho, lô/hạn dùng, kiểm kê và điều chuyển. Ghi nhận biến động đồng bộ với các module nghiệp vụ.",
+ "category": "supply",
+ "version": "0.1.0",
+ "depends": [
+  "master-data"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "warehouse",
+   "label": "Kho",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "branch",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.branch"
+    },
+    {
+     "name": "address",
+     "type": "string",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "warehouse_location",
+   "label": "Vị trí kho",
+   "fields": [
+    { "name": "warehouse", "type": "ref", "required": true, "ref": "inventory.warehouse" },
+    { "name": "code", "type": "string", "required": true },
+    { "name": "name", "type": "string", "required": true },
+    { "name": "active", "type": "bool", "required": false }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "stock_move",
+   "label": "Phiếu kho",
+   "systemManaged": true,
+   "fields": [
+    {
+     "name": "product",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.product"
+    },
+    {
+     "name": "warehouse",
+     "type": "ref",
+     "required": false,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "location",
+     "type": "ref",
+     "required": false,
+     "ref": "inventory.warehouse_location"
+    },
+    {
+     "name": "transfer_to_location",
+     "type": "ref",
+     "required": false,
+     "ref": "inventory.warehouse_location"
+    },
+    {
+     "name": "qty",
+     "type": "number",
+     "required": true
+    },
+    {
+     "name": "direction",
+     "type": "enum",
+     "required": true,
+     "options": [
+      "in",
+      "out"
+     ]
+    },
+    {
+     "name": "unit_cost",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "total_cost",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "fifo_allocations",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "fifo_date",
+     "type": "datetime",
+     "required": false
+    },
+    {
+     "name": "fifo_origin_id",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "lot",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "source",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "source_id",
+     "type": "string",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "reorder_rule",
+   "label": "Định mức bổ sung tồn kho",
+   "fields": [
+    { "name": "product", "type": "ref", "required": true, "ref": "master-data.product" },
+    { "name": "warehouse", "type": "ref", "required": true, "ref": "inventory.warehouse" },
+    { "name": "minimum_qty", "type": "number", "required": true },
+    { "name": "target_qty", "type": "number", "required": true }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "stock_level",
+   "label": "Tồn kho",
+   "systemManaged": true,
+   "fields": [
+    {
+     "name": "product",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.product"
+    },
+    {
+     "name": "warehouse",
+     "type": "ref",
+     "required": false,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "qty",
+     "type": "number",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "value",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "held_qty",
+     "type": "number",
+     "required": false,
+     "system": true
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": [
+    {
+     "type": "min",
+     "field": "qty",
+     "value": 0,
+     "unlessSetting": "allowNegativeStock",
+     "message": "Không đủ tồn kho cho {product:label}"
+    },
+    {
+     "type": "min",
+     "field": "held_qty",
+     "value": 0,
+     "message": "Lượng hàng giữ chờ QC không được âm"
+    }
+   ]
+  },
+  {
+   "name": "lot",
+   "label": "Lô hàng",
+   "fields": [
+    {
+     "name": "product",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.product"
+    },
+    {
+     "name": "code",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "expiry",
+     "type": "date",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "stock_count",
+   "label": "Kiểm kê",
+   "fields": [
+    {
+     "name": "warehouse",
+     "type": "ref",
+     "required": true,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "adjustment_lines",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "reason",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "cycle_count",
+      "damage",
+      "opening_balance",
+      "correction"
+     ]
+    },
+    {
+     "name": "note",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "rejected",
+      "submitted",
+      "approved",
+      "cancelled"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "submitted": {
+      "from": [
+       "draft",
+       "rejected"
+      ],
+      "to": "submitted"
+     },
+     "approved": {
+      "from": [
+       "submitted"
+      ],
+      "to": "approved"
+     },
+     "rejected": {
+      "from": [
+       "submitted"
+      ],
+      "to": "rejected"
+     },
+     "cancelled": {
+      "from": [
+       "draft",
+       "submitted",
+       "rejected"
+      ],
+      "to": "cancelled"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "stock_transfer",
+   "label": "Điều chuyển kho",
+   "fields": [
+    {
+     "name": "from_warehouse",
+     "type": "ref",
+     "required": true,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "to_warehouse",
+     "type": "ref",
+     "required": true,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "lines",
+     "type": "json",
+     "required": true
+    },
+    {
+     "name": "reference",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "note",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "dispatched",
+      "received",
+      "cancelled"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "dispatched": {
+      "from": [
+       "draft"
+      ],
+      "to": "dispatched"
+     },
+     "received": {
+      "from": [
+       "dispatched"
+      ],
+      "to": "received"
+     },
+     "cancelled": {
+      "from": [
+       "draft"
+      ],
+      "to": "cancelled"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

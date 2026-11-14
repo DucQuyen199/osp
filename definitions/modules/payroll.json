@@ -1,0 +1,361 @@
+{
+ "id": "payroll",
+ "name": "Tính lương",
+ "description": "Bảng lương, phiếu lương. Phiếu lương được khóa theo bảng nháp; gửi bảng lương tạo yêu cầu duyệt, duyệt ghi bút toán và đánh dấu đã trả tạo payment.",
+ "category": "people",
+ "version": "0.8.0",
+ "depends": [
+  "hrm",
+  "accounting"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "payroll_run",
+   "label": "Bảng lương",
+   "fields": [
+    {
+     "name": "period",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "hours_per_day",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "total_net",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+   {
+    "name": "payment_date",
+    "type": "date",
+    "required": false
+   },
+    {
+     "name": "payment_method",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "cash",
+      "bank"
+     ]
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "submitted",
+      "approved",
+      "rejected",
+      "paid",
+      "cancelled"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "calculated": {
+      "from": [
+       "draft"
+      ],
+      "to": "draft"
+     },
+     "submitted": {
+      "from": [
+       "draft"
+      ],
+      "to": "submitted"
+     },
+     "approved": {
+      "from": [
+       "submitted"
+      ],
+      "to": "approved"
+     },
+     "rejected": {
+      "from": [
+       "submitted"
+      ],
+      "to": "rejected"
+     },
+     "paid": {
+      "from": [
+       "approved"
+      ],
+      "to": "paid"
+     },
+     "cancelled": {
+      "from": [
+       "draft",
+       "rejected"
+      ],
+      "to": "cancelled"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "tax_policy",
+   "label": "Chính sách thuế lương",
+   "fields": [
+    { "name": "name", "type": "string", "required": true },
+    { "name": "effective_from", "type": "date", "required": true },
+    { "name": "effective_to", "type": "date", "required": false },
+    { "name": "personal_allowance", "type": "money", "required": true },
+    { "name": "dependent_allowance", "type": "money", "required": true },
+    { "name": "resident_brackets", "type": "json", "required": true },
+    { "name": "nonresident_rate", "type": "number", "required": true },
+    { "name": "rounding_unit", "type": "money", "required": true },
+    { "name": "tax_account", "type": "ref", "required": true, "ref": "accounting.account" },
+    { "name": "status", "type": "enum", "required": false, "options": ["draft", "approved"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": { "approved": { "from": ["draft"], "to": "approved" } }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "contribution_policy",
+   "label": "Chính sách đóng góp payroll",
+   "fields": [
+    { "name": "name", "type": "string", "required": true },
+    { "name": "effective_from", "type": "date", "required": true },
+    { "name": "effective_to", "type": "date", "required": false },
+    { "name": "basis", "type": "enum", "required": true, "options": ["salary", "gross"] },
+    { "name": "monthly_base_cap", "type": "money", "required": false },
+    { "name": "employee_rate", "type": "number", "required": true },
+    { "name": "employer_rate", "type": "number", "required": true },
+    { "name": "employee_deductible_for_tax", "type": "bool", "required": false },
+    { "name": "liability_account", "type": "ref", "required": true, "ref": "accounting.account" },
+    { "name": "employer_expense_account", "type": "ref", "required": true, "ref": "accounting.account" },
+    { "name": "status", "type": "enum", "required": false, "options": ["draft", "approved"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": { "approved": { "from": ["draft"], "to": "approved" } }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "payroll_adjustment",
+   "label": "Khoản cộng/trừ lương",
+   "fields": [
+    { "name": "employee", "type": "ref", "required": true, "ref": "hrm.employee" },
+    { "name": "period", "type": "string", "required": true },
+    { "name": "kind", "type": "enum", "required": true, "options": ["addition", "deduction"] },
+    { "name": "amount", "type": "money", "required": true },
+    { "name": "taxable", "type": "bool", "required": false },
+    { "name": "account", "type": "ref", "required": false, "ref": "accounting.account" },
+    { "name": "reason", "type": "text", "required": true },
+    { "name": "status", "type": "enum", "required": false, "options": ["draft", "submitted", "approved", "rejected"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "submitted": { "from": ["draft", "rejected"], "to": "submitted" },
+     "approved": { "from": ["submitted"], "to": "approved" },
+     "rejected": { "from": ["submitted"], "to": "rejected" }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "overtime_entry",
+   "label": "Giờ làm thêm",
+   "fields": [
+    { "name": "employee", "type": "ref", "required": true, "ref": "hrm.employee" },
+    { "name": "date", "type": "date", "required": true },
+    { "name": "hours", "type": "number", "required": true },
+    { "name": "multiplier", "type": "number", "required": true },
+    { "name": "reason", "type": "text", "required": true },
+    { "name": "status", "type": "enum", "required": false, "options": ["draft", "submitted", "approved", "rejected"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "submitted": { "from": ["draft", "rejected"], "to": "submitted" },
+     "approved": { "from": ["submitted"], "to": "approved" },
+     "rejected": { "from": ["submitted"], "to": "rejected" }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "contribution_remittance",
+   "label": "Thanh toán khoản đóng payroll",
+   "fields": [
+    { "name": "period", "type": "string", "required": true },
+    { "name": "policy", "type": "ref", "required": true, "ref": "payroll.contribution_policy" },
+    { "name": "amount", "type": "money", "required": true },
+    { "name": "payment_method", "type": "enum", "required": false, "options": ["cash", "bank"] },
+    { "name": "payment_date", "type": "date", "required": false },
+    { "name": "status", "type": "enum", "required": false, "options": ["draft", "submitted", "approved", "rejected", "paid", "cancelled"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "submitted": { "from": ["draft", "rejected"], "to": "submitted" },
+     "approved": { "from": ["submitted"], "to": "approved" },
+     "rejected": { "from": ["submitted"], "to": "rejected" },
+     "paid": { "from": ["approved"], "to": "paid" },
+     "cancelled": { "from": ["draft", "rejected", "approved"], "to": "cancelled" }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "payslip",
+   "label": "Phiếu lương",
+   "systemManaged": true,
+   "fields": [
+    {
+     "name": "run",
+     "type": "ref",
+     "required": true,
+     "ref": "payroll.payroll_run",
+     "system": true
+    },
+    {
+     "name": "employee",
+     "type": "ref",
+     "required": true,
+     "ref": "hrm.employee",
+     "system": true
+    },
+    {
+     "name": "salary_revision",
+     "type": "ref",
+     "required": false,
+     "ref": "hrm.salary_revision",
+     "system": true
+    },
+    {
+     "name": "salary_basis",
+     "type": "money",
+     "required": true,
+     "system": true
+    },
+    {
+     "name": "paid_days",
+     "type": "number",
+     "required": true,
+     "system": true
+    },
+    {
+     "name": "additions",
+     "type": "money",
+     "required": true,
+     "system": true
+    },
+    {
+     "name": "overtime_hours",
+     "type": "number",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "overtime_pay",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "working_days",
+     "type": "number",
+     "required": true,
+     "system": true
+    },
+    {
+     "name": "gross",
+     "type": "money",
+     "required": true,
+     "system": true
+    },
+    {
+     "name": "deductions",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "tax_policy",
+     "type": "ref",
+     "required": false,
+     "ref": "payroll.tax_policy",
+     "system": true
+    },
+    {
+     "name": "taxable_income",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "income_tax",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "contribution_policy",
+     "type": "ref",
+     "required": false,
+     "ref": "payroll.contribution_policy",
+     "system": true
+    },
+    {
+     "name": "contribution_base",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "employee_contribution",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "employer_contribution",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "net",
+     "type": "money",
+     "required": false,
+     "system": true
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

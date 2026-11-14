@@ -1,0 +1,105 @@
+{
+ "id": "expense",
+ "name": "Chi phí nhân viên",
+ "description": "Đề nghị thanh toán/hoàn ứng chi phí, duyệt chi.",
+ "category": "finance",
+ "version": "0.2.0",
+ "depends": [
+  "hrm",
+  "accounting"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "expense_claim",
+   "label": "Đề nghị chi phí",
+   "fields": [
+    {
+     "name": "employee",
+     "type": "ref",
+     "required": true,
+     "ref": "hrm.employee"
+    },
+    {
+     "name": "items",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "payment_date",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "payment_method",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "cash",
+      "bank"
+     ]
+    },
+    {
+     "name": "note",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "rejected",
+      "submitted",
+      "approved",
+      "paid"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "submitted": {
+      "from": [
+       "draft",
+       "rejected"
+      ],
+      "to": "submitted"
+     },
+     "approved": {
+      "from": [
+       "submitted"
+      ],
+      "to": "approved"
+     },
+     "rejected": {
+      "from": [
+       "submitted"
+      ],
+      "to": "rejected"
+     },
+     "paid": {
+      "from": [
+       "approved"
+      ],
+      "to": "paid"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

@@ -1,0 +1,62 @@
+{
+ "id": "ngo-government",
+ "name": "Tổ chức phi lợi nhuận - Cơ quan công",
+ "description": "NGO, quỹ từ thiện, hiệp hội, đơn vị hành chính sự nghiệp.",
+ "modules": [
+  "charity",
+  "case-management",
+  "project",
+  "budget",
+  "document",
+  "workflow-approval",
+  "communication",
+  "accounting",
+  "einvoice",
+  "hrm",
+  "payroll",
+  "bi"
+ ],
+ "terminology": {
+  "master-data.party": "Nhà tài trợ/Đối tượng",
+  "master-data.product": "Hạng mục",
+  "charity.beneficiary": "Người thụ hưởng",
+  "case-management.case": "Hồ sơ"
+ },
+ "customFields": {
+  "master-data.party": [
+   {
+    "name": "national_id",
+    "type": "string",
+    "required": false
+   },
+   {
+    "name": "ward",
+    "type": "string",
+    "required": false
+   }
+  ]
+ },
+ "roles": {
+  "program_officer": {
+   "name": "Cán bộ chương trình",
+   "permissions": [
+    "charity.*",
+    "case-management.*",
+    "project.*"
+   ]
+  },
+  "finance_officer": {
+   "name": "Cán bộ tài chính",
+   "permissions": [
+    "budget.*",
+    "accounting.*"
+   ]
+  }
+ },
+ "kpis": [
+  "Tỷ lệ giải ngân ngân sách",
+  "Số người thụ hưởng",
+  "Chi phí quản lý %",
+  "Tiến độ chương trình"
+ ]
+}

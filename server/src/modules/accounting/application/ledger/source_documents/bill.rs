@@ -1,0 +1,139 @@
+use super::*;
+
+pub(super) async fn handle(
+    kernel: &Kernel,
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    event_type: &str,
+    event: &Value,
+    event_id: Uuid,
+    depth: u32,
+) -> R<Option<bool>> {
+    let amount = event
+        .get("base_total")
+        .filter(|value| !value.is_null())
+        .or_else(|| event.get("total"))
+        .and_then(crate::money::decimal)
+        .unwrap_or(Decimal::ZERO);
+    let tax = event
+        .get("base_tax_total")
+        .filter(|value| !value.is_null())
+        .or_else(|| event.get("tax_total"))
+        .and_then(crate::money::decimal)
+        .unwrap_or(Decimal::ZERO);
+    let net = amount
+        .checked_sub(tax)
+        .ok_or_else(|| overflow_error(event_type))?;
+    if tax < Decimal::ZERO || net < -amount_tolerance() {
+        return Err(crate::error::ApiError::validation(
+            "accounting.bill",
+            vec!["Bill tax total must be between zero and the bill total".into()],
+        ));
+    }
+    let id = event.get("id").and_then(Value::as_str).unwrap_or_default();
+    let department = event
+        .get("department")
+        .and_then(Value::as_str)
+        .and_then(|value| Uuid::parse_str(value).ok());
+    let is_purchase_order_bill =
+        event.get("source").and_then(Value::as_str) == Some("purchase_order");
+    let mut lines = Vec::new();
+    if is_purchase_order_bill {
+        let grni = ensure_account(
+            kernel,
+            tx,
+            tenant,
+            "GRNI",
+            "Hàng đã nhận chưa có hóa đơn",
+            "liability",
+        )
+        .await?;
+        let purchase_order_id = event
+            .get("source_id")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+            .ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    "accounting.bill",
+                    vec!["Purchase order bill requires a valid source order id".into()],
+                )
+            })?;
+        let accrued = tx
+                    .query_one_row(
+                        "SELECT COALESCE(SUM((posting.line->>'credit')::numeric - (posting.line->>'debit')::numeric), 0)::text FROM purchasing__purchase_receipt pr JOIN inventory__stock_move sm ON sm.tenant_id = pr.tenant_id AND sm.source = 'purchase_receipt' AND sm.source_id = pr.id::text AND sm.direction = 'in' JOIN accounting__journal_entry j ON j.tenant_id = sm.tenant_id AND j.source = 'stock_move' AND j.source_id = sm.id::text AND j.status = 'posted' CROSS JOIN LATERAL jsonb_array_elements(COALESCE(j.lines, '[]'::jsonb)) AS posting(line) JOIN accounting__account a ON a.tenant_id = j.tenant_id AND a.id::text = posting.line->>'account' AND a.code = 'GRNI' WHERE pr.tenant_id = $1 AND pr.purchase_order = $2 AND pr.status = 'received'",
+                        &[&tenant.id, &purchase_order_id],
+                    )
+                    .await?;
+        let accrued = decimal_column(&accrued, 0)?;
+        if accrued < -amount_tolerance() {
+            return Err(crate::error::ApiError::validation(
+                "accounting.bill",
+                vec!["Purchase receipt clearing balance is invalid".into()],
+            ));
+        }
+        let clear_amount = net.min(accrued.max(Decimal::ZERO));
+        if clear_amount > amount_tolerance() {
+            lines.push(journal_line_decimal_with_department(
+                grni,
+                clear_amount,
+                Decimal::ZERO,
+                department,
+            )?);
+        }
+        let unaccrued_amount = net
+            .checked_sub(clear_amount)
+            .ok_or_else(|| overflow_error(event_type))?
+            .max(Decimal::ZERO);
+        if unaccrued_amount > amount_tolerance() {
+            let inventory = account_id(tx, tenant, "156").await?;
+            lines.push(journal_line_decimal_with_department(
+                inventory,
+                unaccrued_amount,
+                Decimal::ZERO,
+                department,
+            )?);
+        }
+    } else if net > amount_tolerance() {
+        let inventory = account_id(tx, tenant, "156").await?;
+        lines.push(journal_line_decimal_with_department(
+            inventory,
+            net,
+            Decimal::ZERO,
+            department,
+        )?);
+    }
+    let payable = account_id(tx, tenant, "331").await?;
+    if tax > amount_tolerance() {
+        let input_tax = ensure_account(
+            kernel,
+            tx,
+            tenant,
+            "1331",
+            "Thuế giá trị gia tăng được khấu trừ",
+            "asset",
+        )
+        .await?;
+        lines.push(journal_line_decimal_with_department(
+            input_tax,
+            tax,
+            Decimal::ZERO,
+            department,
+        )?);
+    }
+    lines.push(journal_line_decimal(payable, Decimal::ZERO, amount)?);
+    create_posted_journal_decimal_at(
+        kernel,
+        tx,
+        tenant,
+        event_id,
+        depth,
+        "Ghi nhận công nợ mua hàng",
+        amount,
+        "bill",
+        id,
+        lines,
+        event.get("issue_date").and_then(Value::as_str),
+    )
+    .await?;
+    Ok(Some(true))
+}

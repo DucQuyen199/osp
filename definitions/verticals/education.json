@@ -1,0 +1,72 @@
+{
+ "id": "education",
+ "name": "Giáo dục - Đào tạo",
+ "description": "Trường tư, trung tâm ngoại ngữ, trung tâm kỹ năng, đào tạo doanh nghiệp.",
+ "modules": [
+  "school",
+  "lms",
+  "crm",
+  "marketing",
+  "communication",
+  "document",
+  "booking",
+  "accounting",
+  "einvoice",
+  "hrm",
+  "payroll",
+  "bi"
+ ],
+ "terminology": {
+  "master-data.party": "Phụ huynh/Học viên",
+  "master-data.product": "Khóa học/Dịch vụ",
+  "crm.lead": "Học viên tiềm năng",
+  "crm.deal": "Hồ sơ tuyển sinh"
+ },
+ "customFields": {
+  "master-data.party": [
+   {
+    "name": "school_year",
+    "type": "string",
+    "required": false
+   },
+   {
+    "name": "learning_goal",
+    "type": "text",
+    "required": false
+   }
+  ]
+ },
+ "roles": {
+  "teacher": {
+   "name": "Giáo viên",
+   "permissions": [
+    "school.grade.*",
+    "school.class_enrollment.read",
+    "school.course_class.read",
+    "lms.*"
+   ]
+  },
+  "admissions": {
+   "name": "Tuyển sinh",
+   "permissions": [
+    "crm.*",
+    "school.student.*",
+    "school.class_enrollment.*"
+   ]
+  },
+  "bursar": {
+   "name": "Thu học phí",
+   "permissions": [
+    "school.fee.*",
+    "accounting.invoice.read",
+    "accounting.payment.*"
+   ]
+  }
+ },
+ "kpis": [
+  "Tỷ lệ chuyển đổi tuyển sinh",
+  "Tỷ lệ giữ chân học viên",
+  "Công nợ học phí",
+  "Sĩ số lớp trung bình"
+ ]
+}

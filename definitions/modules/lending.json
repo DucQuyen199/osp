@@ -1,0 +1,193 @@
+{
+ "id": "lending",
+ "name": "Cho vay / Tài chính vi mô",
+ "description": "Khoản vay lãi suất danh nghĩa năm, lịch niên kim hàng tháng theo dư nợ giảm dần; tự sinh kỳ trả, theo dõi quá hạn và hạch toán gốc/lãi khi giải ngân, thu nợ.",
+ "category": "industry",
+ "version": "0.1.0",
+ "depends": [
+  "master-data",
+  "accounting"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "loan",
+   "label": "Khoản vay",
+   "fields": [
+    {
+     "name": "party",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "principal",
+     "type": "money",
+     "required": true
+    },
+    {
+     "name": "rate",
+     "type": "number",
+     "required": true
+    },
+    {
+     "name": "term_months",
+     "type": "number",
+     "required": true
+    },
+    {
+     "name": "method",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "cash",
+      "bank"
+     ]
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "applied",
+      "approved",
+      "rejected",
+      "disbursed",
+      "closed",
+      "defaulted"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "applied",
+    "actions": {
+     "approved": {
+      "from": [
+       "applied"
+      ],
+      "to": "approved"
+     },
+     "rejected": {
+      "from": [
+       "applied"
+      ],
+      "to": "rejected"
+     },
+     "disbursed": {
+      "from": [
+       "approved"
+      ],
+      "to": "disbursed"
+     },
+     "closed": {
+      "from": [
+       "disbursed"
+      ],
+      "to": "closed"
+     },
+     "defaulted": {
+      "from": [
+       "disbursed"
+      ],
+      "to": "defaulted"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "repayment",
+   "label": "Kỳ trả nợ",
+   "fields": [
+    {
+     "name": "loan",
+     "type": "ref",
+     "required": true,
+     "ref": "lending.loan"
+    },
+    {
+     "name": "party",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "amount",
+     "type": "money",
+     "required": true
+    },
+    {
+     "name": "principal_component",
+     "type": "money",
+     "required": true
+    },
+    {
+     "name": "interest_component",
+     "type": "money",
+     "required": true
+    },
+    {
+     "name": "legacy_schedule",
+     "type": "bool",
+     "required": false
+    },
+    {
+     "name": "method",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "cash",
+      "bank"
+     ]
+    },
+    {
+     "name": "installment_no",
+     "type": "number",
+     "required": true
+    },
+    {
+     "name": "due_date",
+     "type": "date",
+     "required": true
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "due",
+      "paid",
+      "overdue"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "due",
+    "actions": {
+     "paid": {
+      "from": [
+       "due",
+       "overdue"
+      ],
+      "to": "paid"
+     },
+     "overdue": {
+      "from": [
+       "due"
+      ],
+      "to": "overdue"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

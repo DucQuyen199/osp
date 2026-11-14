@@ -1,0 +1,247 @@
+{
+ "id": "logistics",
+ "name": "Vận tải & giao hàng",
+ "description": "Phương tiện, tài xế, tuyến, vận đơn. Đơn hàng có địa chỉ giao sẽ tự sinh vận đơn; giao xong cập nhật ngược đơn hàng.",
+ "category": "supply",
+ "version": "0.1.0",
+ "depends": [
+  "master-data",
+  "inventory"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "vehicle",
+   "label": "Phương tiện",
+   "fields": [
+    {
+     "name": "plate",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "kind",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "capacity",
+     "type": "number",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "driver",
+   "label": "Tài xế",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "phone",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "license",
+     "type": "string",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "route",
+   "label": "Tuyến",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "stops",
+     "type": "json",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "shipment",
+   "label": "Vận đơn",
+   "fields": [
+    {
+     "name": "party",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "warehouse",
+     "type": "ref",
+     "required": false,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "lines",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "origin",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "destination",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "vehicle",
+     "type": "ref",
+     "required": false,
+     "ref": "logistics.vehicle"
+    },
+    {
+     "name": "driver",
+     "type": "ref",
+     "required": false,
+     "ref": "logistics.driver"
+    },
+    {
+     "name": "carrier",
+     "label": "Đơn vị vận chuyển",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "tracking_number",
+     "label": "Mã vận đơn hãng",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "source",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "source_id",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "weight",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "failure_reason",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "created",
+      "dispatched",
+      "delivered",
+      "failed"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "created",
+    "actions": {
+     "dispatched": {
+      "from": [
+       "created"
+      ],
+      "to": "dispatched"
+     },
+     "delivered": {
+      "from": [
+       "dispatched"
+      ],
+      "to": "delivered"
+     },
+     "failed": {
+      "from": [
+       "dispatched"
+      ],
+      "to": "failed"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "tracking_event",
+   "label": "Sự kiện theo dõi vận chuyển",
+   "fields": [
+    {
+     "name": "shipment",
+     "type": "ref",
+     "required": true,
+     "ref": "logistics.shipment"
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": true,
+     "options": [
+      "picked_up",
+      "in_transit",
+      "out_for_delivery",
+      "delivery_attempted",
+      "delivered",
+      "exception"
+     ]
+    },
+    {
+     "name": "location",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "description",
+     "type": "text",
+     "required": true
+    },
+    {
+     "name": "occurred_at",
+     "type": "datetime",
+     "required": true
+    },
+    {
+     "name": "carrier_event_id",
+     "type": "string",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

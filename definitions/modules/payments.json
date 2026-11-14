@@ -1,0 +1,123 @@
+{
+ "id": "payments",
+ "name": "Cổng thanh toán",
+ "description": "Giao dịch qua VNPay, MoMo, ZaloPay, Stripe, chuyển khoản. Thành công sẽ tự ghi nhận vào kế toán.",
+ "category": "finance",
+ "version": "0.1.0",
+ "depends": [
+  "master-data",
+  "accounting"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "payment_txn",
+   "label": "Giao dịch thanh toán",
+   "fields": [
+    {
+     "name": "provider",
+     "type": "enum",
+     "required": true,
+     "options": [
+      "vnpay",
+      "momo",
+      "zalopay",
+      "stripe",
+      "bank"
+     ]
+    },
+    {
+     "name": "party",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "amount",
+     "type": "money",
+     "required": true
+    },
+    {
+     "name": "method",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "cash",
+      "card",
+      "transfer",
+      "ewallet",
+      "bank"
+     ]
+    },
+    {
+     "name": "invoice",
+     "type": "ref",
+     "required": false,
+     "ref": "accounting.invoice"
+    },
+    {
+     "name": "bill",
+     "type": "ref",
+     "required": false,
+     "ref": "accounting.bill"
+    },
+    {
+     "name": "reference",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "source",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "source_id",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "pending",
+      "succeeded",
+      "failed",
+      "refunded"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "pending",
+    "actions": {
+     "succeeded": {
+      "from": [
+       "pending"
+      ],
+      "to": "succeeded"
+     },
+     "failed": {
+      "from": [
+       "pending"
+      ],
+      "to": "failed"
+     },
+     "refunded": {
+      "from": [
+       "succeeded"
+      ],
+      "to": "refunded"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

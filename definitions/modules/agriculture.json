@@ -1,0 +1,200 @@
+{
+  "id": "agriculture",
+  "name": "Nông nghiệp",
+  "description": "Trang trại, vụ mùa, vật tư canh tác, thu hoạch, truy xuất. Thu hoạch tự nhập kho nông sản.",
+  "category": "industry",
+  "version": "0.1.0",
+  "depends": [
+    "master-data",
+    "inventory"
+  ],
+  "core": false,
+  "entities": [
+    {
+      "name": "farm",
+      "label": "Trang trại",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "location",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "area",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "owner",
+          "type": "ref",
+          "required": false,
+          "ref": "master-data.party"
+        }
+      ],
+      "states": null,
+      "computed": {},
+      "constraints": []
+    },
+    {
+      "name": "crop_cycle",
+      "label": "Vụ mùa",
+      "fields": [
+        {
+          "name": "farm",
+          "type": "ref",
+          "required": true,
+          "ref": "agriculture.farm"
+        },
+        {
+          "name": "crop",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "planted_on",
+          "type": "date",
+          "required": true
+        },
+        {
+          "name": "expected_harvest",
+          "type": "date",
+          "required": false
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "required": false,
+          "options": [
+            "growing",
+            "harvested",
+            "failed"
+          ]
+        }
+      ],
+      "states": {
+        "field": "status",
+        "initial": "growing",
+        "actions": {
+          "harvested": {
+            "from": [
+              "growing"
+            ],
+            "to": "harvested"
+          },
+          "failed": {
+            "from": [
+              "growing"
+            ],
+            "to": "failed"
+          }
+        }
+      },
+      "computed": {},
+      "constraints": []
+    },
+    {
+      "name": "harvest",
+      "label": "Thu hoạch",
+      "fields": [
+        {
+          "name": "cycle",
+          "type": "ref",
+          "required": true,
+          "ref": "agriculture.crop_cycle"
+        },
+        {
+          "name": "product",
+          "type": "ref",
+          "required": true,
+          "ref": "master-data.product"
+        },
+        {
+          "name": "qty",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "grade",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "date",
+          "type": "date",
+          "required": true
+        },
+        {
+          "name": "lot_code",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "warehouse",
+          "type": "ref",
+          "required": true,
+          "ref": "inventory.warehouse"
+        }
+      ],
+      "states": null,
+      "computed": {},
+      "constraints": []
+    },
+    {
+      "name": "input_application",
+      "label": "Vật tư canh tác",
+      "fields": [
+        {
+          "name": "cycle",
+          "type": "ref",
+          "required": true,
+          "ref": "agriculture.crop_cycle"
+        },
+        {
+          "name": "kind",
+          "type": "enum",
+          "required": true,
+          "options": [
+            "fertilizer",
+            "pesticide",
+            "water",
+            "seed"
+          ]
+        },
+        {
+          "name": "product",
+          "type": "ref",
+          "required": false,
+          "ref": "master-data.product"
+        },
+        {
+          "name": "qty",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "date",
+          "type": "date",
+          "required": true
+        },
+        {
+          "name": "warehouse",
+          "type": "ref",
+          "required": false,
+          "ref": "inventory.warehouse"
+        }
+      ],
+      "states": null,
+      "computed": {},
+      "constraints": []
+    }
+  ],
+  "rules": [],
+  "seeds": [],
+  "publishes": [],
+  "jobs": []
+}

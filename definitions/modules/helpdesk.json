@@ -1,0 +1,161 @@
+{
+ "id": "helpdesk",
+ "name": "Chăm sóc khách hàng",
+ "description": "Ticket hỗ trợ, chính sách SLA, cơ sở tri thức.",
+ "category": "sales",
+ "version": "0.1.0",
+ "depends": [
+  "master-data"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "ticket",
+   "label": "Ticket",
+   "fields": [
+    {
+     "name": "subject",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "party",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "sla_policy",
+     "type": "ref",
+     "required": false,
+     "ref": "helpdesk.sla_policy"
+    },
+    {
+     "name": "priority",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "low",
+      "normal",
+      "high",
+      "urgent"
+     ]
+    },
+    {
+     "name": "channel",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "description",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "resolution",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "assignee",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "open",
+      "in_progress",
+      "resolved",
+      "closed"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "open",
+    "actions": {
+     "responded": {
+      "from": [
+       "open"
+      ],
+      "to": "in_progress"
+     },
+     "resolved": {
+      "from": ["open", "in_progress"],
+      "to": "resolved"
+     },
+     "closed": {
+      "from": [
+       "resolved"
+      ],
+      "to": "closed"
+     },
+     "reopened": {
+      "from": [
+       "resolved",
+       "closed"
+      ],
+      "to": "open"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "sla_policy",
+   "label": "Chính sách SLA",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "response_hours",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "resolve_hours",
+     "type": "number",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "kb_article",
+   "label": "Bài viết tri thức",
+   "fields": [
+    {
+     "name": "title",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "body",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "published",
+     "type": "bool",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

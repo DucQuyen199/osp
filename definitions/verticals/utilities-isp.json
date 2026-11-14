@@ -1,0 +1,59 @@
+{
+ "id": "utilities-isp",
+ "name": "Viễn thông - Điện nước - ISP",
+ "description": "Nhà cung cấp internet, truyền hình, nước sạch, điện, tiện ích.",
+ "modules": [
+  "utilities",
+  "subscription",
+  "helpdesk",
+  "field-service",
+  "crm",
+  "communication",
+  "accounting",
+  "einvoice",
+  "hrm",
+  "payroll",
+  "bi"
+ ],
+ "terminology": {
+  "master-data.party": "Thuê bao",
+  "master-data.product": "Gói cước/Dịch vụ",
+  "subscription.subscription": "Thuê bao"
+ },
+ "customFields": {
+  "master-data.party": [
+   {
+    "name": "service_address",
+    "type": "string",
+    "required": false
+   },
+   {
+    "name": "zone",
+    "type": "string",
+    "required": false
+   }
+  ]
+ },
+ "roles": {
+  "support": {
+   "name": "Hỗ trợ khách hàng",
+   "permissions": [
+    "helpdesk.*",
+    "field-service.work_order.*"
+   ]
+  },
+  "meter_reader": {
+   "name": "Ghi chỉ số",
+   "permissions": [
+    "utilities.meter_reading.*",
+    "utilities.meter.read"
+   ]
+  }
+ },
+ "kpis": [
+  "ARPU",
+  "Churn",
+  "Thời gian xử lý ticket",
+  "Tỷ lệ thu cước đúng hạn"
+ ]
+}

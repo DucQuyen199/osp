@@ -1,0 +1,214 @@
+{
+ "id": "hotel",
+ "name": "Khách sạn / Lưu trú",
+ "description": "Loại phòng, phòng, đặt phòng, phí phát sinh. Trả phòng tự lập hóa đơn và chuyển phòng sang dọn.",
+ "category": "industry",
+ "version": "0.1.0",
+ "depends": [
+  "master-data",
+  "accounting"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "room_type",
+   "label": "Loại phòng",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "rate",
+     "type": "money",
+     "required": true
+    },
+    {
+     "name": "capacity",
+     "type": "number",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "room",
+   "label": "Phòng",
+   "fields": [
+    {
+     "name": "number",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "room_type",
+     "type": "ref",
+     "required": true,
+     "ref": "hotel.room_type"
+    },
+    {
+     "name": "floor",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "vacant",
+      "occupied",
+      "cleaning"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "vacant",
+    "actions": {
+     "occupied": {
+      "from": [
+       "vacant"
+      ],
+      "to": "occupied"
+     },
+     "cleaning": {
+      "from": [
+       "occupied"
+      ],
+      "to": "cleaning"
+     },
+     "ready": {
+      "from": [
+       "cleaning"
+      ],
+      "to": "vacant"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "reservation",
+   "label": "Đặt phòng",
+   "fields": [
+    {
+     "name": "party",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "room_type",
+     "type": "ref",
+     "required": false,
+     "ref": "hotel.room_type"
+    },
+    {
+     "name": "room",
+     "type": "ref",
+     "required": false,
+     "ref": "hotel.room"
+    },
+    {
+     "name": "check_in",
+     "type": "date",
+     "required": true
+    },
+    {
+     "name": "check_out",
+     "type": "date",
+     "required": true
+    },
+    {
+     "name": "total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "nightly_rate",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "nights",
+     "type": "number",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "booked",
+      "checked_in",
+      "checked_out",
+      "cancelled"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "booked",
+    "actions": {
+     "checked_in": {
+      "from": [
+       "booked"
+      ],
+      "to": "checked_in"
+     },
+     "checked_out": {
+      "from": [
+       "checked_in"
+      ],
+      "to": "checked_out"
+     },
+     "cancelled": {
+      "from": [
+       "booked"
+      ],
+      "to": "cancelled"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "folio_charge",
+   "label": "Phí phát sinh",
+   "fields": [
+    {
+     "name": "reservation",
+     "type": "ref",
+     "required": true,
+     "ref": "hotel.reservation"
+    },
+    {
+     "name": "description",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "amount",
+     "type": "money",
+     "required": true
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

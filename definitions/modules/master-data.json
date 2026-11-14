@@ -1,0 +1,388 @@
+{
+ "id": "master-data",
+ "name": "Dữ liệu gốc",
+ "description": "Danh mục dùng chung cho mọi module: đối tác (khách hàng/nhà cung cấp), sản phẩm, chi nhánh, đơn vị tính, tiền tệ, thuế.",
+ "category": "core",
+ "version": "0.1.0",
+ "depends": [],
+ "core": true,
+ "entities": [
+  {
+   "name": "party",
+   "label": "Đối tác",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "kind",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "person",
+      "company"
+     ]
+    },
+    {
+     "name": "is_customer",
+     "type": "bool",
+     "required": false
+    },
+    {
+     "name": "is_supplier",
+     "type": "bool",
+     "required": false
+    },
+    {
+     "name": "phone",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "email",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "tax_code",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "credit_limit",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "address",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "note",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "source",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "source_id",
+     "type": "string",
+     "required": false,
+     "system": true
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "contact",
+   "label": "Người liên hệ",
+   "fields": [
+    {
+     "name": "party",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "title",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "phone",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "email",
+     "type": "string",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "product",
+   "label": "Sản phẩm/Dịch vụ",
+   "fields": [
+    {
+     "name": "sku",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "kind",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "goods",
+      "service",
+      "digital"
+     ]
+    },
+    {
+     "name": "uom",
+     "type": "ref",
+     "ref": "master-data.uom",
+     "required": false
+    },
+    {
+     "name": "price",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "cost",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "weight",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "category",
+     "type": "ref",
+     "ref": "master-data.product_category",
+     "required": false
+    },
+    {
+     "name": "tracked",
+     "type": "bool",
+     "required": false
+    },
+    {
+     "name": "lot_tracked",
+     "type": "bool",
+     "required": false
+    },
+    {
+     "name": "active",
+     "type": "bool",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": [
+    {
+     "type": "min",
+     "field": "weight",
+     "value": 0,
+     "message": "Khối lượng sản phẩm không được âm"
+    }
+   ]
+  },
+  {
+   "name": "product_category",
+   "label": "Nhóm sản phẩm",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "parent",
+     "type": "ref",
+     "ref": "master-data.product_category",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "uom",
+   "label": "Đơn vị tính",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "ratio",
+     "type": "number",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "branch",
+   "label": "Chi nhánh/Cửa hàng",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "code",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "address",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "kind",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "hq",
+      "branch",
+      "warehouse",
+      "store"
+     ]
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "currency",
+   "label": "Tiền tệ",
+   "fields": [
+    {
+     "name": "code",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "name",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "rate",
+     "type": "number",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "currency_rate",
+   "label": "Tá»· giÃ¡ tiá»n tá»‡",
+   "fields": [
+    {
+     "name": "from_currency",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.currency"
+    },
+    {
+     "name": "to_currency",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.currency"
+    },
+    {
+     "name": "effective_date",
+     "type": "date",
+     "required": true
+    },
+    {
+     "name": "rate",
+     "type": "number",
+     "required": true
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "tax",
+   "label": "Thuế",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "rate",
+     "type": "number",
+     "required": true
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [
+  {
+   "entity": "currency",
+   "data": {
+    "code": "VND",
+    "name": "Đồng Việt Nam",
+    "rate": 1
+   }
+  },
+  {
+   "entity": "tax",
+   "data": {
+    "name": "VAT 10%",
+    "rate": 10
+   }
+  },
+  {
+   "entity": "tax",
+   "data": {
+    "name": "VAT 8%",
+    "rate": 8
+   }
+  },
+  {
+   "entity": "tax",
+   "data": {
+    "name": "VAT 0%",
+    "rate": 0
+   }
+  },
+  {
+   "entity": "uom",
+   "data": {
+    "name": "Cái",
+    "ratio": 1
+   }
+  }
+ ],
+ "publishes": [],
+ "jobs": []
+}

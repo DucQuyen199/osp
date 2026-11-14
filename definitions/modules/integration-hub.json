@@ -1,0 +1,97 @@
+{
+ "id": "integration-hub",
+ "name": "Cổng tích hợp",
+ "description": "Kết nối bên ngoài: connector (ngân hàng, vận chuyển, HĐĐT, Zalo...), webhook, API key.",
+ "category": "platform",
+ "version": "0.1.0",
+ "depends": [],
+ "core": false,
+ "entities": [
+  {
+   "name": "connector",
+   "label": "Connector",
+   "fields": [
+    {
+     "name": "kind",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "config",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "enabled",
+     "type": "bool",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "webhook",
+   "label": "Webhook",
+   "fields": [
+    {
+     "name": "url",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "events",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "secret",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "active",
+     "type": "bool",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "api_key",
+   "label": "API key",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "key",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "scopes",
+     "type": "json",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

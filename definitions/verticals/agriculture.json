@@ -1,0 +1,51 @@
+{
+ "id": "agriculture",
+ "name": "Nông nghiệp - Thủy sản",
+ "description": "Trang trại, hợp tác xã, chế biến nông sản, truy xuất nguồn gốc.",
+ "modules": [
+  "agriculture",
+  "inventory",
+  "sales",
+  "purchasing",
+  "logistics",
+  "quality",
+  "accounting",
+  "einvoice",
+  "hrm",
+  "payroll",
+  "bi"
+ ],
+ "terminology": {
+  "master-data.party": "Đối tác thu mua/bán",
+  "master-data.product": "Nông sản/Vật tư nông nghiệp"
+ },
+ "customFields": {
+  "master-data.product": [
+   {
+    "name": "vietgap_code",
+    "type": "string",
+    "required": false
+   },
+   {
+    "name": "origin",
+    "type": "string",
+    "required": false
+   }
+  ]
+ },
+ "roles": {
+  "farm_manager": {
+   "name": "Quản lý trang trại",
+   "permissions": [
+    "agriculture.*",
+    "inventory.*.read"
+   ]
+  }
+ },
+ "kpis": [
+  "Năng suất/ha",
+  "Chi phí vật tư/ha",
+  "Sản lượng theo vụ",
+  "Tồn kho nông sản"
+ ]
+}

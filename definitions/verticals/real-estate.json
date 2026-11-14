@@ -1,0 +1,62 @@
+{
+ "id": "real-estate",
+ "name": "Bất động sản",
+ "description": "Sàn môi giới, chủ đầu tư, quản lý cho thuê.",
+ "modules": [
+  "real-estate",
+  "crm",
+  "contract",
+  "document",
+  "marketing",
+  "communication",
+  "booking",
+  "accounting",
+  "einvoice",
+  "hrm",
+  "payroll",
+  "bi"
+ ],
+ "terminology": {
+  "master-data.party": "Khách hàng/Chủ nhà",
+  "master-data.product": "Dịch vụ",
+  "crm.deal": "Giao dịch",
+  "crm.lead": "Khách quan tâm"
+ },
+ "customFields": {
+  "master-data.party": [
+   {
+    "name": "budget_range",
+    "type": "string",
+    "required": false
+   },
+   {
+    "name": "preferred_area",
+    "type": "string",
+    "required": false
+   }
+  ]
+ },
+ "roles": {
+  "agent": {
+   "name": "Môi giới",
+   "permissions": [
+    "real-estate.*",
+    "crm.*",
+    "booking.*"
+   ]
+  },
+  "leasing": {
+   "name": "Quản lý cho thuê",
+   "permissions": [
+    "real-estate.lease.*",
+    "contract.*"
+   ]
+  }
+ },
+ "kpis": [
+  "Tỷ lệ chốt giao dịch",
+  "Thời gian bán trung bình",
+  "Hoa hồng theo môi giới",
+  "Tỷ lệ lấp đầy cho thuê"
+ ]
+}

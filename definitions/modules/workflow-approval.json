@@ -1,0 +1,117 @@
+{
+ "id": "workflow-approval",
+ "name": "Phê duyệt",
+ "description": "Luồng duyệt dùng chung. Đơn mua, đề nghị chi phí... tự sinh yêu cầu duyệt khi module này được bật; duyệt xong tự chuyển trạng thái chứng từ gốc.",
+ "category": "platform",
+ "version": "0.1.0",
+ "depends": [],
+ "core": false,
+ "entities": [
+  {
+   "name": "approval_request",
+   "label": "Yêu cầu duyệt",
+   "systemManaged": true,
+   "fields": [
+    {
+     "name": "subject",
+     "type": "string",
+     "required": true,
+     "system": true
+    },
+    {
+     "name": "entity",
+     "type": "string",
+     "required": true,
+     "system": true
+    },
+    {
+     "name": "record_id",
+     "type": "string",
+     "required": true,
+     "system": true
+    },
+    {
+     "name": "amount",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "requested_by",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "requested_by_user",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "pending",
+      "approved",
+      "rejected"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "pending",
+    "actions": {
+     "approved": {
+      "from": [
+       "pending"
+      ],
+      "to": "approved"
+     },
+     "rejected": {
+      "from": [
+       "pending"
+      ],
+      "to": "rejected"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "approval_rule",
+   "label": "Quy tắc duyệt",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "entity",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "min_amount",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "approvers",
+     "type": "json",
+     "required": true
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

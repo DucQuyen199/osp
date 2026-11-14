@@ -1,0 +1,59 @@
+{
+ "id": "automotive",
+ "name": "Ô tô - Xe máy",
+ "description": "Đại lý, showroom, garage, trung tâm bảo hành.",
+ "modules": [
+  "auto-service",
+  "inventory",
+  "purchasing",
+  "crm",
+  "booking",
+  "loyalty",
+  "accounting",
+  "einvoice",
+  "hrm",
+  "payroll",
+  "bi"
+ ],
+ "terminology": {
+  "master-data.party": "Chủ xe",
+  "master-data.product": "Phụ tùng/Dịch vụ",
+  "auto-service.vehicle": "Xe"
+ },
+ "customFields": {
+  "master-data.product": [
+   {
+    "name": "oem_code",
+    "type": "string",
+    "required": false
+   },
+   {
+    "name": "compatible_models",
+    "type": "string",
+    "required": false
+   }
+  ]
+ },
+ "roles": {
+  "service_advisor": {
+   "name": "Cố vấn dịch vụ",
+   "permissions": [
+    "auto-service.*",
+    "booking.*",
+    "crm.*"
+   ]
+  },
+  "mechanic": {
+   "name": "Kỹ thuật viên",
+   "permissions": [
+    "auto-service.repair_order.*"
+   ]
+  }
+ },
+ "kpis": [
+  "Số xe vào xưởng",
+  "Thời gian sửa chữa trung bình",
+  "Doanh thu phụ tùng",
+  "Tỷ lệ quay lại bảo dưỡng"
+ ]
+}

@@ -1,0 +1,172 @@
+{
+ "id": "manufacturing",
+ "name": "Sản xuất",
+ "description": "Định mức BOM, lệnh sản xuất theo trung tâm máy và công suất ngày. Bắt đầu lệnh xuất nguyên liệu vào WIP; QC đạt sẽ nhập thành phẩm vào kho.",
+ "category": "supply",
+ "version": "0.4.0",
+ "depends": [
+  "master-data",
+  "inventory",
+  "quality",
+  "accounting"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "bom",
+   "label": "Định mức (BOM)",
+   "fields": [
+    {
+     "name": "product",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.product"
+    },
+    {
+     "name": "components",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "output_qty",
+     "type": "number",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "production_order",
+   "label": "Lệnh sản xuất",
+   "fields": [
+    {
+     "name": "product",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.product"
+    },
+    {
+     "name": "qty",
+     "type": "number",
+     "required": true
+    },
+    {
+     "name": "good_qty",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "scrap_qty",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "scrap_reason",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "scrap_cost_method",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "absorb",
+      "expense"
+     ]
+    },
+    {
+     "name": "scrap_expense_account",
+     "type": "ref",
+     "required": false,
+     "ref": "accounting.account"
+    },
+    {
+     "name": "bom",
+     "type": "ref",
+     "required": true,
+     "ref": "manufacturing.bom"
+    },
+    {
+     "name": "warehouse",
+     "type": "ref",
+     "required": true,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "work_center",
+     "type": "ref",
+     "required": false,
+     "ref": "manufacturing.work_center"
+    },
+    {
+     "name": "planned_start",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "planned",
+      "in_progress",
+      "done",
+      "cancelled"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "planned",
+    "actions": {
+     "started": {
+      "from": [
+       "planned"
+      ],
+      "to": "in_progress"
+     },
+     "done": {
+      "from": [
+       "in_progress"
+      ],
+      "to": "done"
+     },
+     "cancelled": {
+      "from": [
+       "planned",
+       "in_progress"
+      ],
+      "to": "cancelled"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "work_center",
+   "label": "Trung tâm sản xuất",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "capacity_per_day",
+     "type": "number",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

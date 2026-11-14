@@ -1,0 +1,202 @@
+{
+ "id": "project",
+ "name": "Quản lý dự án",
+ "description": "Dự án, công việc, chấm giờ.",
+ "category": "operations",
+ "version": "0.2.0",
+ "depends": [
+  "master-data"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "project",
+   "label": "Dự án",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "party",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "budget",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "planned",
+      "active",
+      "done",
+      "cancelled"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "planned",
+    "actions": {
+     "started": {
+      "from": [
+       "planned"
+      ],
+      "to": "active"
+     },
+     "completed": {
+      "from": [
+       "active"
+      ],
+      "to": "done"
+     },
+     "cancelled": {
+      "from": [
+       "planned",
+       "active"
+      ],
+      "to": "cancelled"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "task",
+   "label": "Công việc",
+   "fields": [
+    {
+     "name": "project",
+     "type": "ref",
+     "required": true,
+     "ref": "project.project"
+    },
+    {
+     "name": "title",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "assignee",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "due",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "todo",
+      "doing",
+      "done"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "todo",
+    "actions": {
+     "started": {
+      "from": [
+       "todo"
+      ],
+      "to": "doing"
+     },
+     "done": {
+      "from": [
+       "doing"
+      ],
+      "to": "done"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "timesheet",
+   "label": "Chấm giờ",
+   "fields": [
+    {
+     "name": "project",
+     "type": "ref",
+     "required": true,
+     "ref": "project.project"
+    },
+    {
+     "name": "task",
+     "type": "ref",
+     "required": false,
+     "ref": "project.task"
+    },
+    {
+     "name": "employee",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "hours",
+     "type": "number",
+     "required": true
+    },
+    {
+     "name": "date",
+     "type": "date",
+     "required": false
+    },
+    {
+     "name": "rate",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "amount",
+     "type": "money",
+     "required": false,
+     "system": true
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "task_dependency",
+   "label": "Phụ thuộc công việc",
+   "fields": [
+    {
+     "name": "predecessor",
+     "type": "ref",
+     "required": true,
+     "ref": "project.task"
+    },
+    {
+     "name": "successor",
+     "type": "ref",
+     "required": true,
+     "ref": "project.task"
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

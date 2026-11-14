@@ -1,0 +1,136 @@
+{
+ "id": "auto-service",
+ "name": "Garage / Dịch vụ ô tô-xe máy",
+ "description": "Hồ sơ xe, lệnh sửa chữa kèm phụ tùng. Hoàn tất sửa chữa tự trừ kho phụ tùng và lập hóa đơn.",
+ "category": "industry",
+ "version": "0.2.0",
+ "depends": [
+  "master-data",
+  "inventory",
+  "accounting"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "vehicle",
+   "label": "Xe",
+   "fields": [
+    {
+     "name": "party",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "plate",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "make",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "model",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "vin",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "odometer",
+     "type": "number",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "repair_order",
+   "label": "Lệnh sửa chữa",
+   "fields": [
+    {
+     "name": "vehicle",
+     "type": "ref",
+     "required": true,
+     "ref": "auto-service.vehicle"
+    },
+    {
+     "name": "party",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "warehouse",
+     "type": "ref",
+     "required": false,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "complaint",
+     "type": "text",
+     "required": false
+    },
+    {
+     "name": "lines",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "total",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "intake",
+      "in_progress",
+      "completed",
+      "delivered"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "intake",
+    "actions": {
+     "started": {
+      "from": [
+       "intake"
+      ],
+      "to": "in_progress"
+     },
+     "completed": {
+      "from": [
+       "in_progress"
+      ],
+      "to": "completed"
+     },
+     "delivered": {
+      "from": [
+       "completed"
+      ],
+      "to": "delivered"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}

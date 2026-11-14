@@ -1,0 +1,177 @@
+{
+ "id": "utilities",
+ "name": "Điện nước / Viễn thông",
+ "description": "Công tơ, chỉ số, hóa đơn tiêu thụ. Phát hành hóa đơn tự ghi sổ; thu tiền cập nhật ngược.",
+ "category": "industry",
+ "version": "0.1.0",
+ "depends": [
+  "master-data",
+  "accounting"
+ ],
+ "core": false,
+ "entities": [
+  {
+   "name": "meter",
+   "label": "Công tơ/Đường truyền",
+   "fields": [
+    {
+     "name": "party",
+     "type": "ref",
+     "required": true,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "code",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "rate",
+     "type": "money",
+     "required": true
+    },
+    {
+     "name": "opening_reading",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "kind",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "electric",
+      "water",
+      "gas",
+      "internet"
+     ]
+    },
+    {
+     "name": "address",
+     "type": "string",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "meter_reading",
+   "label": "Chỉ số",
+   "fields": [
+    {
+     "name": "meter",
+     "type": "ref",
+     "required": true,
+     "ref": "utilities.meter"
+    },
+    {
+     "name": "reading",
+     "type": "number",
+     "required": true
+    },
+    {
+     "name": "period",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "previous_reading",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "consumption",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "rate",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "amount",
+     "type": "money",
+     "required": false
+    }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "utility_bill",
+   "label": "Hóa đơn tiêu thụ",
+   "fields": [
+    {
+     "name": "meter_reading",
+     "type": "ref",
+     "required": true,
+     "ref": "utilities.meter_reading"
+    },
+    {
+     "name": "party",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.party"
+    },
+    {
+     "name": "period",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "amount",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "consumption",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "unit_rate",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "draft",
+      "issued",
+      "paid"
+     ]
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "issued": {
+      "from": [
+       "draft"
+      ],
+      "to": "issued"
+     },
+     "paid": {
+      "from": [
+       "issued"
+      ],
+      "to": "paid"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  }
+ ],
+ "rules": [],
+ "seeds": [],
+ "publishes": [],
+ "jobs": []
+}
