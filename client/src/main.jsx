@@ -72,6 +72,7 @@ const AccountingPeriodClosePage = lazy(() => import('./AccountingPeriodClosePage
 const AccountingAdjustmentRefundsPage = lazy(() => import('./AccountingAdjustmentRefundsPage.jsx'));
 const AccountingSettlementWorkbenchPage = lazy(() => import('./AccountingSettlementWorkbenchPage.jsx'));
 const InventoryStockCountWorkbenchPage = lazy(() => import('./InventoryStockCountWorkbenchPage.jsx'));
+const EInvoiceWorkbenchPage = lazy(() => import('./EInvoiceWorkbenchPage.jsx'));
 
 function parseRoute(hash = location.hash) {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
@@ -112,6 +113,7 @@ function parseRoute(hash = location.hash) {
   if (a === 'period-close') return { name: 'accounting-period-close' };
   if (a === 'refunds') return { name: 'accounting-adjustment-refunds' };
   if (a === 'settlements') return { name: 'accounting-settlement-workbench' };
+  if (a === 'einvoices') return { name: 'einvoice-workbench' };
   if (a === 'ecommerce') return { name: 'ecommerce-order-desk' };
   if (a === 'agriculture') return { name: 'agriculture-operations' };
   if (a === 'hotel') return { name: 'hotel-frontdesk' };
@@ -222,6 +224,7 @@ function Sidebar({ meta, route, onNavigate, open }) {
     {meta.modules.some((module) => module.id === 'accounting') && can('accounting.bank_statement.read') && link('#/bank-reconciliation', 'Đối soát ngân hàng', route.name === 'bank-reconciliation-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'accounting') && can('accounting.payment.create') && can('accounting.payment.read') && ((can('accounting.credit_note.read') && can('accounting.invoice.read')) || (can('accounting.debit_note.read') && can('accounting.bill.read'))) && link('#/refunds', 'Hoàn tiền điều chỉnh', route.name === 'accounting-adjustment-refunds', 'payment')}
     {meta.modules.some((module) => module.id === 'accounting') && can('accounting.settlement_batch.read') && link('#/settlements', 'Thu/chi phân bổ công nợ', route.name === 'accounting-settlement-workbench', 'payment')}
+    {meta.modules.some((module) => module.id === 'einvoice') && can('einvoice.einvoice.read') && link('#/einvoices', 'Hóa đơn điện tử', route.name === 'einvoice-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'accounting') && can('accounting.period.read') && link('#/period-close', 'Khóa sổ kế toán', route.name === 'accounting-period-close', 'list')}
     {meta.modules.some((module) => module.id === 'ecommerce') && can('ecommerce.web_order.read') && link('#/ecommerce', 'Đơn hàng online', route.name === 'ecommerce-order-desk', 'list')}
     {meta.modules.some((module) => module.id === 'agriculture') && can('agriculture.crop_cycle.read') && link('#/agriculture', 'Điều hành mùa vụ', route.name === 'agriculture-operations', 'list')}
@@ -431,6 +434,7 @@ function App() {
         : route.name === 'accounting-period-close' ? <AccountingPeriodClosePage />
         : route.name === 'accounting-adjustment-refunds' ? <AccountingAdjustmentRefundsPage />
         : route.name === 'accounting-settlement-workbench' ? <AccountingSettlementWorkbenchPage />
+        : route.name === 'einvoice-workbench' ? <EInvoiceWorkbenchPage />
         : route.name === 'ecommerce-order-desk' ? <EcommerceOrderDeskPage />
         : route.name === 'agriculture-operations' ? <AgricultureOperationsPage />
         : route.name === 'hotel-frontdesk' ? <HotelFrontDeskPage />

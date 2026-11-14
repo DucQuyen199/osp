@@ -3,6 +3,9 @@
 Định dạng theo [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/); phiên bản theo [SemVer](https://semver.org/lang/vi/). Design system có phiên bản riêng (hiện v1.0), ghi chung ở đây.
 
 ## [Unreleased]
+### Added
+- Added an e-invoice operations workbench with status queues, provider error visibility, retry controls, source invoice links, provider response and attempt-history inspection, and reasoned cancellation requests.
+
 ### Changed
 - Replaced synchronous handwritten static serving, URL decoding, fixed-window IP counters, request IDs, security headers and request logging with Axum method routes, Tower/Tower HTTP streaming and middleware, `url`/`percent-encoding`, and concurrent Governor GCRA quotas. Public assets support gzip, HEAD, byte ranges and Last-Modified/304; authenticated data stays uncompressed and non-cacheable.
 - Unified null/omitted document validation across create and PostgreSQL lifecycle reads while preserving explicit null patches for immutable-field guards.
