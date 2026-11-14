@@ -53,9 +53,9 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                 && !document
                     .get("good_qty")
                     .and_then(decimal)
-                    .is_some_and(|qty| qty > Decimal::ZERO)
+                    .is_some_and(|qty| qty >= Decimal::ZERO)
             {
-                errors.push("good_qty must be positive".into());
+                errors.push("good_qty must be non-negative".into());
             }
             if document.get("scrap_qty").is_some()
                 && !document
@@ -154,13 +154,20 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
             .and_then(decimal)
             .unwrap_or_default();
         let mut errors = Vec::new();
-        if good <= Decimal::ZERO
+        if good < Decimal::ZERO
             || scrap < Decimal::ZERO
             || good
                 .checked_add(scrap)
                 .is_none_or(|total| !money::within_tolerance(total, planned, Decimal::new(1, 4)))
         {
             errors.push("Good output plus scrap quantity must equal planned production".into());
+        }
+        let scrap_method = document
+            .get("scrap_cost_method")
+            .and_then(Value::as_str)
+            .unwrap_or("absorb");
+        if good.is_zero() && scrap_method != "expense" {
+            errors.push("A batch with no accepted output must expense the full scrap cost".into());
         }
         if scrap > Decimal::ZERO
             && document
@@ -177,11 +184,7 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
                     .push("Ngày hết hạn thành phẩm phải là ngày hợp lệ trong tương lai".into()),
             }
         }
-        match document
-            .get("scrap_cost_method")
-            .and_then(Value::as_str)
-            .unwrap_or("absorb")
-        {
+        match scrap_method {
             "absorb" => {}
             "expense" => {
                 if scrap <= Decimal::ZERO {

@@ -212,23 +212,6 @@ pub(super) async fn dispatch(
             "rule": "operational_source_to_stock_move",
             "outcome": "ok"
         }));
-        if event.ty == "manufacturing.production_order.done"
-            && crate::modules::accounting::post_abnormal_scrap_cost(
-                kernel,
-                tx,
-                tenant,
-                &event.payload,
-                event.id,
-                event.depth,
-            )
-            .await?
-        {
-            handled.push(json!({
-                "module": "accounting",
-                "rule": "production_scrap_to_expense",
-                "outcome": "ok"
-            }));
-        }
         // Receive and value the stock before advancing the purchase order. If
         // this completes the order, its bill can clear the GRNI journals that
         // were just posted by the stock-move events.
@@ -264,6 +247,23 @@ pub(super) async fn dispatch(
         handled.push(json!({
             "module": "sales",
             "rule": "sales_source_event_workflow",
+            "outcome": "ok"
+        }));
+    }
+    if event.ty == "manufacturing.production_order.done"
+        && crate::modules::accounting::post_abnormal_scrap_cost(
+            kernel,
+            tx,
+            tenant,
+            &event.payload,
+            event.id,
+            event.depth,
+        )
+        .await?
+    {
+        handled.push(json!({
+            "module": "accounting",
+            "rule": "production_scrap_to_expense",
             "outcome": "ok"
         }));
     }

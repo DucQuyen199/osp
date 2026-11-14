@@ -144,6 +144,14 @@ pub async fn handle_source_event(
             Ok(true)
         }
         "manufacturing.production_order.done" => {
+            if document
+                .get("good_qty")
+                .and_then(money::decimal)
+                .is_some_and(|quantity| quantity.is_zero())
+            {
+                // A fully scrapped batch has no finished goods to inspect or receive.
+                return Ok(true);
+            }
             let mut data = Map::new();
             for field in ["product", "warehouse"] {
                 if let Some(value) = document.get(field) {
