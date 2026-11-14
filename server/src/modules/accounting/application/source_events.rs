@@ -63,6 +63,11 @@ pub async fn handle_source_document_event(
             data.insert("due_date".into(), due_date.clone());
         }
     }
+    if event_type == "school.fee.issued"
+        && let Some(due_date) = event.get("due_date").filter(|value| !value.is_null())
+    {
+        data.insert("due_date".into(), due_date.clone());
+    }
     if let Some(field) = spec.party
         && let Some(value) = event.get(field).filter(|value| !value.is_null())
     {

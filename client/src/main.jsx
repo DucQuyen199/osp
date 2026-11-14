@@ -204,7 +204,7 @@ function Sidebar({ meta, route, onNavigate, open }) {
     {meta.modules.some((module) => module.id === 'pos') && can('pos.pos_session.read') && can('pos.pos_order.create') && link('#/pos', 'Quầy bán hàng POS', route.name === 'pos-terminal', 'list')}
     {meta.modules.some((module) => module.id === 'clinic') && can('clinic.encounter.read') && can('clinic.encounter.create') && link('#/clinic', 'Điều phối phòng khám', route.name === 'clinic-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'pharmacy') && can('pharmacy.prescription.read') && link('#/pharmacy', 'Đơn thuốc nhà thuốc', route.name === 'pharmacy-workbench', 'list')}
-    {meta.modules.some((module) => module.id === 'school') && can('school.class_session.read') && link('#/education', 'Lịch lớp và điểm danh', route.name === 'education-workbench', 'list')}
+    {meta.modules.some((module) => module.id === 'school') && (can('school.class_session.read') || can('school.fee.read')) && link('#/education', 'Lịch lớp và học phí', route.name === 'education-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'utilities') && can('utilities.meter_reading.read') && link('#/utilities', 'Công tơ và hóa đơn tiện ích', route.name === 'utilities-workbench', 'list')}
     {meta.modules.some((module) => ['lending', 'insurance'].includes(module.id)) && (can('lending.loan.read') || can('insurance.policy.read')) && link('#/finance', 'Cho vay và bảo hiểm', route.name === 'finance-operations', 'list')}
     {meta.modules.some((module) => module.id === 'events') && can('events.ticket.read') && can('events.event.read') && link('#/event-ops', 'Sự kiện và quầy vé', route.name === 'events-operations', 'list')}
