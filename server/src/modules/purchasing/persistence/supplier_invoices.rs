@@ -359,14 +359,9 @@ pub(super) async fn validate(
                 .max(Decimal::ZERO);
         }
 
-        let prior_statuses = if action == "submitted" {
-            "IN ('submitted','approved')"
-        } else {
-            "= 'approved'"
-        };
         let prior = tx
             .query(
-                &format!("SELECT lines FROM purchasing__supplier_invoice WHERE tenant_id=$1 AND purchase_order=$2 AND status {prior_statuses} AND id<>$3 FOR UPDATE"),
+                "SELECT lines FROM purchasing__supplier_invoice WHERE tenant_id=$1 AND purchase_order=$2 AND status IN ('submitted','disputed','approved') AND id<>$3 FOR UPDATE",
                 &[&tenant.id, &order_id, &invoice_id],
             )
             .await?;
@@ -395,7 +390,7 @@ pub(super) async fn validate(
                     .is_none_or(|limit| *qty > limit)
             })
         {
-            errors.push("An invoice needs matched goods or a charge/discount line, and cumulative quantities cannot exceed receipts at PO prices".into());
+            errors.push("An invoice needs matched goods or a charge/discount line, and cumulative quantities cannot exceed receipts at PO prices, including goods claimed by submitted, disputed, or approved invoices".into());
         }
         if tx.query_opt(
             "SELECT id FROM accounting__bill WHERE tenant_id=$1 AND source='purchase_order' AND source_id=$2 AND supplier_invoice_id IS NULL AND status<>'void' LIMIT 1 FOR UPDATE",
