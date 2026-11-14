@@ -40,16 +40,30 @@
   "program_officer": {
    "name": "Cán bộ chương trình",
    "permissions": [
-    "charity.*",
+    "charity.program.*",
+    "charity.beneficiary.*",
+    "charity.donation.*",
+    "charity.disbursement.read",
+    "charity.disbursement.create",
     "case-management.*",
-    "project.*"
+    "project.*",
+    "master-data.party.read",
+    "accounting.account.read"
    ]
   },
   "finance_officer": {
    "name": "Cán bộ tài chính",
    "permissions": [
     "budget.*",
-    "accounting.*"
+    "accounting.*",
+    "charity.program.read",
+    "charity.beneficiary.read",
+    "charity.donation.read",
+    "charity.disbursement.read",
+    "charity.disbursement.approved",
+    "charity.disbursement.rejected",
+    "charity.disbursement.paid",
+    "master-data.party.read"
    ]
   }
  },
