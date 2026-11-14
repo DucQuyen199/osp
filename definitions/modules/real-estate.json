@@ -196,6 +196,18 @@
      "system": true
     },
     {
+      "name": "amendment_in_progress",
+      "type": "string",
+      "required": false,
+      "system": true
+    },
+    {
+      "name": "last_amendment",
+      "type": "string",
+      "required": false,
+      "system": true
+    },
+    {
      "name": "start_date",
      "type": "date",
      "required": false

@@ -152,7 +152,10 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
         "property" if current.get("status").and_then(Value::as_str) == Some("sold") => &["*"][..],
         _ => &[][..],
     };
-    if immutable.contains(&"*") || immutable.iter().any(|field| patch.get(*field).is_some()) {
+    if immutable.contains(&"*")
+        || (immutable.iter().any(|field| patch.get(*field).is_some())
+            && patch.get("amendment_in_progress").is_none())
+    {
         return vec!["Operational lease terms and sold property records are immutable".into()];
     }
     Vec::new()

@@ -35,6 +35,36 @@ pub async fn handle_source_event(
         causation: Some(event_id),
         silent: false,
     };
+    if event_type == "contract.amendment.cancelled" {
+        let record_id = document.get("id").and_then(Value::as_str).ok_or_else(|| {
+            crate::error::ApiError::validation(
+                event_type,
+                vec!["Cancelled amendment event requires a source id".into()],
+            )
+        })?;
+        let request = tx
+            .query_opt(
+                "SELECT id FROM workflow_approval__approval_request WHERE tenant_id = $1 AND entity = 'contract.amendment' AND record_id = $2 AND status = 'pending' ORDER BY created_at DESC LIMIT 1 FOR UPDATE",
+                &[&tenant.id, &record_id],
+            )
+            .await?;
+        if let Some(request) = request {
+            let request_id: Uuid = request.get(0);
+            let entity = kernel.ent(tenant, "workflow-approval.approval_request")?;
+            kernel
+                .act_in(
+                    tx,
+                    &Actor::System,
+                    tenant,
+                    &entity,
+                    &request_id.to_string(),
+                    "cancelled",
+                    &opts,
+                )
+                .await?;
+        }
+        return Ok(true);
+    }
     if let Some(request) = domain::request_for_event(event_type, document) {
         let entity = kernel.ent(tenant, "workflow-approval.approval_request")?;
         kernel

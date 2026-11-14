@@ -4,7 +4,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 
 ## Đã có
 
-- 50 module, 182 loại dữ liệu, 811 sự kiện, 22 gói ngành; nghiệp vụ liên module chạy trong Rust bounded contexts.
+- 50 module, 183 loại dữ liệu, 821 sự kiện, 22 gói ngành; nghiệp vụ liên module chạy trong Rust bounded contexts.
 - PostgreSQL, transaction/savepoint, tenant lock, migration, RLS, backup.
 - Tài sản cố định có vốn hóa, khấu hao theo hai phương pháp, thanh lý và báo cáo lịch dự báo theo tháng dùng chung công thức Decimal với luồng ghi sổ.
 - Application của module tài sản cố định chia facade và use case nhỏ cho chuẩn hóa tài sản, khấu hao, vốn hóa, thanh lý và cập nhật sổ cái.
@@ -16,6 +16,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - RBAC, Argon2id, phiên và API token, rate limiting, OpenAPI 3.1.
 - React/Vite, giao diện quản trị, timeline liên module, responsive; design system và rà axe-core.
 - Bàn vận hành hóa đơn điện tử: hàng đợi theo trạng thái, liên kết hóa đơn kế toán, xem lỗi/phản hồi/lịch sử gọi provider, thử lại và yêu cầu hủy có lý do. Phát hành thật vẫn cần ánh xạ hợp đồng và thông tin xác thực từ provider được chọn.
+- Phụ lục hợp đồng được lập, gửi duyệt, áp dụng theo ngày hiệu lực và ghi snapshot lịch sử; hỗ trợ đổi tên, điều khoản, giá trị và ngày kết thúc trên hợp đồng đang hiệu lực.
 - Docker image Linux đã build và chạy qua Compose test riêng; đã diễn tập pg_dump/pg_restore, restart, RLS, phiên đăng nhập và luồng bán hàng sau khôi phục. Vẫn cần xác minh vận hành/tải/HA trên hạ tầng production thực tế.
 
 ## Còn thiếu

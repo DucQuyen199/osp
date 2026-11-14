@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **50 module**, **182 loại dữ liệu**, **811 sự kiện**.
+Tổng: **50 module**, **183 loại dữ liệu**, **821 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -357,12 +357,13 @@ Tổng: **50 module**, **182 loại dữ liệu**, **811 sự kiện**.
 | `task_dependency` Phụ thuộc công việc | — |
 
 ### contract
-**Hợp đồng** — Hợp đồng, điều khoản, vòng đời hiệu lực/hết hạn.
+**Hợp đồng** — Hợp đồng, điều khoản, phụ lục có phê duyệt và vòng đời hiệu lực/hết hạn.
 
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
-| `contract` Hợp đồng | `draft` → **activated** (draft→active), **cancelled** (draft→terminated), **expired** (active→expired), **terminated** (active→terminated) |
+| `contract` Hợp đồng | `draft` → **activated** (draft→active), **amended** (active→active), **cancelled** (draft→terminated), **expired** (active→expired), **terminated** (active→terminated) |
 | `clause` Điều khoản | — |
+| `amendment` Phụ lục hợp đồng | `draft` → **applied** (approved→applied), **approved** (submitted→approved), **cancelled** (draft/rejected/submitted/approved→cancelled), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 
 ## Nền tảng dùng chung
 
@@ -408,7 +409,7 @@ Tổng: **50 module**, **182 loại dữ liệu**, **811 sự kiện**.
 
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
-| `approval_request` Yêu cầu duyệt | `pending` → **approved** (pending→approved), **rejected** (pending→rejected) |
+| `approval_request` Yêu cầu duyệt | `pending` → **approved** (pending→approved), **cancelled** (pending→cancelled), **rejected** (pending→rejected) |
 | `approval_rule` Quy tắc duyệt | — |
 
 ## Module chuyên ngành

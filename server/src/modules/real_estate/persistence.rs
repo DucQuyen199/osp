@@ -16,6 +16,9 @@ pub async fn validate_persistence(
             "created" | "updated" | "reserved" | "converted" | "cancelled" | "expired",
         ) => validate_reservation(tx, tenant, action, document).await,
         ("lease", "activated") => validate_lease_activation(tx, tenant, document).await,
+        ("lease", "updated") if document.get("amendment_in_progress").is_some() => {
+            validate_lease_amendment(tx, tenant, document).await
+        }
         ("lease", "rent_due") => validate_rent_due(tx, tenant, document).await,
         ("lease", "terminated") => validate_lease_termination(tx, tenant, document).await,
         ("property", "leased") => validate_property_has_active_lease(tx, tenant, document).await,
@@ -27,6 +30,54 @@ pub async fn validate_persistence(
         ("viewing", "created" | "updated") => validate_viewing(tx, tenant, document).await,
         _ => Ok(Vec::new()),
     }
+}
+
+async fn validate_lease_amendment(tx: &Tx<'_>, tenant: &Tenant, lease: &Value) -> R<Vec<String>> {
+    let (Some(lease_id), Some(amendment_id)) = (
+        parse_id(lease, "id"),
+        parse_id(lease, "amendment_in_progress"),
+    ) else {
+        return Ok(vec![
+            "Điều chỉnh lease phải tham chiếu phụ lục hợp đồng hợp lệ".into(),
+        ]);
+    };
+    if lease.get("last_amendment").and_then(Value::as_str)
+        != lease.get("amendment_in_progress").and_then(Value::as_str)
+    {
+        return Ok(vec![
+            "Phụ lục lease đang áp dụng không khớp dấu vết gần nhất".into(),
+        ]);
+    }
+    if lease.get("status").and_then(Value::as_str) != Some("active") {
+        return Ok(vec![
+            "Chỉ lease đang hoạt động mới được thay đổi điều khoản".into(),
+        ]);
+    }
+    let Some(row) = tx
+        .query_opt(
+            "SELECT a.changes FROM contract__amendment a JOIN contract__contract c ON c.tenant_id = a.tenant_id AND c.id = a.contract WHERE a.tenant_id = $1 AND a.id = $2 AND a.status = 'effective' AND c.source = 'real_estate_lease' AND c.source_id = $3 AND a.effective_date <= CURRENT_DATE",
+            &[&tenant.id, &amendment_id, &lease_id.to_string()],
+        )
+        .await?
+    else {
+        return Ok(vec!["Lease chỉ được cập nhật từ phụ lục đã có hiệu lực của đúng hợp đồng nguồn".into()]);
+    };
+    let changes: Value = row.get(0);
+    if let Some(value) = changes.get("value") {
+        if crate::money::decimal(value) != lease.get("rent").and_then(crate::money::decimal) {
+            return Ok(vec![
+                "Giá thuê phải khớp giá trị đã duyệt trong phụ lục".into(),
+            ]);
+        }
+    }
+    if let Some(end_date) = changes.get("end_date")
+        && lease.get("end_date") != Some(end_date)
+    {
+        return Ok(vec![
+            "Ngày kết thúc lease phải khớp phụ lục đã duyệt".into(),
+        ]);
+    }
+    Ok(Vec::new())
 }
 
 async fn validate_reservation(

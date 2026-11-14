@@ -1,7 +1,7 @@
 {
  "id": "contract",
  "name": "Hợp đồng",
- "description": "Hợp đồng, điều khoản, vòng đời hiệu lực/hết hạn.",
+ "description": "Hợp đồng, điều khoản, phụ lục có phê duyệt và vòng đời hiệu lực/hết hạn.",
  "category": "operations",
  "version": "0.1.0",
  "depends": [
@@ -17,6 +17,11 @@
      "name": "title",
      "type": "string",
      "required": true
+    },
+    {
+      "name": "terms",
+      "type": "text",
+      "required": false
     },
     {
      "name": "party",
@@ -52,6 +57,24 @@
      "system": true
     },
     {
+      "name": "amendment_in_progress",
+      "type": "string",
+      "required": false,
+      "system": true
+    },
+    {
+      "name": "last_amendment",
+      "type": "string",
+      "required": false,
+      "system": true
+    },
+    {
+      "name": "amendment_history",
+      "type": "json",
+      "required": false,
+      "system": true
+    },
+    {
      "name": "status",
      "type": "enum",
      "required": false,
@@ -79,6 +102,12 @@
       ],
       "to": "terminated"
      },
+      "amended": {
+        "from": [
+          "active"
+        ],
+        "to": "active"
+      },
      "cancelled": {
       "from": [
        "draft"
@@ -120,6 +149,93 @@
    "states": null,
    "computed": {},
    "constraints": []
+  },
+  {
+    "name": "amendment",
+    "label": "Phụ lục hợp đồng",
+    "fields": [
+      {
+        "name": "contract",
+        "type": "ref",
+        "required": true,
+        "ref": "contract.contract"
+      },
+      {
+        "name": "reference",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "effective_date",
+        "type": "date",
+        "required": true
+      },
+      {
+        "name": "reason",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "changes",
+        "type": "json",
+        "required": true
+      },
+      {
+        "name": "status",
+        "type": "enum",
+        "required": false,
+        "options": [
+          "draft",
+          "submitted",
+          "approved",
+          "rejected",
+          "effective",
+          "cancelled"
+        ]
+      }
+    ],
+    "states": {
+      "field": "status",
+      "initial": "draft",
+      "actions": {
+        "submitted": {
+          "from": [
+            "draft",
+            "rejected"
+          ],
+          "to": "submitted"
+        },
+        "approved": {
+          "from": [
+            "submitted"
+          ],
+          "to": "approved"
+        },
+        "rejected": {
+          "from": [
+            "submitted"
+          ],
+          "to": "rejected"
+        },
+        "applied": {
+          "from": [
+            "approved"
+          ],
+          "to": "applied"
+        },
+        "cancelled": {
+          "from": [
+            "draft",
+            "rejected",
+            "submitted",
+            "approved"
+          ],
+          "to": "cancelled"
+        }
+      }
+    },
+    "computed": {},
+    "constraints": []
   }
  ],
  "rules": [],

@@ -6,8 +6,232 @@ use crate::{
     kernel::{Actor, Kernel, Opts, Tenant},
 };
 use chrono::{Datelike, Duration};
+use rust_decimal::Decimal;
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
+
+/// Keep rent billing aligned with an approved addendum on a lease-linked
+/// contract. The caller applies this within the same tenant transaction as the
+/// contract amendment, so later rent cycles use the approved terms only.
+async fn apply_lease_amendment(
+    kernel: &Kernel,
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    lease_id: Uuid,
+    amendment_id: Uuid,
+    effective_date: &str,
+    changes: &Value,
+    event_id: Uuid,
+    depth: u32,
+) -> R<()> {
+    let Some(row) = tx
+        .query_opt(
+            "SELECT jsonb_build_object('status', status, 'start_date', start_date, 'end_date', end_date, 'next_rent_date', next_rent_date, 'billing_interval', billing_interval) FROM real_estate__lease WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+            &[&tenant.id, &lease_id],
+        )
+        .await?
+    else {
+        return Err(crate::error::ApiError::validation(
+            "contract.amendment.applied",
+            vec!["Lease nguồn của hợp đồng không còn tồn tại".into()],
+        ));
+    };
+    let lease: Value = row.get(0);
+    if lease.get("status").and_then(Value::as_str) != Some("active") {
+        return Err(crate::error::ApiError::validation(
+            "contract.amendment.applied",
+            vec!["Chỉ lease đang hoạt động mới nhận điều chỉnh từ phụ lục".into()],
+        ));
+    }
+    let Some(changes) = changes.as_object() else {
+        return Err(crate::error::ApiError::validation(
+            "contract.amendment.applied",
+            vec!["Nội dung phụ lục không hợp lệ".into()],
+        ));
+    };
+    let Some(effective_date) = chrono::NaiveDate::parse_from_str(effective_date, "%Y-%m-%d").ok()
+    else {
+        return Err(crate::error::ApiError::validation(
+            "contract.amendment.applied",
+            vec!["Ngày hiệu lực phụ lục không hợp lệ".into()],
+        ));
+    };
+    let today = chrono::Utc::now().date_naive();
+    let old_end = domain::date(&lease, "end_date");
+    let new_end = match changes.get("end_date") {
+        Some(Value::Null) => {
+            return Err(crate::error::ApiError::validation(
+                "contract.amendment.applied",
+                vec!["Lease bất động sản phải duy trì ngày kết thúc xác định".into()],
+            ));
+        }
+        Some(value) => value
+            .as_str()
+            .and_then(|value| chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").ok()),
+        None => old_end,
+    };
+    if new_end.is_none_or(|end| end < effective_date) {
+        return Err(crate::error::ApiError::validation(
+            "contract.amendment.applied",
+            vec!["Ngày kết thúc lease phải bằng hoặc sau ngày hiệu lực phụ lục".into()],
+        ));
+    }
+    let new_end = new_end.expect("validated lease end date");
+    if (changes.contains_key("value") || changes.contains_key("end_date"))
+        && let Some(next_rent) = domain::date(&lease, "next_rent_date")
+        && next_rent <= today
+        && next_rent < effective_date
+        && next_rent <= new_end
+    {
+        return Err(crate::error::ApiError::validation(
+            "contract.amendment.applied",
+            vec!["Hãy lập hóa đơn kỳ thuê đến hạn trước khi áp dụng thay đổi lease".into()],
+        ));
+    }
+
+    let mut patch = Map::from_iter([
+        (
+            "amendment_in_progress".into(),
+            json!(amendment_id.to_string()),
+        ),
+        ("last_amendment".into(), json!(amendment_id.to_string())),
+    ]);
+    if let Some(value) = changes.get("value") {
+        if value.is_null()
+            || !crate::money::decimal(value).is_some_and(|amount| amount >= Decimal::ZERO)
+        {
+            return Err(crate::error::ApiError::validation(
+                "contract.amendment.applied",
+                vec!["Giá thuê sau điều chỉnh phải là số không âm".into()],
+            ));
+        }
+        patch.insert("rent".into(), value.clone());
+    }
+    if let Some(value) = changes.get("end_date") {
+        patch.insert("end_date".into(), value.clone());
+    }
+
+    let next_rent = domain::date(&lease, "next_rent_date");
+    let updated_next = if let Some(next_rent) = next_rent {
+        if next_rent > new_end {
+            Some(None)
+        } else {
+            None
+        }
+    } else if old_end.is_some_and(|end| new_end > end) {
+        let start = domain::date(&lease, "start_date").ok_or_else(|| {
+            crate::error::ApiError::validation(
+                "contract.amendment.applied",
+                vec!["Lease cần ngày bắt đầu để tính kỳ thu tiếp theo".into()],
+            )
+        })?;
+        let mut due = start;
+        let anchor = start.day();
+        let months = domain::interval_months(&lease);
+        let mut periods = 0;
+        while due <= effective_date && periods < 1200 {
+            due = domain::next_anchor_date(due, anchor, months).ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    "contract.amendment.applied",
+                    vec!["Không thể tính kỳ thu tiếp theo của lease".into()],
+                )
+            })?;
+            periods += 1;
+        }
+        Some((due <= new_end).then_some(due))
+    } else {
+        None
+    };
+    if let Some(next_rent) = updated_next {
+        patch.insert(
+            "next_rent_date".into(),
+            next_rent.map(|date| json!(date)).unwrap_or(Value::Null),
+        );
+    }
+
+    let entity = kernel.ent(tenant, "real-estate.lease")?;
+    kernel
+        .update_in(
+            tx,
+            &Actor::System,
+            tenant,
+            &entity,
+            &lease_id.to_string(),
+            patch,
+            &Opts {
+                depth: Some(depth + 1),
+                causation: Some(event_id),
+                silent: false,
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+async fn handle_contract_amendment(
+    kernel: &Kernel,
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    document: &Value,
+    event_id: Uuid,
+    depth: u32,
+) -> R<bool> {
+    let Some(contract_id) = document
+        .get("id")
+        .and_then(Value::as_str)
+        .and_then(|id| Uuid::parse_str(id).ok())
+    else {
+        return Err(crate::error::ApiError::validation(
+            "contract.contract.amended",
+            vec!["Sự kiện hợp đồng cần mã UUID hợp lệ".into()],
+        ));
+    };
+    let Some(amendment_id) = document
+        .get("last_amendment")
+        .and_then(Value::as_str)
+        .and_then(|id| Uuid::parse_str(id).ok())
+    else {
+        return Ok(false);
+    };
+    let Some(row) = tx
+        .query_opt(
+            "SELECT c.source, c.source_id, a.effective_date::text, a.changes FROM contract__contract c JOIN contract__amendment a ON a.tenant_id = c.tenant_id AND a.contract = c.id WHERE c.tenant_id = $1 AND c.id = $2 AND a.id = $3 AND a.status = 'effective' FOR SHARE OF c, a",
+            &[&tenant.id, &contract_id, &amendment_id],
+        )
+        .await?
+    else {
+        return Ok(false);
+    };
+    let source: Option<String> = row.get(0);
+    if source.as_deref() != Some("real_estate_lease") {
+        return Ok(false);
+    }
+    let source_id: Option<String> = row.get(1);
+    let lease_id = source_id
+        .as_deref()
+        .and_then(|id| Uuid::parse_str(id).ok())
+        .ok_or_else(|| {
+            crate::error::ApiError::validation(
+                "contract.contract.amended",
+                vec!["Hợp đồng lease không có mã nguồn hợp lệ".into()],
+            )
+        })?;
+    let effective_date: String = row.get(2);
+    let changes: Value = row.get(3);
+    apply_lease_amendment(
+        kernel,
+        tx,
+        tenant,
+        lease_id,
+        amendment_id,
+        &effective_date,
+        &changes,
+        event_id,
+        depth,
+    )
+    .await?;
+    Ok(true)
+}
 
 pub async fn handle_source_event(
     kernel: &Kernel,
@@ -18,6 +242,9 @@ pub async fn handle_source_event(
     event_id: Uuid,
     depth: u32,
 ) -> R<bool> {
+    if event_type == "contract.contract.amended" {
+        return handle_contract_amendment(kernel, tx, tenant, document, event_id, depth).await;
+    }
     if matches!(
         event_type,
         "real-estate.reservation.reserved"

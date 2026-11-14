@@ -48,7 +48,7 @@ const FIELDS = {
 const STATUS = {
   released: 'Sẵn sàng trở lại',
   cycle_count: 'Kiểm kê định kỳ', damage: 'Hư hỏng', opening_balance: 'Tồn đầu kỳ', correction: 'Điều chỉnh',
-  draft: 'Nháp', new: 'Mới', open: 'Mở', planned: 'Lên kế hoạch', pending: 'Chờ xử lý', cart: 'Giỏ hàng', requested: 'Đã yêu cầu', applied: 'Đã nộp', quoted: 'Đã báo giá',
+  draft: 'Nháp', new: 'Mới', open: 'Mở', planned: 'Lên kế hoạch', pending: 'Chờ xử lý', cart: 'Giỏ hàng', requested: 'Đã yêu cầu', applied: 'Đã nộp', effective: 'Có hiệu lực', quoted: 'Đã báo giá',
   created: 'Mới tạo', queued: 'Đang chờ', ordered: 'Đã chỉ định', submitted: 'Đã gửi', returned: 'Cần chỉnh sửa', acknowledged: 'Đã xác nhận', intake: 'Tiếp nhận', pledged: 'Cam kết', reserved: 'Đã giữ chỗ', recorded: 'Đã ghi nhận',
   due: 'Đến hạn', booked: 'Đã đặt', available: 'Còn trống', vacant: 'Trống', growing: 'Đang trồng', todo: 'Cần làm', active: 'Đang hoạt động', pause: 'Tạm dừng',
   contacted: 'Đã liên hệ', qualified: 'Đủ điều kiện', disqualified: 'Không đạt', converted: 'Đã chuyển đổi', won: 'Thắng', lost: 'Thua',
@@ -89,7 +89,7 @@ const ACTIONS = {
 
 const TONE = {
   success: ['won', 'paid', 'completed', 'delivered', 'approved', 'active', 'issued', 'signed', 'sold', 'resulted', 'done', 'succeeded', 'hired', 'converted', 'accepted',
-    'resolved', 'received', 'posted', 'confirmed', 'dispensed', 'disbursed', 'harvested', 'published', 'ready', 'served', 'pass', 'leased'],
+    'resolved', 'received', 'posted', 'confirmed', 'dispensed', 'disbursed', 'harvested', 'published', 'ready', 'served', 'pass', 'leased', 'effective'],
   danger: ['lost', 'rejected', 'cancelled', 'failed', 'void', 'reversed', 'disqualified', 'defaulted', 'overdue', 'terminated', 'expired', 'declined', 'no_show', 'fail', 'lapsed', 'refunded', 'disposed', 'dropped'],
   warning: ['pending', 'due', 'on_hold', 'requested', 'queued', 'preparing', 'paused', 'pledged', 'cleaning', 'submitted', 'intake'],
   info: ['sent', 'in_progress', 'doing', 'launched', 'dispatched', 'contacted', 'qualified', 'placed', 'booked', 'reserved', 'quoted', 'checked_in', 'occupied', 'growing', 'ordered', 'applied'],
