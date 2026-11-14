@@ -1,7 +1,7 @@
 {
  "id": "purchasing",
  "name": "Mua hàng",
- "description": "Đề nghị mua, yêu cầu báo giá, đơn mua và trả hàng nhà cung cấp. Đơn mua nhận hàng vào kho và ghi công nợ; phiếu trả gửi kho và điều chỉnh bill gốc.",
+ "description": "Đề nghị mua, báo giá, đơn mua, phiếu nhận và hóa đơn nhà cung cấp; phiếu trả gửi kho và điều chỉnh bill gốc.",
  "category": "supply",
  "version": "0.1.0",
  "depends": [
@@ -311,6 +311,29 @@
       "to": "cancelled"
      }
     }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "supplier_invoice",
+   "label": "Hóa đơn nhà cung cấp",
+   "fields": [
+    { "name": "purchase_order", "type": "ref", "required": true, "ref": "purchasing.purchase_order" },
+    { "name": "supplier", "type": "ref", "required": true, "ref": "master-data.party" },
+    { "name": "department", "type": "ref", "required": false, "ref": "hrm.department" },
+    { "name": "invoice_number", "type": "string", "required": true },
+    { "name": "issue_date", "type": "date", "required": true },
+    { "name": "due_date", "type": "date", "required": false },
+    { "name": "total", "type": "money", "required": true },
+    { "name": "tax_total", "type": "money", "required": false },
+    { "name": "lines", "type": "json", "required": true },
+    { "name": "status", "type": "enum", "required": false, "options": ["draft", "approved"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": { "approved": { "from": ["draft"], "to": "approved" } }
    },
    "computed": {},
    "constraints": []

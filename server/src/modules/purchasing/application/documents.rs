@@ -28,6 +28,17 @@ async fn prepare_document_with_lock(
     document: &mut Map<String, Value>,
     lock_rows: bool,
 ) -> R<Vec<String>> {
+    if entity == "supplier_invoice"
+        && let Some(invoice_number) = document
+            .get("invoice_number")
+            .and_then(Value::as_str)
+            .map(str::trim)
+    {
+        document.insert(
+            "invoice_number".into(),
+            Value::String(invoice_number.to_owned()),
+        );
+    }
     if !matches!(
         entity,
         "rfq" | "purchase_order" | "purchase_receipt" | "purchase_return"

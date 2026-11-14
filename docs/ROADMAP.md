@@ -23,6 +23,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Bàn bán buôn cho phép lập thêm vận đơn theo số lượng còn lại, tính cả chuyến nháp/đang giao/đã giao và loại phần giao thất bại khỏi lượng đã phân công.
 - Lịch hẹn ở trạng thái yêu cầu tính lại giờ kết thúc và giá mặc định khi đổi dịch vụ hoặc giờ bắt đầu; khung giờ mới tiếp tục qua kiểm tra khóa tài nguyên và trùng lịch.
 - Ký thầu phụ chỉ ghi nhận cam kết chi phí; hồ sơ nghiệm thu/đề nghị thanh toán có giá trị lũy kế được giới hạn trong hợp đồng và chỉ phát sinh hóa đơn phải trả sau khi duyệt.
+- Mua hàng chỉ ghi nhận GRNI khi nhận kho; hóa đơn nhà cung cấp có số và ngày chứng từ riêng, chỉ tạo công nợ sau khi đối chiếu và duyệt.
 - Docker image Linux đã build và chạy qua Compose test riêng; đã diễn tập pg_dump/pg_restore, restart, RLS, phiên đăng nhập và luồng bán hàng sau khôi phục. Vẫn cần xác minh vận hành/tải/HA trên hạ tầng production thực tế.
 
 ## Còn thiếu

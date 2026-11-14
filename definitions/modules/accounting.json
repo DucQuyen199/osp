@@ -288,6 +288,11 @@
      "ref": "master-data.party"
     },
     {
+     "name": "supplier_invoice_number",
+     "type": "string",
+     "required": false
+    },
+    {
      "name": "currency",
      "type": "ref",
      "required": false,

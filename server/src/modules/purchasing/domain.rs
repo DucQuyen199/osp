@@ -9,7 +9,12 @@ fn decimal(value: &Value) -> Option<Decimal> {
 pub fn validate(entity: &str, document: &Value) -> Vec<String> {
     if !matches!(
         entity,
-        "rfq" | "purchase_order" | "purchase_requisition" | "purchase_receipt" | "purchase_return"
+        "rfq"
+            | "purchase_order"
+            | "purchase_requisition"
+            | "purchase_receipt"
+            | "purchase_return"
+            | "supplier_invoice"
     ) {
         return Vec::new();
     }
@@ -112,6 +117,17 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
         "purchase_receipt" if current.get("status").and_then(Value::as_str) != Some("draft") => {
             &["purchase_order", "warehouse", "lines", "total", "note"]
         }
+        "supplier_invoice" if current.get("status").and_then(Value::as_str) != Some("draft") => &[
+            "purchase_order",
+            "supplier",
+            "department",
+            "invoice_number",
+            "issue_date",
+            "due_date",
+            "total",
+            "tax_total",
+            "lines",
+        ],
         "purchase_order"
             if !matches!(
                 current.get("status").and_then(Value::as_str),
@@ -188,6 +204,7 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
             | ("purchase_requisition", "submitted" | "approved")
             | ("purchase_return", "submitted" | "approved" | "dispatched")
             | ("purchase_receipt", "received")
+            | ("supplier_invoice", "approved")
     ) {
         return Vec::new();
     }
@@ -270,6 +287,55 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
     {
         errors.push("Purchase receipt total must be greater than zero".into());
     }
+    if entity == "supplier_invoice" && action == "approved" {
+        if document
+            .get("invoice_number")
+            .and_then(Value::as_str)
+            .is_none_or(|value| value.trim().is_empty())
+        {
+            errors.push("Supplier invoice number is required".into());
+        }
+        let issue = document
+            .get("issue_date")
+            .and_then(Value::as_str)
+            .and_then(|value| chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").ok());
+        if issue.is_none() {
+            errors.push("Supplier invoice needs a valid issue date".into());
+        } else if issue.is_some_and(|date| date > chrono::Utc::now().date_naive()) {
+            errors.push("Supplier invoice issue date cannot be in the future".into());
+        }
+        if document
+            .get("due_date")
+            .and_then(Value::as_str)
+            .is_some_and(|value| chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").is_err())
+        {
+            errors.push("Supplier invoice due date must be a valid date".into());
+        }
+        if let (Some(issue), Some(due)) = (
+            issue,
+            document
+                .get("due_date")
+                .and_then(Value::as_str)
+                .and_then(|value| chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").ok()),
+        ) && due < issue
+        {
+            errors.push("Supplier invoice due date cannot precede its issue date".into());
+        }
+        if !document
+            .get("total")
+            .and_then(decimal)
+            .is_some_and(|value| value > Decimal::ZERO)
+        {
+            errors.push("Supplier invoice total must be greater than zero".into());
+        }
+        if document
+            .get("tax_total")
+            .and_then(decimal)
+            .is_some_and(|value| value < Decimal::ZERO)
+        {
+            errors.push("Supplier invoice tax cannot be negative".into());
+        }
+    }
     if entity == "rfq" && matches!(action, "quoted" | "accepted") {
         errors.extend(validate_quote_lines(document));
     }
@@ -312,6 +378,7 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
     let protected = match entity {
         "purchase_return" => status != "draft",
         "purchase_receipt" => status != "draft",
+        "supplier_invoice" => status != "draft",
         "purchase_requisition" => !matches!(status, "draft" | "rejected"),
         "purchase_order" => {
             !matches!(status, "draft" | "cancelled") || document.get("source").is_some()

@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **50 module**, **183 loại dữ liệu**, **821 sự kiện**.
+Tổng: **50 module**, **185 loại dữ liệu**, **829 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -221,13 +221,14 @@ Tổng: **50 module**, **183 loại dữ liệu**, **821 sự kiện**.
 | `work_center` Trung tâm sản xuất | — |
 
 ### purchasing
-**Mua hàng** — Đề nghị mua, yêu cầu báo giá, đơn mua và trả hàng nhà cung cấp. Đơn mua nhận hàng vào kho và ghi công nợ; phiếu trả gửi kho và điều chỉnh bill gốc.
+**Mua hàng** — Đề nghị mua, báo giá, đơn mua, phiếu nhận và hóa đơn nhà cung cấp; phiếu trả gửi kho và điều chỉnh bill gốc.
 
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
 | `rfq` Yêu cầu báo giá | `draft` → **accepted** (quoted→accepted), **cancelled** (draft/sent→cancelled), **quoted** (sent→quoted), **rejected** (sent/quoted→rejected), **sent** (draft→sent) |
 | `purchase_order` Đơn mua hàng | `draft` → **approved** (submitted→approved), **cancelled** (draft/submitted/approved/rejected→cancelled), **partially_received** (approved→partially_received), **received** (approved/partially_received→received), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 | `purchase_receipt` Phiếu nhận hàng mua | `draft` → **cancelled** (draft→cancelled), **received** (draft→received) |
+| `supplier_invoice` Hóa đơn nhà cung cấp | `draft` → **approved** (draft→approved) |
 | `purchase_requisition` Đề nghị mua | `draft` → **approved** (submitted→approved), **rejected** (submitted→rejected), **sourced** (approved→sourced), **submitted** (draft/rejected→submitted) |
 | `purchase_return` Phiếu trả hàng mua | `draft` → **approved** (submitted→approved), **cancelled** (draft/rejected→cancelled), **dispatched** (approved→dispatched), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 
@@ -462,7 +463,7 @@ Tổng: **50 module**, **183 loại dữ liệu**, **821 sự kiện**.
 | `lab_order` Chỉ định xét nghiệm | `ordered` → **resulted** (ordered→resulted) |
 
 ### construction
-**Xây dựng** — Dự toán (BOQ), công trường, thầu phụ, nhật ký thi công. Ký thầu phụ tự ghi nhận công nợ.
+**Xây dựng** — Dự toán, công trường, thầu phụ, nghiệm thu khối lượng và cam kết chi phí.
 
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
@@ -470,6 +471,7 @@ Tổng: **50 module**, **183 loại dữ liệu**, **821 sự kiện**.
 | `site` Công trường | — |
 | `subcontract` Thầu phụ | `draft` → **completed** (signed→completed), **signed** (draft→signed) |
 | `site_diary` Nhật ký thi công | — |
+| `progress_claim` Nghiệm thu / đề nghị thanh toán thầu phụ | `draft` → **approved** (draft→approved) |
 
 ### events
 **Sự kiện & bán vé** — Sự kiện, vé, check-in. Giá vé công bố đã gồm thuế theo cấu hình của sự kiện; bán vé tự ghi nhận thu và thuế.

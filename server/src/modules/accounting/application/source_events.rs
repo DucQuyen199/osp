@@ -34,7 +34,12 @@ pub async fn handle_source_document_event(
     if !source_documents::qualifies(&spec, event) {
         return Ok(true);
     }
-    let source_id = event.get("id").cloned().ok_or_else(|| {
+    let source_id = (if event_type == "purchasing.supplier_invoice.approved" {
+        event.get("purchase_order").cloned()
+    } else {
+        event.get("id").cloned()
+    })
+    .ok_or_else(|| {
         crate::error::ApiError::validation(
             event_type,
             vec!["Accounting source document requires an id".into()],
@@ -96,12 +101,26 @@ pub async fn handle_source_document_event(
         event_type,
         "sales.sales_order.confirmed"
             | "sales.sales_order.delivered"
-            | "purchasing.purchase_order.received"
+            | "purchasing.supplier_invoice.approved"
     ) {
         for field in ["tax_total", "lines"] {
             if let Some(value) = event.get(field).filter(|value| !value.is_null()) {
                 data.insert(field.into(), value.clone());
             }
+        }
+    }
+    if event_type == "purchasing.supplier_invoice.approved" {
+        for (source, target) in [
+            ("invoice_number", "supplier_invoice_number"),
+            ("issue_date", "issue_date"),
+            ("due_date", "due_date"),
+        ] {
+            if let Some(value) = event.get(source).filter(|value| !value.is_null()) {
+                data.insert(target.into(), value.clone());
+            }
+        }
+        if let Some(value) = event.get("department").filter(|value| !value.is_null()) {
+            data.insert("department".into(), value.clone());
         }
     }
     if event_type == "purchasing.purchase_order.received"

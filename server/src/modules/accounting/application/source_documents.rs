@@ -42,14 +42,14 @@ pub(super) fn source_document(event_type: &str) -> Option<SourceDocument> {
             Condition::Always,
             true,
         ),
-        "purchasing.purchase_order.received" => (
+        "purchasing.supplier_invoice.approved" => (
             Target::Bill,
             "total",
             None,
             Some("supplier"),
             "purchase_order",
             None,
-            Condition::Always,
+            Condition::Positive("total"),
             true,
         ),
         "pos.pos_order.completed" => (
