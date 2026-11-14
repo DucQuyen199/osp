@@ -104,6 +104,18 @@ export default function BiReportsPage({ route }) {
   const [draftSearch, setDraftSearch] = useState('');
   const [draftFilter, setDraftFilter] = useState('');
   const [draftFilterValue, setDraftFilterValue] = useState('');
+  const [creatingDashboard, setCreatingDashboard] = useState(false);
+  const [savingDashboard, setSavingDashboard] = useState(false);
+  const [dashboardName, setDashboardName] = useState('');
+  const [widgetReportId, setWidgetReportId] = useState('');
+  const [widgetType, setWidgetType] = useState('table');
+  const [dashboardWidgets, setDashboardWidgets] = useState([]);
+  const [creatingKpi, setCreatingKpi] = useState(false);
+  const [savingKpi, setSavingKpi] = useState(false);
+  const [kpiName, setKpiName] = useState('');
+  const [kpiReportId, setKpiReportId] = useState('');
+  const [kpiTarget, setKpiTarget] = useState('');
+  const [kpiFormula, setKpiFormula] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -185,6 +197,45 @@ export default function BiReportsPage({ route }) {
     } finally { setSavingReport(false); }
   };
 
+  const reportWidgetTypes = (item) => {
+    if (!item?.query?.aggregate) return ['table'];
+    return item.query.group_by ? ['line', 'bar', 'pie'] : ['number'];
+  };
+  const selectedWidgetReport = reports.find((item) => item.id === widgetReportId);
+  const widgetTypeOptions = reportWidgetTypes(selectedWidgetReport);
+  const addDashboardWidget = () => {
+    const reportItem = reports.find((item) => item.id === widgetReportId);
+    if (!reportItem || !reportWidgetTypes(reportItem).includes(widgetType) || dashboardWidgets.length >= 24) return;
+    setDashboardWidgets((items) => [...items, { report: reportItem.id, type: widgetType }]);
+  };
+  const createDashboard = async (event) => {
+    event.preventDefault();
+    if (savingDashboard || !dashboardName.trim() || !dashboardWidgets.length) return;
+    setSavingDashboard(true); setError('');
+    try {
+      const created = await api(dataPath('bi.dashboard'), { method: 'POST', body: { name: dashboardName.trim(), widgets: dashboardWidgets } });
+      setCreatingDashboard(false); setDashboardName(''); setDashboardWidgets([]);
+      await load();
+      if (created?.id) window.location.hash = `#/reports/bi/dashboard/${encodeURIComponent(created.id)}`;
+    } catch (reason) { setError(reason.message || 'Could not create dashboard.'); }
+    finally { setSavingDashboard(false); }
+  };
+  const kpiReports = reports.filter((item) => item.query?.aggregate && !item.query?.group_by);
+  const createKpi = async (event) => {
+    event.preventDefault();
+    if (savingKpi || !kpiName.trim() || !kpiReportId) return;
+    const body = { name: kpiName.trim(), report: kpiReportId };
+    if (kpiTarget.trim()) body.target = kpiTarget;
+    if (kpiFormula.trim()) body.formula = kpiFormula.trim();
+    setSavingKpi(true); setError('');
+    try {
+      await api(dataPath('bi.kpi'), { method: 'POST', body });
+      setCreatingKpi(false); setKpiName(''); setKpiTarget(''); setKpiFormula('');
+      await load();
+    } catch (reason) { setError(reason.message || 'Could not create KPI.'); }
+    finally { setSavingKpi(false); }
+  };
+
   if (route.view === 'dashboard' && route.id) return <div className="page">
     <div className="page-head"><div><a className="back-link" href="#/reports/bi">← Báo cáo & phân tích</a><h1>{dashboard?.name || 'Dashboard'}</h1><p className="sub">Các widget được lấy từ báo cáo đã lưu và phân quyền theo tenant.</p></div></div>
     {error && <div className="alert danger" role="alert">{error}</div>}
@@ -198,7 +249,11 @@ export default function BiReportsPage({ route }) {
   </div>;
 
   return <div className="page">
-    {can('bi.report.create') && !creating && <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn btn-primary" type="button" onClick={() => { setCreating(true); if (!draftSource && sources[0]) setDraftSource(sources[0].qname); }}>Tạo báo cáo</button></div>}
+    <div className="row" style={{ justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+      {can('bi.report.create') && !creating && <button className="btn btn-primary" type="button" onClick={() => { setCreating(true); if (!draftSource && sources[0]) setDraftSource(sources[0].qname); }}>Tạo báo cáo</button>}
+      {can('bi.dashboard.create') && can('bi.report.read') && !creatingDashboard && <button className="btn" type="button" onClick={() => setCreatingDashboard(true)}>Tạo dashboard</button>}
+      {can('bi.kpi.create') && can('bi.report.read') && !creatingKpi && <button className="btn" type="button" onClick={() => setCreatingKpi(true)}>Tạo KPI</button>}
+    </div>
     {creating && <section className="card report-section"><div className="card-head"><h2>Thiết kế báo cáo</h2><button className="btn btn-ghost" type="button" onClick={() => setCreating(false)}>Đóng</button></div><form className="card-pad stack" onSubmit={createReport}>
       <div className="form-grid"><label className="field"><span>Tên báo cáo</span><input className="input" required maxLength={160} value={draftName} onChange={(event) => setDraftName(event.target.value)} /></label>
         <label className="field"><span>Nguồn dữ liệu</span><select className="input" required value={selectedSource?.qname || ''} onChange={(event) => { setDraftSource(event.target.value); setDraftField(''); setDraftGroup(''); setDraftFilter(''); }}><option value="">Chọn module và dữ liệu</option>{sources.map((source) => <option key={source.qname} value={source.qname}>{source.label}</option>)}</select></label>
@@ -211,6 +266,23 @@ export default function BiReportsPage({ route }) {
       </div>
       {!sources.length && <p className="small muted">Bạn chưa có quyền đọc nguồn dữ liệu nào để thiết kế báo cáo.</p>}
       <div className="row"><button className="btn btn-primary" type="submit" disabled={savingReport || !selectedSource}>{savingReport ? 'Đang lưu…' : 'Lưu và chạy báo cáo'}</button></div>
+    </form></section>}
+    {creatingDashboard && <section className="card report-section"><div className="card-head"><h2>Tạo dashboard</h2><button className="btn btn-ghost" type="button" onClick={() => setCreatingDashboard(false)}>Đóng</button></div><form className="card-pad stack" onSubmit={createDashboard}>
+      <label className="field"><span>Tên dashboard</span><input className="input" required maxLength={160} value={dashboardName} onChange={(event) => setDashboardName(event.target.value)} /></label>
+      <div className="form-grid"><label className="field"><span>Báo cáo</span><select className="input" value={widgetReportId} onChange={(event) => { const next = reports.find((item) => item.id === event.target.value); setWidgetReportId(event.target.value); setWidgetType(reportWidgetTypes(next)[0]); }}><option value="">Chọn báo cáo đã lưu</option>{reports.filter((item) => item.query).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label className="field"><span>Kiểu widget</span><select className="input" value={widgetTypeOptions.includes(widgetType) ? widgetType : widgetTypeOptions[0]} onChange={(event) => setWidgetType(event.target.value)}>{widgetTypeOptions.map((type) => <option key={type} value={type}>{({ table: 'Bảng', number: 'Chỉ số', line: 'Đường', bar: 'Cột', pie: 'Tròn' })[type]}</option>)}</select></label>
+        <button className="btn" type="button" disabled={!selectedWidgetReport || dashboardWidgets.length >= 24} onClick={addDashboardWidget}>Thêm widget</button>
+      </div>
+      {dashboardWidgets.length > 0 && <ol className="stack-sm">{dashboardWidgets.map((widget, index) => <li key={`${widget.report}:${index}`} className="row"><span>{reports.find((item) => item.id === widget.report)?.name || 'Báo cáo'} · {widget.type}</span><button className="btn btn-ghost btn-sm" type="button" aria-label={`Xóa widget ${index + 1}`} onClick={() => setDashboardWidgets((items) => items.filter((_, itemIndex) => itemIndex !== index))}>Xóa</button></li>)}</ol>}
+      <div className="row"><button className="btn btn-primary" type="submit" disabled={savingDashboard || !dashboardWidgets.length}>{savingDashboard ? 'Đang lưu…' : 'Lưu dashboard'}</button></div>
+    </form></section>}
+    {creatingKpi && <section className="card report-section"><div className="card-head"><h2>Tạo KPI</h2><button className="btn btn-ghost" type="button" onClick={() => setCreatingKpi(false)}>Đóng</button></div><form className="card-pad stack" onSubmit={createKpi}>
+      <div className="form-grid"><label className="field"><span>Tên KPI</span><input className="input" required maxLength={160} value={kpiName} onChange={(event) => setKpiName(event.target.value)} /></label>
+        <label className="field"><span>Báo cáo tổng hợp không nhóm</span><select className="input" required value={kpiReportId} onChange={(event) => setKpiReportId(event.target.value)}><option value="">Chọn nguồn KPI</option>{kpiReports.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label className="field"><span>Mục tiêu (không bắt buộc)</span><input className="input num" type="number" min="0" step="any" value={kpiTarget} onChange={(event) => setKpiTarget(event.target.value)} /></label>
+        <label className="field"><span>Công thức (không bắt buộc)</span><input className="input" maxLength={500} value={kpiFormula} onChange={(event) => setKpiFormula(event.target.value)} /><span className="small muted">Biến khả dụng: value, target. Ví dụ: value / target * 100</span></label>
+      </div>
+      <div className="row"><button className="btn btn-primary" type="submit" disabled={savingKpi || !kpiReports.length}>{savingKpi ? 'Đang lưu…' : 'Lưu KPI'}</button></div>
     </form></section>}
     <div className="page-head"><div><h1>Báo cáo & phân tích</h1><p className="sub">Chạy truy vấn đã lưu và xem dashboard từ dữ liệu tenant mà Rust API cho phép.</p></div></div>
     {error && <div className="alert danger" role="alert">{error}</div>}
