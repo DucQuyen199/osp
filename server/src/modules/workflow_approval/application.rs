@@ -35,7 +35,15 @@ pub async fn handle_source_event(
         causation: Some(event_id),
         silent: false,
     };
-    if event_type == "contract.amendment.cancelled" {
+    if matches!(
+        event_type,
+        "contract.amendment.cancelled" | "purchasing.supplier_invoice.disputed"
+    ) {
+        let target = if event_type == "contract.amendment.cancelled" {
+            "contract.amendment"
+        } else {
+            "purchasing.supplier_invoice"
+        };
         let record_id = document.get("id").and_then(Value::as_str).ok_or_else(|| {
             crate::error::ApiError::validation(
                 event_type,
@@ -44,8 +52,8 @@ pub async fn handle_source_event(
         })?;
         let request = tx
             .query_opt(
-                "SELECT id FROM workflow_approval__approval_request WHERE tenant_id = $1 AND entity = 'contract.amendment' AND record_id = $2 AND status = 'pending' ORDER BY created_at DESC LIMIT 1 FOR UPDATE",
-                &[&tenant.id, &record_id],
+                "SELECT id FROM workflow_approval__approval_request WHERE tenant_id = $1 AND entity = $2 AND record_id = $3 AND status = 'pending' ORDER BY created_at DESC LIMIT 1 FOR UPDATE",
+                &[&tenant.id, &target, &record_id],
             )
             .await?;
         if let Some(request) = request {
@@ -71,6 +79,10 @@ pub async fn handle_source_event(
             .create_in(tx, &Actor::System, tenant, &entity, request, &opts)
             .await?;
         if event_type == "purchasing.supplier_invoice.submitted"
+            && document
+                .get("dispute_reason")
+                .and_then(Value::as_str)
+                .is_none_or(|reason| reason.trim().is_empty())
             && let (Some(total), Some(variance)) = (
                 document.get("total").and_then(crate::money::decimal),
                 document

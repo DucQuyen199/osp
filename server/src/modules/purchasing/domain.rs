@@ -134,18 +134,50 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
                 Some("draft" | "rejected")
             ) =>
         {
-            &[
-                "purchase_order",
-                "supplier",
-                "department",
-                "invoice_number",
-                "issue_date",
-                "due_date",
-                "total",
-                "tax_total",
-                "adjustments",
-                "lines",
-            ]
+            if current.get("status").and_then(Value::as_str) == Some("submitted") {
+                &[
+                    "purchase_order",
+                    "supplier",
+                    "department",
+                    "invoice_number",
+                    "issue_date",
+                    "due_date",
+                    "total",
+                    "tax_total",
+                    "adjustments",
+                    "resolution_note",
+                    "lines",
+                ]
+            } else if current.get("status").and_then(Value::as_str) == Some("disputed") {
+                &[
+                    "purchase_order",
+                    "supplier",
+                    "department",
+                    "invoice_number",
+                    "issue_date",
+                    "due_date",
+                    "total",
+                    "tax_total",
+                    "adjustments",
+                    "dispute_reason",
+                    "lines",
+                ]
+            } else {
+                &[
+                    "purchase_order",
+                    "supplier",
+                    "department",
+                    "invoice_number",
+                    "issue_date",
+                    "due_date",
+                    "total",
+                    "tax_total",
+                    "adjustments",
+                    "dispute_reason",
+                    "resolution_note",
+                    "lines",
+                ]
+            }
         }
         "purchase_order"
             if !matches!(
@@ -205,8 +237,17 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
         }
         _ => return Vec::new(),
     };
-    if protected.contains(&"*") || protected.iter().any(|field| patch.get(*field).is_some()) {
-        vec!["Submitted purchasing documents cannot change their lines or warehouse".into()]
+    if protected.contains(&"*")
+        || protected.iter().any(|field| {
+            let Some(next) = patch.get(*field) else {
+                return false;
+            };
+            let next = (!next.is_null()).then_some(next);
+            let existing = current.get(*field).filter(|value| !value.is_null());
+            next != existing
+        })
+    {
+        vec!["Submitted purchasing documents cannot change protected business fields".into()]
     } else {
         Vec::new()
     }
@@ -223,11 +264,30 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
             | ("purchase_requisition", "submitted" | "approved")
             | ("purchase_return", "submitted" | "approved" | "dispatched")
             | ("purchase_receipt", "received")
-            | ("supplier_invoice", "submitted" | "approved")
+            | ("supplier_invoice", "submitted" | "approved" | "disputed")
     ) {
         return Vec::new();
     }
     let mut errors = Vec::new();
+    if entity == "supplier_invoice"
+        && action == "disputed"
+        && document
+            .get("dispute_reason")
+            .and_then(Value::as_str)
+            .is_none_or(|reason| reason.trim().is_empty())
+    {
+        errors.push("Add a reason before disputing the supplier invoice".into());
+    }
+    if entity == "supplier_invoice"
+        && action == "submitted"
+        && document.get("status").and_then(Value::as_str) == Some("disputed")
+        && document
+            .get("resolution_note")
+            .and_then(Value::as_str)
+            .is_none_or(|note| note.trim().is_empty())
+    {
+        errors.push("Add a resolution note before resubmitting a disputed supplier invoice".into());
+    }
     if entity == "rfq"
         && action == "sent"
         && document

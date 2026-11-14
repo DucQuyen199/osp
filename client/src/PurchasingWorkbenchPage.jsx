@@ -36,7 +36,9 @@ export default function PurchasingWorkbenchPage() {
   const [receiptOrderId, setReceiptOrderId] = useState('');
   const [receiptLines, setReceiptLines] = useState([]);
   const [receiptNote, setReceiptNote] = useState('');
-  const [supplierInvoiceForm, setSupplierInvoiceForm] = useState({ invoice_number: '', issue_date: new Date().toISOString().slice(0, 10), due_date: '' });
+  const [supplierInvoiceForm, setSupplierInvoiceForm] = useState({ invoice_number: '', issue_date: new Date().toISOString().slice(0, 10), due_date: '', dispute_reason: '' });
+  const [invoiceDisputeReasons, setInvoiceDisputeReasons] = useState({});
+  const [invoiceResolutionNotes, setInvoiceResolutionNotes] = useState({});
   const [invoiceQuantities, setInvoiceQuantities] = useState({});
   const [invoicePrices, setInvoicePrices] = useState({});
   const [invoiceTaxes, setInvoiceTaxes] = useState({});
@@ -97,7 +99,7 @@ export default function PurchasingWorkbenchPage() {
       }
     }
     const reserved = new Map();
-    for (const invoice of selectedSupplierInvoices.filter((row) => ['draft','submitted','approved'].includes(row.status))) {
+    for (const invoice of selectedSupplierInvoices.filter((row) => ['draft','submitted','disputed','approved'].includes(row.status))) {
       for (const line of invoice.lines || []) {
         const key = orderPriceKeyOf({ ...line, price: line.po_price ?? line.order_price ?? line.price });
         reserved.set(key, (reserved.get(key) || 0) + Number(line.qty || 0));
@@ -227,12 +229,27 @@ export default function PurchasingWorkbenchPage() {
       purchase_order: selected.id, supplier: selected.supplier, department: selected.department || undefined,
       invoice_number: supplierInvoiceForm.invoice_number.trim(),
       issue_date: supplierInvoiceForm.issue_date, due_date: supplierInvoiceForm.due_date || undefined,
+      dispute_reason: supplierInvoiceForm.dispute_reason.trim() || undefined,
       lines: invoiceableLines.map((line) => ({ ...line, qty: Number(invoiceQuantities[keyOf(line)] ?? line.qty) })).filter((line) => line.qty > 0).map((line) => { const key = keyOf(line); const tax = invoiceTaxes[key]; return { product: line.product, qty: line.qty, order_price: Number(line.price), price: Number(invoicePrices[key] ?? line.price), tax: tax === '__po__' || tax === undefined ? line.tax || undefined : tax || undefined }; }),
       adjustments: invoiceAdjustments.filter((line) => Number(line.amount) > 0 && line.description.trim()).map((line) => ({ ...line, amount: Number(line.amount), tax: line.tax || undefined })),
     } }), 'Đã lưu nháp hóa đơn nhà cung cấp. Hãy đối chiếu số hóa đơn và duyệt để ghi nhận công nợ.');
-    setSupplierInvoiceForm((current) => ({ ...current, invoice_number: '', due_date: '' }));
+    setSupplierInvoiceForm((current) => ({ ...current, invoice_number: '', due_date: '', dispute_reason: '' }));
     setInvoiceQuantities({});
     setInvoicePrices({}); setInvoiceTaxes({}); setInvoiceAdjustments([]);
+  }
+
+  async function disputeSupplierInvoice(invoice) {
+    const reason = String(invoiceDisputeReasons[invoice.id] ?? invoice.dispute_reason ?? '').trim();
+    if (!reason) throw new Error('Nhập lý do tranh chấp trước khi chuyển trạng thái hóa đơn.');
+    await api(dataPath('purchasing.supplier_invoice', invoice.id), { method: 'PATCH', body: { dispute_reason: reason } });
+    await action('purchasing.supplier_invoice', invoice, 'disputed');
+  }
+
+  async function resolveSupplierInvoiceDispute(invoice) {
+    const note = String(invoiceResolutionNotes[invoice.id] ?? '').trim();
+    if (!note) throw new Error('Nhập ghi chú giải quyết trước khi gửi lại hóa đơn.');
+    await api(dataPath('purchasing.supplier_invoice', invoice.id), { method: 'PATCH', body: { resolution_note: note } });
+    await action('purchasing.supplier_invoice', invoice, 'submitted');
   }
 
   const addLine = () => setLines((current) => [...current, { product: [...products.keys()][0] || '', qty: '1', price: '', tax: '' }]);
@@ -283,6 +300,7 @@ export default function PurchasingWorkbenchPage() {
         <label className="field"><span className="label">Số hóa đơn nhà cung cấp *</span><input className="input" required value={supplierInvoiceForm.invoice_number} onChange={(e) => setSupplierInvoiceForm({ ...supplierInvoiceForm, invoice_number: e.target.value })}/></label>
         <label className="field"><span className="label">Ngày hóa đơn *</span><input className="input" type="date" required value={supplierInvoiceForm.issue_date} onChange={(e) => setSupplierInvoiceForm({ ...supplierInvoiceForm, issue_date: e.target.value })}/></label>
         <label className="field"><span className="label">Hạn thanh toán</span><input className="input" type="date" min={supplierInvoiceForm.issue_date} value={supplierInvoiceForm.due_date} onChange={(e) => setSupplierInvoiceForm({ ...supplierInvoiceForm, due_date: e.target.value })}/></label>
+        <label className="field full"><span className="label">Lý do tranh chấp (nếu có)</span><textarea className="input" rows="2" value={supplierInvoiceForm.dispute_reason} onChange={(e) => setSupplierInvoiceForm({ ...supplierInvoiceForm, dispute_reason: e.target.value })} placeholder="Ví dụ: sai số lượng, sai thuế suất hoặc thiếu chứng từ"/></label>
         <div className="row"><span className="grow small muted">Chênh lệch ròng gồm phí/chiết khấu: {fmtMoney(invoiceableVariance)}</span><button className="btn btn-secondary" disabled={Boolean(busy) || invoiceableTotal <= 0 || invoiceAdjustmentsInvalid}>Lưu nháp · {fmtMoney(invoiceableTotal)}</button></div>
       </div>
     </form>}

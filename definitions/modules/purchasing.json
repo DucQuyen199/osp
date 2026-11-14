@@ -332,14 +332,17 @@
     { "name": "adjustments", "type": "json", "required": false },
     { "name": "adjustment_net", "type": "money", "required": false, "system": true },
     { "name": "adjustment_tax", "type": "money", "required": false, "system": true },
+    { "name": "dispute_reason", "type": "text", "required": false },
+    { "name": "resolution_note", "type": "text", "required": false },
     { "name": "lines", "type": "json", "required": true },
-    { "name": "status", "type": "enum", "required": false, "options": ["draft", "submitted", "rejected", "approved"] }
+    { "name": "status", "type": "enum", "required": false, "options": ["draft", "submitted", "disputed", "rejected", "approved"] }
    ],
    "states": {
     "field": "status",
     "initial": "draft",
     "actions": {
-     "submitted": { "from": ["draft", "rejected"], "to": "submitted" },
+     "submitted": { "from": ["draft", "disputed", "rejected"], "to": "submitted" },
+     "disputed": { "from": ["submitted"], "to": "disputed" },
      "approved": { "from": ["draft", "submitted"], "to": "approved" },
      "rejected": { "from": ["submitted"], "to": "rejected" }
     }
