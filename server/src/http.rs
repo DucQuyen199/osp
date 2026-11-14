@@ -1879,6 +1879,59 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     }
                     return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
                 }
+                if q == "clinic.encounter" && *action == "completed" {
+                    let mut body = json_obj(&bytes)?;
+                    let doctor = body
+                        .get("doctor")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::trim)
+                        .unwrap_or_default()
+                        .to_owned();
+                    let diagnosis = body
+                        .get("diagnosis")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::trim)
+                        .unwrap_or_default()
+                        .to_owned();
+                    let valid = body.len() == 3
+                        && body.contains_key("doctor")
+                        && body.contains_key("diagnosis")
+                        && body.contains_key("fee")
+                        && !doctor.is_empty()
+                        && !diagnosis.is_empty()
+                        && body
+                            .get("fee")
+                            .and_then(crate::money::decimal)
+                            .is_some_and(|fee| fee > rust_decimal::Decimal::ZERO);
+                    if !valid {
+                        return Err(ApiError::validation(
+                            "clinic.encounter.completed",
+                            vec![
+                                "Cần gửi bác sĩ, chẩn đoán không rỗng và phí khám lớn hơn 0".into(),
+                            ],
+                        ));
+                    }
+                    body.insert("doctor".into(), serde_json::json!(doctor));
+                    body.insert("diagnosis".into(), serde_json::json!(diagnosis));
+                    return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
+                }
+                if q == "clinic.lab_order" && *action == "resulted" {
+                    let mut body = json_obj(&bytes)?;
+                    let result = body
+                        .get("result")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::trim)
+                        .unwrap_or_default()
+                        .to_owned();
+                    if body.len() != 1 || result.is_empty() {
+                        return Err(ApiError::validation(
+                            "clinic.lab_order.resulted",
+                            vec!["Cần gửi duy nhất trường result có nội dung".into()],
+                        ));
+                    }
+                    body.insert("result".into(), serde_json::json!(result));
+                    return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
+                }
                 return json_ok(k.act(&actor, &t, &q, id, action).await?);
             }
             _ => {}

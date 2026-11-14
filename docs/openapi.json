@@ -41926,7 +41926,7 @@
     },
     "/api/t/{tenantId}/data/clinic/encounter/{id}/completed": {
       "post": {
-        "description": "Phát sự kiện `clinic.encounter.completed` cho các module khác phản ứng.",
+        "description": "Save the attending doctor, diagnosis and positive visit fee, complete the encounter, and create the receivable invoice in one transaction.",
         "parameters": [
           {
             "in": "path",
@@ -41946,6 +41946,36 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "diagnosis": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "doctor": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "fee": {
+                    "exclusiveMinimum": 0,
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "doctor",
+                  "diagnosis",
+                  "fee"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -42604,7 +42634,7 @@
     },
     "/api/t/{tenantId}/data/clinic/lab_order/{id}/resulted": {
       "post": {
-        "description": "Phát sự kiện `clinic.lab_order.resulted` cho các module khác phản ứng.",
+        "description": "Save the non-empty test result and mark the lab order resulted atomically.",
         "parameters": [
           {
             "in": "path",
@@ -42624,6 +42654,26 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "result": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "result"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {

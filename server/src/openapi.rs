@@ -308,6 +308,40 @@ pub fn build(reg: &Registry) -> Value {
                             } } }
                         });
                     }
+                    if def.qname() == "clinic.encounter" && action == "completed" {
+                        operation["description"] = json!(
+                            "Save the attending doctor, diagnosis and positive visit fee, complete the encounter, and create the receivable invoice in one transaction."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": true,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "required": ["doctor", "diagnosis", "fee"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "doctor": { "type": "string", "minLength": 1 },
+                                    "diagnosis": { "type": "string", "minLength": 1 },
+                                    "fee": { "type": "number", "exclusiveMinimum": 0 }
+                                }
+                            } } }
+                        });
+                    }
+                    if def.qname() == "clinic.lab_order" && action == "resulted" {
+                        operation["description"] = json!(
+                            "Save the non-empty test result and mark the lab order resulted atomically."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": true,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "required": ["result"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "result": { "type": "string", "minLength": 1 }
+                                }
+                            } } }
+                        });
+                    }
                     paths.insert(
                         format!("{base}/{{id}}/{action}"),
                         json!({ "post": operation }),

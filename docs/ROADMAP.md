@@ -30,6 +30,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Nhà hàng ghi nhận phương thức thanh toán và lý do hủy cùng lần chuyển trạng thái; xuất kho, thanh toán và hủy phiếu bếp chờ cùng commit hoặc rollback.
 - Bảo hiểm lưu lý do từ chối bồi thường; số tiền duyệt, quyết định bồi thường và thông tin chi trả cùng kiểm tra hạn mức/bút toán trong giao dịch.
 - Đối soát ngân hàng lưu liên kết payment/bút toán khớp thủ công và lý do bỏ qua cùng lần đổi trạng thái của dòng sao kê.
+- Phòng khám hoàn tất lượt khám cùng thông tin bác sĩ, chẩn đoán, phí và hóa đơn phải thu; kết quả xét nghiệm lưu cùng trạng thái hoàn tất.
 - Ký thầu phụ chỉ ghi nhận cam kết chi phí; hồ sơ nghiệm thu/đề nghị thanh toán có giá trị lũy kế được giới hạn trong hợp đồng và chỉ phát sinh hóa đơn phải trả sau khi duyệt.
 - Mua hàng chỉ ghi nhận GRNI khi nhận kho; nhiều hóa đơn nhà cung cấp theo từng đợt nhận được đối chiếu lũy kế với số lượng nhận/trả và GRNI, công nợ chỉ phát sinh sau khi duyệt từng hóa đơn; hàng trả trước hóa đơn giảm GRNI, hàng trả sau hóa đơn gắn với bill để điều chỉnh giảm phải trả.
 - BI hỗ trợ tự thiết kế báo cáo dòng/tổng hợp, dashboard, KPI, snapshot theo lịch ngày/tuần và gửi CSV qua hàng đợi email; lịch chạy được ràng buộc với người tạo/lên lịch và tự dừng khi người đó mất quyền đọc dữ liệu hoặc bị khóa.
