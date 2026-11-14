@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, dataPath, tenantPath } from './lib/api.js';
 import { fmtNumber } from './lib/i18n.js';
-import { can } from './lib/state.js';
+import { app, can } from './lib/state.js';
 
 const asItems = (value) => Array.isArray(value?.items) ? value.items : [];
 const label = (value) => String(value ?? '—');
@@ -94,6 +94,16 @@ export default function BiReportsPage({ route }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [savingReport, setSavingReport] = useState(false);
+  const [draftName, setDraftName] = useState('');
+  const [draftSource, setDraftSource] = useState('');
+  const [draftOperation, setDraftOperation] = useState('rows');
+  const [draftField, setDraftField] = useState('');
+  const [draftGroup, setDraftGroup] = useState('');
+  const [draftSearch, setDraftSearch] = useState('');
+  const [draftFilter, setDraftFilter] = useState('');
+  const [draftFilterValue, setDraftFilterValue] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -145,6 +155,36 @@ export default function BiReportsPage({ route }) {
     }
   };
 
+  const sources = (app.meta?.modules || []).flatMap((module) => (module.entities || [])
+    .filter((item) => can(`${module.id}.${item.name}.read`))
+    .map((item) => ({ qname: `${module.id}.${item.name}`, label: `${module.name} · ${item.label}`, fields: item.fields || [] })));
+  const selectedSource = sources.find((item) => item.qname === draftSource) || sources[0];
+  const sourceFields = selectedSource?.fields || [];
+  const numericFields = sourceFields.filter((field) => ['number', 'money'].includes(field.type));
+  const groupFields = sourceFields.filter((field) => !['json', 'text'].includes(field.type));
+
+  const createReport = async (event) => {
+    event.preventDefault();
+    if (savingReport || !draftName.trim() || !selectedSource) return;
+    const query = { source: selectedSource.qname, limit: 100 };
+    if (draftSearch.trim()) query.search = draftSearch.trim();
+    if (draftFilter && draftFilterValue.trim()) query.filters = { [draftFilter]: draftFilterValue.trim() };
+    if (draftOperation !== 'rows') {
+      query.aggregate = { operation: draftOperation, ...(draftField ? { field: draftField } : {}) };
+      if (draftGroup) query.group_by = draftGroup;
+    }
+    setSavingReport(true);
+    setError('');
+    try {
+      const created = await api(dataPath('bi.report'), { method: 'POST', body: { name: draftName.trim(), query } });
+      setDraftName(''); setCreating(false);
+      await load();
+      if (created?.id) window.location.hash = `#/reports/bi/report/${encodeURIComponent(created.id)}`;
+    } catch (reason) {
+      setError(reason.message || 'Could not create report.');
+    } finally { setSavingReport(false); }
+  };
+
   if (route.view === 'dashboard' && route.id) return <div className="page">
     <div className="page-head"><div><a className="back-link" href="#/reports/bi">← Báo cáo & phân tích</a><h1>{dashboard?.name || 'Dashboard'}</h1><p className="sub">Các widget được lấy từ báo cáo đã lưu và phân quyền theo tenant.</p></div></div>
     {error && <div className="alert danger" role="alert">{error}</div>}
@@ -158,6 +198,20 @@ export default function BiReportsPage({ route }) {
   </div>;
 
   return <div className="page">
+    {can('bi.report.create') && !creating && <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn btn-primary" type="button" onClick={() => { setCreating(true); if (!draftSource && sources[0]) setDraftSource(sources[0].qname); }}>Tạo báo cáo</button></div>}
+    {creating && <section className="card report-section"><div className="card-head"><h2>Thiết kế báo cáo</h2><button className="btn btn-ghost" type="button" onClick={() => setCreating(false)}>Đóng</button></div><form className="card-pad stack" onSubmit={createReport}>
+      <div className="form-grid"><label className="field"><span>Tên báo cáo</span><input className="input" required maxLength={160} value={draftName} onChange={(event) => setDraftName(event.target.value)} /></label>
+        <label className="field"><span>Nguồn dữ liệu</span><select className="input" required value={selectedSource?.qname || ''} onChange={(event) => { setDraftSource(event.target.value); setDraftField(''); setDraftGroup(''); setDraftFilter(''); }}><option value="">Chọn module và dữ liệu</option>{sources.map((source) => <option key={source.qname} value={source.qname}>{source.label}</option>)}</select></label>
+        <label className="field"><span>Kiểu kết quả</span><select className="input" value={draftOperation} onChange={(event) => { setDraftOperation(event.target.value); setDraftField(''); setDraftGroup(''); }}><option value="rows">Danh sách bản ghi</option><option value="count">Đếm bản ghi</option><option value="sum">Tổng</option><option value="avg">Trung bình</option><option value="min">Nhỏ nhất</option><option value="max">Lớn nhất</option></select></label>
+        {draftOperation !== 'rows' && draftOperation !== 'count' && <label className="field"><span>Trường số cần tính</span><select className="input" required value={draftField} onChange={(event) => setDraftField(event.target.value)}><option value="">Chọn trường</option>{numericFields.map((field) => <option key={field.name} value={field.name}>{field.label || field.name}</option>)}</select></label>}
+        {draftOperation !== 'rows' && <label className="field"><span>Nhóm theo (không bắt buộc)</span><select className="input" value={draftGroup} onChange={(event) => setDraftGroup(event.target.value)}><option value="">Không nhóm</option>{groupFields.map((field) => <option key={field.name} value={field.name}>{field.label || field.name}</option>)}</select></label>}
+        <label className="field"><span>Tìm kiếm văn bản (không bắt buộc)</span><input className="input" value={draftSearch} onChange={(event) => setDraftSearch(event.target.value)} /></label>
+        <label className="field"><span>Lọc theo trường (không bắt buộc)</span><select className="input" value={draftFilter} onChange={(event) => setDraftFilter(event.target.value)}><option value="">Không lọc</option>{sourceFields.filter((field) => field.type !== 'json').map((field) => <option key={field.name} value={field.name}>{field.label || field.name}</option>)}</select></label>
+        {draftFilter && <label className="field"><span>Giá trị lọc chính xác</span><input className="input" value={draftFilterValue} onChange={(event) => setDraftFilterValue(event.target.value)} /></label>}
+      </div>
+      {!sources.length && <p className="small muted">Bạn chưa có quyền đọc nguồn dữ liệu nào để thiết kế báo cáo.</p>}
+      <div className="row"><button className="btn btn-primary" type="submit" disabled={savingReport || !selectedSource}>{savingReport ? 'Đang lưu…' : 'Lưu và chạy báo cáo'}</button></div>
+    </form></section>}
     <div className="page-head"><div><h1>Báo cáo & phân tích</h1><p className="sub">Chạy truy vấn đã lưu và xem dashboard từ dữ liệu tenant mà Rust API cho phép.</p></div></div>
     {error && <div className="alert danger" role="alert">{error}</div>}
     {loading ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <div className="stack">
