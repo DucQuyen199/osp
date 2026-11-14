@@ -84,6 +84,7 @@
       "pending",
       "succeeded",
       "failed",
+      "partially_refunded",
       "refunded"
      ]
     }
@@ -104,12 +105,39 @@
       ],
       "to": "failed"
      },
-     "refunded": {
+     "partially_refunded": {
       "from": [
        "succeeded"
       ],
+      "to": "partially_refunded"
+     },
+     "refunded": {
+      "from": [
+       "succeeded",
+       "partially_refunded"
+      ],
       "to": "refunded"
      }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "payment_refund",
+   "label": "Hoàn tiền giao dịch",
+   "fields": [
+    { "name": "payment_txn", "type": "ref", "required": true, "ref": "payments.payment_txn" },
+    { "name": "amount", "type": "money", "required": true },
+    { "name": "reference", "type": "string", "required": false },
+    { "name": "status", "type": "enum", "required": false, "options": ["pending", "succeeded", "failed"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "pending",
+    "actions": {
+     "succeeded": { "from": ["pending"], "to": "succeeded" },
+     "failed": { "from": ["pending"], "to": "failed" }
     }
    },
    "computed": {},

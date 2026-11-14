@@ -3,7 +3,7 @@ use rust_decimal::Decimal;
 use serde_json::Value;
 
 pub fn validate(entity: &str, document: &Value) -> Vec<String> {
-    if entity != "payment_txn" {
+    if !matches!(entity, "payment_txn" | "payment_refund") {
         return Vec::new();
     }
     match document.get("amount").and_then(money::decimal) {
@@ -13,6 +13,16 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<String> {
+    if entity == "payment_refund"
+        && current.get("status").and_then(Value::as_str) != Some("pending")
+        && ["payment_txn", "amount", "reference"]
+            .iter()
+            .any(|field| patch.get(*field).is_some())
+    {
+        return vec![
+            "A processed refund cannot change its payment, amount, or provider reference".into(),
+        ];
+    }
     if entity == "payment_txn"
         && current.get("status").and_then(Value::as_str) != Some("pending")
         && [
@@ -35,6 +45,11 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
 }
 
 pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
+    if entity == "payment_refund"
+        && document.get("status").and_then(Value::as_str) != Some("pending")
+    {
+        return vec!["A processed refund must be retained as financial audit history".into()];
+    }
     if entity == "payment_txn" && document.get("status").and_then(Value::as_str) != Some("pending")
     {
         return vec!["Giao dịch đã xử lý phải được giữ làm dấu vết tài chính".into()];
@@ -43,6 +58,15 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
+    if entity == "payment_refund"
+        && action == "succeeded"
+        && document
+            .get("reference")
+            .and_then(Value::as_str)
+            .is_none_or(|reference| reference.trim().is_empty())
+    {
+        return vec!["A successful refund requires the provider refund reference".into()];
+    }
     if entity != "payment_txn" {
         return Vec::new();
     }

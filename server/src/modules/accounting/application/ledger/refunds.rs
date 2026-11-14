@@ -1,5 +1,5 @@
 use super::*;
-use rust_decimal::Decimal;
+use rust_decimal::{Decimal, RoundingStrategy};
 
 fn decimal_column(row: &tokio_postgres::Row, column: usize, event_type: &str) -> R<Decimal> {
     let value: String = row.get(column);
@@ -29,6 +29,77 @@ pub(super) async fn handle_event(
     depth: u32,
 ) -> R<Option<bool>> {
     match event_type {
+        "payments.payment_refund.succeeded" => {
+            let refund_id = event
+                .get("id")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+                .ok_or_else(|| {
+                    crate::error::ApiError::validation(
+                        event_type,
+                        vec!["Provider refund requires a valid id".into()],
+                    )
+                })?;
+            if tx.query_opt(
+                "SELECT id FROM accounting__journal_entry WHERE tenant_id = $1 AND source = 'payment_refund' AND source_id = $2 AND status = 'posted' LIMIT 1 FOR UPDATE",
+                &[&tenant.id, &refund_id.to_string()],
+            ).await?.is_some() {
+                return Ok(Some(true));
+            }
+            let refund = tx.query_opt(
+                "SELECT refund.amount::text, payment.id, payment.amount::text, original.id, COALESCE(original.base_amount, original.amount)::text FROM payments__payment_refund refund JOIN payments__payment_txn payment ON payment.tenant_id = refund.tenant_id AND payment.id = refund.payment_txn JOIN accounting__payment original ON original.tenant_id = payment.tenant_id AND original.source = 'payments' AND original.source_id = payment.id::text WHERE refund.tenant_id = $1 AND refund.id = $2 AND refund.status = 'succeeded' FOR UPDATE OF refund, original",
+                &[&tenant.id, &refund_id],
+            ).await?.ok_or_else(|| crate::error::ApiError::validation(event_type, vec!["Refund has no successful provider record and matching accounting payment".into()]))?;
+            let refund_amount = decimal_column(&refund, 0, event_type)?;
+            let _payment_id: Uuid = refund.get(1);
+            let original_amount = decimal_column(&refund, 2, event_type)?;
+            let accounting_payment_id: Uuid = refund.get(3);
+            let original_base_amount = decimal_column(&refund, 4, event_type)?;
+            if original_amount <= Decimal::ZERO || refund_amount <= Decimal::ZERO {
+                return Err(crate::error::ApiError::validation(
+                    event_type,
+                    vec!["Refund and original payment amounts must be positive".into()],
+                ));
+            }
+            let ratio = refund_amount.checked_div(original_amount).ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    event_type,
+                    vec!["Refund ratio exceeds the supported range".into()],
+                )
+            })?;
+            let base_refund = original_base_amount
+                .checked_mul(ratio)
+                .map(|amount| {
+                    amount.round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
+                })
+                .ok_or_else(|| {
+                    crate::error::ApiError::validation(
+                        event_type,
+                        vec!["Refund base amount exceeds the supported range".into()],
+                    )
+                })?;
+            let original = tx.query_opt(
+                "SELECT lines FROM accounting__journal_entry WHERE tenant_id = $1 AND source = 'payment' AND source_id = $2 AND status = 'posted' FOR SHARE",
+                &[&tenant.id, &accounting_payment_id.to_string()],
+            ).await?.ok_or_else(|| crate::error::ApiError::validation(event_type, vec!["Provider refund requires the original payment journal to be posted".into()]))?;
+            let original_lines: Value = original.get(0);
+            let mut lines = reversal::lines_to_reverse(&original_lines, event_type)?;
+            scale_reversal_lines(&mut lines, ratio, event_type)?;
+            create_posted_journal_decimal(
+                kernel,
+                tx,
+                tenant,
+                event_id,
+                depth,
+                "Hoàn một phần giao dịch qua cổng thanh toán",
+                base_refund,
+                "payment_refund",
+                &refund_id.to_string(),
+                lines,
+            )
+            .await?;
+            Ok(Some(true))
+        }
         "payments.payment_txn.refunded" => {
             let transaction_id = event
                 .get("id")
@@ -40,6 +111,13 @@ pub(super) async fn handle_event(
                         vec!["Refunded provider transaction requires a valid id".into()],
                     )
                 })?;
+            if tx.query_opt(
+                "SELECT id FROM payments__payment_refund WHERE tenant_id = $1 AND payment_txn = $2 AND status = 'succeeded' LIMIT 1 FOR UPDATE",
+                &[&tenant.id, &transaction_id],
+            ).await?.is_some() {
+                // Each partial refund already posted its proportional reversal.
+                return Ok(Some(true));
+            }
             let payment = tx
                 .query_opt(
                     "SELECT id, amount::text FROM accounting__payment WHERE tenant_id = $1 AND source = 'payments' AND source_id = $2 FOR UPDATE",
@@ -268,4 +346,98 @@ pub(super) async fn handle_event(
         }
         _ => Ok(None),
     }
+}
+
+fn scale_reversal_lines(lines: &mut [Value], ratio: Decimal, event_type: &str) -> R<()> {
+    let mut debit_total = Decimal::ZERO;
+    let mut credit_total = Decimal::ZERO;
+    let mut last_credit = None;
+    for (index, line) in lines.iter_mut().enumerate() {
+        let debit = line
+            .get("debit")
+            .and_then(crate::money::decimal)
+            .unwrap_or_default();
+        let credit = line
+            .get("credit")
+            .and_then(crate::money::decimal)
+            .unwrap_or_default();
+        let debit = debit
+            .checked_mul(ratio)
+            .map(|amount| amount.round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero))
+            .ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    event_type,
+                    vec!["Refund journal exceeds the supported range".into()],
+                )
+            })?;
+        let credit = credit
+            .checked_mul(ratio)
+            .map(|amount| amount.round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero))
+            .ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    event_type,
+                    vec!["Refund journal exceeds the supported range".into()],
+                )
+            })?;
+        line["debit"] = crate::money::json_number(debit).ok_or_else(|| {
+            crate::error::ApiError::validation(
+                event_type,
+                vec!["Refund journal amount exceeds the supported range".into()],
+            )
+        })?;
+        line["credit"] = crate::money::json_number(credit).ok_or_else(|| {
+            crate::error::ApiError::validation(
+                event_type,
+                vec!["Refund journal amount exceeds the supported range".into()],
+            )
+        })?;
+        debit_total = debit_total.checked_add(debit).ok_or_else(|| {
+            crate::error::ApiError::validation(
+                event_type,
+                vec!["Refund journal total exceeds the supported range".into()],
+            )
+        })?;
+        credit_total = credit_total.checked_add(credit).ok_or_else(|| {
+            crate::error::ApiError::validation(
+                event_type,
+                vec!["Refund journal total exceeds the supported range".into()],
+            )
+        })?;
+        if credit > Decimal::ZERO {
+            last_credit = Some(index);
+        }
+    }
+    if debit_total != credit_total {
+        let Some(index) = last_credit else {
+            return Err(crate::error::ApiError::validation(
+                event_type,
+                vec!["Refund journal cannot be balanced after currency rounding".into()],
+            ));
+        };
+        let adjustment = debit_total.checked_sub(credit_total).ok_or_else(|| {
+            crate::error::ApiError::validation(
+                event_type,
+                vec!["Refund journal balance exceeds the supported range".into()],
+            )
+        })?;
+        let credit = lines[index]
+            .get("credit")
+            .and_then(crate::money::decimal)
+            .unwrap_or_default()
+            .checked_add(adjustment)
+            .filter(|value| *value >= Decimal::ZERO)
+            .ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    event_type,
+                    vec!["Refund journal rounding cannot be balanced".into()],
+                )
+            })?;
+        lines[index]["credit"] = crate::money::json_number(credit).ok_or_else(|| {
+            crate::error::ApiError::validation(
+                event_type,
+                vec!["Refund journal amount exceeds the supported range".into()],
+            )
+        })?;
+    }
+    Ok(())
 }
