@@ -267,6 +267,18 @@
       "master-data.currency_rate.read",
       "master-data.party.read"
     ]
+  },
+  "accounting_period_manager": {
+    "name": "Qu?n l? kh?a s? k? to?n",
+    "permissions": [
+      "accounting.period.read",
+      "accounting.period.create",
+      "accounting.period.update",
+      "accounting.period.closed",
+      "accounting.period.reopened",
+      "accounting.bank_statement.read",
+      "accounting.journal_entry.read"
+    ]
   }
 },
  "kpis": [

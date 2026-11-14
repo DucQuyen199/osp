@@ -1,0 +1,115 @@
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { api, dataPath } from './lib/api.js';
+import { fmtDate, fmtMoney, statusLabel } from './lib/i18n.js';
+import { app, can } from './lib/state.js';
+import { recordHref } from './lib/routes.js';
+
+const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
+const today = () => new Date().toISOString().slice(0, 10);
+const monthStart = () => `${today().slice(0, 7)}-01`;
+const monthEnd = () => new Date(Date.UTC(Number(today().slice(0, 4)), Number(today().slice(5, 7)), 0)).toISOString().slice(0, 10);
+
+async function listAll(qname, filters = {}) {
+  const rows = [];
+  let total = Number.POSITIVE_INFINITY;
+  for (let offset = 0; offset < total; offset += 1000) {
+    const query = new URLSearchParams({ ...filters, limit: '1000', offset: String(offset) });
+    const response = await api(`${dataPath(qname)}?${query}`);
+    const items = itemsOf(response);
+    rows.push(...items);
+    total = Number(response?.total ?? rows.length);
+    if (!items.length) break;
+  }
+  return rows;
+}
+
+const dateForJournal = (row) => row.posting_date || String(row.createdAt || '').slice(0, 10);
+const inPeriod = (date, period) => Boolean(date && period && date >= period.start_date && date <= period.end_date);
+
+export default function AccountingPeriodClosePage() {
+  const [periods, setPeriods] = useState([]);
+  const [draftStatements, setDraftStatements] = useState([]);
+  const [draftJournals, setDraftJournals] = useState([]);
+  const [periodId, setPeriodId] = useState('');
+  const [form, setForm] = useState({ name: `${today().slice(0, 7)}`, start_date: monthStart(), end_date: monthEnd() });
+  const [busy, setBusy] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const load = useCallback(async (quiet = false) => {
+    if (!quiet) { setLoading(true); setError(''); }
+    try {
+      const [periodRows, statementRows, journalRows] = await Promise.all([
+        can('accounting.period.read') ? listAll('accounting.period') : Promise.resolve([]),
+        can('accounting.bank_statement.read') ? listAll('accounting.bank_statement', { status: 'draft' }) : Promise.resolve([]),
+        can('accounting.journal_entry.read') ? listAll('accounting.journal_entry', { status: 'draft' }) : Promise.resolve([]),
+      ]);
+      periodRows.sort((a, b) => String(b.start_date || '').localeCompare(String(a.start_date || '')));
+      setPeriods(periodRows); setDraftStatements(statementRows); setDraftJournals(journalRows);
+      setPeriodId((id) => periodRows.some((row) => row.id === id) ? id : periodRows.find((row) => row.status === 'open')?.id || periodRows[0]?.id || '');
+    } catch (reason) { setError(reason.message || 'Không tải được dữ liệu khóa sổ.'); }
+    finally { if (!quiet) setLoading(false); }
+  }, []);
+
+  useEffect(() => { document.title = 'Khóa sổ kế toán · OSP Suite'; load(); }, [load]);
+
+  const selected = periods.find((row) => row.id === periodId);
+  const blockingStatements = useMemo(() => selected ? draftStatements.filter((row) => row.start_date <= selected.end_date && row.end_date >= selected.start_date) : [], [draftStatements, selected]);
+  const blockingJournals = useMemo(() => selected ? draftJournals.filter((row) => inPeriod(dateForJournal(row), selected)) : [], [draftJournals, selected]);
+  const periodEnded = Boolean(selected && selected.end_date <= today());
+  const closeReady = Boolean(selected && selected.status === 'open' && periodEnded && !blockingStatements.length && !blockingJournals.length);
+
+  async function run(key, operation, success) {
+    setBusy(key); setError(''); setNotice('');
+    try { await operation(); setNotice(success); await load(true); }
+    catch (reason) { setError(reason.message || 'Không cập nhật được kỳ kế toán.'); await load(true); }
+    finally { setBusy(''); }
+  }
+
+  async function createPeriod(event) {
+    event.preventDefault();
+    await run('period:create', async () => {
+      await api(dataPath('accounting.period'), { method: 'POST', body: form });
+      setForm((current) => ({ ...current, name: `${today().slice(0, 7)}`, start_date: monthStart(), end_date: monthEnd() }));
+    }, 'Đã tạo kỳ kế toán. Hệ thống sẽ chặn kỳ bị chồng và bảo vệ ngày sau khi có bút toán.');
+  }
+
+  async function closePeriod() {
+    if (!selected) return;
+    await run(`${selected.id}:closed`, () => api(dataPath('accounting.period', selected.id, 'closed'), { method: 'POST' }), 'Đã khóa kỳ. Hệ thống không cho ghi sổ hoặc sửa bút toán trong khoảng ngày này.');
+  }
+
+  async function reopenPeriod() {
+    if (!selected || !window.confirm(`Mở lại kỳ ${selected.name}? Việc này cho phép ghi nhận lại bút toán trong kỳ.`)) return;
+    await run(`${selected.id}:reopened`, () => api(dataPath('accounting.period', selected.id, 'reopened'), { method: 'POST' }), 'Đã mở lại kỳ kế toán.');
+  }
+
+  return <div className="page">
+    <div className="page-head"><div><h1>Khóa sổ kế toán</h1><p className="sub">Rà soát chứng từ nháp, xác nhận ngày kết thúc và khóa kỳ bằng quy tắc kiểm tra của hệ thống.</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>Làm mới</button></div>
+    {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+
+    {can('accounting.period.create') && <section className="card card-pad"><h2>Tạo kỳ kế toán</h2><form className="form-grid" onSubmit={createPeriod}>
+      <label className="field"><span className="label">Tên kỳ *</span><input className="input" required value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}/></label>
+      <label className="field"><span className="label">Từ ngày *</span><input className="input" required type="date" value={form.start_date} onChange={(event) => setForm((current) => ({ ...current, start_date: event.target.value }))}/></label>
+      <label className="field"><span className="label">Đến ngày *</span><input className="input" required type="date" min={form.start_date} value={form.end_date} onChange={(event) => setForm((current) => ({ ...current, end_date: event.target.value }))}/></label>
+      <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || loading}>Tạo kỳ mở</button></div>
+    </form></section>}
+
+    <div className="layout-split" style={{ marginTop: 16 }}>
+      <section className="card card-pad"><h2>Lịch kỳ kế toán</h2>{loading ? <div className="skeleton" data-h="row"/> : !periods.length ? <div className="empty">Chưa có kỳ kế toán. Tạo kỳ để bắt đầu kiểm soát ngày ghi sổ.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Kỳ</th><th>Khoảng ngày</th><th>Trạng thái</th></tr></thead><tbody>{periods.map((row) => <tr key={row.id} className={row.id === periodId ? 'selected' : ''} onClick={() => setPeriodId(row.id)} style={{ cursor: 'pointer' }}><td><strong>{row.name}</strong></td><td>{fmtDate(row.start_date)} – {fmtDate(row.end_date)}</td><td><span className={`badge ${row.status === 'period_closed' ? 'success' : 'warning'}`}>{statusLabel(row.status)}</span></td></tr>)}</tbody></table></div>}</section>
+
+      {selected && <section className="card card-pad"><div className="row wrap"><div><h2>{selected.name}</h2><div className="small muted">{fmtDate(selected.start_date)} – {fmtDate(selected.end_date)}</div></div><span className="grow"/><span className={`badge ${selected.status === 'period_closed' ? 'success' : 'warning'}`}>{statusLabel(selected.status)}</span><a className="btn btn-ghost btn-sm" href={recordHref('accounting.period', selected.id)}>Mở chi tiết kỳ</a></div>
+        <div className="stats" style={{ marginTop: 12 }}><div className="card stat"><span className="stat-label">Ngày kết thúc</span><strong className="stat-value">{periodEnded ? 'Đã qua' : 'Chưa tới'}</strong><span className="small muted">{fmtDate(selected.end_date)}</span></div><div className="card stat"><span className="stat-label">Sao kê nháp giao kỳ</span><strong className="stat-value">{blockingStatements.length}</strong></div><div className="card stat"><span className="stat-label">Bút toán nháp trong kỳ</span><strong className="stat-value">{blockingJournals.length}</strong></div><div className="card stat"><span className="stat-label">Điều kiện khóa sổ</span><strong className="stat-value">{selected.status === 'period_closed' ? 'Đã khóa' : closeReady ? 'Sẵn sàng' : 'Cần xử lý'}</strong></div></div>
+
+        {selected.status === 'open' && <section className="stack" style={{ marginTop: 14 }}><div className={`alert ${closeReady ? 'success' : 'warning'}`} role="status">{!periodEnded ? 'Chưa thể khóa kỳ: ngày kết thúc phải là hôm nay hoặc trước đó.' : blockingStatements.length || blockingJournals.length ? 'Chưa thể khóa kỳ: hoàn tất hoặc hủy các chứng từ nháp đang hiển thị bên dưới.' : 'Đủ điều kiện theo checklist; máy chủ sẽ kiểm tra lại trong giao dịch khóa sổ.'}</div>
+          {blockingStatements.length > 0 && <div><h3>Sao kê ngân hàng nháp giao với kỳ</h3><div className="table-wrap"><table className="table"><thead><tr><th>Số sao kê</th><th>Khoảng ngày</th><th>Hành động</th></tr></thead><tbody>{blockingStatements.map((row) => <tr key={row.id}><td>{row.statement_number}</td><td>{fmtDate(row.start_date)} – {fmtDate(row.end_date)}</td><td><a href={recordHref('accounting.bank_statement', row.id)}>Mở sao kê</a></td></tr>)}</tbody></table></div></div>}
+          {blockingJournals.length > 0 && <div><h3>Bút toán nháp trong kỳ</h3><div className="table-wrap"><table className="table"><thead><tr><th>Ngày ghi sổ</th><th>Diễn giải</th><th>Số tiền</th><th>Hành động</th></tr></thead><tbody>{blockingJournals.map((row) => <tr key={row.id}><td>{fmtDate(dateForJournal(row))}</td><td>{row.memo || row.source || 'Bút toán nháp'}</td><td className="num">{fmtMoney(row.amount)}</td><td><a href={recordHref('accounting.journal_entry', row.id)}>Mở bút toán</a></td></tr>)}</tbody></table></div></div>}
+          <div className="row wrap"><span className="small muted">Backend chỉ cho khóa kỳ đã kết thúc và không còn sao kê hoặc bút toán nháp liên quan.</span><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !closeReady || !can('accounting.period.closed')} onClick={closePeriod}>Khóa kỳ</button></div>
+        </section>}
+        {selected.status === 'period_closed' && <div className="row wrap" style={{ marginTop: 14 }}><span className="small muted">Kỳ đã khóa sẽ chặn ghi sổ trong khoảng ngày này. Mở lại chỉ khi có quyền và đã xác nhận với người phụ trách kế toán.</span><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy) || !can('accounting.period.reopened')} onClick={reopenPeriod}>Mở lại kỳ</button></div>}
+      </section>}
+    </div>
+    <p className="small muted" style={{ marginTop: 12 }}>Kỳ không được chồng lấn. Không thể đổi ngày kỳ sau khi kỳ đã có bút toán hoặc sao kê; kỳ đã khóa không thể xóa.</p>
+  </div>;
+}
