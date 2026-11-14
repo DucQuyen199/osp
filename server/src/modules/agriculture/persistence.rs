@@ -154,22 +154,19 @@ async fn validate_harvest(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<V
         return Ok(vec!["Phiếu thu hoạch cần ngày thu hoạch hợp lệ".into()]);
     };
     let Some(row) = tx.query_opt(
-        "SELECT status, planted_on::text, expected_harvest::text FROM agriculture__crop_cycle WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+        "SELECT status, planted_on::text FROM agriculture__crop_cycle WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
         &[&tenant.id, &cycle],
     ).await? else {
         return Ok(vec!["Vụ mùa không tồn tại trong doanh nghiệp".into()]);
     };
     let status: String = row.get(0);
     let planted: Option<String> = row.get(1);
-    let expected: Option<String> = row.get(2);
     let mut errors = Vec::new();
     if status != "growing" {
         errors.push("Chỉ vụ mùa đang canh tác mới nhận thu hoạch".into());
     }
-    if planted.as_deref().is_some_and(|planted| date < planted)
-        || expected.as_deref().is_some_and(|expected| date > expected)
-    {
-        errors.push("Ngày thu hoạch nằm ngoài khoảng thời gian của vụ mùa".into());
+    if planted.as_deref().is_some_and(|planted| date < planted) {
+        errors.push("Ngày thu hoạch không thể trước ngày gieo trồng".into());
     }
     if let Some(row) = tx
         .query_opt(
@@ -228,22 +225,19 @@ async fn validate_input(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<Vec
         return Ok(vec!["Phiếu vật tư cần ngày sử dụng hợp lệ".into()]);
     };
     let Some(row) = tx.query_opt(
-        "SELECT status, planted_on::text, expected_harvest::text FROM agriculture__crop_cycle WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+        "SELECT status, planted_on::text FROM agriculture__crop_cycle WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
         &[&tenant.id, &cycle],
     ).await? else {
         return Ok(vec!["Vụ mùa không tồn tại trong doanh nghiệp".into()]);
     };
     let status: String = row.get(0);
     let planted: Option<String> = row.get(1);
-    let expected: Option<String> = row.get(2);
     let mut errors = Vec::new();
     if status != "growing" {
         errors.push("Chỉ vụ mùa đang canh tác mới ghi nhận sử dụng vật tư".into());
     }
-    if planted.as_deref().is_some_and(|planted| date < planted)
-        || expected.as_deref().is_some_and(|expected| date > expected)
-    {
-        errors.push("Ngày sử dụng vật tư nằm ngoài thời gian của vụ mùa".into());
+    if planted.as_deref().is_some_and(|planted| date < planted) {
+        errors.push("Ngày sử dụng vật tư không thể trước ngày gieo trồng".into());
     }
     if let Some(product) = parse_id(document, "product") {
         if tx
