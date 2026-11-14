@@ -10,7 +10,7 @@
 | Build image Linux | `osp-suite:rust-web-verification` build được với Rust 1.89 |
 | `npm.cmd run test:container` | Compose riêng, luồng bán hàng, backup/restore và restart đạt |
 
-Kiểm tra catalog xác nhận 49 module, 177 entity, 777 sự kiện và 22 gói ngành.
+Kiểm tra catalog xác nhận 50 module, 182 entity, 811 sự kiện và 22 gói ngành.
 API danh sách của mọi entity đã được gọi với xác thực trên PostgreSQL thật.
 Điều này xác nhận hợp đồng danh sách và schema, không thay thế kiểm thử đầy đủ
 mọi quy trình của từng ngành.

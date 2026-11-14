@@ -1542,6 +1542,12 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                 return json_ok(k.act_bulk(&actor, &t, &q, action, ids).await?);
             }
             (&Method::POST, [id, action]) => {
+                if q == "logistics.shipment" && *action == "delivered" {
+                    return json_ok(
+                        k.logistics_confirm_shipment_delivery(&actor, &t, id, json_obj(&bytes)?)
+                            .await?,
+                    );
+                }
                 return json_ok(k.act(&actor, &t, &q, id, action).await?);
             }
             _ => {}

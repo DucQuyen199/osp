@@ -117,11 +117,35 @@ pub fn build(reg: &Registry) -> Value {
             }));
             if let Some(st) = &def.states {
                 for (action, tr) in &st.actions {
-                    paths.insert(format!("{base}/{{id}}/{action}"), json!({ "post": {
+                    let mut operation = json!({
                         "tags": [def.module], "summary": format!("{}: {action} ({} → {})", def.label, tr.from.join("|"), tr.to), "security": sec, "parameters": [tid, rid],
                         "description": format!("Phát sự kiện `{}.{action}` cho các module khác phản ứng.", def.qname()),
                         "responses": with_common(Map::from_iter([("200".to_string(), ok(&r#ref)), ("409".to_string(), err("Sai trạng thái"))])),
-                    } }));
+                    });
+                    if def.qname() == "logistics.shipment" && action == "delivered" {
+                        operation["description"] = json!(
+                            "Hoàn tất vận đơn và ghi POD trong cùng giao dịch. Cần nhập tên người nhận hoặc bằng chứng/mã tham chiếu."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": true,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "received_by": { "type": "string", "maxLength": 160 },
+                                    "delivery_evidence": { "type": "string", "maxLength": 1000 }
+                                },
+                                "anyOf": [
+                                    { "required": ["received_by"] },
+                                    { "required": ["delivery_evidence"] }
+                                ]
+                            } } }
+                        });
+                    }
+                    paths.insert(
+                        format!("{base}/{{id}}/{action}"),
+                        json!({ "post": operation }),
+                    );
                 }
                 let action_names: Vec<&String> = st.actions.keys().collect();
                 paths.insert(format!("{base}/bulk/{{action}}"), json!({ "post": {

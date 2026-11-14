@@ -4,7 +4,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 
 ## Đã có
 
-- 49 module, 177 loại dữ liệu, 777 sự kiện, 22 gói ngành; nghiệp vụ liên module chạy trong Rust bounded contexts.
+- 50 module, 182 loại dữ liệu, 811 sự kiện, 22 gói ngành; nghiệp vụ liên module chạy trong Rust bounded contexts.
 - PostgreSQL, transaction/savepoint, tenant lock, migration, RLS, backup.
 - Tài sản cố định có vốn hóa, khấu hao theo hai phương pháp, thanh lý và báo cáo lịch dự báo theo tháng dùng chung công thức Decimal với luồng ghi sổ.
 - Application của module tài sản cố định chia facade và use case nhỏ cho chuẩn hóa tài sản, khấu hao, vốn hóa, thanh lý và cập nhật sổ cái.

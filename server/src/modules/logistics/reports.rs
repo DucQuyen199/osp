@@ -4,9 +4,66 @@ use crate::{
     error::{ApiError, R},
     kernel::{Actor, Kernel, Opts, Tenant},
 };
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 
 impl Kernel {
+    /// Captures proof fields and completes a shipment in one transaction.
+    pub async fn logistics_confirm_shipment_delivery(
+        &self,
+        actor: &Actor,
+        tenant: &Tenant,
+        shipment_id: &str,
+        proof: Map<String, Value>,
+    ) -> R<Value> {
+        if !tenant.has_module("logistics") {
+            return Err(ApiError::new(
+                404,
+                "MODULE_DISABLED",
+                "Module logistics is not enabled for this tenant",
+            ));
+        }
+        self.authorize(tenant, actor, "logistics.shipment.delivered")?;
+        let shipment_id = uuid::Uuid::parse_str(shipment_id)
+            .map_err(|_| ApiError::not_found("Shipment was not found"))?;
+        let mut patch = Map::new();
+        patch.insert(
+            "delivered_at".into(),
+            json!(chrono::Utc::now().to_rfc3339()),
+        );
+        for field in ["received_by", "delivery_evidence"] {
+            if let Some(value) = proof.get(field) {
+                patch.insert(field.into(), value.clone());
+            }
+        }
+        let mut conn = self.pool.get().await?;
+        let tx = Tx::begin(&mut conn, &tenant.id, true).await?;
+        let entity = self.ent(tenant, "logistics.shipment")?;
+        let opts = Opts::top();
+        self.update_in(
+            &tx,
+            &Actor::System,
+            tenant,
+            &entity,
+            &shipment_id.to_string(),
+            patch,
+            &opts,
+        )
+        .await?;
+        let delivered = self
+            .act_in(
+                &tx,
+                actor,
+                tenant,
+                &entity,
+                &shipment_id.to_string(),
+                "delivered",
+                &opts,
+            )
+            .await?;
+        tx.commit().await?;
+        Ok(delivered)
+    }
+
     /// Lists open and failed shipments for the dispatch board, oldest first.
     pub async fn logistics_delivery_board(&self, actor: &Actor, tenant: &Tenant) -> R<Value> {
         if !tenant.has_module("logistics") {

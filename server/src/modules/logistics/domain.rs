@@ -114,6 +114,9 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
                 "failure_reason",
                 "carrier",
                 "tracking_number",
+                "delivered_at",
+                "received_by",
+                "delivery_evidence",
             ]
         } else {
             &[]
@@ -140,6 +143,47 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
+    if entity == "shipment" && action == "delivered" {
+        let mut errors = Vec::new();
+        let delivered_at = document
+            .get("delivered_at")
+            .and_then(Value::as_str)
+            .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok());
+        if delivered_at
+            .is_none_or(|value| value > chrono::Utc::now() + chrono::Duration::minutes(5))
+        {
+            errors.push("Xác nhận giao hàng cần thời điểm giao hợp lệ, không ở tương lai".into());
+        }
+        let received_by = document
+            .get("received_by")
+            .and_then(Value::as_str)
+            .is_some_and(|value| !value.trim().is_empty());
+        let evidence = document
+            .get("delivery_evidence")
+            .and_then(Value::as_str)
+            .is_some_and(|value| !value.trim().is_empty());
+        if !received_by && !evidence {
+            errors
+                .push("Cần ghi người nhận hoặc mã/bằng chứng giao hàng trước khi hoàn tất".into());
+        }
+        if document
+            .get("received_by")
+            .and_then(Value::as_str)
+            .is_some_and(|value| value.chars().count() > 160)
+        {
+            errors.push("Tên người nhận không được vượt quá 160 ký tự".into());
+        }
+        if document
+            .get("delivery_evidence")
+            .and_then(Value::as_str)
+            .is_some_and(|value| value.chars().count() > 1000)
+        {
+            errors.push("Bằng chứng giao hàng không được vượt quá 1000 ký tự".into());
+        }
+        if !errors.is_empty() {
+            return errors;
+        }
+    }
     if entity == "shipment" && action == "dispatched" && number(document, "weight").is_none() {
         return vec!["Cần khai báo hoặc tính được khối lượng vận đơn trước khi xuất phát".into()];
     }

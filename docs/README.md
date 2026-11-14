@@ -21,7 +21,7 @@ Chọn theo việc bạn cần làm.
 
 | Tệp | Nội dung |
 |---|---|
-| [MODULE-CATALOG.md](MODULE-CATALOG.md) | 49 module: dữ liệu, máy trạng thái, luật phản ứng |
+| [MODULE-CATALOG.md](MODULE-CATALOG.md) | 50 module: dữ liệu, máy trạng thái, luật phản ứng |
 | [INTEGRATION-MAP.md](INTEGRATION-MAP.md) | Sơ đồ và bảng các luật tích hợp giữa module |
 | [VERTICALS.md](VERTICALS.md) | 22 gói ngành: module, thuật ngữ, trường mở rộng, vai trò, KPI |
 | [openapi.json](openapi.json) | Đặc tả OpenAPI 3.1 |

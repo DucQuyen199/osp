@@ -18,6 +18,7 @@ export default function LogisticsDeliveryBoardPage() {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState('');
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [deliveryProof, setDeliveryProof] = useState({});
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
@@ -60,6 +61,35 @@ export default function LogisticsDeliveryBoardPage() {
     }
   };
 
+  const confirmDelivered = async (shipment) => {
+    const proof = deliveryProof[shipment.id] || {};
+    const receivedBy = proof.receivedBy?.trim() || '';
+    const evidence = proof.evidence?.trim() || '';
+    if (!receivedBy && !evidence) {
+      setError('Nhập tên người nhận hoặc mã/bằng chứng giao hàng trước khi xác nhận.');
+      return;
+    }
+    const key = `${shipment.id}:delivered`;
+    setBusy(key);
+    setError('');
+    try {
+      await api(dataPath('logistics.shipment', shipment.id, 'delivered'), {
+        method: 'POST',
+        body: {
+          ...(receivedBy ? { received_by: receivedBy } : {}),
+          ...(evidence ? { delivery_evidence: evidence } : {}),
+        },
+      });
+      setDeliveryProof((current) => { const next = { ...current }; delete next[shipment.id]; return next; });
+      await load(true);
+    } catch (reason) {
+      setError(reason.message || 'Không hoàn tất được giao hàng. Kiểm tra bằng chứng giao hàng và số lượng đã điều phối.');
+      await load(true);
+    } finally {
+      setBusy('');
+    }
+  };
+
   const redeliver = async (shipment) => {
     setBusy(`${shipment.id}:redeliver`);
     setError('');
@@ -90,11 +120,16 @@ export default function LogisticsDeliveryBoardPage() {
     </div>
     {shipment.failureReason && <div className="alert danger delivery-alert">{shipment.failureReason}</div>}
     {shipment.lastTrackingEvent && <div className="small delivery-tracking"><strong>{statusLabel(shipment.lastTrackingEvent)}</strong>{shipment.lastTrackingLocation && ` · ${shipment.lastTrackingLocation}`}{shipment.lastTrackingAt && ` · ${fmtDateTime(shipment.lastTrackingAt)}`}</div>}
+    {shipment.status === 'dispatched' && can('logistics.shipment.delivered') && <div className="delivery-proof" role="group" aria-label="Bằng chứng giao hàng">
+      <label className="field"><span>Người nhận hàng (nếu có)</span><input className="input" maxLength="160" value={deliveryProof[shipment.id]?.receivedBy || ''} onChange={(event) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], receivedBy: event.target.value } }))}/></label>
+      <label className="field"><span>Mã POD / bằng chứng giao hàng</span><input className="input" maxLength="1000" value={deliveryProof[shipment.id]?.evidence || ''} onChange={(event) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], evidence: event.target.value } }))}/></label>
+      <p className="small muted">Điền tên người nhận hoặc mã tham chiếu/bằng chứng từ đơn vị vận chuyển.</p>
+    </div>}
     <footer className="row wrap delivery-footer">
       {shipment.source === 'sales_order' && shipment.sourceId && can('sales.sales_order.read') && <a className="small" href={recordHref('sales.sales_order', shipment.sourceId)}>Mở đơn bán</a>}
       <span className="grow" />
       {shipment.status === 'created' && can('logistics.shipment.dispatched') && <button className="btn btn-primary" type="button" disabled={Boolean(busy) || !shipment.vehicleId || !shipment.driverId} title={!shipment.vehicleId || !shipment.driverId ? 'Mở vận đơn để phân công xe và tài xế trước khi xuất phát' : ''} onClick={() => transition(shipment, 'dispatched')}>{busy === `${shipment.id}:dispatched` ? 'Đang cập nhật…' : 'Xác nhận xuất phát'}</button>}
-      {shipment.status === 'dispatched' && can('logistics.shipment.delivered') && <button className="btn btn-primary" type="button" disabled={Boolean(busy)} onClick={() => transition(shipment, 'delivered')}>{busy === `${shipment.id}:delivered` ? 'Đang cập nhật…' : 'Xác nhận đã giao'}</button>}
+      {shipment.status === 'dispatched' && can('logistics.shipment.delivered') && <button className="btn btn-primary" type="button" disabled={Boolean(busy) || !(deliveryProof[shipment.id]?.receivedBy?.trim() || deliveryProof[shipment.id]?.evidence?.trim())} onClick={() => confirmDelivered(shipment)}>{busy === `${shipment.id}:delivered` ? 'Đang cập nhật…' : 'Xác nhận đã giao'}</button>}
       {shipment.status === 'failed' && can('logistics.shipment.create') && <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => redeliver(shipment)}>{busy === `${shipment.id}:redeliver` ? 'Đang tạo…' : 'Tạo vận đơn giao lại'}</button>}
       {shipment.status === 'failed' && can('logistics.shipment.read') && <a className="btn btn-secondary" href={recordHref('logistics.shipment', shipment.id)}>Xem lịch sử</a>}
     </footer>

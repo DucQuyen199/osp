@@ -4,7 +4,7 @@
 
 Keep one deployable Rust modular monolith backed by PostgreSQL. Organize business code by bounded context and keep delivery, application, domain, and infrastructure responsibilities separate. Use one database transaction for synchronous business changes that cross modules. Split into services only when a measured operational need outweighs distributed transaction and deployment costs.
 
-This document defines the target architecture and current Rust module contract. Rust is the production API and workflow runtime; all 49 module and 22 industry catalogs are JSON. TypeScript runtime, source files, and compiler configuration have been removed. All current client routes and screens are rendered in React; the remaining work is deeper domain behavior, external integrations, and release verification.
+This document defines the target architecture and current Rust module contract. Rust is the production API and workflow runtime; all 50 module and 22 industry catalogs are JSON. TypeScript runtime, source files, and compiler configuration have been removed. All current client routes and screens are rendered in React; the remaining work is deeper domain behavior, external integrations, and release verification.
 
 ## Dependency direction
 

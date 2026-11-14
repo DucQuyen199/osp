@@ -1137,6 +1137,24 @@
           "principal_component": {
             "type": "number"
           },
+          "refund_credit_note": {
+            "description": "Tham chiếu tới accounting.credit_note",
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "refund_debit_note": {
+            "description": "Tham chiếu tới accounting.debit_note",
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "settlement_batch": {
+            "description": "Tham chiếu tới accounting.settlement_batch",
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
           "source": {
             "readOnly": true,
             "type": "string"
@@ -1240,6 +1258,24 @@
           "principal_component": {
             "type": "number"
           },
+          "refund_credit_note": {
+            "description": "Tham chiếu tới accounting.credit_note",
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "refund_debit_note": {
+            "description": "Tham chiếu tới accounting.debit_note",
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "settlement_batch": {
+            "description": "Tham chiếu tới accounting.settlement_batch",
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
           "source": {
             "readOnly": true,
             "type": "string"
@@ -1326,6 +1362,134 @@
           "name",
           "start_date",
           "end_date"
+        ],
+        "type": "object"
+      },
+      "accounting_settlement_batch": {
+        "description": "Phiếu thu/chi phân bổ công nợ",
+        "properties": {
+          "allocations": {
+            "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "currency": {
+            "description": "Tham chiếu tới master-data.currency",
+            "format": "uuid",
+            "type": "string"
+          },
+          "direction": {
+            "enum": [
+              "receipt",
+              "disbursement"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "method": {
+            "enum": [
+              "cash",
+              "card",
+              "transfer",
+              "ewallet",
+              "bank"
+            ],
+            "type": "string"
+          },
+          "party": {
+            "description": "Tham chiếu tới master-data.party",
+            "format": "uuid",
+            "type": "string"
+          },
+          "payment_date": {
+            "format": "date",
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "submitted",
+              "approved",
+              "rejected",
+              "cancelled"
+            ],
+            "readOnly": true,
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "accounting_settlement_batchInput": {
+        "additionalProperties": false,
+        "description": "Phiếu thu/chi phân bổ công nợ (dữ liệu gửi lên)",
+        "properties": {
+          "allocations": {
+            "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "currency": {
+            "description": "Tham chiếu tới master-data.currency",
+            "format": "uuid",
+            "type": "string"
+          },
+          "direction": {
+            "enum": [
+              "receipt",
+              "disbursement"
+            ],
+            "type": "string"
+          },
+          "method": {
+            "enum": [
+              "cash",
+              "card",
+              "transfer",
+              "ewallet",
+              "bank"
+            ],
+            "type": "string"
+          },
+          "party": {
+            "description": "Tham chiếu tới master-data.party",
+            "format": "uuid",
+            "type": "string"
+          },
+          "payment_date": {
+            "format": "date",
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "party",
+          "direction",
+          "currency",
+          "amount",
+          "method",
+          "payment_date",
+          "allocations"
         ],
         "type": "object"
       },
@@ -8178,6 +8342,15 @@
             "readOnly": true,
             "type": "string"
           },
+          "delivered_at": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "delivery_evidence": {
+            "readOnly": true,
+            "type": "string"
+          },
           "destination": {
             "type": "string"
           },
@@ -8203,6 +8376,10 @@
           "party": {
             "description": "Tham chiếu tới master-data.party",
             "format": "uuid",
+            "type": "string"
+          },
+          "received_by": {
+            "readOnly": true,
             "type": "string"
           },
           "source": {
@@ -8252,6 +8429,15 @@
           "carrier": {
             "type": "string"
           },
+          "delivered_at": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "delivery_evidence": {
+            "readOnly": true,
+            "type": "string"
+          },
           "destination": {
             "type": "string"
           },
@@ -8272,6 +8458,10 @@
           "party": {
             "description": "Tham chiếu tới master-data.party",
             "format": "uuid",
+            "type": "string"
+          },
+          "received_by": {
+            "readOnly": true,
             "type": "string"
           },
           "source": {
@@ -12078,12 +12268,20 @@
           "requested_by": {
             "type": "string"
           },
+          "sourcing_method": {
+            "enum": [
+              "direct",
+              "competitive"
+            ],
+            "type": "string"
+          },
           "status": {
             "enum": [
               "draft",
               "rejected",
               "submitted",
-              "approved"
+              "approved",
+              "sourced"
             ],
             "readOnly": true,
             "type": "string"
@@ -12122,6 +12320,13 @@
             "type": "string"
           },
           "requested_by": {
+            "type": "string"
+          },
+          "sourcing_method": {
+            "enum": [
+              "direct",
+              "competitive"
+            ],
             "type": "string"
           },
           "supplier": {
@@ -12273,12 +12478,29 @@
           "note": {
             "type": "string"
           },
+          "purchase_requisition": {
+            "description": "Tham chiếu tới purchasing.purchase_requisition",
+            "format": "uuid",
+            "type": "string"
+          },
+          "quote_lines": {
+            "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
+          },
+          "quote_reference": {
+            "type": "string"
+          },
+          "response_due": {
+            "format": "date",
+            "type": "string"
+          },
           "status": {
             "enum": [
               "draft",
               "sent",
               "quoted",
-              "accepted"
+              "accepted",
+              "rejected",
+              "cancelled"
             ],
             "readOnly": true,
             "type": "string"
@@ -12291,6 +12513,10 @@
           "updatedAt": {
             "format": "date-time",
             "readOnly": true,
+            "type": "string"
+          },
+          "valid_until": {
+            "format": "date",
             "type": "string"
           },
           "warehouse": {
@@ -12316,9 +12542,28 @@
           "note": {
             "type": "string"
           },
+          "purchase_requisition": {
+            "description": "Tham chiếu tới purchasing.purchase_requisition",
+            "format": "uuid",
+            "type": "string"
+          },
+          "quote_lines": {
+            "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
+          },
+          "quote_reference": {
+            "type": "string"
+          },
+          "response_due": {
+            "format": "date",
+            "type": "string"
+          },
           "supplier": {
             "description": "Tham chiếu tới master-data.party",
             "format": "uuid",
+            "type": "string"
+          },
+          "valid_until": {
+            "format": "date",
             "type": "string"
           },
           "warehouse": {
@@ -15422,6 +15667,131 @@
         "summary": "Request a password reset email",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/accounting/adjustment-refunds": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "adjustmentId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "amount": {
+                    "exclusiveMinimum": 0,
+                    "type": "number"
+                  },
+                  "kind": {
+                    "enum": [
+                      "credit_note",
+                      "debit_note"
+                    ],
+                    "type": "string"
+                  },
+                  "method": {
+                    "enum": [
+                      "cash",
+                      "card",
+                      "transfer",
+                      "ewallet",
+                      "bank"
+                    ],
+                    "type": "string"
+                  },
+                  "paymentDate": {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  "requestId": {
+                    "description": "Idempotency key reused for retries",
+                    "format": "uuid",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "adjustmentId",
+                  "amount",
+                  "method",
+                  "paymentDate",
+                  "requestId"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotent replay returned the existing payment"
+          },
+          "201": {
+            "description": "Payment and accounting journal created"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Invalid note, amount, date, method, or insufficient refundable balance"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Refund a posted credit/debit note",
+        "tags": [
+          "accounting"
         ]
       }
     },
@@ -23464,6 +23834,942 @@
           }
         ],
         "summary": "Kỳ kế toán: reopened (period_closed → open)",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/accounting/settlement_batch": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Tìm văn bản trong các trường chuỗi",
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dir",
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Lọc bằng nhau theo bất kỳ trường nào, ví dụ ?status=draft",
+            "in": "query",
+            "name": "<field>",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "$ref": "#/components/schemas/accounting_settlement_batch"
+                      },
+                      "type": "array"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Danh sách Phiếu thu/chi phân bổ công nợ",
+        "tags": [
+          "accounting"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/accounting_settlement_batchInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/accounting_settlement_batch"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Dữ liệu không hợp lệ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tạo Phiếu thu/chi phân bổ công nợ",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/accounting/settlement_batch/bulk/{action}": {
+      "post": {
+        "description": "Thực hiện cùng một chuyển trạng thái cho 1–100 bản ghi trong một giao dịch. Nếu một bản ghi lỗi, toàn bộ lô được hoàn tác.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "action",
+            "required": true,
+            "schema": {
+              "enum": [
+                "approved",
+                "cancelled",
+                "rejected",
+                "submitted"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "ids": {
+                    "items": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "maxItems": 100,
+                    "minItems": 1,
+                    "type": "array",
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "ids"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "action": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "items": {
+                      "items": {
+                        "$ref": "#/components/schemas/accounting_settlement_batch"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "count",
+                    "items"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Ít nhất một bản ghi không ở trạng thái cho phép"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Danh sách ID hoặc dữ liệu không hợp lệ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Chuyển trạng thái hàng loạt: Phiếu thu/chi phân bổ công nợ",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/accounting/settlement_batch/{id}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Đã xóa"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Đang được tham chiếu"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Xóa Phiếu thu/chi phân bổ công nợ",
+        "tags": [
+          "accounting"
+        ]
+      },
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/accounting_settlement_batch"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Xem Phiếu thu/chi phân bổ công nợ",
+        "tags": [
+          "accounting"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/accounting_settlement_batchInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/accounting_settlement_batch"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Dữ liệu không hợp lệ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sửa Phiếu thu/chi phân bổ công nợ",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/accounting/settlement_batch/{id}/approved": {
+      "post": {
+        "description": "Phát sự kiện `accounting.settlement_batch.approved` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/accounting_settlement_batch"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Phiếu thu/chi phân bổ công nợ: approved (submitted → approved)",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/accounting/settlement_batch/{id}/cancelled": {
+      "post": {
+        "description": "Phát sự kiện `accounting.settlement_batch.cancelled` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/accounting_settlement_batch"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Phiếu thu/chi phân bổ công nợ: cancelled (draft|rejected → cancelled)",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/accounting/settlement_batch/{id}/rejected": {
+      "post": {
+        "description": "Phát sự kiện `accounting.settlement_batch.rejected` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/accounting_settlement_batch"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Phiếu thu/chi phân bổ công nợ: rejected (submitted → rejected)",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/accounting/settlement_batch/{id}/submitted": {
+      "post": {
+        "description": "Phát sự kiện `accounting.settlement_batch.submitted` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/accounting_settlement_batch"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Phiếu thu/chi phân bổ công nợ: submitted (draft|rejected → submitted)",
         "tags": [
           "accounting"
         ]
@@ -78145,7 +79451,7 @@
     },
     "/api/t/{tenantId}/data/logistics/shipment/{id}/delivered": {
       "post": {
-        "description": "Phát sự kiện `logistics.shipment.delivered` cho các module khác phản ứng.",
+        "description": "Hoàn tất vận đơn và ghi POD trong cùng giao dịch. Cần nhập tên người nhận hoặc bằng chứng/mã tham chiếu.",
         "parameters": [
           {
             "in": "path",
@@ -78165,6 +79471,39 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "anyOf": [
+                  {
+                    "required": [
+                      "received_by"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "delivery_evidence"
+                    ]
+                  }
+                ],
+                "properties": {
+                  "delivery_evidence": {
+                    "maxLength": 1000,
+                    "type": "string"
+                  },
+                  "received_by": {
+                    "maxLength": 160,
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -106559,6 +107898,7 @@
               "enum": [
                 "approved",
                 "rejected",
+                "sourced",
                 "submitted"
               ],
               "type": "string"
@@ -107089,6 +108429,91 @@
           }
         ],
         "summary": "Đề nghị mua: rejected (submitted → rejected)",
+        "tags": [
+          "purchasing"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/purchasing/purchase_requisition/{id}/sourced": {
+      "post": {
+        "description": "Phát sự kiện `purchasing.purchase_requisition.sourced` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/purchasing_purchase_requisition"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Đề nghị mua: sourced (approved → sourced)",
         "tags": [
           "purchasing"
         ]
@@ -108430,7 +109855,9 @@
             "schema": {
               "enum": [
                 "accepted",
+                "cancelled",
                 "quoted",
+                "rejected",
                 "sent"
               ],
               "type": "string"
@@ -108881,6 +110308,91 @@
         ]
       }
     },
+    "/api/t/{tenantId}/data/purchasing/rfq/{id}/cancelled": {
+      "post": {
+        "description": "Phát sự kiện `purchasing.rfq.cancelled` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/purchasing_rfq"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Yêu cầu báo giá: cancelled (draft|sent → cancelled)",
+        "tags": [
+          "purchasing"
+        ]
+      }
+    },
     "/api/t/{tenantId}/data/purchasing/rfq/{id}/quoted": {
       "post": {
         "description": "Phát sự kiện `purchasing.rfq.quoted` cho các module khác phản ứng.",
@@ -108961,6 +110473,91 @@
           }
         ],
         "summary": "Yêu cầu báo giá: quoted (sent → quoted)",
+        "tags": [
+          "purchasing"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/purchasing/rfq/{id}/rejected": {
+      "post": {
+        "description": "Phát sự kiện `purchasing.rfq.rejected` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/purchasing_rfq"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Yêu cầu báo giá: rejected (sent|quoted → rejected)",
         "tags": [
           "purchasing"
         ]

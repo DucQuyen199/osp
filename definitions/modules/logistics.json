@@ -153,6 +153,24 @@
      "required": false
     },
     {
+     "name": "delivered_at",
+     "type": "datetime",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "received_by",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "delivery_evidence",
+     "type": "text",
+     "required": false,
+     "system": true
+    },
+    {
      "name": "status",
      "type": "enum",
      "required": false,

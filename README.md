@@ -4,8 +4,8 @@ Bộ phần mềm quản trị doanh nghiệp dạng **module**: ERP, CRM, kế 
 
 | | |
 |---|---|
-| Module | 49 (lõi, bán hàng, chuỗi cung ứng, tài chính, nhân sự, vận hành, nền tảng, chuyên ngành) |
-| Loại dữ liệu · sự kiện | 177 · 777 |
+| Module | 50 (lõi, bán hàng, chuỗi cung ứng, tài chính, nhân sự, vận hành, nền tảng, chuyên ngành) |
+| Loại dữ liệu · sự kiện | 182 · 811 |
 | Luồng liên module | Handler Rust trong các bounded context; catalog không còn luật nghiệp vụ JSON |
 | Gói ngành | 22 |
 | Kiểm tra build/catalog | `npm run check`; Rust test suite và E2E chạy riêng khi cần |
