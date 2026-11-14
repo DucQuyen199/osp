@@ -214,12 +214,13 @@ Tổng: **50 module**, **189 loại dữ liệu**, **854 sự kiện**.
 | `nonconformance` Sự không phù hợp | `open` → **closed** (open→closed) |
 
 ### manufacturing
-**Sản xuất** — Định mức BOM, lệnh sản xuất theo trung tâm máy và công suất ngày. Bắt đầu lệnh xuất nguyên liệu vào WIP; QC đạt sẽ nhập thành phẩm vào kho.
+**Sản xuất** — Định mức BOM, lệnh sản xuất theo trung tâm máy và công suất ngày. Bắt đầu lệnh xuất nguyên liệu vào WIP; QC đạt sẽ nhập thành phẩm vào kho. Hàng lỗi có thể được sửa theo lệnh rework, bổ sung chi phí vào WIP gốc và kiểm tra lại.
 
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
 | `bom` Định mức (BOM) | — |
 | `production_order` Lệnh sản xuất | `planned` → **cancelled** (planned/in_progress→cancelled), **done** (in_progress→done), **started** (planned→in_progress) |
+| `rework_order` Lệnh sửa hàng lỗi | `planned` → **cancelled** (planned→cancelled), **done** (in_progress→done), **started** (planned→in_progress) |
 | `work_center` Trung tâm sản xuất | — |
 
 ### purchasing

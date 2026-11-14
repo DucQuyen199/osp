@@ -1,7 +1,7 @@
 {
  "id": "manufacturing",
  "name": "Sản xuất",
- "description": "Định mức BOM, lệnh sản xuất theo trung tâm máy và công suất ngày. Bắt đầu lệnh xuất nguyên liệu vào WIP; QC đạt sẽ nhập thành phẩm vào kho.",
+ "description": "Định mức BOM, lệnh sản xuất theo trung tâm máy và công suất ngày. Bắt đầu lệnh xuất nguyên liệu vào WIP; QC đạt sẽ nhập thành phẩm vào kho. Hàng lỗi có thể được sửa theo lệnh rework, bổ sung chi phí vào WIP gốc và kiểm tra lại.",
  "category": "supply",
  "version": "0.4.0",
  "depends": [
@@ -150,6 +150,28 @@
       ],
       "to": "cancelled"
      }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "rework_order",
+   "label": "Lệnh sửa hàng lỗi",
+   "fields": [
+    { "name": "production_order", "type": "ref", "required": true, "ref": "manufacturing.production_order" },
+    { "name": "inspection", "type": "ref", "required": true, "ref": "quality.inspection" },
+    { "name": "qty", "type": "number", "required": true },
+    { "name": "reason", "type": "text", "required": true },
+    { "name": "status", "type": "enum", "required": false, "options": ["planned", "in_progress", "done", "cancelled"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "planned",
+    "actions": {
+     "started": { "from": ["planned"], "to": "in_progress" },
+     "done": { "from": ["in_progress"], "to": "done" },
+     "cancelled": { "from": ["planned"], "to": "cancelled" }
     }
    },
    "computed": {},

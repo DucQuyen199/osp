@@ -78,6 +78,22 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                     .push("A planned start date is required when a work center is assigned".into());
             }
         }
+        "rework_order" => {
+            if !document
+                .get("qty")
+                .and_then(decimal)
+                .is_some_and(|qty| qty > Decimal::ZERO)
+            {
+                errors.push("Rework quantity must be positive".into());
+            }
+            if document
+                .get("reason")
+                .and_then(Value::as_str)
+                .is_none_or(|reason| reason.trim().is_empty())
+            {
+                errors.push("A reason is required for production rework".into());
+            }
+        }
         "work_center" => {
             if document
                 .get("capacity_per_day")
@@ -96,6 +112,14 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<String> {
+    if entity == "rework_order"
+        && current.get("status").and_then(Value::as_str) != Some("planned")
+        && ["production_order", "inspection", "qty", "reason"]
+            .iter()
+            .any(|field| patch.get(*field).is_some())
+    {
+        return vec!["Started rework orders are immutable".into()];
+    }
     if entity == "production_order"
         && current.get("status").and_then(Value::as_str) == Some("planned")
         && ["good_qty", "scrap_qty", "scrap_reason"]
@@ -129,6 +153,10 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
 }
 
 pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
+    if entity == "rework_order" && document.get("status").and_then(Value::as_str) != Some("planned")
+    {
+        return vec!["Started rework orders must be kept as production history".into()];
+    }
     if entity == "production_order"
         && matches!(
             document.get("status").and_then(Value::as_str),

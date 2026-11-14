@@ -62,6 +62,9 @@ pub async fn handle_source_stock_event(
         "manufacturing.production_order.started" => {
             (Some("$bom"), "out", "production_order_bom", true)
         }
+        "manufacturing.rework_order.started" => {
+            (Some("$rework_bom"), "out", "production_order_bom", true)
+        }
         "agriculture.harvest.created" => (None, "in", "harvest", false),
         "agriculture.input_application.created" => (None, "out", "input_application", false),
         _ => return Ok(false),
@@ -73,7 +76,14 @@ pub async fn handle_source_stock_event(
         )
     })?;
     let mut warehouse = document.get("warehouse").cloned();
-    let movement_source_id = if event_type == "quality.inspection.passed" {
+    let movement_source_id = if event_type == "manufacturing.rework_order.started" {
+        document.get("production_order").cloned().ok_or_else(|| {
+            crate::error::ApiError::validation(
+                event_type,
+                vec!["Rework order requires its source production-order id".into()],
+            )
+        })?
+    } else if event_type == "quality.inspection.passed" {
         document.get("source_id").cloned().ok_or_else(|| {
             crate::error::ApiError::validation(
                 event_type,
@@ -90,8 +100,35 @@ pub async fn handle_source_stock_event(
     } else {
         source_id.clone()
     };
-    let mut lines = if field == Some("$bom") {
-        if let Some(bom_value) = document.get("bom").and_then(Value::as_str) {
+    let mut lines = if matches!(field, Some("$bom" | "$rework_bom")) {
+        let bom_value = if field == Some("$rework_bom") {
+            let order_id = document
+                .get("production_order")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+                .ok_or_else(|| {
+                    crate::error::ApiError::validation(
+                        event_type,
+                        vec!["Rework production-order id must be a valid UUID".into()],
+                    )
+                })?;
+            let order = tx.query_opt(
+                "SELECT bom, warehouse FROM manufacturing__production_order WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                &[&tenant.id, &order_id],
+            ).await?.ok_or_else(|| crate::error::ApiError::validation(
+                event_type,
+                vec!["Rework source production order was not found".into()],
+            ))?;
+            let warehouse_id: Uuid = order.get(1);
+            warehouse = Some(json!(warehouse_id));
+            Some(order.get::<_, Uuid>(0).to_string())
+        } else {
+            document
+                .get("bom")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+        };
+        if let Some(bom_value) = bom_value.as_deref() {
             let bom_id = Uuid::parse_str(bom_value).map_err(|_| {
                 crate::error::ApiError::validation(
                     event_type,

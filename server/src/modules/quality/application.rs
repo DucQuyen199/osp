@@ -63,6 +63,27 @@ pub async fn handle_source_event(
 ) -> R<bool> {
     let opts = event_opts(event_id, depth);
     match event_type {
+        "manufacturing.rework_order.done" => {
+            let inspection_id = id(document, "inspection").ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    event_type,
+                    vec!["Completed rework requires its quality-inspection id".into()],
+                )
+            })?;
+            let entity = kernel.ent(tenant, "quality.inspection")?;
+            kernel
+                .act_in(
+                    tx,
+                    &Actor::System,
+                    tenant,
+                    &entity,
+                    &inspection_id.to_string(),
+                    "retest",
+                    &opts,
+                )
+                .await?;
+            Ok(true)
+        }
         "quality.inspection_disposition.posted" => {
             let inspection_id = id(document, "inspection").ok_or_else(|| {
                 crate::error::ApiError::validation(
@@ -402,6 +423,36 @@ pub async fn handle_source_event(
             kernel
                 .create_in(tx, &Actor::System, tenant, &entity, data, &opts)
                 .await?;
+            Ok(true)
+        }
+        "quality.inspection.passed" => {
+            let inspection_id = id(document, "id").ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    event_type,
+                    vec!["Passed inspection requires an id".into()],
+                )
+            })?;
+            let entity = kernel.ent(tenant, "quality.nonconformance")?;
+            let open = tx
+                .query(
+                    "SELECT id FROM quality__nonconformance WHERE tenant_id = $1 AND inspection = $2 AND status = 'open' ORDER BY created_at, id FOR UPDATE",
+                    &[&tenant.id, &inspection_id],
+                )
+                .await?;
+            for row in open {
+                let nonconformance_id: Uuid = row.get(0);
+                kernel
+                    .act_in(
+                        tx,
+                        &Actor::System,
+                        tenant,
+                        &entity,
+                        &nonconformance_id.to_string(),
+                        "closed",
+                        &opts,
+                    )
+                    .await?;
+            }
             Ok(true)
         }
         _ => Ok(false),
