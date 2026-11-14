@@ -142,7 +142,9 @@ pub(super) async fn handle(
                         .and_then(Value::as_str)
                         .unwrap_or_default();
                     let amount = adjustment
-                        .get("amount")
+                        .get("base_amount")
+                        .filter(|value| !value.is_null())
+                        .or_else(|| adjustment.get("amount"))
                         .and_then(crate::money::decimal)
                         .ok_or_else(|| {
                             crate::error::ApiError::validation(

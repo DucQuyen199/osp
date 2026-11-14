@@ -128,6 +128,17 @@ pub async fn handle_source_document_event(
         if let Some(value) = event.get("matched_net").filter(|value| !value.is_null()) {
             data.insert("grni_match_amount".into(), value.clone());
         }
+        for field in [
+            "currency",
+            "exchange_rate",
+            "exchange_rate_date",
+            "base_total",
+            "base_tax_total",
+        ] {
+            if let Some(value) = event.get(field).filter(|value| !value.is_null()) {
+                data.insert(field.into(), value.clone());
+            }
+        }
         if let Some(value) = event.get("adjustments").filter(|value| !value.is_null()) {
             data.insert("purchase_adjustments".into(), value.clone());
         }

@@ -164,7 +164,7 @@ pub(super) async fn validate_posted_document(
                     .unwrap_or_else(|| Value::Array(Vec::new()));
                 let expected_bill = if let Some(invoice_id) = supplier_invoice_id {
                     match tx.query_opt(
-                        "SELECT purchase_order,supplier,total::text,COALESCE(tax_total,0)::text,status,lines,invoice_number,department,COALESCE(matched_net,0)::text,COALESCE(adjustments,'[]'::jsonb) FROM purchasing__supplier_invoice WHERE tenant_id=$1 AND id=$2 FOR UPDATE",
+                        "SELECT purchase_order,supplier,total::text,COALESCE(tax_total,0)::text,status,lines,invoice_number,department,COALESCE(matched_net,0)::text,COALESCE(adjustments,'[]'::jsonb),currency,exchange_rate::text,exchange_rate_date,base_total::text,base_tax_total::text FROM purchasing__supplier_invoice WHERE tenant_id=$1 AND id=$2 FOR UPDATE",
                         &[&tenant.id, &invoice_id],
                     ).await? {
                         Some(invoice) => {
@@ -178,6 +178,11 @@ pub(super) async fn validate_posted_document(
                             let invoice_department: Option<Uuid> = invoice.get(7);
                             let matched_net = database_amount(&invoice, 8)?;
                             let invoice_adjustments: Value = invoice.get(9);
+                            let invoice_currency: Option<Uuid> = invoice.get(10);
+                            let invoice_exchange_rate = database_optional_amount(&invoice, 11)?;
+                            let invoice_exchange_rate_date: Option<chrono::NaiveDate> = invoice.get(12);
+                            let invoice_base_total = database_optional_amount(&invoice, 13)?;
+                            let invoice_base_tax_total = database_optional_amount(&invoice, 14)?;
                             if invoice_order != order_id || invoice_supplier != supplier {
                                 errors.push("Supplier invoice does not match the source purchase order".into());
                             }
@@ -203,6 +208,47 @@ pub(super) async fn validate_posted_document(
                                 != &invoice_adjustments
                             {
                                 errors.push("Bill purchase adjustments must match its supplier invoice".into());
+                            }
+                            if document
+                                .get("currency")
+                                .and_then(Value::as_str)
+                                .and_then(|value| Uuid::parse_str(value).ok())
+                                != invoice_currency
+                            {
+                                errors.push("Bill currency must match its supplier invoice".into());
+                            }
+                            if !document
+                                .get("exchange_rate")
+                                .and_then(money::decimal)
+                                .zip(invoice_exchange_rate)
+                                .is_some_and(|(actual, expected)| {
+                                    money::within_tolerance(actual, expected, amount_tolerance())
+                                })
+                            {
+                                errors.push("Bill exchange-rate snapshot must match its supplier invoice".into());
+                            }
+                            if document
+                                .get("exchange_rate_date")
+                                .and_then(Value::as_str)
+                                .and_then(|value| chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").ok())
+                                != invoice_exchange_rate_date
+                            {
+                                errors.push("Bill exchange-rate date must match its supplier invoice".into());
+                            }
+                            for (field, expected) in [
+                                ("base_total", invoice_base_total),
+                                ("base_tax_total", invoice_base_tax_total),
+                            ] {
+                                if !document
+                                    .get(field)
+                                    .and_then(money::decimal)
+                                    .zip(expected)
+                                    .is_some_and(|(actual, expected)| {
+                                        money::within_tolerance(actual, expected, amount_tolerance())
+                                    })
+                                {
+                                    errors.push(format!("Bill {field} must match its supplier invoice"));
+                                }
                             }
                             Some(invoice_lines)
                         }

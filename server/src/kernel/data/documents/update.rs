@@ -340,6 +340,14 @@ impl Kernel {
                 Some("draft" | "rejected")
             )
         {
+            if qname == "purchasing.supplier_invoice"
+                && changed
+                    .iter()
+                    .any(|field| matches!(field.as_str(), "currency" | "issue_date"))
+            {
+                cur.remove("exchange_rate");
+                cur.remove("exchange_rate_date");
+            }
             let errors = crate::modules::purchasing::prepare_document(
                 tx,
                 t,

@@ -3,6 +3,118 @@ use rust_decimal::Decimal;
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
+fn round_currency(value: Decimal) -> Decimal {
+    value.round_dp(2)
+}
+
+async fn supplier_invoice_currency_snapshot(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    document: &Map<String, Value>,
+) -> R<(Uuid, Decimal, chrono::NaiveDate)> {
+    let base_code = tenant
+        .setting_str("baseCurrency")
+        .unwrap_or("VND")
+        .to_ascii_uppercase();
+    let base = tx
+        .query_opt(
+            "SELECT id FROM master_data__currency WHERE tenant_id=$1 AND upper(code)=$2 FOR SHARE",
+            &[&tenant.id, &base_code],
+        )
+        .await?
+        .ok_or_else(|| {
+            crate::error::ApiError::validation(
+                "purchasing.supplier_invoice.currency",
+                vec![format!(
+                    "Tenant base currency {base_code} is missing from its currency catalog"
+                )],
+            )
+        })?;
+    let base_id: Uuid = base.get(0);
+    let currency_id = match document.get("currency") {
+        None | Some(Value::Null) => base_id,
+        Some(Value::String(value)) => Uuid::parse_str(value).map_err(|_| {
+            crate::error::ApiError::validation(
+                "purchasing.supplier_invoice.currency",
+                vec!["Supplier invoice currency must reference a valid tenant currency".into()],
+            )
+        })?,
+        _ => {
+            return Err(crate::error::ApiError::validation(
+                "purchasing.supplier_invoice.currency",
+                vec!["Supplier invoice currency must reference a valid tenant currency".into()],
+            ));
+        }
+    };
+    if tx
+        .query_opt(
+            "SELECT id FROM master_data__currency WHERE tenant_id=$1 AND id=$2 FOR SHARE",
+            &[&tenant.id, &currency_id],
+        )
+        .await?
+        .is_none()
+    {
+        return Err(crate::error::ApiError::validation(
+            "purchasing.supplier_invoice.currency",
+            vec!["Supplier invoice currency does not belong to this tenant".into()],
+        ));
+    }
+    let issue_date = document
+        .get("issue_date")
+        .and_then(Value::as_str)
+        .and_then(|value| chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").ok())
+        .ok_or_else(|| {
+            crate::error::ApiError::validation(
+                "purchasing.supplier_invoice.issue_date",
+                vec!["Supplier invoice issue date must be valid before currency conversion".into()],
+            )
+        })?;
+    let existing_snapshot = document
+        .get("exchange_rate")
+        .and_then(money::decimal)
+        .filter(|rate| *rate > Decimal::ZERO)
+        .zip(
+            document
+                .get("exchange_rate_date")
+                .and_then(Value::as_str)
+                .and_then(|value| chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").ok()),
+        );
+    let (rate, rate_date) = if currency_id == base_id {
+        (Decimal::ONE, issue_date)
+    } else if let Some((rate, rate_date)) = existing_snapshot {
+        (rate, rate_date)
+    } else {
+        let row = tx
+            .query_opt(
+                "SELECT rate::text, effective_date FROM master_data__currency_rate WHERE tenant_id=$1 AND from_currency=$2 AND to_currency=$3 AND effective_date<=$4 ORDER BY effective_date DESC,created_at DESC LIMIT 1 FOR SHARE",
+                &[&tenant.id, &currency_id, &base_id, &issue_date],
+            )
+            .await?
+            .ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    "purchasing.supplier_invoice.exchange_rate",
+                    vec![format!("No exchange rate exists for this invoice currency on {issue_date}")],
+                )
+            })?;
+        let rate: String = row.get(0);
+        let rate = money::decimal_str(&rate).ok_or_else(|| {
+            crate::error::ApiError::validation(
+                "purchasing.supplier_invoice.exchange_rate",
+                vec!["Supplier invoice exchange rate is invalid".into()],
+            )
+        })?;
+        let rate_date: chrono::NaiveDate = row.get(1);
+        (rate, rate_date)
+    };
+    if rate <= Decimal::ZERO {
+        return Err(crate::error::ApiError::validation(
+            "purchasing.supplier_invoice.exchange_rate",
+            vec!["Supplier invoice exchange rate must be greater than zero".into()],
+        ));
+    }
+    Ok((currency_id, rate, rate_date))
+}
+
 pub async fn prepare_document(
     tx: &Tx<'_>,
     tenant: &Tenant,
@@ -141,6 +253,9 @@ async fn prepare_document_with_lock(
     let mut tax_total = Decimal::ZERO;
     let mut net_total = Decimal::ZERO;
     let mut matched_net = Decimal::ZERO;
+    let mut adjustment_net = Decimal::ZERO;
+    let mut adjustment_tax = Decimal::ZERO;
+    let mut supplier_invoice_base_net = None;
     for (index, line) in lines.iter_mut().enumerate() {
         let Some(line) = line.as_object_mut() else {
             errors.push(format!("lines[{}] phải là một dòng hàng", index + 1));
@@ -470,8 +585,6 @@ async fn prepare_document_with_lock(
         let Some(adjustment_lines) = adjustment_lines.as_array_mut() else {
             return Ok(vec!["Invoice adjustments must be an array".into()]);
         };
-        let mut adjustment_net = Decimal::ZERO;
-        let mut adjustment_tax = Decimal::ZERO;
         for (index, line) in adjustment_lines.iter_mut().enumerate() {
             let Some(line) = line.as_object_mut() else {
                 errors.push(format!(
@@ -632,6 +745,154 @@ async fn prepare_document_with_lock(
             errors.push("Supplier invoice adjustments cannot be serialized".into());
         }
     }
+    if entity == "supplier_invoice" {
+        let (currency_id, exchange_rate, rate_date) =
+            supplier_invoice_currency_snapshot(tx, tenant, document).await?;
+        let base_total = total
+            .checked_mul(exchange_rate)
+            .map(round_currency)
+            .ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    "purchasing.supplier_invoice.base_total",
+                    vec!["Converted supplier invoice total exceeds the supported range".into()],
+                )
+            })?;
+        let base_tax_total = tax_total
+            .checked_mul(exchange_rate)
+            .map(round_currency)
+            .ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    "purchasing.supplier_invoice.base_tax_total",
+                    vec!["Converted supplier invoice tax exceeds the supported range".into()],
+                )
+            })?;
+        let base_net = base_total.checked_sub(base_tax_total).ok_or_else(|| {
+            crate::error::ApiError::validation(
+                "purchasing.supplier_invoice.base_total",
+                vec!["Converted supplier invoice net exceeds the supported range".into()],
+            )
+        })?;
+        let mut base_adjustment_net = Decimal::ZERO;
+        let mut base_adjustment_tax = Decimal::ZERO;
+        let (
+            Some(exchange_rate_value),
+            Some(base_total_value),
+            Some(base_tax_value),
+            Some(base_adjustment_net_value),
+            Some(base_adjustment_tax_value),
+        ) = (
+            money::json_number(exchange_rate),
+            money::json_number(base_total),
+            money::json_number(base_tax_total),
+            money::json_number(base_adjustment_net),
+            money::json_number(base_adjustment_tax),
+        )
+        else {
+            errors.push("Converted supplier invoice amounts cannot be serialized".into());
+            return Ok(errors);
+        };
+        document.insert("currency".into(), json!(currency_id));
+        document.insert("exchange_rate".into(), exchange_rate_value);
+        document.insert("exchange_rate_date".into(), json!(rate_date.to_string()));
+        document.insert("base_total".into(), base_total_value);
+        document.insert("base_tax_total".into(), base_tax_value);
+        document.insert("base_adjustment_net".into(), base_adjustment_net_value);
+        document.insert("base_adjustment_tax".into(), base_adjustment_tax_value);
+        if let Some(lines) = document.get_mut("lines").and_then(Value::as_array_mut) {
+            for line in lines.iter_mut().filter_map(Value::as_object_mut) {
+                let Some(net) = line.get("net_amount").and_then(money::decimal) else {
+                    continue;
+                };
+                let Some(base_net) = net.checked_mul(exchange_rate).map(round_currency) else {
+                    errors
+                        .push("Converted supplier invoice line exceeds the supported range".into());
+                    continue;
+                };
+                if let Some(value) = money::json_number(base_net) {
+                    line.insert("base_net_amount".into(), value);
+                } else {
+                    errors.push("Converted supplier invoice line cannot be serialized".into());
+                }
+            }
+        }
+        if let Some(adjustments) = document
+            .get_mut("adjustments")
+            .and_then(Value::as_array_mut)
+        {
+            for adjustment in adjustments.iter_mut().filter_map(Value::as_object_mut) {
+                let kind = adjustment
+                    .get("kind")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                let sign = if kind == "discount" {
+                    Decimal::NEGATIVE_ONE
+                } else {
+                    Decimal::ONE
+                };
+                for (source, target) in
+                    [("amount", "base_amount"), ("tax_amount", "base_tax_amount")]
+                {
+                    let Some(amount) = adjustment.get(source).and_then(money::decimal) else {
+                        continue;
+                    };
+                    let Some(base_amount) = amount.checked_mul(exchange_rate).map(round_currency)
+                    else {
+                        errors.push(
+                            "Converted supplier invoice adjustment exceeds the supported range"
+                                .into(),
+                        );
+                        continue;
+                    };
+                    if let Some(value) = money::json_number(base_amount) {
+                        adjustment.insert(target.into(), value);
+                        if source == "amount" {
+                            base_adjustment_net = base_adjustment_net
+                                .checked_add(base_amount.checked_mul(sign).ok_or_else(|| {
+                                    crate::error::ApiError::validation(
+                                        "purchasing.supplier_invoice.base_adjustment_net",
+                                        vec!["Converted invoice adjustment exceeds the supported range".into()],
+                                    )
+                                })?)
+                                .ok_or_else(|| {
+                                    crate::error::ApiError::validation(
+                                        "purchasing.supplier_invoice.base_adjustment_net",
+                                        vec!["Converted invoice adjustment exceeds the supported range".into()],
+                                    )
+                                })?;
+                        } else {
+                            base_adjustment_tax = base_adjustment_tax
+                                .checked_add(base_amount.checked_mul(sign).ok_or_else(|| {
+                                    crate::error::ApiError::validation(
+                                        "purchasing.supplier_invoice.base_adjustment_tax",
+                                        vec!["Converted invoice adjustment tax exceeds the supported range".into()],
+                                    )
+                                })?)
+                                .ok_or_else(|| {
+                                    crate::error::ApiError::validation(
+                                        "purchasing.supplier_invoice.base_adjustment_tax",
+                                        vec!["Converted invoice adjustment tax exceeds the supported range".into()],
+                                    )
+                                })?;
+                        }
+                    } else {
+                        errors.push(
+                            "Converted supplier invoice adjustment cannot be serialized".into(),
+                        );
+                    }
+                }
+            }
+        }
+        let (Some(base_adjustment_net), Some(base_adjustment_tax)) = (
+            money::json_number(base_adjustment_net),
+            money::json_number(base_adjustment_tax),
+        ) else {
+            errors.push("Converted supplier invoice adjustments cannot be serialized".into());
+            return Ok(errors);
+        };
+        document.insert("base_adjustment_net".into(), base_adjustment_net);
+        document.insert("base_adjustment_tax".into(), base_adjustment_tax);
+        supplier_invoice_base_net = Some(base_net);
+    }
     if matches!(
         entity,
         "purchase_order" | "purchase_return" | "purchase_receipt" | "supplier_invoice"
@@ -646,12 +907,15 @@ async fn prepare_document_with_lock(
         }
     }
     if entity == "supplier_invoice" {
-        let variance = net_total.checked_sub(matched_net).ok_or_else(|| {
-            crate::error::ApiError::validation(
-                "purchasing.supplier_invoice.price_variance",
-                vec!["Purchase price variance exceeds the supported range".into()],
-            )
-        })?;
+        let variance = supplier_invoice_base_net
+            .unwrap_or(net_total)
+            .checked_sub(matched_net)
+            .ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    "purchasing.supplier_invoice.price_variance",
+                    vec!["Purchase price variance exceeds the supported range".into()],
+                )
+            })?;
         if let (Some(matched), Some(variance)) = (
             money::json_number(matched_net),
             money::json_number(variance),

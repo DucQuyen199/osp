@@ -23,6 +23,10 @@ fn amount(document: &Value, field: &str) -> Option<Decimal> {
     document.get(field).and_then(money::decimal)
 }
 
+fn round_currency(value: Decimal) -> Decimal {
+    value.round_dp(2)
+}
+
 fn add_lines(
     totals: &mut BTreeMap<LineKey, Decimal>,
     lines: &Value,
@@ -293,6 +297,33 @@ pub(super) async fn validate(
                 vec!["Invoice adjustment tax is missing".into()],
             )
         })?;
+        let exchange_rate = amount(document, "exchange_rate")
+            .filter(|rate| *rate > Decimal::ZERO)
+            .ok_or_else(|| {
+                ApiError::validation(
+                    "purchasing.supplier_invoice.exchange_rate",
+                    vec!["Supplier invoice needs a positive exchange-rate snapshot".into()],
+                )
+            })?;
+        let base_total = amount(document, "base_total").ok_or_else(|| {
+            ApiError::validation(
+                "purchasing.supplier_invoice.base_total",
+                vec!["Converted supplier invoice total is missing".into()],
+            )
+        })?;
+        let base_tax_total = amount(document, "base_tax_total").ok_or_else(|| {
+            ApiError::validation(
+                "purchasing.supplier_invoice.base_tax_total",
+                vec!["Converted supplier invoice tax is missing".into()],
+            )
+        })?;
+        let expected_base_total = total.checked_mul(exchange_rate).map(round_currency);
+        let expected_base_tax = tax.checked_mul(exchange_rate).map(round_currency);
+        if expected_base_total != Some(base_total) || expected_base_tax != Some(base_tax_total) {
+            errors.push(
+                "Supplier invoice base-currency totals do not match its currency snapshot".into(),
+            );
+        }
         let (expected_adjustment_net, expected_adjustment_tax) = adjustment_totals(
             document
                 .get("adjustments")
@@ -301,13 +332,88 @@ pub(super) async fn validate(
         if adjustment_net != expected_adjustment_net || adjustment_tax != expected_adjustment_tax {
             errors.push("Invoice adjustment totals do not match the adjustment lines".into());
         }
-        let net = total.checked_sub(tax).ok_or_else(|| {
+        let adjustments = document
+            .get("adjustments")
+            .and_then(Value::as_array)
+            .map(Vec::as_slice)
+            .unwrap_or_default();
+        let mut expected_base_adjustment_net = Decimal::ZERO;
+        let mut expected_base_adjustment_tax = Decimal::ZERO;
+        for adjustment in adjustments {
+            let kind = adjustment
+                .get("kind")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let sign = match kind {
+                "charge" => Decimal::ONE,
+                "discount" => Decimal::NEGATIVE_ONE,
+                _ => {
+                    errors.push("Invoice adjustment kind is invalid".into());
+                    continue;
+                }
+            };
+            for (source, converted, accumulator) in [
+                ("amount", "base_amount", &mut expected_base_adjustment_net),
+                (
+                    "tax_amount",
+                    "base_tax_amount",
+                    &mut expected_base_adjustment_tax,
+                ),
+            ] {
+                let source_amount = adjustment.get(source).and_then(money::decimal);
+                let converted_amount = adjustment.get(converted).and_then(money::decimal);
+                let expected = source_amount
+                    .and_then(|value| value.checked_mul(exchange_rate))
+                    .map(round_currency);
+                if converted_amount != expected {
+                    errors.push(format!(
+                        "Invoice adjustment {converted} does not match its currency snapshot"
+                    ));
+                    continue;
+                }
+                if let Some(converted_amount) = converted_amount {
+                    if let Some(next) = converted_amount
+                        .checked_mul(sign)
+                        .and_then(|value| accumulator.checked_add(value))
+                    {
+                        *accumulator = next;
+                    } else {
+                        errors.push(
+                            "Converted invoice adjustment exceeds the supported range".into(),
+                        );
+                    }
+                }
+            }
+        }
+        if amount(document, "base_adjustment_net") != Some(expected_base_adjustment_net)
+            || amount(document, "base_adjustment_tax") != Some(expected_base_adjustment_tax)
+        {
+            errors.push(
+                "Converted adjustment totals do not match the invoice currency snapshot".into(),
+            );
+        }
+        if let Some(lines) = document.get("lines").and_then(Value::as_array) {
+            for line in lines {
+                let expected = line
+                    .get("net_amount")
+                    .and_then(money::decimal)
+                    .and_then(|value| value.checked_mul(exchange_rate))
+                    .map(round_currency);
+                if line.get("base_net_amount").and_then(money::decimal) != expected {
+                    errors.push(
+                        "Converted invoice line totals do not match the currency snapshot".into(),
+                    );
+                    break;
+                }
+            }
+        }
+        let base_net = base_total.checked_sub(base_tax_total).ok_or_else(|| {
             ApiError::validation(
-                "purchasing.supplier_invoice.total",
-                vec!["Supplier invoice net value is outside the supported range".into()],
+                "purchasing.supplier_invoice.base_total",
+                vec!["Converted supplier invoice net value is outside the supported range".into()],
             )
         })?;
-        let expected_variance = net.checked_sub(matched_net).ok_or_else(|| {
+        let expected_variance = base_net.checked_sub(matched_net).ok_or_else(|| {
             ApiError::validation(
                 "purchasing.supplier_invoice.price_variance",
                 vec!["Supplier invoice price variance is outside the supported range".into()],
@@ -323,7 +429,7 @@ pub(super) async fn validate(
         if !amount(document, "price_variance").is_some_and(|variance| variance == expected_variance)
         {
             errors.push(
-                "Supplier invoice price variance must equal invoice net less matched receipt value"
+                "Supplier invoice price variance must equal converted invoice net less matched receipt value"
                     .into(),
             );
         }

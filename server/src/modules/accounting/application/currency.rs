@@ -144,7 +144,14 @@ pub async fn prepare_currency_posting(
             }
         };
         let source = document.get("source").and_then(Value::as_str);
-        if entity == "bill" && source == Some("purchase_order") && currency_id != base_id {
+        if entity == "bill"
+            && source == Some("purchase_order")
+            && document
+                .get("supplier_invoice_id")
+                .and_then(Value::as_str)
+                .is_none_or(str::is_empty)
+            && currency_id != base_id
+        {
             return Ok(vec![
                 "Purchase-order bills must use the tenant base currency because purchase orders are denominated in base currency".into(),
             ]);
@@ -175,6 +182,18 @@ pub async fn prepare_currency_posting(
         };
         if currency_id == base_id {
             (currency_id, Decimal::ONE, issue_date)
+        } else if let Some(exchange_rate) = document.get("exchange_rate").and_then(money::decimal) {
+            if exchange_rate <= Decimal::ZERO {
+                return Ok(conversion_error(
+                    "Document exchange rate must be greater than zero",
+                ));
+            }
+            let rate_date = document
+                .get("exchange_rate_date")
+                .and_then(Value::as_str)
+                .and_then(|value| chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").ok())
+                .unwrap_or(issue_date);
+            (currency_id, exchange_rate, rate_date)
         } else {
             let rate = tx
                 .query_opt(
