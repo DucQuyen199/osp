@@ -3,7 +3,7 @@
  "name": "Nhân sự",
  "description": "Hồ sơ nhân viên, phòng ban, chức danh, nghỉ phép, chấm công.",
  "category": "people",
- "version": "0.5.0",
+ "version": "0.6.0",
  "depends": [
   "master-data"
  ],
@@ -170,7 +170,7 @@
   },
   {
    "name": "salary_revision",
-   "label": "Äiá»u chá»‰nh lÆ°Æ¡ng",
+   "label": "Điều chỉnh lương",
    "fields": [
     { "name": "employee", "type": "ref", "required": true, "ref": "hrm.employee" },
     { "name": "effective_from", "type": "date", "required": true },
@@ -369,7 +369,8 @@
    "name": "work_schedule_pattern",
    "label": "Mẫu ca luân phiên",
    "fields": [
-    { "name": "employee", "type": "ref", "required": true, "ref": "hrm.employee" },
+    { "name": "employee", "type": "ref", "required": false, "ref": "hrm.employee" },
+    { "name": "employees", "type": "json", "required": false },
     { "name": "start_date", "type": "date", "required": true },
     { "name": "end_date", "type": "date", "required": true },
     { "name": "timezone", "type": "string", "required": true },

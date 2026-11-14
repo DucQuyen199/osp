@@ -3,6 +3,7 @@ use crate::money;
 use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use rust_decimal::Decimal;
 use serde_json::Value;
+use uuid::Uuid;
 fn validate_period(document: &Value) -> Vec<String> {
     let start = document
         .get("start_date")
@@ -204,6 +205,34 @@ fn validate_work_schedule_entry(document: &Value) -> Vec<String> {
 
 fn validate_work_schedule_pattern(document: &Value) -> Vec<String> {
     let mut errors = Vec::new();
+    let single_employee = document
+        .get("employee")
+        .and_then(Value::as_str)
+        .is_some_and(|value| Uuid::parse_str(value).is_ok());
+    let employee_ids = document.get("employees").and_then(Value::as_array);
+    if employee_ids.is_some_and(|ids| {
+        ids.is_empty()
+            || ids.len() > 50
+            || ids.iter().any(|id| {
+                id.as_str()
+                    .is_none_or(|value| Uuid::parse_str(value).is_err())
+            })
+            || ids
+                .iter()
+                .filter_map(Value::as_str)
+                .collect::<std::collections::HashSet<_>>()
+                .len()
+                != ids.len()
+    }) {
+        errors.push(
+            "Shift rotation employees must contain between 1 and 50 unique employee IDs".into(),
+        );
+    }
+    if (single_employee && employee_ids.is_some()) || (!single_employee && employee_ids.is_none()) {
+        errors.push(
+            "Select either one employee or a team of employees for the shift rotation".into(),
+        );
+    }
     let parse_date = |field: &str| {
         document
             .get(field)

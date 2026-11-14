@@ -7169,7 +7169,7 @@
         "type": "object"
       },
       "hrm_salary_revision": {
-        "description": "Äiá»u chá»‰nh lÆ°Æ¡ng",
+        "description": "Điều chỉnh lương",
         "properties": {
           "base_salary": {
             "type": "number"
@@ -7216,7 +7216,7 @@
       },
       "hrm_salary_revisionInput": {
         "additionalProperties": false,
-        "description": "Äiá»u chá»‰nh lÆ°Æ¡ng (dữ liệu gửi lên)",
+        "description": "Điều chỉnh lương (dữ liệu gửi lên)",
         "properties": {
           "base_salary": {
             "type": "number"
@@ -7337,6 +7337,9 @@
             "format": "uuid",
             "type": "string"
           },
+          "employees": {
+            "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
+          },
           "end_date": {
             "format": "date",
             "type": "string"
@@ -7381,6 +7384,9 @@
             "format": "uuid",
             "type": "string"
           },
+          "employees": {
+            "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
+          },
           "end_date": {
             "format": "date",
             "type": "string"
@@ -7394,7 +7400,6 @@
           }
         },
         "required": [
-          "employee",
           "start_date",
           "end_date",
           "timezone",
@@ -70468,7 +70473,7 @@
             "bearer": []
           }
         ],
-        "summary": "Danh sách Äiá»u chá»‰nh lÆ°Æ¡ng",
+        "summary": "Danh sách Điều chỉnh lương",
         "tags": [
           "hrm"
         ]
@@ -70551,7 +70556,7 @@
             "bearer": []
           }
         ],
-        "summary": "Tạo Äiá»u chá»‰nh lÆ°Æ¡ng",
+        "summary": "Tạo Điều chỉnh lương",
         "tags": [
           "hrm"
         ]
@@ -70695,7 +70700,7 @@
             "bearer": []
           }
         ],
-        "summary": "Chuyển trạng thái hàng loạt: Äiá»u chá»‰nh lÆ°Æ¡ng",
+        "summary": "Chuyển trạng thái hàng loạt: Điều chỉnh lương",
         "tags": [
           "hrm"
         ]
@@ -70772,7 +70777,7 @@
             "bearer": []
           }
         ],
-        "summary": "Xóa Äiá»u chá»‰nh lÆ°Æ¡ng",
+        "summary": "Xóa Điều chỉnh lương",
         "tags": [
           "hrm"
         ]
@@ -70844,7 +70849,7 @@
             "bearer": []
           }
         ],
-        "summary": "Xem Äiá»u chá»‰nh lÆ°Æ¡ng",
+        "summary": "Xem Điều chỉnh lương",
         "tags": [
           "hrm"
         ]
@@ -70936,7 +70941,7 @@
             "bearer": []
           }
         ],
-        "summary": "Sửa Äiá»u chá»‰nh lÆ°Æ¡ng",
+        "summary": "Sửa Điều chỉnh lương",
         "tags": [
           "hrm"
         ]
@@ -71021,7 +71026,7 @@
             "bearer": []
           }
         ],
-        "summary": "Äiá»u chá»‰nh lÆ°Æ¡ng: approved (submitted → approved)",
+        "summary": "Điều chỉnh lương: approved (submitted → approved)",
         "tags": [
           "hrm"
         ]
@@ -71106,7 +71111,7 @@
             "bearer": []
           }
         ],
-        "summary": "Äiá»u chá»‰nh lÆ°Æ¡ng: rejected (submitted → rejected)",
+        "summary": "Điều chỉnh lương: rejected (submitted → rejected)",
         "tags": [
           "hrm"
         ]
@@ -71191,7 +71196,7 @@
             "bearer": []
           }
         ],
-        "summary": "Äiá»u chá»‰nh lÆ°Æ¡ng: submitted (draft|rejected → submitted)",
+        "summary": "Điều chỉnh lương: submitted (draft|rejected → submitted)",
         "tags": [
           "hrm"
         ]

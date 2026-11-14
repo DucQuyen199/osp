@@ -22,7 +22,31 @@ impl Kernel {
         let mut params: Vec<BoxParam> = vec![Box::new(t.id.clone())];
         let mut wh = vec!["t.tenant_id = $1".to_string()];
         for (k, v) in &q.filter {
-            if k == "id" {
+            let range_filter = [
+                ("__gte", ">="),
+                ("__gt", ">"),
+                ("__lte", "<="),
+                ("__lt", "<"),
+            ]
+            .iter()
+            .find_map(|(suffix, operator)| k.strip_suffix(suffix).map(|field| (field, operator)));
+            if let Some((field, operator)) = range_filter {
+                if is_ident(field)
+                    && ent
+                        .field(field)
+                        .is_some_and(|definition| definition.ty == "date")
+                    && NaiveDate::parse_from_str(v, "%Y-%m-%d").is_ok()
+                {
+                    params.push(Box::new(v.clone()));
+                    wh.push(format!(
+                        "t.{} {operator} ${}::date",
+                        quote(field),
+                        params.len()
+                    ));
+                } else {
+                    wh.push("false".into());
+                }
+            } else if k == "id" {
                 params.push(Box::new(v.clone()));
                 wh.push(format!("t.id::text = ${}", params.len()));
             } else if ent.is_typed(k) {

@@ -4,6 +4,22 @@ use chrono::{Datelike, NaiveDate};
 use serde_json::Value;
 use uuid::Uuid;
 
+fn pattern_employees(document: &Value) -> Option<Vec<Uuid>> {
+    if let Some(employees) = document.get("employees").and_then(Value::as_array) {
+        let parsed = employees
+            .iter()
+            .map(|id| id.as_str().and_then(|value| Uuid::parse_str(value).ok()))
+            .collect::<Option<Vec<_>>>()?;
+        (!parsed.is_empty() && parsed.len() <= 50).then_some(parsed)
+    } else {
+        document
+            .get("employee")
+            .and_then(Value::as_str)
+            .and_then(|id| Uuid::parse_str(id).ok())
+            .map(|id| vec![id])
+    }
+}
+
 pub(super) async fn validate(
     tx: &Tx<'_>,
     tenant: &Tenant,
@@ -111,12 +127,10 @@ async fn validate_pattern(
     if !matches!(action, "created" | "updated" | "removed" | "applied") {
         return Ok(Vec::new());
     }
-    let Some(employee) = document
-        .get("employee")
-        .and_then(Value::as_str)
-        .and_then(|id| Uuid::parse_str(id).ok())
-    else {
-        return Ok(vec!["Shift rotation requires a valid employee".into()]);
+    let Some(employees) = pattern_employees(document) else {
+        return Ok(vec![
+            "Shift rotation requires one employee or a valid team of employees".into(),
+        ]);
     };
     let parse_date = |field: &str| {
         document
@@ -178,23 +192,24 @@ async fn validate_pattern(
             };
         }
     }
-    let employee_row = tx
-        .query_opt(
-            "SELECT status, hire_date, termination_date FROM hrm__employee WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
-            &[&tenant.id, &employee],
+    let employee_rows = tx
+        .query(
+            "SELECT status, hire_date, termination_date FROM hrm__employee WHERE tenant_id = $1 AND id = ANY($2::uuid[]) ORDER BY id FOR UPDATE",
+            &[&tenant.id, &employees],
         )
         .await?;
-    let employee_valid = employee_row.is_some_and(|row| {
-        let status: String = row.get(0);
-        let hire_date: Option<NaiveDate> = row.get(1);
-        let termination_date: Option<NaiveDate> = row.get(2);
-        status == "active"
-            && hire_date.is_none_or(|date| start >= date)
-            && termination_date.is_none_or(|date| end <= date)
-    });
-    if !employee_valid {
+    let employees_valid = employee_rows.len() == employees.len()
+        && employee_rows.iter().all(|row| {
+            let status: String = row.get(0);
+            let hire_date: Option<NaiveDate> = row.get(1);
+            let termination_date: Option<NaiveDate> = row.get(2);
+            status == "active"
+                && hire_date.is_none_or(|date| start >= date)
+                && termination_date.is_none_or(|date| end <= date)
+        });
+    if !employees_valid {
         errors.push(
-            "Shift rotation dates must fall within the active employee's employment period".into(),
+            "Every employee in the rotation must be active for the full schedule period".into(),
         );
     }
     if action != "applied" || !errors.is_empty() {
@@ -202,8 +217,8 @@ async fn validate_pattern(
     }
     if tx
         .query_opt(
-            "SELECT 1 FROM hrm__work_schedule_entry WHERE tenant_id = $1 AND employee = $2 AND work_date BETWEEN $3 AND $4 LIMIT 1",
-            &[&tenant.id, &employee, &start, &end],
+            "SELECT 1 FROM hrm__work_schedule_entry WHERE tenant_id = $1 AND employee = ANY($2::uuid[]) AND work_date BETWEEN $3 AND $4 LIMIT 1",
+            &[&tenant.id, &employees, &start, &end],
         )
         .await?
         .is_some()
@@ -217,8 +232,8 @@ async fn validate_pattern(
         .unwrap_or(Uuid::nil());
     if tx
         .query_opt(
-            "SELECT 1 FROM hrm__work_schedule_pattern WHERE tenant_id = $1 AND employee = $2 AND status = 'applied' AND start_date <= $4 AND end_date >= $3 AND id <> $5 LIMIT 1",
-            &[&tenant.id, &employee, &start, &end, &pattern_id],
+            "SELECT 1 FROM hrm__work_schedule_pattern p WHERE p.tenant_id = $1 AND p.status = 'applied' AND p.start_date <= $4 AND p.end_date >= $3 AND p.id <> $5 AND (p.employee = ANY($2::uuid[]) OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE(p.employees, '[]'::jsonb)) AS team(value) WHERE team.value::uuid = ANY($2::uuid[]))) LIMIT 1",
+            &[&tenant.id, &employees, &start, &end, &pattern_id],
         )
         .await?
         .is_some()
@@ -229,8 +244,8 @@ async fn validate_pattern(
     let last_period = end.format("%Y-%m").to_string();
     if tx
         .query_opt(
-            "SELECT 1 FROM payroll__payslip s JOIN payroll__payroll_run r ON r.tenant_id = s.tenant_id AND r.id = s.run WHERE s.tenant_id = $1 AND s.employee = $2 AND r.period BETWEEN $3 AND $4 LIMIT 1",
-            &[&tenant.id, &employee, &first_period, &last_period],
+            "SELECT 1 FROM payroll__payslip s JOIN payroll__payroll_run r ON r.tenant_id = s.tenant_id AND r.id = s.run WHERE s.tenant_id = $1 AND s.employee = ANY($2::uuid[]) AND r.period BETWEEN $3 AND $4 LIMIT 1",
+            &[&tenant.id, &employees, &first_period, &last_period],
         )
         .await?
         .is_some()
@@ -254,13 +269,14 @@ async fn validate_pattern(
     })?;
     tx.execute(
         "INSERT INTO hrm__work_schedule_entry (tenant_id, id, created_at, updated_at, employee, work_date, is_working, start_at, end_at, break_minutes) \
-         SELECT $1, gen_random_uuid(), now(), now(), $2, days.work_date::date, (slot.day->>'is_working')::boolean, \
+         SELECT $1, gen_random_uuid(), now(), now(), team.employee, days.work_date::date, (slot.day->>'is_working')::boolean, \
            CASE WHEN (slot.day->>'is_working')::boolean THEN ((days.work_date::date + (slot.day->>'start_time')::time) AT TIME ZONE $6::text) ELSE NULL END, \
            CASE WHEN (slot.day->>'is_working')::boolean THEN ((days.work_date::date + (slot.day->>'end_time')::time + CASE WHEN (slot.day->>'end_time')::time <= (slot.day->>'start_time')::time THEN interval '1 day' ELSE interval '0 day' END) AT TIME ZONE $6::text) ELSE NULL END, \
            COALESCE((slot.day->>'break_minutes')::int, 0) \
-         FROM generate_series($3::date, $4::date, interval '1 day') AS days(work_date) \
+         FROM unnest($2::uuid[]) AS team(employee) \
+         CROSS JOIN generate_series($3::date, $4::date, interval '1 day') AS days(work_date) \
          CROSS JOIN LATERAL (SELECT $5::jsonb -> (((days.work_date::date - $3::date)::int % jsonb_array_length($5::jsonb))::int) AS day) AS slot",
-        &[&tenant.id, &employee, &start, &end, &cycle_json, &timezone],
+        &[&tenant.id, &employees, &start, &end, &cycle_json, &timezone],
     )
     .await?;
     Ok(Vec::new())

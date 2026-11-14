@@ -302,7 +302,7 @@ Tổng: **50 module**, **192 loại dữ liệu**, **867 sự kiện**.
 | `department` Phòng ban | — |
 | `position` Chức danh | — |
 | `employee` Nhân viên | `active` → **terminated** (active→terminated) |
-| `salary_revision` Äiá»u chá»‰nh lÆ°Æ¡ng | `draft` → **approved** (submitted→approved), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
+| `salary_revision` Điều chỉnh lương | `draft` → **approved** (submitted→approved), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 | `leave_request` Đơn nghỉ phép | `draft` → **approved** (submitted→approved), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 | `leave_allocation` Hạn mức nghỉ | — |
 | `holiday` Ngày lễ doanh nghiệp | — |
