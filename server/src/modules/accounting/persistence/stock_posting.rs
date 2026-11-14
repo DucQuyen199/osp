@@ -36,19 +36,61 @@ pub async fn post_stock_movement(
     else {
         return Ok(false);
     };
-    let (debit_code, credit_code) = match (direction, source) {
-        (
-            "out",
-            "sales_order" | "pos_order" | "work_order" | "table_order" | "repair_order"
-            | "prescription" | "maintenance",
-        ) => ("632", "156"),
-        ("in", "sales_return" | "pos_order_refund") => ("156", "632"),
-        ("in", "purchase_receipt") => ("156", "GRNI"),
-        ("out", "production_order_bom") => ("154", "156"),
-        ("in", "production_order") => ("156", "154"),
-        ("in", "stock_count") => ("156", "642"),
-        ("out", "stock_count") => ("642", "156"),
-        _ => return Ok(false),
+    let pre_invoice_purchase_return = if direction == "out"
+        && matches!(source, "purchase_return" | "quality_return")
+    {
+        let return_source_id = movement
+            .get("source_id")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok());
+        if let Some(return_source_id) = return_source_id {
+            let return_record = if source == "quality_return" {
+                tx.query_opt("SELECT purchase_order,supplier_invoice FROM purchasing__purchase_return WHERE tenant_id=$1 AND inspection=$2 FOR UPDATE", &[&tenant.id, &return_source_id]).await?
+            } else {
+                tx.query_opt("SELECT purchase_order,supplier_invoice FROM purchasing__purchase_return WHERE tenant_id=$1 AND id=$2 FOR UPDATE", &[&tenant.id, &return_source_id]).await?
+            };
+            let has_bill = if let Some(return_record) = return_record {
+                let order_id: Uuid = return_record.get(0);
+                let invoice_id: Option<Uuid> = return_record.get(1);
+                if let Some(invoice_id) = invoice_id {
+                    tx.query_opt(
+                        "SELECT id FROM accounting__bill WHERE tenant_id=$1 AND supplier_invoice_id=$2::text AND status IN ('posted','partially_paid','partially_settled','paid','settled') LIMIT 1 FOR UPDATE",
+                        &[&tenant.id, &invoice_id.to_string()],
+                    ).await?.is_some()
+                } else {
+                    tx.query_opt(
+                        "SELECT id FROM accounting__bill WHERE tenant_id=$1 AND source='purchase_order' AND source_id=$2::text AND supplier_invoice_id IS NULL AND status IN ('posted','partially_paid','partially_settled','paid','settled') LIMIT 1 FOR UPDATE",
+                        &[&tenant.id, &order_id],
+                    ).await?.is_some()
+                }
+            } else {
+                false
+            };
+            !has_bill
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+    let (debit_code, credit_code) = if pre_invoice_purchase_return {
+        ("GRNI", "156")
+    } else {
+        match (direction, source) {
+            (
+                "out",
+                "sales_order" | "pos_order" | "work_order" | "table_order" | "repair_order"
+                | "prescription" | "maintenance",
+            ) => ("632", "156"),
+            ("in", "sales_return" | "pos_order_refund") => ("156", "632"),
+            ("in", "purchase_receipt") => ("156", "GRNI"),
+            ("out", "production_order_bom") => ("154", "156"),
+            ("in", "production_order") => ("156", "154"),
+            ("in", "stock_count") => ("156", "642"),
+            ("out", "stock_count") => ("642", "156"),
+            ("out", "purchase_return" | "quality_return") => return Ok(false),
+            _ => return Ok(false),
+        }
     };
     let Some(movement_id) = movement
         .get("id")

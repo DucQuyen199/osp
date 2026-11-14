@@ -5,10 +5,12 @@ import { app, can, loadRefs, recordLabel } from './lib/state.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
-const keyOf = (line) => `${line.product}|${Number(line.price || 0)}`;
+const billForSupplierInvoice = (bills, invoice) => bills.find((row) => row.supplier_invoice_id === invoice.id);
+const keyOf = (line) => `${line.product}|${Number(line.price || 0)}|${Number(line.tax_rate ?? 0)}`;
 const lineValue = (line, taxes) => {
   const net = (Number(line.qty) || 0) * (Number(line.price) || 0);
-  return net * (1 + (Number(taxes.get(line.tax)?.rate) || 0) / 100);
+  const rate = Number(line.tax_rate ?? taxes.get(line.tax)?.rate) || 0;
+  return net * (1 + rate / 100);
 };
 
 export default function PurchasingWorkbenchPage() {
@@ -16,6 +18,7 @@ export default function PurchasingWorkbenchPage() {
   const [requisitions, setRequisitions] = useState([]);
   const [receipts, setReceipts] = useState([]);
   const [supplierInvoices, setSupplierInvoices] = useState([]);
+  const [purchaseReturns, setPurchaseReturns] = useState([]);
   const [suppliers, setSuppliers] = useState(new Map());
   const [products, setProducts] = useState(new Map());
   const [warehouses, setWarehouses] = useState(new Map());
@@ -33,6 +36,7 @@ export default function PurchasingWorkbenchPage() {
   const [receiptLines, setReceiptLines] = useState([]);
   const [receiptNote, setReceiptNote] = useState('');
   const [supplierInvoiceForm, setSupplierInvoiceForm] = useState({ invoice_number: '', issue_date: new Date().toISOString().slice(0, 10), due_date: '' });
+  const [invoiceQuantities, setInvoiceQuantities] = useState({});
   const [busy, setBusy] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -42,11 +46,12 @@ export default function PurchasingWorkbenchPage() {
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
-      const [orderRes, receiptRes, requisitionRes, supplierInvoiceRes, supplierMap, productMap, warehouseMap, taxRes, billRes, approvalRes] = await Promise.all([
+      const [orderRes, receiptRes, requisitionRes, supplierInvoiceRes, returnRes, supplierMap, productMap, warehouseMap, taxRes, billRes, approvalRes] = await Promise.all([
         can('purchasing.purchase_order.read') ? api(`${dataPath('purchasing.purchase_order')}?limit=1000`) : Promise.resolve({ items: [] }),
         can('purchasing.purchase_receipt.read') ? api(`${dataPath('purchasing.purchase_receipt')}?limit=1000`) : Promise.resolve({ items: [] }),
         can('purchasing.purchase_requisition.read') ? api(`${dataPath('purchasing.purchase_requisition')}?limit=1000`) : Promise.resolve({ items: [] }),
         can('purchasing.supplier_invoice.read') ? api(`${dataPath('purchasing.supplier_invoice')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('purchasing.purchase_return.read') ? api(`${dataPath('purchasing.purchase_return')}?limit=1000`) : Promise.resolve({ items: [] }),
         can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
         can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
         can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
@@ -57,7 +62,7 @@ export default function PurchasingWorkbenchPage() {
       const orderRows = itemsOf(orderRes).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
       const requisitionRows = itemsOf(requisitionRes).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
       const supplierRows = new Map([...supplierMap].filter(([, row]) => row.is_supplier !== false));
-      setOrders(orderRows); setRequisitions(requisitionRows); setReceipts(itemsOf(receiptRes)); setSupplierInvoices(itemsOf(supplierInvoiceRes)); setSuppliers(supplierRows); setProducts(productMap); setWarehouses(warehouseMap);
+      setOrders(orderRows); setRequisitions(requisitionRows); setReceipts(itemsOf(receiptRes)); setSupplierInvoices(itemsOf(supplierInvoiceRes)); setPurchaseReturns(itemsOf(returnRes)); setSuppliers(supplierRows); setProducts(productMap); setWarehouses(warehouseMap);
       setTaxes(itemsOf(taxRes)); setBills(itemsOf(billRes)); setApprovalRequests(itemsOf(approvalRes));
       setSelectedId((current) => orderRows.some((row) => row.id === current) ? current : orderRows[0]?.id || '');
       setOrderForm((current) => ({ ...current, supplier: current.supplier || [...supplierRows.keys()][0] || '', warehouse: current.warehouse || [...warehouseMap.keys()][0] || '' }));
@@ -71,7 +76,28 @@ export default function PurchasingWorkbenchPage() {
   const selected = orders.find((row) => row.id === selectedId);
   const selectedReceipts = useMemo(() => receipts.filter((row) => row.purchase_order === selectedId).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))), [receipts, selectedId]);
   const billByOrder = useMemo(() => new Map(bills.filter((row) => row.source === 'purchase_order').map((row) => [row.source_id, row])), [bills]);
-  const supplierInvoiceByOrder = useMemo(() => new Map(supplierInvoices.map((row) => [row.purchase_order, row])), [supplierInvoices]);
+  const selectedSupplierInvoices = useMemo(() => supplierInvoices.filter((row) => row.purchase_order === selectedId).sort((a, b) => String(a.issue_date).localeCompare(String(b.issue_date))), [supplierInvoices, selectedId]);
+  const invoiceableLines = useMemo(() => {
+    const received = new Map();
+    for (const receipt of selectedReceipts.filter((row) => row.status === 'received')) {
+      for (const line of receipt.lines || []) {
+        const key = keyOf(line); const entry = received.get(key) || { ...line, qty: 0 };
+        entry.qty += Number(line.qty || 0); received.set(key, entry);
+      }
+    }
+    for (const purchaseReturn of purchaseReturns.filter((row) => row.purchase_order === selectedId && row.status === 'dispatched')) {
+      for (const line of purchaseReturn.lines || []) {
+        const key = keyOf(line); const entry = received.get(key);
+        if (entry) entry.qty = Math.max(0, entry.qty - Number(line.qty || 0));
+      }
+    }
+    const reserved = new Map();
+    for (const invoice of selectedSupplierInvoices.filter((row) => ['draft','approved'].includes(row.status))) {
+      for (const line of invoice.lines || []) reserved.set(keyOf(line), (reserved.get(keyOf(line)) || 0) + Number(line.qty || 0));
+    }
+    return [...received.entries()].map(([key, line]) => ({ ...line, qty: Math.max(0, line.qty - (reserved.get(key) || 0)) })).filter((line) => line.qty > 0.000001);
+  }, [selectedReceipts, selectedSupplierInvoices, purchaseReturns, selectedId]);
+  const invoiceableTotal = invoiceableLines.reduce((sum, line) => sum + lineValue({ ...line, qty: invoiceQuantities[keyOf(line)] ?? line.qty }, taxById), 0);
   const approvalByOrder = useMemo(() => new Map(approvalRequests.filter((row) => row.entity === 'purchasing.purchase_order').map((row) => [row.record_id, row])), [approvalRequests]);
   const approvalByRequisition = useMemo(() => new Map(approvalRequests.filter((row) => row.entity === 'purchasing.purchase_requisition').map((row) => [row.record_id, row])), [approvalRequests]);
   const orderByRequisition = useMemo(() => new Map(orders.filter((row) => row.source === 'purchase_requisition').map((row) => [row.source_id, row])), [orders]);
@@ -182,9 +208,10 @@ export default function PurchasingWorkbenchPage() {
       purchase_order: selected.id, supplier: selected.supplier, department: selected.department || undefined,
       invoice_number: supplierInvoiceForm.invoice_number.trim(),
       issue_date: supplierInvoiceForm.issue_date, due_date: supplierInvoiceForm.due_date || undefined,
-      total: Number(selected.total), tax_total: Number(selected.tax_total || 0), lines: selected.lines || [],
+      lines: invoiceableLines.map((line) => ({ ...line, qty: Number(invoiceQuantities[keyOf(line)] ?? line.qty) })).filter((line) => line.qty > 0).map((line) => ({ product: line.product, qty: line.qty, price: Number(line.price), tax: line.tax || undefined })),
     } }), 'Đã lưu nháp hóa đơn nhà cung cấp. Hãy đối chiếu số hóa đơn và duyệt để ghi nhận công nợ.');
     setSupplierInvoiceForm((current) => ({ ...current, invoice_number: '', due_date: '' }));
+    setInvoiceQuantities({});
   }
 
   const addLine = () => setLines((current) => [...current, { product: [...products.keys()][0] || '', qty: '1', price: '', tax: '' }]);
@@ -226,11 +253,11 @@ export default function PurchasingWorkbenchPage() {
         <div className="table-wrap" style={{ marginTop: 12 }}><table className="table"><thead><tr><th>Hàng</th><th>Đặt</th><th>Đã nhận</th><th>Đơn giá</th><th>Thành tiền</th></tr></thead><tbody>{(selected.lines || []).map((line, index) => { const receivedQty = selectedReceipts.filter((receipt) => receipt.status === 'received').flatMap((receipt) => receipt.lines || []).filter((receiptLine) => keyOf(receiptLine) === keyOf(line)).reduce((sum, receiptLine) => sum + Number(receiptLine.qty || 0), 0); return <tr key={`${line.product}-${index}`}><td>{products.get(line.product)?.name || 'Hàng hóa'}</td><td>{line.qty}</td><td>{receivedQty}</td><td>{fmtMoney(line.price)}</td><td>{fmtMoney(line.line_total || Number(line.qty || 0) * Number(line.price || 0))}</td></tr>; })}</tbody><tfoot><tr><th colSpan="4">Tổng có thuế</th><th>{fmtMoney(selected.total || 0)}</th></tr></tfoot></table></div>
         {selected.status === 'submitted' && workflowApproval && approvalByOrder.get(selected.id) && <p className="small muted" style={{ marginTop: 10 }}>Yêu cầu phê duyệt: <a href={`#/e/workflow-approval/approval_request/${approvalByOrder.get(selected.id).id}`}>{statusLabel(approvalByOrder.get(selected.id).status)} · mở yêu cầu</a></p>}
         <div className="row wrap" style={{ marginTop: 12 }}>{['draft','rejected'].includes(selected.status) && can('purchasing.purchase_order.update') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => editOrder(selected)}>Sửa nháp</button>}{['draft','rejected'].includes(selected.status) && can('purchasing.purchase_order.submitted') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy) || !(selected.lines || []).length || Number(selected.total) <= 0} onClick={() => submitOrder(selected)}>Gửi duyệt</button>}{selected.status === 'submitted' && !workflowApproval && can('purchasing.purchase_order.approved') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => approveOrder(selected)}>Duyệt đơn</button>}{['draft','submitted','approved','rejected'].includes(selected.status) && !(approvalByOrder.get(selected.id)?.status === 'pending') && can('purchasing.purchase_order.cancelled') && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => orderAction(selected, 'cancelled')}>Hủy đơn</button>}{canReceive(selected) && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => prepareReceipt(selected)}>Nhận hàng</button>}{billByOrder.has(selected.id) && <a className="btn btn-secondary btn-sm" href={`#/e/accounting/bill/${billByOrder.get(selected.id).id}`}>Mở hóa đơn {statusLabel(billByOrder.get(selected.id).status)}</a>}</div>
-        {selected.status === 'received' && !billByOrder.has(selected.id) && !supplierInvoiceByOrder.has(selected.id) && can('purchasing.supplier_invoice.create') && <form className="card card-pad" style={{ marginTop: 14 }} onSubmit={createSupplierInvoice}><h3>Ghi nhận hóa đơn nhà cung cấp</h3><p className="small muted">Chỉ lập sau khi nhận đủ hàng. Tổng tiền, thuế và dòng hàng được đối chiếu với đơn mua; duyệt sẽ ghi sổ công nợ phải trả.</p><div className="form-grid"><label className="field"><span className="label">Số hóa đơn nhà cung cấp *</span><input className="input" required value={supplierInvoiceForm.invoice_number} onChange={(e) => setSupplierInvoiceForm({ ...supplierInvoiceForm, invoice_number: e.target.value })}/></label><label className="field"><span className="label">Ngày hóa đơn *</span><input className="input" type="date" required value={supplierInvoiceForm.issue_date} onChange={(e) => setSupplierInvoiceForm({ ...supplierInvoiceForm, issue_date: e.target.value })}/></label><label className="field"><span className="label">Hạn thanh toán</span><input className="input" type="date" min={supplierInvoiceForm.issue_date} value={supplierInvoiceForm.due_date} onChange={(e) => setSupplierInvoiceForm({ ...supplierInvoiceForm, due_date: e.target.value })}/></label><div className="row"><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy)}>Lưu hóa đơn nháp · {fmtMoney(selected.total || 0)}</button></div></div></form>}
-        {supplierInvoiceByOrder.has(selected.id) && <div className="card card-pad" style={{ marginTop: 14 }}><h3>Hóa đơn nhà cung cấp · {supplierInvoiceByOrder.get(selected.id).invoice_number}</h3><p className="small muted">Ngày {fmtDate(supplierInvoiceByOrder.get(selected.id).issue_date)} · {fmtMoney(supplierInvoiceByOrder.get(selected.id).total)} · {statusLabel(supplierInvoiceByOrder.get(selected.id).status)}</p>{supplierInvoiceByOrder.get(selected.id).status === 'draft' && can('purchasing.supplier_invoice.approved') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => run(`${selected.id}:invoice-approved`, () => action('purchasing.supplier_invoice', supplierInvoiceByOrder.get(selected.id), 'approved'), 'Đã duyệt hóa đơn nhà cung cấp và ghi sổ công nợ phải trả.')}>Duyệt và ghi sổ phải trả</button>}{billByOrder.has(selected.id) && <a className="btn btn-secondary btn-sm" style={{ marginLeft: 8 }} href={`#/e/accounting/bill/${billByOrder.get(selected.id).id}`}>Mở hóa đơn kế toán</a>}</div>}
+        {['partially_received','received'].includes(selected.status) && invoiceableLines.length > 0 && can('purchasing.supplier_invoice.create') && <form className="card card-pad" style={{ marginTop: 14 }} onSubmit={createSupplierInvoice}><h3>Ghi nhận hóa đơn nhà cung cấp</h3><p className="small muted">Ghi hóa đơn theo hàng đã nhận, kể cả đơn nhận từng phần. Chọn khối lượng trên hóa đơn; hệ thống tự tính tiền/thuế và đối chiếu lũy kế đã nhận/đã lập hóa đơn.</p><div className="form-grid"><div className="field full"><span className="label">Khối lượng trên hóa đơn *</span>{invoiceableLines.map((line) => <label className="row wrap" key={keyOf(line)} style={{ marginTop: 6 }}><span className="grow">{products.get(line.product)?.name || 'Hàng hóa'} · còn lập hóa đơn {line.qty}</span><input className="input num" aria-label={`Số lượng hóa đơn ${products.get(line.product)?.name || 'hàng hóa'}`} type="number" min="0" max={line.qty} step="any" value={invoiceQuantities[keyOf(line)] ?? line.qty} onChange={(e) => setInvoiceQuantities({ ...invoiceQuantities, [keyOf(line)]: e.target.value })} style={{ maxWidth: 150 }}/></label>)}</div><label className="field"><span className="label">Số hóa đơn nhà cung cấp *</span><input className="input" required value={supplierInvoiceForm.invoice_number} onChange={(e) => setSupplierInvoiceForm({ ...supplierInvoiceForm, invoice_number: e.target.value })}/></label><label className="field"><span className="label">Ngày hóa đơn *</span><input className="input" type="date" required value={supplierInvoiceForm.issue_date} onChange={(e) => setSupplierInvoiceForm({ ...supplierInvoiceForm, issue_date: e.target.value })}/></label><label className="field"><span className="label">Hạn thanh toán</span><input className="input" type="date" min={supplierInvoiceForm.issue_date} value={supplierInvoiceForm.due_date} onChange={(e) => setSupplierInvoiceForm({ ...supplierInvoiceForm, due_date: e.target.value })}/></label><div className="row"><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy) || invoiceableTotal <= 0}>Lưu nháp · {fmtMoney(invoiceableTotal)}</button></div></div></form>}
+        {selectedSupplierInvoices.length > 0 && <div className="card card-pad" style={{ marginTop: 14 }}><h3>Hóa đơn nhà cung cấp</h3>{selectedSupplierInvoices.map((invoice) => { const bill = billForSupplierInvoice(bills, invoice); return <div className="row wrap" key={invoice.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--line)' }}><div className="grow"><strong>{invoice.invoice_number}</strong><div className="small muted">{fmtDate(invoice.issue_date)} · {fmtMoney(invoice.total)} · {statusLabel(invoice.status)}</div></div><a className="btn btn-ghost btn-sm" href={`#/e/purchasing.supplier_invoice/${invoice.id}`}>Chi tiết</a>{invoice.status === 'draft' && can('purchasing.supplier_invoice.approved') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => run(`${invoice.id}:invoice-approved`, () => action('purchasing.supplier_invoice', invoice, 'approved'), 'Đã duyệt hóa đơn nhà cung cấp và ghi sổ công nợ phải trả.')}>Duyệt và ghi sổ</button>}{bill && <a className="btn btn-secondary btn-sm" href={`#/e/accounting/bill/${bill.id}`}>Mở bill kế toán</a>}</div>; })}</div>}
         {receiptOrderId === selected.id && <form className="card card-pad" style={{ marginTop: 14 }} onSubmit={receiveGoods}><div className="row wrap"><h3>Phiếu nhận hàng</h3><span className="grow"/><button className="btn btn-ghost btn-sm" type="button" onClick={() => setReceiptOrderId('')}>Đóng</button></div><p className="small muted">Nhập số lượng thực nhận. Kho được khóa theo đơn mua; số lượng không được vượt phần còn lại.</p>{receiptLines.map((line, index) => <div className="row wrap" key={line.key}><strong className="grow">{products.get(line.product)?.name || 'Hàng hóa'} · còn {line.qty}</strong><input className="input num" aria-label="Số lượng thực nhận" type="number" min="0" max={line.qty} step="any" required value={line.received ?? line.qty} onChange={(e) => setReceiptLines((current) => current.map((item, i) => i === index ? { ...item, received: e.target.value } : item))} style={{ maxWidth: 150}}/></div>)}<label className="field" style={{ marginTop: 10 }}><span className="label">Ghi chú nhận hàng</span><textarea className="input" rows="2" value={receiptNote} onChange={(e) => setReceiptNote(e.target.value)}/></label><div className="row"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy)}>Ghi nhận vào kho</button></div></form>}
         {selectedReceipts.length > 0 && <div className="table-wrap" style={{ marginTop: 14 }}><h3>Lịch sử nhận hàng</h3><table className="table"><thead><tr><th>Ngày</th><th>Tổng phiếu</th><th>Trạng thái</th></tr></thead><tbody>{selectedReceipts.map((row) => <tr key={row.id}><td>{fmtDate(row.created_at)}</td><td>{fmtMoney(row.total || 0)}</td><td>{statusLabel(row.status)}</td></tr>)}</tbody></table></div>}
-        <p className="small muted" style={{ marginTop: 12 }}>Phiếu nhận cộng tồn kho theo số lượng thực nhận. Khi đơn đã nhận đủ, ghi số hóa đơn nhà cung cấp riêng; chỉ duyệt hóa đơn sau khi đối chiếu hồ sơ mua hàng.</p>
+        <p className="small muted" style={{ marginTop: 12 }}>Phiếu nhận cộng tồn kho theo số lượng thực nhận. Có thể nhập nhiều hóa đơn theo các đợt giao; mỗi hóa đơn chỉ được duyệt trong giới hạn số lượng đã nhận và chưa lập hóa đơn.</p>
       </section>}
     </div>}
   </div>;

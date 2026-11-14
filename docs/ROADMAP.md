@@ -23,7 +23,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Bàn bán buôn cho phép lập thêm vận đơn theo số lượng còn lại, tính cả chuyến nháp/đang giao/đã giao và loại phần giao thất bại khỏi lượng đã phân công.
 - Lịch hẹn ở trạng thái yêu cầu tính lại giờ kết thúc và giá mặc định khi đổi dịch vụ hoặc giờ bắt đầu; khung giờ mới tiếp tục qua kiểm tra khóa tài nguyên và trùng lịch.
 - Ký thầu phụ chỉ ghi nhận cam kết chi phí; hồ sơ nghiệm thu/đề nghị thanh toán có giá trị lũy kế được giới hạn trong hợp đồng và chỉ phát sinh hóa đơn phải trả sau khi duyệt.
-- Mua hàng chỉ ghi nhận GRNI khi nhận kho; hóa đơn nhà cung cấp có số và ngày chứng từ riêng, chỉ tạo công nợ sau khi đối chiếu và duyệt.
+- Mua hàng chỉ ghi nhận GRNI khi nhận kho; nhiều hóa đơn nhà cung cấp theo từng đợt nhận được đối chiếu lũy kế với số lượng nhận/trả và GRNI, công nợ chỉ phát sinh sau khi duyệt từng hóa đơn; hàng trả trước hóa đơn giảm GRNI, hàng trả sau hóa đơn gắn với bill để điều chỉnh giảm phải trả.
 - Docker image Linux đã build và chạy qua Compose test riêng; đã diễn tập pg_dump/pg_restore, restart, RLS, phiên đăng nhập và luồng bán hàng sau khôi phục. Vẫn cần xác minh vận hành/tải/HA trên hạ tầng production thực tế.
 
 ## Còn thiếu
@@ -33,7 +33,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Tối ưu chỉ mục/truy vấn theo workload, mở rộng scheduler và billing/licensing OSP.
 - Kế toán Việt Nam có mẫu tài khoản cấp 1 và các mã chi tiết được liệt kê trong phụ lục TT99/2025, TT133/2016; vẫn thiếu ánh xạ biểu mẫu, kê khai thuế chính thức, nhập ngân hàng trực tiếp và xác minh chuyên môn.
 - Hóa đơn điện tử cần adapter nhà cung cấp. Kho/sản xuất cần xác minh production và đào sâu các nghiệp vụ theo ngành.
-- Đối chiếu hóa đơn mua hiện duyệt một hóa đơn khớp toàn bộ đơn mua đã nhận đủ; còn thiếu nhiều hóa đơn/nhận hàng từng phần, khoản phí lệch và quy trình xử lý sai khác.
+- Đối chiếu hóa đơn mua còn thiếu khoản phí lệch PO, sai khác giá/thuế, điều khoản giảm giá và quy trình xử lý hóa đơn sai lệch.
 - Đối soát sao kê ngân hàng đã hỗ trợ đồng tiền giao dịch, snapshot tỷ giá từng dòng, CSV/CAMT.053 và kiểm tra với giá trị sổ cái tiền cơ sở; còn thiếu kết nối API ngân hàng trực tiếp và báo cáo hợp nhất. Còn thiếu đa công ty, accessibility với trình đọc màn hình, đa ngôn ngữ, POS/KDS chuyên dụng, PWA/offline, tải HTTP và đa trình duyệt. Bulk action cho mọi entity có state machine đã có API Rust và giao diện danh sách; giới hạn 100 bản ghi mỗi giao dịch và rollback cả lô nếu một chuyển trạng thái lỗi. Kế toán hiện snapshot tỷ giá chứng từ/thanh toán, ghi nhận FX realized và tạo nháp đánh giá lại công nợ theo ngày.
 
 Các module CRM/Marketing, bán hàng, mua hàng, loyalty, logistics, field service, helpdesk, LMS, performance, ngân sách, lịch, nhà hàng, lương và bán vé đã có luồng Rust nền tảng; cần hoàn thiện theo ngành và phản hồi khách hàng. Payroll hiện có thuế, khoản đóng góp theo policy tenant, giờ làm thêm đã duyệt và thanh toán công nợ khoản đóng; cần chuyên môn hóa bảng thuế/bảo hiểm, điều kiện tham gia, khai báo và quyết toán theo từng pháp vực.

@@ -14,7 +14,8 @@
 - Stopped creating a full-value payable bill when a construction subcontract is signed; signing now records a budget commitment, while payable documents are entered through accounting when supported by work/payment documentation.
 - Added construction progress claims with approval-gated payable bills and tenant-transactional cumulative checks against the signed subcontract value.
 - Deferred receivables for shipped sales orders until all deliveries succeed; counter sales continue to invoice at confirmation.
-- Added supplier invoice capture after full receipt; approval checks supplier invoice number uniqueness and matches order supplier, tax, totals and lines before posting the payable bill against GRNI.
+- Added supplier invoice capture for partial and complete receipts; approval checks unique invoice numbers and cumulative received quantities after dispatched returns before posting each matched payable bill against remaining GRNI.
+- Linked purchase returns to the supplier invoice they reverse; returns before invoicing reduce GRNI directly, while billed returns create a debit note against the selected payable.
 
 ### Changed
 - Scoped the runtime data ignore rule to the repository root so nested application source such as `server/src/kernel/data` is tracked and included in source releases.

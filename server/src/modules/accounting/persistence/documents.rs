@@ -139,7 +139,15 @@ pub(super) async fn validate_posted_document(
                 let order_tax = database_amount(&order, 2)?;
                 let order_status: String = order.get(3);
                 let order_lines: Value = order.get(4);
-                if order_status != "received" {
+                let supplier_invoice_id = document
+                    .get("supplier_invoice_id")
+                    .and_then(Value::as_str)
+                    .and_then(|value| Uuid::parse_str(value).ok());
+                if supplier_invoice_id.is_some() {
+                    if !matches!(order_status.as_str(), "partially_received" | "received") {
+                        errors.push("Chỉ được ghi bill theo hàng đã nhận".into());
+                    }
+                } else if order_status != "received" {
                     errors.push("Chỉ được ghi bill khi đơn mua đã nhận đủ hàng".into());
                 }
                 if document
@@ -150,22 +158,65 @@ pub(super) async fn validate_posted_document(
                 {
                     errors.push("Nhà cung cấp trên bill phải khớp đơn mua nguồn".into());
                 }
-                if !amount(document, "total").is_some_and(|value| {
-                    money::within_tolerance(value, order_total, amount_tolerance())
-                }) {
-                    errors.push("Tổng bill phải khớp tổng đơn mua nguồn".into());
-                }
-                if !amount(document, "tax_total").is_some_and(|value| {
-                    money::within_tolerance(value, order_tax, amount_tolerance())
-                }) {
-                    errors.push("Thuế bill phải khớp thuế đơn mua nguồn".into());
-                }
                 let bill_lines = document
                     .get("lines")
                     .cloned()
                     .unwrap_or_else(|| Value::Array(Vec::new()));
-                match (
-                    purchase_line_amounts(&order_lines),
+                let expected_bill = if let Some(invoice_id) = supplier_invoice_id {
+                    match tx.query_opt(
+                        "SELECT purchase_order,supplier,total::text,COALESCE(tax_total,0)::text,status,lines,invoice_number,department FROM purchasing__supplier_invoice WHERE tenant_id=$1 AND id=$2 FOR UPDATE",
+                        &[&tenant.id, &invoice_id],
+                    ).await? {
+                        Some(invoice) => {
+                            let invoice_order: Uuid = invoice.get(0);
+                            let invoice_supplier: Uuid = invoice.get(1);
+                            let invoice_total = database_amount(&invoice, 2)?;
+                            let invoice_tax = database_amount(&invoice, 3)?;
+                            let invoice_status: String = invoice.get(4);
+                            let invoice_lines: Value = invoice.get(5);
+                            let invoice_number: String = invoice.get(6);
+                            let invoice_department: Option<Uuid> = invoice.get(7);
+                            if invoice_order != order_id || invoice_supplier != supplier {
+                                errors.push("Supplier invoice does not match the source purchase order".into());
+                            }
+                            if invoice_status != "approved" {
+                                errors.push("A payable bill can only be posted from an approved supplier invoice".into());
+                            }
+                            if document.get("supplier_invoice_number").and_then(Value::as_str) != Some(invoice_number.as_str()) {
+                                errors.push("Supplier invoice number on the bill does not match its source document".into());
+                            }
+                            if document.get("department").and_then(Value::as_str).and_then(|value| Uuid::parse_str(value).ok()) != invoice_department {
+                                errors.push("Department on the bill does not match its supplier invoice".into());
+                            }
+                            if !amount(document, "total").is_some_and(|value| money::within_tolerance(value, invoice_total, amount_tolerance())) {
+                                errors.push("Bill total must match the supplier invoice".into());
+                            }
+                            if !amount(document, "tax_total").is_some_and(|value| money::within_tolerance(value, invoice_tax, amount_tolerance())) {
+                                errors.push("Bill tax must match the supplier invoice".into());
+                            }
+                            Some(invoice_lines)
+                        }
+                        None => {
+                            errors.push("Source supplier invoice was not found for this tenant".into());
+                            None
+                        }
+                    }
+                } else {
+                    if !amount(document, "total").is_some_and(|value| {
+                        money::within_tolerance(value, order_total, amount_tolerance())
+                    }) {
+                        errors.push("Tổng bill phải khớp tổng đơn mua nguồn".into());
+                    }
+                    if !amount(document, "tax_total").is_some_and(|value| {
+                        money::within_tolerance(value, order_tax, amount_tolerance())
+                    }) {
+                        errors.push("Thuế bill phải khớp thuế đơn mua nguồn".into());
+                    }
+                    Some(order_lines)
+                };
+                if let Some(expected_bill) = expected_bill {
+                    match (
+                    purchase_line_amounts(&expected_bill),
                     purchase_line_amounts(&bill_lines),
                 ) {
                     (Some(expected), Some(actual))
@@ -188,19 +239,24 @@ pub(super) async fn validate_posted_document(
                             .into(),
                     ),
                 }
+                }
                 let bill_id = document
                     .get("id")
                     .and_then(Value::as_str)
                     .and_then(|value| Uuid::parse_str(value).ok())
                     .unwrap_or(Uuid::nil());
-                if tx
-                    .query_opt(
-                        "SELECT 1 FROM accounting__bill WHERE tenant_id = $1 AND source = 'purchase_order' AND source_id = $2 AND id <> $3 AND status <> 'void' LIMIT 1",
+                let duplicate = if let Some(invoice_id) = supplier_invoice_id {
+                    tx.query_opt(
+                        "SELECT 1 FROM accounting__bill WHERE tenant_id=$1 AND supplier_invoice_id=$2::text AND id<>$3 AND status<>'void' LIMIT 1",
+                        &[&tenant.id, &invoice_id.to_string(), &bill_id],
+                    ).await?
+                } else {
+                    tx.query_opt(
+                        "SELECT 1 FROM accounting__bill WHERE tenant_id=$1 AND source='purchase_order' AND source_id=$2 AND id<>$3 AND status<>'void' LIMIT 1",
                         &[&tenant.id, &order_id.to_string(), &bill_id],
-                    )
-                    .await?
-                    .is_some()
-                {
+                    ).await?
+                };
+                if duplicate.is_some() {
                     errors.push("Đơn mua nguồn đã có bill khác, không thể ghi trùng".into());
                 }
             }

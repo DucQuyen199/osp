@@ -293,6 +293,11 @@
      "required": false
     },
     {
+     "name": "supplier_invoice_id",
+     "type": "string",
+     "required": false
+    },
+    {
      "name": "currency",
      "type": "ref",
      "required": false,

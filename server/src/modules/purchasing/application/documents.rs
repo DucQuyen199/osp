@@ -41,14 +41,14 @@ async fn prepare_document_with_lock(
     }
     if !matches!(
         entity,
-        "rfq" | "purchase_order" | "purchase_receipt" | "purchase_return"
+        "rfq" | "purchase_order" | "purchase_receipt" | "purchase_return" | "supplier_invoice"
     ) {
         return Ok(Vec::new());
     }
     let lock = if lock_rows { " FOR SHARE" } else { "" };
     let (source_lines, source_department) = if matches!(
         entity,
-        "purchase_return" | "purchase_receipt"
+        "purchase_return" | "purchase_receipt" | "supplier_invoice"
     ) {
         let Some(order_id) = document
             .get("purchase_order")
@@ -73,7 +73,7 @@ async fn prepare_document_with_lock(
     } else {
         (Vec::new(), None)
     };
-    if entity == "purchase_return" {
+    if matches!(entity, "purchase_return" | "supplier_invoice") {
         if let Some(department) = source_department {
             document.insert("department".into(), json!(department));
         } else {
@@ -161,7 +161,7 @@ async fn prepare_document_with_lock(
                             money::within_tolerance(source_price, price, Decimal::new(5, 3))
                         })
                 }),
-                "purchase_receipt" => unit_price.is_some_and(|price| {
+                "purchase_receipt" | "supplier_invoice" => unit_price.is_some_and(|price| {
                     source
                         .get("price")
                         .and_then(money::decimal)
@@ -171,8 +171,12 @@ async fn prepare_document_with_lock(
                 }),
                 _ => true,
             };
+            let matches_tax = entity != "supplier_invoice"
+                || source.get("tax").and_then(Value::as_str)
+                    == line.get("tax").and_then(Value::as_str);
             source.get("product").and_then(Value::as_str) == Some(product_id.to_string().as_str())
                 && matches_price
+                && matches_tax
         });
         if entity == "purchase_return" {
             if unit_price.is_some() && source_line.is_none() {
@@ -192,7 +196,7 @@ async fn prepare_document_with_lock(
                 }
             }
         }
-        if entity == "purchase_receipt" {
+        if matches!(entity, "purchase_receipt" | "supplier_invoice") {
             if let Some(source) = source_line {
                 for field in ["tax", "tax_rate", "tax_name"] {
                     if let Some(value) = source.get(field) {
@@ -244,9 +248,12 @@ async fn prepare_document_with_lock(
 
         if matches!(
             entity,
-            "purchase_order" | "purchase_return" | "purchase_receipt"
+            "purchase_order" | "purchase_return" | "purchase_receipt" | "supplier_invoice"
         ) {
-            let tax_rate = if matches!(entity, "purchase_return" | "purchase_receipt") {
+            let tax_rate = if matches!(
+                entity,
+                "purchase_return" | "purchase_receipt" | "supplier_invoice"
+            ) {
                 let rate = line
                     .get("tax_rate")
                     .and_then(money::decimal)
@@ -343,7 +350,7 @@ async fn prepare_document_with_lock(
     }
     if matches!(
         entity,
-        "purchase_order" | "purchase_return" | "purchase_receipt"
+        "purchase_order" | "purchase_return" | "purchase_receipt" | "supplier_invoice"
     ) {
         if let (Some(total), Some(tax_total)) =
             (money::json_number(total), money::json_number(tax_total))

@@ -114,6 +114,17 @@ fn validate_quote_lines(document: &Value) -> Vec<String> {
 
 pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<String> {
     let protected: &[&str] = match entity {
+        "purchase_return" if current.get("status").and_then(Value::as_str) != Some("draft") => &[
+            "purchase_order",
+            "supplier_invoice",
+            "inspection",
+            "department",
+            "warehouse",
+            "lines",
+            "total",
+            "tax_total",
+            "reason",
+        ],
         "purchase_receipt" if current.get("status").and_then(Value::as_str) != Some("draft") => {
             &["purchase_order", "warehouse", "lines", "total", "note"]
         }

@@ -110,6 +110,9 @@ pub async fn handle_source_document_event(
         }
     }
     if event_type == "purchasing.supplier_invoice.approved" {
+        if let Some(value) = event.get("id").filter(|value| !value.is_null()) {
+            data.insert("supplier_invoice_id".into(), value.clone());
+        }
         for (source, target) in [
             ("invoice_number", "supplier_invoice_number"),
             ("issue_date", "issue_date"),
@@ -148,13 +151,19 @@ pub async fn handle_source_document_event(
     };
     let source_key = source_id.as_str().unwrap_or_default();
     if spec.post {
-        if let Some(existing) = tx
-            .query_opt(
-                &format!("SELECT id, status FROM {table} WHERE tenant_id = $1 AND source = $2 AND source_id = $3 ORDER BY created_at, id LIMIT 1 FOR UPDATE"),
+        let existing = if event_type == "purchasing.supplier_invoice.approved" {
+            let invoice_id = event.get("id").and_then(Value::as_str).unwrap_or_default();
+            tx.query_opt(
+                &format!("SELECT id, status FROM {table} WHERE tenant_id=$1 AND source=$2 AND supplier_invoice_id=$3 ORDER BY created_at,id LIMIT 1 FOR UPDATE"),
+                &[&tenant.id, &spec.source, &invoice_id],
+            ).await?
+        } else {
+            tx.query_opt(
+                &format!("SELECT id, status FROM {table} WHERE tenant_id=$1 AND source=$2 AND source_id=$3 ORDER BY created_at,id LIMIT 1 FOR UPDATE"),
                 &[&tenant.id, &spec.source, &source_key],
-            )
-            .await?
-        {
+            ).await?
+        };
+        if let Some(existing) = existing {
             let id: Uuid = existing.get(0);
             let status: String = existing.get(1);
             if status == "draft" {

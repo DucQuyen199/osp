@@ -49,23 +49,25 @@ pub(super) async fn create_return_note(
         )
     };
     let source_key = source_id.to_string();
-    let lookup_sql = format!(
-        "SELECT id FROM {table} WHERE tenant_id = $1 AND source = $2 AND source_id = $3 ORDER BY created_at, id LIMIT 1 FOR UPDATE"
-    );
-    let source_document = tx
-        .query_opt(
-            &lookup_sql,
-            &[
-                &tenant.id,
-                &if purchase {
-                    "purchase_order"
-                } else {
-                    "sales_order"
-                },
-                &source_key,
-            ],
-        )
-        .await?;
+    let source_document = if purchase {
+        if let Some(invoice_id) = event.get("supplier_invoice").and_then(Value::as_str) {
+            tx.query_opt(
+                "SELECT id FROM accounting__bill WHERE tenant_id=$1 AND source='purchase_order' AND source_id=$2 AND supplier_invoice_id=$3 AND status IN ('posted','partially_paid','partially_settled','paid','settled') ORDER BY created_at,id LIMIT 1 FOR UPDATE",
+                &[&tenant.id, &source_key, &invoice_id],
+            ).await?
+        } else {
+            tx.query_opt(
+                "SELECT id FROM accounting__bill WHERE tenant_id=$1 AND source='purchase_order' AND source_id=$2 AND supplier_invoice_id IS NULL AND status IN ('posted','partially_paid','partially_settled','paid','settled') ORDER BY created_at,id LIMIT 1 FOR UPDATE",
+                &[&tenant.id, &source_key],
+            ).await?
+        }
+    } else {
+        let lookup_sql = format!(
+            "SELECT id FROM {table} WHERE tenant_id=$1 AND source='sales_order' AND source_id=$2 ORDER BY created_at,id LIMIT 1 FOR UPDATE"
+        );
+        tx.query_opt(&lookup_sql, &[&tenant.id, &source_key])
+            .await?
+    };
     let Some(source_document) = source_document else {
         return Err(crate::error::ApiError::validation(
             if purchase {

@@ -60,7 +60,34 @@ pub(super) async fn handle(
             })?;
         let accrued = tx
                     .query_one_row(
-                        "SELECT COALESCE(SUM((posting.line->>'credit')::numeric - (posting.line->>'debit')::numeric), 0)::text FROM purchasing__purchase_receipt pr JOIN inventory__stock_move sm ON sm.tenant_id = pr.tenant_id AND sm.source = 'purchase_receipt' AND sm.source_id = pr.id::text AND sm.direction = 'in' JOIN accounting__journal_entry j ON j.tenant_id = sm.tenant_id AND j.source = 'stock_move' AND j.source_id = sm.id::text AND j.status = 'posted' CROSS JOIN LATERAL jsonb_array_elements(COALESCE(j.lines, '[]'::jsonb)) AS posting(line) JOIN accounting__account a ON a.tenant_id = j.tenant_id AND a.id::text = posting.line->>'account' AND a.code = 'GRNI' WHERE pr.tenant_id = $1 AND pr.purchase_order = $2 AND pr.status = 'received'",
+                        r#"SELECT (
+                            COALESCE((
+                                SELECT SUM((posting.line->>'credit')::numeric - (posting.line->>'debit')::numeric)
+                                FROM purchasing__purchase_receipt pr
+                                JOIN inventory__stock_move sm ON sm.tenant_id=pr.tenant_id AND sm.source='purchase_receipt' AND sm.source_id=pr.id::text AND sm.direction='in'
+                                JOIN accounting__journal_entry j ON j.tenant_id=sm.tenant_id AND j.source='stock_move' AND j.source_id=sm.id::text AND j.status='posted'
+                                CROSS JOIN LATERAL jsonb_array_elements(COALESCE(j.lines,'[]'::jsonb)) AS posting(line)
+                                JOIN accounting__account a ON a.tenant_id=j.tenant_id AND a.id::text=posting.line->>'account' AND a.code='GRNI'
+                                WHERE pr.tenant_id=$1 AND pr.purchase_order=$2 AND pr.status='received'
+                            ),0)
+                            - COALESCE((
+                                SELECT SUM((posting.line->>'debit')::numeric - (posting.line->>'credit')::numeric)
+                                FROM inventory__stock_move sm
+                                JOIN accounting__journal_entry j ON j.tenant_id=sm.tenant_id AND j.source='stock_move' AND j.source_id=sm.id::text AND j.status='posted'
+                                CROSS JOIN LATERAL jsonb_array_elements(COALESCE(j.lines,'[]'::jsonb)) AS posting(line)
+                                JOIN accounting__account a ON a.tenant_id=j.tenant_id AND a.id::text=posting.line->>'account' AND a.code='GRNI'
+                                JOIN purchasing__purchase_return pr ON pr.tenant_id=sm.tenant_id AND ((sm.source='purchase_return' AND pr.id::text=sm.source_id) OR (sm.source='quality_return' AND pr.inspection::text=sm.source_id))
+                                WHERE pr.tenant_id=$1 AND pr.purchase_order=$2 AND pr.status='dispatched' AND sm.direction='out' AND sm.source IN ('purchase_return','quality_return')
+                            ),0)
+                            - COALESCE((
+                                SELECT SUM((posting.line->>'debit')::numeric - (posting.line->>'credit')::numeric)
+                                FROM accounting__bill b
+                                JOIN accounting__journal_entry j ON j.tenant_id=b.tenant_id AND j.source='bill' AND j.source_id=b.id::text AND j.status='posted'
+                                CROSS JOIN LATERAL jsonb_array_elements(COALESCE(j.lines,'[]'::jsonb)) AS posting(line)
+                                JOIN accounting__account a ON a.tenant_id=j.tenant_id AND a.id::text=posting.line->>'account' AND a.code='GRNI'
+                                WHERE b.tenant_id=$1 AND b.source='purchase_order' AND b.source_id=$2::text AND b.status<>'void'
+                            ),0)
+                        )::text"#,
                         &[&tenant.id, &purchase_order_id],
                     )
                     .await?;

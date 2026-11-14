@@ -426,6 +426,9 @@
             "format": "uuid",
             "type": "string"
           },
+          "supplier_invoice_id": {
+            "type": "string"
+          },
           "supplier_invoice_number": {
             "type": "string"
           },
@@ -506,6 +509,9 @@
           "supplier": {
             "description": "Tham chiếu tới master-data.party",
             "format": "uuid",
+            "type": "string"
+          },
+          "supplier_invoice_id": {
             "type": "string"
           },
           "supplier_invoice_number": {
@@ -12603,6 +12609,11 @@
             "readOnly": true,
             "type": "string"
           },
+          "supplier_invoice": {
+            "description": "Tham chiếu tới purchasing.supplier_invoice",
+            "format": "uuid",
+            "type": "string"
+          },
           "tax_total": {
             "readOnly": true,
             "type": "number"
@@ -12647,6 +12658,11 @@
             "type": "string"
           },
           "reason": {
+            "type": "string"
+          },
+          "supplier_invoice": {
+            "description": "Tham chiếu tới purchasing.supplier_invoice",
+            "format": "uuid",
             "type": "string"
           },
           "tax_total": {
@@ -12843,9 +12859,11 @@
             "type": "string"
           },
           "tax_total": {
+            "readOnly": true,
             "type": "number"
           },
           "total": {
+            "readOnly": true,
             "type": "number"
           },
           "updatedAt": {
@@ -12890,9 +12908,11 @@
             "type": "string"
           },
           "tax_total": {
+            "readOnly": true,
             "type": "number"
           },
           "total": {
+            "readOnly": true,
             "type": "number"
           }
         },

@@ -25,6 +25,10 @@ pub(super) async fn validate_return_persistence(
         .get("inspection")
         .and_then(Value::as_str)
         .and_then(|id| Uuid::parse_str(id).ok());
+    let supplier_invoice_id = document
+        .get("supplier_invoice")
+        .and_then(Value::as_str)
+        .and_then(|id| Uuid::parse_str(id).ok());
     // Keep the same inspection -> order -> SKU lock order as QC decisions.
     let inspection_record = if let Some(inspection_id) = inspection_id {
         tx.query_opt(
@@ -53,6 +57,41 @@ pub(super) async fn validate_return_persistence(
     if status != "received" {
         errors.push("Returns can only be created from a received purchase order".into());
     }
+    let invoice_lines = if let Some(invoice_id) = supplier_invoice_id {
+        match tx.query_opt(
+            "SELECT purchase_order,status,lines FROM purchasing__supplier_invoice WHERE tenant_id=$1 AND id=$2 FOR UPDATE",
+            &[&tenant.id, &invoice_id],
+        ).await? {
+            Some(invoice) => {
+                let invoice_order: Uuid = invoice.get(0);
+                let invoice_status: String = invoice.get(1);
+                let lines: Value = invoice.get(2);
+                if invoice_order != order_id || invoice_status != "approved" {
+                    errors.push("Return invoice must be approved and belong to the selected purchase order".into());
+                }
+                if action == "dispatched" && tx.query_opt(
+                    "SELECT id FROM accounting__bill WHERE tenant_id=$1 AND supplier_invoice_id=$2::text AND status IN ('posted','partially_paid','partially_settled','paid','settled') LIMIT 1 FOR UPDATE",
+                    &[&tenant.id, &invoice_id.to_string()],
+                ).await?.is_none() {
+                    errors.push("A return against an invoice needs its posted payable bill".into());
+                }
+                Some(lines)
+            }
+            None => {
+                errors.push("Selected supplier invoice was not found in this tenant".into());
+                None
+            }
+        }
+    } else {
+        let posted_invoice_bill = tx.query_opt(
+            "SELECT id FROM accounting__bill WHERE tenant_id=$1 AND source='purchase_order' AND source_id=$2 AND supplier_invoice_id IS NOT NULL AND status IN ('posted','partially_paid','partially_settled','paid','settled') LIMIT 1 FOR UPDATE",
+            &[&tenant.id, &order_id.to_string()],
+        ).await?.is_some();
+        if posted_invoice_bill {
+            errors.push("Select the supplier invoice whose billed goods are being returned".into());
+        }
+        None
+    };
     let return_warehouse = document
         .get("warehouse")
         .and_then(Value::as_str)
@@ -245,6 +284,46 @@ pub(super) async fn validate_return_persistence(
                 "Product {product} at price {price} is not present in the source purchase order"
             ));
             continue;
+        }
+        if let Some(invoice_lines) = &invoice_lines {
+            let invoiced_qty = invoice_lines
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|line| {
+                    line.get("product").and_then(Value::as_str) == Some(product.as_str())
+                        && line
+                            .get("price")
+                            .and_then(money::decimal)
+                            .is_some_and(|value| {
+                                money::within_tolerance(value, price, Decimal::new(5, 3))
+                            })
+                })
+                .try_fold(Decimal::ZERO, |sum, line| {
+                    sum.checked_add(
+                        line.get("qty")
+                            .and_then(money::decimal)
+                            .unwrap_or(Decimal::ZERO),
+                    )
+                })
+                .ok_or_else(purchasing_quantity_error)?;
+            let invoice_id = supplier_invoice_id.unwrap_or_default();
+            let prior_invoice_returns = tx.query_opt(
+                "SELECT COALESCE(SUM((item.line->>'qty')::numeric),0)::text FROM purchasing__purchase_return pr CROSS JOIN LATERAL jsonb_array_elements(COALESCE(pr.lines,'[]'::jsonb)) AS item(line) WHERE pr.tenant_id=$1 AND pr.supplier_invoice=$2 AND pr.id<>$3 AND pr.status IN ('submitted','approved','dispatched') AND item.line->>'product'=$4 AND abs((item.line->>'price')::numeric-$5::text::numeric)<=0.005",
+                &[&tenant.id, &invoice_id, &return_id, &product, &price.normalize().to_string()],
+            ).await?;
+            let prior_invoice_qty = prior_invoice_returns
+                .as_ref()
+                .map(|row| decimal_column(row, 0, "prior invoice returns"))
+                .transpose()?
+                .unwrap_or(Decimal::ZERO);
+            if prior_invoice_qty
+                .checked_add(return_qty)
+                .zip(invoiced_qty.checked_add(Decimal::new(1, 6)))
+                .is_none_or(|(returned, maximum)| returned > maximum)
+            {
+                errors.push(format!("Return quantity for {product} exceeds the quantity on the selected supplier invoice"));
+            }
         }
         let price_text = price.normalize().to_string();
         let prior_row = tx
