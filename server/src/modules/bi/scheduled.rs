@@ -30,12 +30,12 @@ fn csv_cell(value: &Value) -> String {
 fn report_csv(result: &Value) -> String {
     let Some(rows) = result.get("items").and_then(Value::as_array) else {
         return format!(
-            "Kết quả tổng hợp: {}",
-            result.get("total").unwrap_or(&Value::Null)
+            "total\n{}\n",
+            csv_cell(result.get("total").unwrap_or(&Value::Null))
         );
     };
     let Some(first) = rows.first().and_then(Value::as_object) else {
-        return "Báo cáo không có dòng dữ liệu.".into();
+        return "message\n\"Báo cáo không có dòng dữ liệu.\"\n".into();
     };
     let columns = first.keys().collect::<Vec<_>>();
     let mut output = columns
@@ -235,7 +235,7 @@ pub async fn handle_source_event(
                     message.insert(
                         "body".into(),
                         json!(format!(
-                            "Báo cáo: {}\nThời điểm: {}\nSố dòng: {}\n\n{csv}",
+                            "Báo cáo: {}\nThời điểm: {}\nSố dòng: {}\n\nTệp CSV kết quả được đính kèm.",
                             report
                                 .get("name")
                                 .and_then(Value::as_str)
@@ -247,6 +247,15 @@ pub async fn handle_source_event(
                             saved_run.get("row_count").unwrap_or(&Value::Null)
                         )),
                     );
+                    message.insert(
+                        "attachment_name".into(),
+                        json!(format!("bi-report-{run_id}.csv")),
+                    );
+                    message.insert(
+                        "attachment_content_type".into(),
+                        json!("text/csv; charset=utf-8"),
+                    );
+                    message.insert("attachment_content".into(), json!(csv));
                     let key = format!("bi.report_run:{run_id}:{}", address.to_ascii_lowercase());
                     crate::modules::communication::enqueue_message_with_key(
                         kernel, tx, tenant, message, &key, event_id, depth,

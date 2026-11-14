@@ -122,6 +122,24 @@
      "system": true
     },
     {
+     "name": "attachment_name",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "attachment_content_type",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "attachment_content",
+     "type": "text",
+     "required": false,
+     "system": true
+    },
+    {
      "name": "source_event",
      "type": "string",
      "required": false,

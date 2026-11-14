@@ -25,6 +25,9 @@ struct Message {
     recipient_email: Option<String>,
     subject: Option<String>,
     body: Option<String>,
+    attachment_name: Option<String>,
+    attachment_content_type: Option<String>,
+    attachment_content: Option<String>,
     attempts: i64,
     is_auth: bool,
 }
@@ -163,6 +166,9 @@ async fn claim_auth_mail(kernel: &Kernel, tenant_id: &str) -> R<Vec<Message>> {
             recipient_email: Some(row.get(1)),
             subject: row.get(2),
             body: row.get(3),
+            attachment_name: None,
+            attachment_content_type: None,
+            attachment_content: None,
             attempts: row.get(4),
             is_auth: true,
         })
@@ -196,7 +202,7 @@ async fn claim(kernel: &Kernel, tenant_id: &str, channel: &str) -> R<Vec<Message
     let tx = Tx::begin(&mut conn, tenant_id, true).await?;
     let rows = tx
         .query(
-            "WITH ready AS (SELECT id FROM communication__message_log WHERE tenant_id = $1 AND channel = $2 AND ((status IN ('queued', 'retry') AND (available_at IS NULL OR available_at <= now())) OR (status = 'processing' AND (available_at IS NULL OR available_at <= now()))) ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT $3) UPDATE communication__message_log m SET status = 'processing', attempts = COALESCE(m.attempts, 0) + 1, available_at = now() + interval '2 minutes', last_error = NULL, updated_at = now() FROM ready WHERE m.tenant_id = $1 AND m.id = ready.id RETURNING m.id, m.channel, m.recipient, m.recipient_email, m.subject, m.body, COALESCE(m.attempts, 1)::bigint",
+            "WITH ready AS (SELECT id FROM communication__message_log WHERE tenant_id = $1 AND channel = $2 AND ((status IN ('queued', 'retry') AND (available_at IS NULL OR available_at <= now())) OR (status = 'processing' AND (available_at IS NULL OR available_at <= now()))) ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT $3) UPDATE communication__message_log m SET status = 'processing', attempts = COALESCE(m.attempts, 0) + 1, available_at = now() + interval '2 minutes', last_error = NULL, updated_at = now() FROM ready WHERE m.tenant_id = $1 AND m.id = ready.id RETURNING m.id, m.channel, m.recipient, m.recipient_email, m.subject, m.body, m.attachment_name, m.attachment_content_type, m.attachment_content, COALESCE(m.attempts, 1)::bigint",
             &[&tenant_id, &channel, &BATCH_SIZE],
         )
         .await?;
@@ -211,7 +217,10 @@ async fn claim(kernel: &Kernel, tenant_id: &str, channel: &str) -> R<Vec<Message
             recipient_email: row.get(3),
             subject: row.get(4),
             body: row.get(5),
-            attempts: row.get(6),
+            attachment_name: row.get(6),
+            attachment_content_type: row.get(7),
+            attachment_content: row.get(8),
+            attempts: row.get(9),
             is_auth: false,
         })
         .collect())
@@ -247,6 +256,10 @@ async fn deliver(kernel: &Kernel, provider: &Provider, message: &Message) -> Res
         "from": provider.sender,
         "subject": message.subject,
         "text": message.body,
+        "attachment": match (&message.attachment_name, &message.attachment_content_type, &message.attachment_content) {
+            (Some(name), Some(content_type), Some(content)) => Some(json!({ "filename": name, "contentType": content_type, "content": content })),
+            _ => None,
+        },
         "tenantId": message.tenant_id,
         "messageId": message.id,
     }));
@@ -283,6 +296,9 @@ async fn deliver_smtp(
         &destination,
         message.subject.as_deref().unwrap_or_default(),
         message.body.as_deref().unwrap_or_default(),
+        message.attachment_name.as_deref(),
+        message.attachment_content_type.as_deref(),
+        message.attachment_content.as_deref(),
     )
     .await
 }

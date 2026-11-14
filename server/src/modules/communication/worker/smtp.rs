@@ -3,7 +3,7 @@ use super::Failure;
 use crate::error::{ApiError, R};
 use lettre::{
     AsyncSmtpTransport, AsyncTransport, Message as EmailMessage, Tokio1Executor,
-    message::{Mailbox, header::ContentType},
+    message::{Attachment, Mailbox, MultiPart, SinglePart, header::ContentType},
     transport::smtp::authentication::Credentials,
 };
 use std::{env, time::Duration};
@@ -108,21 +108,52 @@ impl SmtpSender {
         recipient: &str,
         subject: &str,
         body: &str,
+        attachment_name: Option<&str>,
+        attachment_content_type: Option<&str>,
+        attachment_content: Option<&str>,
     ) -> Result<(), Failure> {
         let to = recipient.parse::<Mailbox>().map_err(|_| Failure {
             retryable: false,
             message: "email recipient address is invalid",
         })?;
-        let message = EmailMessage::builder()
+        let builder = EmailMessage::builder()
             .from(self.from.clone())
             .to(to)
-            .subject(subject)
-            .header(ContentType::TEXT_PLAIN)
-            .body(body.to_owned())
-            .map_err(|_| Failure {
-                retryable: false,
-                message: "email message could not be encoded",
-            })?;
+            .subject(subject);
+        let message = match (attachment_name, attachment_content_type, attachment_content) {
+            (Some(filename), Some(content_type), Some(content)) => {
+                let content_type = content_type.parse::<ContentType>().map_err(|_| Failure {
+                    retryable: false,
+                    message: "email attachment content type is invalid",
+                })?;
+                builder
+                    .multipart(
+                        MultiPart::mixed()
+                            .singlepart(SinglePart::plain(body.to_owned()))
+                            .singlepart(
+                                Attachment::new(filename.to_owned())
+                                    .body(content.as_bytes().to_vec(), content_type),
+                            ),
+                    )
+                    .map_err(|_| Failure {
+                        retryable: false,
+                        message: "email attachment could not be encoded",
+                    })?
+            }
+            (None, None, None) => builder
+                .header(ContentType::TEXT_PLAIN)
+                .body(body.to_owned())
+                .map_err(|_| Failure {
+                    retryable: false,
+                    message: "email message could not be encoded",
+                })?,
+            _ => {
+                return Err(Failure {
+                    retryable: false,
+                    message: "email attachment metadata is incomplete",
+                });
+            }
+        };
         self.transport
             .send(message)
             .await
