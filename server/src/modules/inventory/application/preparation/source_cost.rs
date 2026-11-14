@@ -108,7 +108,15 @@ pub(super) async fn resolve_unit_cost(
         }
     } else if direction == "out" {
         if source == "purchase_return" {
-            if let Some(cost) = document.get("unit_cost").and_then(money::decimal) {
+            if tenant.setting_str("inventoryCostMethod") == Some("moving_average")
+                && on_hand > Decimal::new(1, 6)
+            {
+                unit_cost = inventory_value
+                    .filter(|value| *value >= Decimal::ZERO)
+                    .and_then(|value| value.checked_div(on_hand))
+                    .filter(|average| *average >= Decimal::ZERO)
+                    .unwrap_or(standard_cost);
+            } else if let Some(cost) = document.get("unit_cost").and_then(money::decimal) {
                 unit_cost = cost;
             } else if let Some(source_id) = source_id {
                 if let Some(row) = tx

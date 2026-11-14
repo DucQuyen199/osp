@@ -21,6 +21,23 @@ pub async fn dispatch_source_events(
     inventory_orders::dispatch(kernel, tx, tenant, event, handled).await?;
     support::dispatch(kernel, tx, tenant, event, handled).await?;
     finance_commerce::dispatch(kernel, tx, tenant, event, handled).await?;
+    if event.ty == "accounting.bill.posted"
+        && crate::modules::inventory::apply_landed_costs(
+            kernel,
+            tx,
+            tenant,
+            &event.payload,
+            event.id,
+            event.depth,
+        )
+        .await?
+    {
+        handled.push(serde_json::json!({
+            "module": "inventory",
+            "rule": "supplier_bill_landed_cost_to_inventory_valuation",
+            "outcome": "ok"
+        }));
+    }
     if crate::modules::bi::handle_source_event(
         kernel,
         tx,

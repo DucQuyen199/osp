@@ -241,7 +241,8 @@ impl Kernel {
              product.id AS product_id, product.sku, product.name AS product, product.uom AS unit, \
              warehouse.id AS warehouse_id, warehouse.name AS warehouse, \
              SUM(CASE WHEN move.direction = 'in' THEN move.qty::numeric ELSE -move.qty::numeric END) AS quantity, \
-             SUM(CASE WHEN move.direction = 'in' THEN COALESCE(move.total_cost, 0)::numeric ELSE -COALESCE(move.total_cost, 0)::numeric END) AS value \
+             SUM(CASE WHEN move.direction = 'in' THEN COALESCE(move.total_cost, 0)::numeric ELSE -COALESCE(move.total_cost, 0)::numeric END) + \
+             COALESCE((SELECT SUM(va.capitalized_amount::numeric) FROM inventory__valuation_adjustment va JOIN inventory__stock_move layer ON layer.tenant_id=va.tenant_id AND layer.id=va.stock_move WHERE va.tenant_id=lot.tenant_id AND layer.product=lot.product AND layer.lot=lot.id::text AND layer.warehouse IS NOT DISTINCT FROM warehouse.id),0) AS value \
            FROM inventory__lot lot \
            JOIN master_data__product product ON product.tenant_id = lot.tenant_id AND product.id = lot.product \
            JOIN inventory__stock_move move ON move.tenant_id = lot.tenant_id AND move.lot = lot.id::text \
@@ -334,6 +335,8 @@ impl Kernel {
                 "SELECT jsonb_build_object( \
                    'id', sm.id, 'at', sm.created_at, 'direction', sm.direction, \
                    'quantity', sm.qty, 'unitCost', sm.unit_cost, 'totalCost', sm.total_cost, \
+                   'landedCost', COALESCE((SELECT SUM(va.amount) FROM inventory__valuation_adjustment va WHERE va.tenant_id=sm.tenant_id AND va.stock_move=sm.id),0), \
+                   'remainingLandedCost', COALESCE((SELECT SUM(va.capitalized_amount) FROM inventory__valuation_adjustment va WHERE va.tenant_id=sm.tenant_id AND va.stock_move=sm.id),0), \
                    'warehouseId', warehouse.id, 'warehouse', warehouse.name, \
                    'locationId', location.id, 'locationCode', location.code, 'location', location.name, \
                    'source', sm.source, 'sourceId', sm.source_id, \
@@ -371,13 +374,14 @@ impl Kernel {
                 "SELECT jsonb_build_object( \
                    'warehouseId', warehouse.id, 'warehouse', warehouse.name, \
                    'quantity', SUM(CASE WHEN sm.direction = 'in' THEN sm.qty::numeric ELSE -sm.qty::numeric END), \
-                   'value', SUM(CASE WHEN sm.direction = 'in' THEN COALESCE(sm.total_cost, 0)::numeric ELSE -COALESCE(sm.total_cost, 0)::numeric END) \
+                   'value', SUM(CASE WHEN sm.direction = 'in' THEN COALESCE(sm.total_cost, 0)::numeric ELSE -COALESCE(sm.total_cost, 0)::numeric END) + \
+                     COALESCE((SELECT SUM(va.capitalized_amount::numeric) FROM inventory__valuation_adjustment va JOIN inventory__stock_move layer ON layer.tenant_id=va.tenant_id AND layer.id=va.stock_move WHERE va.tenant_id=$1 AND layer.lot=$2::text AND layer.warehouse IS NOT DISTINCT FROM warehouse.id),0) \
                  ) FROM inventory__stock_move sm \
                  LEFT JOIN inventory__warehouse warehouse ON warehouse.tenant_id = sm.tenant_id AND warehouse.id = sm.warehouse \
                  WHERE sm.tenant_id = $1 AND sm.lot = $2::text \
                  GROUP BY warehouse.id, warehouse.name \
                  HAVING abs(SUM(CASE WHEN sm.direction = 'in' THEN sm.qty::numeric ELSE -sm.qty::numeric END)) > 0.000001 \
-                    OR abs(SUM(CASE WHEN sm.direction = 'in' THEN COALESCE(sm.total_cost, 0)::numeric ELSE -COALESCE(sm.total_cost, 0)::numeric END)) > 0.005 \
+                    OR abs(SUM(CASE WHEN sm.direction = 'in' THEN COALESCE(sm.total_cost, 0)::numeric ELSE -COALESCE(sm.total_cost, 0)::numeric END) + COALESCE((SELECT SUM(va.capitalized_amount::numeric) FROM inventory__valuation_adjustment va JOIN inventory__stock_move layer ON layer.tenant_id=va.tenant_id AND layer.id=va.stock_move WHERE va.tenant_id=$1 AND layer.lot=$2::text AND layer.warehouse IS NOT DISTINCT FROM warehouse.id),0)) > 0.005 \
                  ORDER BY warehouse.name NULLS FIRST, warehouse.id",
                 &[&tenant.id, &lot_id],
             )
@@ -563,7 +567,8 @@ impl Kernel {
                    'locationCode', l.code, 'location', l.name, 'productId', p.id, \
                    'sku', p.sku, 'product', p.name, \
                    'qty', SUM(CASE WHEN sm.direction = 'in' THEN sm.qty::numeric ELSE -sm.qty::numeric END), \
-                   'value', SUM(CASE WHEN sm.direction = 'in' THEN COALESCE(sm.total_cost, 0)::numeric ELSE -COALESCE(sm.total_cost, 0)::numeric END) \
+                   'value', SUM(CASE WHEN sm.direction = 'in' THEN COALESCE(sm.total_cost, 0)::numeric ELSE -COALESCE(sm.total_cost, 0)::numeric END) + \
+                     COALESCE((SELECT SUM(va.capitalized_amount::numeric) FROM inventory__valuation_adjustment va JOIN inventory__stock_move layer ON layer.tenant_id=va.tenant_id AND layer.id=va.stock_move WHERE va.tenant_id=$1 AND layer.product=p.id AND layer.warehouse=w.id AND layer.location IS NOT DISTINCT FROM l.id),0) \
                  ) FROM inventory__stock_move sm \
                  JOIN inventory__warehouse w ON w.tenant_id = sm.tenant_id AND w.id = sm.warehouse \
                  LEFT JOIN inventory__warehouse_location l ON l.tenant_id = sm.tenant_id AND l.id = sm.location \
@@ -571,7 +576,7 @@ impl Kernel {
                  WHERE sm.tenant_id = $1 AND ($2::uuid IS NULL OR sm.warehouse = $2) \
                  GROUP BY w.id, w.name, l.id, l.code, l.name, p.id, p.sku, p.name \
                  HAVING abs(SUM(CASE WHEN sm.direction = 'in' THEN sm.qty::numeric ELSE -sm.qty::numeric END)) > 0.000001 \
-                    OR abs(SUM(CASE WHEN sm.direction = 'in' THEN COALESCE(sm.total_cost, 0)::numeric ELSE -COALESCE(sm.total_cost, 0)::numeric END)) > 0.005 \
+                    OR abs(SUM(CASE WHEN sm.direction = 'in' THEN COALESCE(sm.total_cost, 0)::numeric ELSE -COALESCE(sm.total_cost, 0)::numeric END) + COALESCE((SELECT SUM(va.capitalized_amount::numeric) FROM inventory__valuation_adjustment va JOIN inventory__stock_move layer ON layer.tenant_id=va.tenant_id AND layer.id=va.stock_move WHERE va.tenant_id=$1 AND layer.product=p.id AND layer.warehouse=w.id AND layer.location IS NOT DISTINCT FROM l.id),0)) > 0.005 \
                  ORDER BY w.name, l.code NULLS FIRST, p.name, p.id",
                 &[&tenant.id, &warehouse],
             )

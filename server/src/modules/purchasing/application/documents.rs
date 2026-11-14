@@ -579,6 +579,10 @@ async fn prepare_document_with_lock(
         }
     }
     if entity == "supplier_invoice" {
+        let supplier_invoice_order_id = document
+            .get("purchase_order")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok());
         let adjustment_lines = document
             .entry("adjustments")
             .or_insert_with(|| Value::Array(Vec::new()));
@@ -630,6 +634,83 @@ async fn prepare_document_with_lock(
                     index + 1
                 ));
                 continue;
+            }
+            let allocation = line
+                .get("allocation")
+                .and_then(Value::as_str)
+                .unwrap_or("expense")
+                .to_owned();
+            if !matches!(allocation.as_str(), "expense" | "landed_cost") {
+                errors.push(format!(
+                    "Invoice adjustment {} allocation type is invalid",
+                    index + 1
+                ));
+                continue;
+            }
+            line.insert("allocation".into(), json!(allocation));
+            if allocation == "landed_cost" {
+                let basis = line
+                    .get("allocation_basis")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                if kind != "charge" {
+                    errors.push(format!("Invoice adjustment {} can capitalize charges only; record discounts as expense adjustments", index + 1));
+                    continue;
+                }
+                if !matches!(basis, "quantity" | "value") {
+                    errors.push(format!(
+                        "Invoice adjustment {} needs quantity or value allocation",
+                        index + 1
+                    ));
+                    continue;
+                }
+                let Some(receipts) = line.get("receipt_ids").and_then(Value::as_array) else {
+                    errors.push(format!("Invoice adjustment {} must select received goods for landed-cost allocation", index + 1));
+                    continue;
+                };
+                let Some(order_id) = supplier_invoice_order_id else {
+                    errors.push("Landed-cost allocation requires a valid purchase order".into());
+                    continue;
+                };
+                let mut unique_receipts = Vec::new();
+                let mut invalid_receipt = false;
+                for receipt in receipts {
+                    let Some(receipt_id) = receipt
+                        .as_str()
+                        .and_then(|value| Uuid::parse_str(value).ok())
+                    else {
+                        invalid_receipt = true;
+                        break;
+                    };
+                    if unique_receipts.contains(&receipt_id) {
+                        continue;
+                    }
+                    if tx.query_opt(
+                        &format!("SELECT id FROM purchasing__purchase_receipt WHERE tenant_id=$1 AND id=$2 AND purchase_order=$3 AND status='received'{lock}"),
+                        &[&tenant.id, &receipt_id, &order_id],
+                    ).await?.is_none() {
+                        invalid_receipt = true;
+                        break;
+                    }
+                    unique_receipts.push(receipt_id);
+                }
+                if unique_receipts.is_empty() || invalid_receipt {
+                    errors.push(format!("Invoice adjustment {} must reference received purchase receipts from its order", index + 1));
+                    continue;
+                }
+                line.insert("allocation_basis".into(), json!(basis));
+                line.insert(
+                    "receipt_ids".into(),
+                    json!(
+                        unique_receipts
+                            .iter()
+                            .map(Uuid::to_string)
+                            .collect::<Vec<_>>()
+                    ),
+                );
+            } else {
+                line.remove("allocation_basis");
+                line.remove("receipt_ids");
             }
             let tax_rate = if let Some(tax_id) = line.get("tax").and_then(Value::as_str) {
                 let Some(tax_id) = Uuid::parse_str(tax_id).ok() else {

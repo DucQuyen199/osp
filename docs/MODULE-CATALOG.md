@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **50 module**, **186 loại dữ liệu**, **839 sự kiện**.
+Tổng: **50 module**, **188 loại dữ liệu**, **850 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -13,13 +13,13 @@ Tổng: **50 module**, **186 loại dữ liệu**, **839 sự kiện**.
 | [`agriculture`](#agriculture) — Nông nghiệp | Module chuyên ngành | `master-data`, `inventory` |
 | [`asset`](#asset) — Tài sản cố định | Tài chính | `master-data`, `accounting` |
 | [`auto-service`](#auto-service) — Garage / Dịch vụ ô tô-xe máy | Module chuyên ngành | `master-data`, `inventory`, `accounting` |
-| [`bi`](#bi) — Báo cáo & phân tích | Nền tảng dùng chung | — |
+| [`communication`](#communication) — Truyền thông & thông báo | Nền tảng dùng chung | `master-data` |
+| [`bi`](#bi) — Báo cáo & phân tích | Nền tảng dùng chung | `communication` |
 | [`booking`](#booking) — Đặt lịch & tài nguyên | Bán hàng & khách hàng | `master-data`, `accounting` |
 | [`budget`](#budget) — Ngân sách | Tài chính | `accounting`, `hrm` |
 | [`case-management`](#case-management) — Quản lý hồ sơ vụ việc | Module chuyên ngành | `master-data`, `accounting` |
 | [`charity`](#charity) — Từ thiện / Phi lợi nhuận | Module chuyên ngành | `master-data`, `accounting` |
 | [`clinic`](#clinic) — Phòng khám / Y tế | Module chuyên ngành | `master-data`, `inventory`, `accounting` |
-| [`communication`](#communication) — Truyền thông & thông báo | Nền tảng dùng chung | `master-data` |
 | [`project`](#project) — Quản lý dự án | Vận hành | `master-data` |
 | [`construction`](#construction) — Xây dựng | Module chuyên ngành | `project`, `accounting` |
 | [`contract`](#contract) — Hợp đồng | Vận hành | `master-data` |
@@ -177,6 +177,7 @@ Tổng: **50 module**, **186 loại dữ liệu**, **839 sự kiện**.
 | `warehouse` Kho | — |
 | `warehouse_location` Vị trí kho | — |
 | `stock_move` Phiếu kho | — |
+| `valuation_adjustment` Điều chỉnh giá trị lớp tồn kho | — |
 | `reorder_rule` Định mức bổ sung tồn kho | — |
 | `stock_level` Tồn kho | — |
 | `lot` Lô hàng | — |
@@ -286,7 +287,8 @@ Tổng: **50 module**, **186 loại dữ liệu**, **839 sự kiện**.
 
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
-| `payment_txn` Giao dịch thanh toán | `pending` → **failed** (pending→failed), **refunded** (succeeded→refunded), **succeeded** (pending→succeeded) |
+| `payment_txn` Giao dịch thanh toán | `pending` → **failed** (pending→failed), **partially_refunded** (succeeded→partially_refunded), **refunded** (succeeded/partially_refunded→refunded), **succeeded** (pending→succeeded) |
+| `payment_refund` Hoàn tiền giao dịch | `pending` → **failed** (pending→failed), **succeeded** (pending→succeeded) |
 
 ## Nhân sự
 
@@ -368,16 +370,6 @@ Tổng: **50 module**, **186 loại dữ liệu**, **839 sự kiện**.
 
 ## Nền tảng dùng chung
 
-### bi
-**Báo cáo & phân tích** — Dashboard, báo cáo, KPI. Khung để đọc dữ liệu chéo mọi module.
-
-| Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
-|---|---|
-| `dashboard` Dashboard | — |
-| `report` Báo cáo | `paused` → **paused** (scheduled→paused), **run_due** (scheduled→scheduled), **scheduled** (paused→scheduled) |
-| `report_run` Lần chạy báo cáo | — |
-| `kpi` Chỉ tiêu KPI | — |
-
 ### communication
 **Truyền thông & thông báo** — Kênh (email/SMS/Zalo/push/webhook), mẫu tin, nhật ký gửi. Tự ghi thông báo cho các sự kiện chính.
 
@@ -387,6 +379,16 @@ Tổng: **50 module**, **186 loại dữ liệu**, **839 sự kiện**.
 | `template` Mẫu tin | — |
 | `reminder` Nhắc việc | `pending` → **cancelled** (pending→cancelled), **queued** (pending→queued) |
 | `message_log` Nhật ký gửi | — |
+
+### bi
+**Báo cáo & phân tích** — Dashboard, báo cáo, KPI. Khung để đọc dữ liệu chéo mọi module.
+
+| Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
+|---|---|
+| `dashboard` Dashboard | — |
+| `report` Báo cáo | `paused` → **paused** (scheduled→paused), **run_due** (scheduled→scheduled), **scheduled** (paused→scheduled) |
+| `report_run` Lần chạy báo cáo | — |
+| `kpi` Chỉ tiêu KPI | — |
 
 ### document
 **Quản lý tài liệu** — Thư mục, tài liệu có phiên bản, yêu cầu ký.
@@ -513,7 +515,7 @@ Tổng: **50 module**, **186 loại dữ liệu**, **839 sự kiện**.
 
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
-| `prescription` Đơn thuốc | `draft` → **cancelled** (draft/verified→cancelled), **dispensed** (verified→dispensed), **verified** (draft→verified) |
+| `prescription` Đơn thuốc | `draft` → **cancelled** (draft/verified→cancelled), **dispensed** (verified/partially_dispensed→dispensed), **partially_dispensed** (verified/partially_dispensed→partially_dispensed), **verified** (draft→verified) |
 
 ### real-estate
 **Bất động sản** — Bất động sản, lịch xem, hợp đồng thuê. Bán xong tự lập hóa đơn; kích hoạt thuê tự tạo hợp đồng.
@@ -534,8 +536,8 @@ Tổng: **50 module**, **186 loại dữ liệu**, **839 sự kiện**.
 | `table` Bàn | — |
 | `menu_item` Món | — |
 | `recipe` Công thức | — |
-| `table_order` Order bàn | `open` → **cancelled** (open→cancelled), **completed** (served→completed), **sent** (open→sent), **served** (sent→served) |
-| `kitchen_ticket` Phiếu bếp | `queued` → **preparing** (queued→preparing), **ready** (preparing→ready) |
+| `table_order` Order bàn | `open` → **cancelled** (open/sent→cancelled), **completed** (served→completed), **sent** (open→sent), **served** (sent→served) |
+| `kitchen_ticket` Phiếu bếp | `queued` → **cancelled** (queued→cancelled), **preparing** (queued→preparing), **ready** (preparing→ready) |
 
 ### school
 **Trường học / Trung tâm đào tạo** — Học viên, lớp học, ghi danh, điểm số, học phí. Phát hành học phí tự lập hóa đơn; thu tiền cập nhật ngược trạng thái học phí.

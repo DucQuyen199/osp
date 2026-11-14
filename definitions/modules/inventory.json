@@ -138,6 +138,24 @@
    "constraints": []
   },
   {
+   "name": "valuation_adjustment",
+   "label": "Điều chỉnh giá trị lớp tồn kho",
+   "systemManaged": true,
+   "fields": [
+    { "name": "stock_move", "type": "ref", "required": true, "ref": "inventory.stock_move" },
+    { "name": "source_bill", "type": "string", "required": true },
+    { "name": "source_invoice", "type": "string", "required": true },
+    { "name": "receipt", "type": "string", "required": true },
+    { "name": "amount", "type": "money", "required": true },
+    { "name": "capitalized_amount", "type": "money", "required": true, "system": true },
+    { "name": "layer_qty", "type": "number", "required": true },
+    { "name": "cost_method", "type": "enum", "required": true, "options": ["fifo", "moving_average"] }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
    "name": "reorder_rule",
    "label": "Định mức bổ sung tồn kho",
    "fields": [

@@ -2377,6 +2377,9 @@
             "readOnly": true,
             "type": "string"
           },
+          "email_recipients": {
+            "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
+          },
           "id": {
             "format": "uuid",
             "readOnly": true,
@@ -2420,6 +2423,9 @@
         "additionalProperties": false,
         "description": "Báo cáo (dữ liệu gửi lên)",
         "properties": {
+          "email_recipients": {
+            "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
+          },
           "name": {
             "type": "string"
           },
@@ -3771,6 +3777,18 @@
       "communication_message_log": {
         "description": "Nhật ký gửi",
         "properties": {
+          "attachment_content": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "attachment_content_type": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "attachment_name": {
+            "readOnly": true,
+            "type": "string"
+          },
           "attempts": {
             "readOnly": true,
             "type": "number"
@@ -3806,6 +3824,10 @@
             "readOnly": true,
             "type": "string"
           },
+          "recipient_email": {
+            "readOnly": true,
+            "type": "string"
+          },
           "source_event": {
             "readOnly": true,
             "type": "string"
@@ -3837,6 +3859,18 @@
         "additionalProperties": false,
         "description": "Nhật ký gửi (dữ liệu gửi lên)",
         "properties": {
+          "attachment_content": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "attachment_content_type": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "attachment_name": {
+            "readOnly": true,
+            "type": "string"
+          },
           "attempts": {
             "readOnly": true,
             "type": "number"
@@ -3859,6 +3893,10 @@
             "type": "string"
           },
           "recipient": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "recipient_email": {
             "readOnly": true,
             "type": "string"
           },
@@ -8049,6 +8087,115 @@
         ],
         "type": "object"
       },
+      "inventory_valuation_adjustment": {
+        "description": "Điều chỉnh giá trị lớp tồn kho",
+        "properties": {
+          "amount": {
+            "type": "number"
+          },
+          "cost_method": {
+            "enum": [
+              "fifo",
+              "moving_average"
+            ],
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "layer_qty": {
+            "type": "number"
+          },
+          "receipt": {
+            "type": "string"
+          },
+          "remaining_amount": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "remaining_qty": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "source_bill": {
+            "type": "string"
+          },
+          "source_invoice": {
+            "type": "string"
+          },
+          "stock_move": {
+            "description": "Tham chiếu tới inventory.stock_move",
+            "format": "uuid",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "inventory_valuation_adjustmentInput": {
+        "additionalProperties": false,
+        "description": "Điều chỉnh giá trị lớp tồn kho (dữ liệu gửi lên)",
+        "properties": {
+          "amount": {
+            "type": "number"
+          },
+          "cost_method": {
+            "enum": [
+              "fifo",
+              "moving_average"
+            ],
+            "type": "string"
+          },
+          "layer_qty": {
+            "type": "number"
+          },
+          "receipt": {
+            "type": "string"
+          },
+          "remaining_amount": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "remaining_qty": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "source_bill": {
+            "type": "string"
+          },
+          "source_invoice": {
+            "type": "string"
+          },
+          "stock_move": {
+            "description": "Tham chiếu tới inventory.stock_move",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stock_move",
+          "source_bill",
+          "source_invoice",
+          "receipt",
+          "amount",
+          "remaining_amount",
+          "layer_qty",
+          "remaining_qty",
+          "cost_method"
+        ],
+        "type": "object"
+      },
       "inventory_warehouse": {
         "description": "Kho",
         "properties": {
@@ -10589,6 +10736,69 @@
         ],
         "type": "object"
       },
+      "payments_payment_refund": {
+        "description": "Hoàn tiền giao dịch",
+        "properties": {
+          "amount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "payment_txn": {
+            "description": "Tham chiếu tới payments.payment_txn",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "succeeded",
+              "failed"
+            ],
+            "readOnly": true,
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "payments_payment_refundInput": {
+        "additionalProperties": false,
+        "description": "Hoàn tiền giao dịch (dữ liệu gửi lên)",
+        "properties": {
+          "amount": {
+            "type": "number"
+          },
+          "payment_txn": {
+            "description": "Tham chiếu tới payments.payment_txn",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "payment_txn",
+          "amount"
+        ],
+        "type": "object"
+      },
       "payments_payment_txn": {
         "description": "Giao dịch thanh toán",
         "properties": {
@@ -10654,6 +10864,7 @@
               "pending",
               "succeeded",
               "failed",
+              "partially_refunded",
               "refunded"
             ],
             "readOnly": true,
@@ -11764,6 +11975,7 @@
             "enum": [
               "draft",
               "verified",
+              "partially_dispensed",
               "dispensed",
               "cancelled"
             ],
@@ -12990,9 +13202,30 @@
           "adjustments": {
             "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
           },
+          "base_adjustment_net": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "base_adjustment_tax": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "base_tax_total": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "base_total": {
+            "readOnly": true,
+            "type": "number"
+          },
           "createdAt": {
             "format": "date-time",
             "readOnly": true,
+            "type": "string"
+          },
+          "currency": {
+            "description": "Tham chiếu tới master-data.currency",
+            "format": "uuid",
             "type": "string"
           },
           "department": {
@@ -13005,6 +13238,15 @@
           },
           "due_date": {
             "format": "date",
+            "type": "string"
+          },
+          "exchange_rate": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "exchange_rate_date": {
+            "format": "date",
+            "readOnly": true,
             "type": "string"
           },
           "id": {
@@ -13085,6 +13327,27 @@
           "adjustments": {
             "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
           },
+          "base_adjustment_net": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "base_adjustment_tax": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "base_tax_total": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "base_total": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "currency": {
+            "description": "Tham chiếu tới master-data.currency",
+            "format": "uuid",
+            "type": "string"
+          },
           "department": {
             "description": "Tham chiếu tới hrm.department",
             "format": "uuid",
@@ -13095,6 +13358,15 @@
           },
           "due_date": {
             "format": "date",
+            "type": "string"
+          },
+          "exchange_rate": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "exchange_rate_date": {
+            "format": "date",
+            "readOnly": true,
             "type": "string"
           },
           "invoice_number": {
@@ -14126,7 +14398,8 @@
             "enum": [
               "queued",
               "preparing",
-              "ready"
+              "ready",
+              "cancelled"
             ],
             "readOnly": true,
             "type": "string"
@@ -14336,6 +14609,9 @@
       "restaurant_table_order": {
         "description": "Order bàn",
         "properties": {
+          "cancellation_reason": {
+            "type": "string"
+          },
           "consumptions": {
             "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)",
             "readOnly": true
@@ -14411,6 +14687,9 @@
         "additionalProperties": false,
         "description": "Order bàn (dữ liệu gửi lên)",
         "properties": {
+          "cancellation_reason": {
+            "type": "string"
+          },
           "consumptions": {
             "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)",
             "readOnly": true
@@ -76240,6 +76519,457 @@
         ]
       }
     },
+    "/api/t/{tenantId}/data/inventory/valuation_adjustment": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Tìm văn bản trong các trường chuỗi",
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dir",
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Lọc bằng nhau theo bất kỳ trường nào, ví dụ ?status=draft",
+            "in": "query",
+            "name": "<field>",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "$ref": "#/components/schemas/inventory_valuation_adjustment"
+                      },
+                      "type": "array"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Danh sách Điều chỉnh giá trị lớp tồn kho",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/inventory_valuation_adjustmentInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/inventory_valuation_adjustment"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Dữ liệu không hợp lệ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tạo Điều chỉnh giá trị lớp tồn kho",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/inventory/valuation_adjustment/{id}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Đã xóa"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Đang được tham chiếu"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Xóa Điều chỉnh giá trị lớp tồn kho",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/inventory_valuation_adjustment"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Xem Điều chỉnh giá trị lớp tồn kho",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/inventory_valuation_adjustmentInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/inventory_valuation_adjustment"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Dữ liệu không hợp lệ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sửa Điều chỉnh giá trị lớp tồn kho",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/t/{tenantId}/data/inventory/warehouse": {
       "get": {
         "parameters": [
@@ -95391,6 +96121,770 @@
         ]
       }
     },
+    "/api/t/{tenantId}/data/payments/payment_refund": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Tìm văn bản trong các trường chuỗi",
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dir",
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Lọc bằng nhau theo bất kỳ trường nào, ví dụ ?status=draft",
+            "in": "query",
+            "name": "<field>",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "$ref": "#/components/schemas/payments_payment_refund"
+                      },
+                      "type": "array"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Danh sách Hoàn tiền giao dịch",
+        "tags": [
+          "payments"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/payments_payment_refundInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/payments_payment_refund"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Dữ liệu không hợp lệ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tạo Hoàn tiền giao dịch",
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/payments/payment_refund/bulk/{action}": {
+      "post": {
+        "description": "Thực hiện cùng một chuyển trạng thái cho 1–100 bản ghi trong một giao dịch. Nếu một bản ghi lỗi, toàn bộ lô được hoàn tác.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "action",
+            "required": true,
+            "schema": {
+              "enum": [
+                "failed",
+                "succeeded"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "ids": {
+                    "items": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "maxItems": 100,
+                    "minItems": 1,
+                    "type": "array",
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "ids"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "action": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "items": {
+                      "items": {
+                        "$ref": "#/components/schemas/payments_payment_refund"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "count",
+                    "items"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Ít nhất một bản ghi không ở trạng thái cho phép"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Danh sách ID hoặc dữ liệu không hợp lệ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Chuyển trạng thái hàng loạt: Hoàn tiền giao dịch",
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/payments/payment_refund/{id}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Đã xóa"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Đang được tham chiếu"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Xóa Hoàn tiền giao dịch",
+        "tags": [
+          "payments"
+        ]
+      },
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/payments_payment_refund"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Xem Hoàn tiền giao dịch",
+        "tags": [
+          "payments"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/payments_payment_refundInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/payments_payment_refund"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Dữ liệu không hợp lệ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sửa Hoàn tiền giao dịch",
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/payments/payment_refund/{id}/failed": {
+      "post": {
+        "description": "Phát sự kiện `payments.payment_refund.failed` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/payments_payment_refund"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Hoàn tiền giao dịch: failed (pending → failed)",
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/payments/payment_refund/{id}/succeeded": {
+      "post": {
+        "description": "Phát sự kiện `payments.payment_refund.succeeded` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/payments_payment_refund"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Hoàn tiền giao dịch: succeeded (pending → succeeded)",
+        "tags": [
+          "payments"
+        ]
+      }
+    },
     "/api/t/{tenantId}/data/payments/payment_txn": {
       "get": {
         "parameters": [
@@ -95620,6 +97114,7 @@
             "schema": {
               "enum": [
                 "failed",
+                "partially_refunded",
                 "refunded",
                 "succeeded"
               ],
@@ -96071,6 +97566,91 @@
         ]
       }
     },
+    "/api/t/{tenantId}/data/payments/payment_txn/{id}/partially_refunded": {
+      "post": {
+        "description": "Phát sự kiện `payments.payment_txn.partially_refunded` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/payments_payment_txn"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Giao dịch thanh toán: partially_refunded (succeeded → partially_refunded)",
+        "tags": [
+          "payments"
+        ]
+      }
+    },
     "/api/t/{tenantId}/data/payments/payment_txn/{id}/refunded": {
       "post": {
         "description": "Phát sự kiện `payments.payment_txn.refunded` cho các module khác phản ứng.",
@@ -96150,7 +97730,7 @@
             "bearer": []
           }
         ],
-        "summary": "Giao dịch thanh toán: refunded (succeeded → refunded)",
+        "summary": "Giao dịch thanh toán: refunded (succeeded|partially_refunded → refunded)",
         "tags": [
           "payments"
         ]
@@ -103860,6 +105440,7 @@
               "enum": [
                 "cancelled",
                 "dispensed",
+                "partially_dispensed",
                 "verified"
               ],
               "type": "string"
@@ -104389,7 +105970,92 @@
             "bearer": []
           }
         ],
-        "summary": "Đơn thuốc: dispensed (verified → dispensed)",
+        "summary": "Đơn thuốc: dispensed (verified|partially_dispensed → dispensed)",
+        "tags": [
+          "pharmacy"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/pharmacy/prescription/{id}/partially_dispensed": {
+      "post": {
+        "description": "Phát sự kiện `pharmacy.prescription.partially_dispensed` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pharmacy_prescription"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Đơn thuốc: partially_dispensed (verified|partially_dispensed → partially_dispensed)",
         "tags": [
           "pharmacy"
         ]
@@ -123027,6 +124693,7 @@
             "required": true,
             "schema": {
               "enum": [
+                "cancelled",
                 "preparing",
                 "ready"
               ],
@@ -123388,6 +125055,91 @@
           }
         ],
         "summary": "Sửa Phiếu bếp",
+        "tags": [
+          "restaurant"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/restaurant/kitchen_ticket/{id}/cancelled": {
+      "post": {
+        "description": "Phát sự kiện `restaurant.kitchen_ticket.cancelled` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/restaurant_kitchen_ticket"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Phiếu bếp: cancelled (queued → cancelled)",
         "tags": [
           "restaurant"
         ]
@@ -125591,7 +127343,7 @@
             "bearer": []
           }
         ],
-        "summary": "Order bàn: cancelled (open → cancelled)",
+        "summary": "Order bàn: cancelled (open|sent → cancelled)",
         "tags": [
           "restaurant"
         ]
@@ -141681,6 +143433,10 @@
       "name": "auto-service"
     },
     {
+      "description": "Truyền thông & thông báo",
+      "name": "communication"
+    },
+    {
       "description": "Báo cáo & phân tích",
       "name": "bi"
     },
@@ -141703,10 +143459,6 @@
     {
       "description": "Phòng khám / Y tế",
       "name": "clinic"
-    },
-    {
-      "description": "Truyền thông & thông báo",
-      "name": "communication"
     },
     {
       "description": "Quản lý dự án",

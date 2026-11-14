@@ -236,7 +236,7 @@ pub(super) async fn fifo_cost_allocations(
 ) -> R<(Decimal, Value)> {
     let rows = tx
         .query(
-            "SELECT id, direction, qty::text, COALESCE(total_cost, 0)::text, lot, fifo_date::text, fifo_origin_id, created_at::text, fifo_allocations FROM inventory__stock_move WHERE tenant_id = $1 AND product = $2 AND warehouse IS NOT DISTINCT FROM $3 ORDER BY created_at, id",
+            "SELECT sm.id, sm.direction, sm.qty::text, (COALESCE(sm.total_cost, 0)::numeric + COALESCE((SELECT SUM(va.amount::numeric) FROM inventory__valuation_adjustment va WHERE va.tenant_id=sm.tenant_id AND va.stock_move=sm.id AND va.cost_method='fifo'),0))::text, sm.lot, sm.fifo_date::text, sm.fifo_origin_id, sm.created_at::text, sm.fifo_allocations FROM inventory__stock_move sm WHERE sm.tenant_id = $1 AND sm.product = $2 AND sm.warehouse IS NOT DISTINCT FROM $3 ORDER BY sm.created_at, sm.id",
             &[&tenant.id, &product, &warehouse],
         )
         .await?;
