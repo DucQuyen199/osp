@@ -49,8 +49,11 @@ export default function MaintenanceWorkbenchPage() {
 
   useEffect(() => { document.title = 'Bảo trì tài sản · OSP Suite'; load(); }, [load]);
   const selected = requests.find((row) => row.id === selectedId);
-  const overduePlans = plans.filter((row) => row.status === 'active' && row.next_due && row.next_due <= today());
   const openRequests = requests.filter((row) => ['open', 'in_progress'].includes(row.status));
+  const requestForPlan = (plan) => requests.find((request) => request.source_plan === plan.id
+    && request.scheduled_for === plan.next_due
+    && ['open', 'in_progress'].includes(request.status));
+  const overduePlans = plans.filter((row) => row.status === 'active' && row.next_due && row.next_due <= today() && !requestForPlan(row));
 
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
@@ -73,7 +76,7 @@ export default function MaintenanceWorkbenchPage() {
   }
 
   async function runPlan(plan) {
-    await run(`${plan.id}:due`, () => action('maintenance.maintenance_plan', plan, 'due'), 'Đã tạo lệnh bảo trì định kỳ và tính kỳ kế tiếp.');
+    await run(`${plan.id}:due`, () => action('maintenance.maintenance_plan', plan, 'due'), 'Đã đưa lệnh bảo trì định kỳ vào hàng đợi. Kỳ kế tiếp sẽ tính sau khi lệnh được hoàn tất.');
   }
 
   async function startRequest(row) {
@@ -111,7 +114,7 @@ export default function MaintenanceWorkbenchPage() {
     </form></section>}
 
     <div className="layout-split" style={{ marginTop: 16 }}>
-      <section className="card card-pad"><h2>Kế hoạch định kỳ</h2>{loading ? <div className="skeleton" data-h="row"/> : !plans.length ? <div className="empty">Chưa có kế hoạch bảo trì. Tạo kế hoạch trong module Tài sản và bảo trì.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Kế hoạch / tài sản</th><th>Đến hạn</th><th>Trạng thái</th><th/></tr></thead><tbody>{plans.map((row) => <tr key={row.id}><td><strong>{row.title}</strong><div className="small muted">{assets.get(row.asset) ? recordLabel('asset.asset', assets.get(row.asset)) : 'Tài sản'}</div></td><td>{fmtDate(row.next_due)}</td><td>{statusLabel(row.status)}{row.status === 'active' && row.next_due && row.next_due <= today() && <span className="badge danger" style={{ marginLeft: 6 }}>Quá hạn</span>}</td><td>{row.status === 'active' && can('maintenance.maintenance_plan.due') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy) || !row.next_due || row.next_due > today()} onClick={() => runPlan(row)}>Tạo lệnh</button>}</td></tr>)}</tbody></table></div>}</section>
+      <section className="card card-pad"><h2>Kế hoạch định kỳ</h2>{loading ? <div className="skeleton" data-h="row"/> : !plans.length ? <div className="empty">Chưa có kế hoạch bảo trì. Tạo kế hoạch trong module Tài sản và bảo trì.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Kế hoạch / tài sản</th><th>Đến hạn</th><th>Trạng thái</th><th/></tr></thead><tbody>{plans.map((row) => { const activeRequest = requestForPlan(row); return <tr key={row.id}><td><strong>{row.title}</strong><div className="small muted">{assets.get(row.asset) ? recordLabel('asset.asset', assets.get(row.asset)) : 'Tài sản'}</div></td><td>{fmtDate(row.next_due)}</td><td>{statusLabel(row.status)}{row.status === 'active' && row.next_due && row.next_due <= today() && <span className="badge danger" style={{ marginLeft: 6 }}>Quá hạn</span>}</td><td>{activeRequest ? <button className="btn btn-secondary btn-sm" type="button" onClick={() => setSelectedId(activeRequest.id)}>Mở lệnh · {statusLabel(activeRequest.status)}</button> : row.status === 'active' && can('maintenance.maintenance_plan.due') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy) || !row.next_due || row.next_due > today()} onClick={() => runPlan(row)}>Tạo lệnh</button>}</td></tr>; })}</tbody></table></div>}</section>
       <section className="card card-pad"><h2>Hàng đợi lệnh bảo trì</h2>{loading ? <div className="skeleton" data-h="row"/> : !requests.length ? <div className="empty">Chưa có lệnh bảo trì.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Tài sản / mô tả</th><th>Ưu tiên</th><th>Ngày</th><th>Trạng thái</th></tr></thead><tbody>{requests.map((row) => <tr key={row.id} className={selectedId === row.id ? 'selected' : ''} onClick={() => setSelectedId(row.id)} style={{ cursor: 'pointer' }}><td><strong>{assets.get(row.asset) ? recordLabel('asset.asset', assets.get(row.asset)) : 'Tài sản'}</strong><div className="small muted">{row.description || (row.source_plan ? 'Bảo trì định kỳ' : 'Yêu cầu mới')}</div></td><td>{statusLabel(row.priority)}</td><td>{fmtDate(row.scheduled_for || row.created_at)}</td><td>{statusLabel(row.status)}</td></tr>)}</tbody></table></div>}</section>
     </div>
     {selected && <section className="card card-pad" style={{ marginTop: 16 }}><div className="row wrap"><div><h2>{assets.get(selected.asset) ? recordLabel('asset.asset', assets.get(selected.asset)) : 'Lệnh bảo trì'}</h2><p className="small muted">{selected.description || 'Không có mô tả'} · Ưu tiên {statusLabel(selected.priority)} · Kho vật tư {warehouses.get(selected.warehouse)?.name || 'chưa chọn'}</p></div><span className="grow"/><span className="badge warning">{statusLabel(selected.status)}</span></div>
@@ -120,6 +123,6 @@ export default function MaintenanceWorkbenchPage() {
       {selected.status === 'in_progress' && can('maintenance.maintenance_request.update') && can('maintenance.maintenance_request.done') && <form className="card card-pad" style={{ marginTop: 12 }} onSubmit={(event) => completeRequest(event, selected)}><h3>Ghi nhận hoàn tất</h3><label className="field"><span className="label">Kết quả xử lý *</span><textarea className="input" required rows="3" value={resolution} onChange={(event) => setResolution(event.target.value)} placeholder="Nguyên nhân, công việc đã làm, tình trạng sau sửa chữa…"/></label><div className="form-grid" style={{ marginTop: 10 }}><label className="field"><span className="label">Giờ công</span><input className="input num" type="number" min="0" step="0.25" value={laborHours} onChange={(event) => setLaborHours(event.target.value)}/></label><label className="field"><span className="label">Đơn giá giờ công</span><input className="input num" type="number" min="0" step="any" value={laborRate} onChange={(event) => setLaborRate(event.target.value)}/></label></div><div className="row" style={{ marginTop: 10 }}><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy)}>Hoàn tất lệnh</button></div></form>}
       {selected.resolution && <div className="alert success" style={{ marginTop: 12 }}><strong>Kết quả:</strong> {selected.resolution}{selected.labor_hours != null && <span> · {selected.labor_hours} giờ công · {fmtMoney((Number(selected.labor_hours) || 0) * (Number(selected.labor_rate) || 0))}</span>}</div>}
     </section>}
-    <p className="small muted" style={{ marginTop: 12 }}>Kế hoạch đến hạn chỉ phát sinh một lệnh cho mỗi kỳ. Khi hoàn tất lệnh có vật tư, hệ thống kiểm tra tồn kho và ghi xuất vật tư cùng giao dịch.</p>
+    <p className="small muted" style={{ marginTop: 12 }}>Kế hoạch đến hạn chỉ phát sinh một lệnh đang mở cho mỗi kỳ; nếu lệnh bị hủy, có thể tạo lại. Khi hoàn tất lệnh, hệ thống kiểm tra tồn kho, ghi xuất vật tư, lưu ngày bảo trì và tính kỳ kế tiếp từ ngày hoàn tất.</p>
   </div>;
 }
