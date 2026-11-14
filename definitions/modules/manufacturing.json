@@ -83,6 +83,16 @@
      "ref": "accounting.account"
     },
     {
+     "name": "output_lot_code",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "output_expiry",
+     "type": "date",
+     "required": false
+    },
+    {
      "name": "bom",
      "type": "ref",
      "required": true,

@@ -20,7 +20,7 @@ const FIELDS = {
   tier: 'Hạng', points: 'Điểm', percent: 'Phần trăm', used: 'Đã dùng', interval: 'Chu kỳ', plan: 'Gói', subscription: 'Thuê bao', due_date: 'Hạn thanh toán',
   duration_min: 'Thời lượng (phút)', resource: 'Tài nguyên', service: 'Dịch vụ', starts_at: 'Bắt đầu lúc', ends_at: 'Kết thúc lúc', refund_reason: 'Lý do hoàn vé',
   title_: 'Tiêu đề', technician: 'Kỹ thuật viên', scheduled_at: 'Lịch hẹn', expected_date: 'Dự kiến về', requested_by: 'Người đề nghị', reason: 'Lý do', ignore_reason: 'Lý do bỏ qua',
-  lot: 'Lô', expiry: 'Hạn dùng', direction: 'Chiều', components: 'Thành phần', output_qty: 'Sản lượng', bom: 'Định mức', planned_start: 'Dự kiến bắt đầu',
+  lot: 'Lô', expiry: 'Hạn dùng', output_lot_code: 'Mã lô thành phẩm', output_expiry: 'Hạn dùng thành phẩm', direction: 'Chiều', components: 'Thành phần', output_qty: 'Sản lượng', bom: 'Định mức', planned_start: 'Dự kiến bắt đầu',
   capacity_per_day: 'Công suất/ngày', result: 'Kết quả', severity: 'Mức độ', purchase_date: 'Ngày mua', location: 'Vị trí',
   asset: 'Tài sản', interval_days: 'Chu kỳ (ngày)', next_due: 'Lần tới', plate: 'Biển số', capacity: 'Tải trọng/Sức chứa', reservation_minutes: 'Thời gian giữ vé (phút)', reservation_expires_at: 'Hạn giữ vé', license: 'Bằng lái', reviewer: 'Người đánh giá',
   stops: 'Điểm dừng', origin: 'Điểm đi', destination: 'Điểm đến', vehicle: 'Phương tiện', driver: 'Tài xế', weight: 'Khối lượng',

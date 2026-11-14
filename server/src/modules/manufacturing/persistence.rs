@@ -232,11 +232,19 @@ pub async fn validate_persistence(
                 errors.push("Kho sản xuất không tồn tại trong doanh nghiệp".into());
             }
             if let Some(row) = tx.query_opt(
-                "SELECT COALESCE(tracked, kind = 'goods', true) FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                "SELECT COALESCE(tracked, kind = 'goods', true), COALESCE(lot_tracked, false) FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
                 &[&tenant.id, &product],
             ).await? {
                 if !row.get::<_, bool>(0) {
                     errors.push("Thành phẩm sản xuất phải được theo dõi tồn kho".into());
+                }
+                if row.get::<_, bool>(1)
+                    && document
+                        .get("output_lot_code")
+                        .and_then(Value::as_str)
+                        .is_none_or(|code| code.trim().is_empty())
+                {
+                    errors.push("Thành phẩm theo dõi lô cần mã lô đầu ra trước khi lập lệnh".into());
                 }
             } else {
                 errors.push("Không tìm thấy thành phẩm trong doanh nghiệp".into());

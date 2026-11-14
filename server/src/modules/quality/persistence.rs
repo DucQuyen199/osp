@@ -89,7 +89,7 @@ pub async fn validate_persistence(
         };
         if source == Some("production_order") {
             let order = tx.query_opt(
-                "SELECT product, qty::text, warehouse, status FROM manufacturing__production_order WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                "SELECT po.product, COALESCE(po.good_qty, po.qty)::text, po.warehouse, po.status, COALESCE(product.lot_tracked, false), po.output_lot_code FROM manufacturing__production_order po JOIN master_data__product product ON product.tenant_id = po.tenant_id AND product.id = po.product WHERE po.tenant_id = $1 AND po.id = $2 FOR UPDATE OF po",
                 &[&tenant.id, &order_id],
             ).await?;
             if action == "passed" {
@@ -100,7 +100,7 @@ pub async fn validate_persistence(
                 )
                 .await?;
             }
-            let valid = if let Some(row) = order {
+            let valid = if let Some(row) = &order {
                 row.get::<_, Uuid>(0) == product
                     && money::within_tolerance(
                         decimal_column(&row, 1, "production quantity")?,
@@ -117,6 +117,25 @@ pub async fn validate_persistence(
                     "Phiếu QC phải khớp thành phẩm, số lượng, kho và lệnh sản xuất đã hoàn tất"
                         .into(),
                 );
+            }
+            if let Some(order) = &order
+                && order.get::<_, bool>(4)
+            {
+                let expected_code: Option<String> = order.get(5);
+                let lot = id(document, "lot");
+                let lot_matches = if let (Some(lot), Some(expected_code)) = (lot, expected_code) {
+                    tx.query_opt(
+                        "SELECT 1 FROM inventory__lot WHERE tenant_id = $1 AND id = $2 AND product = $3 AND code = $4 FOR SHARE",
+                        &[&tenant.id, &lot, &product, &expected_code],
+                    )
+                    .await?
+                    .is_some()
+                } else {
+                    false
+                };
+                if !lot_matches {
+                    errors.push("QC thành phẩm phải giữ đúng lô đầu ra của lệnh sản xuất".into());
+                }
             }
             if action == "created" && tx.query_opt(
                 "SELECT id FROM quality__inspection WHERE tenant_id = $1 AND source = 'production_order' AND source_id = $2 LIMIT 1",

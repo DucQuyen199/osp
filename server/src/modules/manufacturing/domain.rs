@@ -113,6 +113,8 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
             "warehouse",
             "work_center",
             "planned_start",
+            "output_lot_code",
+            "output_expiry",
         ]
         .iter()
         .any(|field| patch.get(*field).is_some())
@@ -167,6 +169,13 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
                 .is_none_or(|reason| reason.trim().is_empty())
         {
             errors.push("A reason is required when production scrap is recorded".into());
+        }
+        if let Some(expiry) = document.get("output_expiry").and_then(Value::as_str) {
+            match chrono::NaiveDate::parse_from_str(expiry, "%Y-%m-%d") {
+                Ok(expiry) if expiry >= chrono::Utc::now().date_naive() => {}
+                _ => errors
+                    .push("Ngày hết hạn thành phẩm phải là ngày hợp lệ trong tương lai".into()),
+            }
         }
         match document
             .get("scrap_cost_method")

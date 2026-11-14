@@ -9233,6 +9233,13 @@
             "readOnly": true,
             "type": "string"
           },
+          "output_expiry": {
+            "format": "date",
+            "type": "string"
+          },
+          "output_lot_code": {
+            "type": "string"
+          },
           "planned_start": {
             "format": "date",
             "type": "string"
@@ -9302,6 +9309,13 @@
           },
           "good_qty": {
             "type": "number"
+          },
+          "output_expiry": {
+            "format": "date",
+            "type": "string"
+          },
+          "output_lot_code": {
+            "type": "string"
           },
           "planned_start": {
             "format": "date",

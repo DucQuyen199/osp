@@ -150,6 +150,52 @@ pub async fn handle_source_event(
                     data.insert(field.into(), value.clone());
                 }
             }
+            let product_id = id(document, "product").ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    event_type,
+                    vec!["Production order requires a valid output product".into()],
+                )
+            })?;
+            let lot_tracked = tx
+                .query_opt(
+                    "SELECT COALESCE(lot_tracked, false) FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                    &[&tenant.id, &product_id],
+                )
+                .await?
+                .is_some_and(|row| row.get::<_, bool>(0));
+            if lot_tracked {
+                let code = document
+                    .get("output_lot_code")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|code| !code.is_empty())
+                    .ok_or_else(|| {
+                        crate::error::ApiError::validation(
+                            event_type,
+                            vec!["Thành phẩm theo dõi lô cần mã lô đầu ra".into()],
+                        )
+                    })?;
+                let lot = kernel.ent(tenant, "inventory.lot")?;
+                let mut lot_data = Map::from_iter([
+                    ("product".into(), json!(product_id)),
+                    ("code".into(), json!(code)),
+                ]);
+                if let Some(expiry) = document
+                    .get("output_expiry")
+                    .filter(|value| !value.is_null())
+                {
+                    lot_data.insert("expiry".into(), expiry.clone());
+                }
+                let created = kernel
+                    .create_in(tx, &Actor::System, tenant, &lot, lot_data, &opts)
+                    .await?;
+                data.insert(
+                    "lot".into(),
+                    created.get("id").cloned().ok_or_else(|| {
+                        crate::error::ApiError::internal("Created production lot has no id")
+                    })?,
+                );
+            }
             data.insert(
                 "qty".into(),
                 document

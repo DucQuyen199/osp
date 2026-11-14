@@ -19,6 +19,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Phụ lục hợp đồng được lập, gửi duyệt, áp dụng theo ngày hiệu lực và ghi snapshot lịch sử; hỗ trợ đổi tên, điều khoản, giá trị và ngày kết thúc trên hợp đồng đang hiệu lực.
 - Thuê bao lưu ngày bắt đầu mặc định và neo ngày thu theo lịch gốc, tránh trôi lịch tháng/quý/năm qua các tháng ngắn; kỳ đến hạn tiếp tục tự lập hóa đơn bằng scheduler.
 - Nhà thuốc chỉ ghi nhận cấp phát qua state machine sau giao dịch POS hoàn tất; timestamp, lịch sử đơn thuốc và bán hàng cùng commit/rollback.
+- Lệnh sản xuất theo dõi sản lượng đạt/phế phẩm riêng trong QC; thành phẩm theo dõi lô nhận mã lô và hạn dùng được liên kết tới phiếu QC và tồn kho.
 - Docker image Linux đã build và chạy qua Compose test riêng; đã diễn tập pg_dump/pg_restore, restart, RLS, phiên đăng nhập và luồng bán hàng sau khôi phục. Vẫn cần xác minh vận hành/tải/HA trên hạ tầng production thực tế.
 
 ## Còn thiếu
