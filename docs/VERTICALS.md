@@ -192,7 +192,7 @@ Nhà cung cấp internet, truyền hình, nước sạch, điện, tiện ích.
 - **Module (14):** `master-data`, `hrm`, `accounting`, `inventory`, `bi`, `communication`, `sales`, `crm`, `einvoice`, `helpdesk`, `field-service`, `payroll`, `subscription`, `utilities`
 - **Thuật ngữ:** `master-data.party` = Thuê bao; `master-data.product` = Gói cước/Dịch vụ; `subscription.subscription` = Thuê bao
 - **Trường mở rộng:** `master-data.party`: service_address, zone
-- **Vai trò riêng:** Ghi chỉ số, Hỗ trợ khách hàng
+- **Vai trò riêng:** Ghi chỉ số, Hỗ trợ khách hàng, Lập và thu hóa đơn tiện ích
 - **KPI:** ARPU; Churn; Thời gian xử lý ticket; Tỷ lệ thu cước đúng hạn
 
 ## Bán buôn - Phân phối (`wholesale`)

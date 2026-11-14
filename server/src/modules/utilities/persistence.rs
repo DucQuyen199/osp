@@ -150,6 +150,16 @@ async fn validate_reading(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<V
     {
         errors.push("Mỗi công tơ chỉ được có một chỉ số trong một kỳ".into());
     }
+    if tx
+        .query_opt(
+            "SELECT id FROM utilities__meter_reading WHERE tenant_id = $1 AND meter = $2 AND period > $3 AND ($4::uuid IS NULL OR id <> $4) ORDER BY period ASC LIMIT 1 FOR UPDATE",
+            &[&tenant.id, &meter, &period, &id],
+        )
+        .await?
+        .is_some()
+    {
+        errors.push("Không thể ghi bổ sung kỳ cũ sau khi đã có kỳ mới vì sẽ làm sai mức tiêu thụ và hóa đơn đã chốt".into());
+    }
     let reading = document
         .get("reading")
         .and_then(money::decimal)

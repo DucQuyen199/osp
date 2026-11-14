@@ -48,7 +48,17 @@
     "utilities.meter_reading.*",
     "utilities.meter.read"
    ]
-  }
+   },
+   "utility_billing": {
+    "name": "Lập và thu hóa đơn tiện ích",
+    "permissions": [
+     "utilities.meter.read",
+     "utilities.meter_reading.read",
+     "utilities.utility_bill.*",
+     "accounting.invoice.read",
+     "accounting.payment.*"
+    ]
+   }
  },
  "kpis": [
   "ARPU",
