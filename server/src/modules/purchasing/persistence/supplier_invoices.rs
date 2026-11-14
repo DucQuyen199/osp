@@ -114,6 +114,18 @@ pub(super) async fn validate(
         .and_then(Value::as_str)
         .unwrap_or_default()
         .trim();
+    // A row lock cannot protect the empty result of a uniqueness query. Serialize
+    // checks for the same normalized supplier number so concurrent approvals on
+    // different purchase orders cannot both create the same payable invoice.
+    let invoice_number_lock = format!(
+        "purchasing.supplier_invoice.number:{}:{}:{invoice_number}",
+        tenant.id, supplier_id
+    );
+    tx.query_one_row(
+        "SELECT pg_advisory_xact_lock(hashtextextended(upper($1), 0))",
+        &[&invoice_number_lock],
+    )
+    .await?;
     if tx.query_opt(
         "SELECT id FROM purchasing__supplier_invoice WHERE tenant_id=$1 AND supplier=$2 AND upper(trim(invoice_number))=upper($3) AND id<>$4 LIMIT 1 FOR UPDATE",
         &[&tenant.id, &supplier_id, &invoice_number, &invoice_id],

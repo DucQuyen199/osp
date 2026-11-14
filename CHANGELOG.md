@@ -16,6 +16,7 @@
 - Deferred receivables for shipped sales orders until all deliveries succeed; counter sales continue to invoice at confirmation.
 - Added supplier invoice capture for partial and complete receipts; approval checks unique invoice numbers and cumulative received quantities after dispatched returns before posting each matched payable bill against remaining GRNI.
 - Linked purchase returns to the supplier invoice they reverse; returns before invoicing reduce GRNI directly, while billed returns create a debit note against the selected payable.
+- Serialized supplier invoice number uniqueness checks per tenant and supplier so concurrent approvals on different purchase orders cannot create duplicate payable documents.
 
 ### Changed
 - Scoped the runtime data ignore rule to the repository root so nested application source such as `server/src/kernel/data` is tracked and included in source releases.
