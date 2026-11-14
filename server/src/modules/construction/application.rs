@@ -17,6 +17,7 @@ pub async fn prepare_document(
     match entity {
         "site" => trim(document, &["name", "address"]),
         "subcontract" => trim(document, &["scope"]),
+        "progress_claim" => trim(document, &["notes"]),
         "site_diary" => trim(document, &["weather", "notes"]),
         "boq" => prepare_boq(tx, tenant, document).await,
         _ => Ok(Vec::new()),

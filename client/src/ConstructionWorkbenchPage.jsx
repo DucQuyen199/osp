@@ -15,6 +15,7 @@ export default function ConstructionWorkbenchPage() {
   const [diaries, setDiaries] = useState([]);
   const [boqs, setBoqs] = useState([]);
   const [subcontracts, setSubcontracts] = useState([]);
+  const [claims, setClaims] = useState([]);
   const [bills, setBills] = useState([]);
   const [parties, setParties] = useState(new Map());
   const [projectId, setProjectId] = useState('');
@@ -23,6 +24,7 @@ export default function ConstructionWorkbenchPage() {
   const [boqForm, setBoqForm] = useState({ project: '', supersedes: '', revision_reason: '' });
   const [boqLines, setBoqLines] = useState([{ description: '', qty: '1', unit_price: '' }]);
   const [subcontractForm, setSubcontractForm] = useState({ project: '', vendor: '', value: '', scope: '' });
+  const [claimForm, setClaimForm] = useState({ subcontract: '', period: today(), amount: '', notes: '' });
   const [busy, setBusy] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -31,12 +33,13 @@ export default function ConstructionWorkbenchPage() {
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
-      const [projectRes, siteRes, diaryRes, boqRes, subcontractRes, billRes, partyMap] = await Promise.all([
+      const [projectRes, siteRes, diaryRes, boqRes, subcontractRes, claimRes, billRes, partyMap] = await Promise.all([
         can('project.project.read') ? api(`${dataPath('project.project')}?limit=1000`) : Promise.resolve({ items: [] }),
         can('construction.site.read') ? api(`${dataPath('construction.site')}?limit=1000`) : Promise.resolve({ items: [] }),
         can('construction.site_diary.read') ? api(`${dataPath('construction.site_diary')}?limit=1000`) : Promise.resolve({ items: [] }),
         can('construction.boq.read') ? api(`${dataPath('construction.boq')}?limit=1000`) : Promise.resolve({ items: [] }),
         can('construction.subcontract.read') ? api(`${dataPath('construction.subcontract')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('construction.progress_claim.read') ? api(`${dataPath('construction.progress_claim')}?limit=1000`) : Promise.resolve({ items: [] }),
         can('accounting.bill.read') ? api(`${dataPath('accounting.bill')}?limit=1000`) : Promise.resolve({ items: [] }),
         can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
       ]);
@@ -44,12 +47,13 @@ export default function ConstructionWorkbenchPage() {
       const siteRows = itemsOf(siteRes);
       const boqRows = itemsOf(boqRes);
       setProjects(projectRows); setSites(siteRows); setDiaries(itemsOf(diaryRes)); setBoqs(boqRows);
-      setSubcontracts(itemsOf(subcontractRes)); setBills(itemsOf(billRes)); setParties(partyMap);
+      setSubcontracts(itemsOf(subcontractRes)); setClaims(itemsOf(claimRes)); setBills(itemsOf(billRes)); setParties(partyMap);
       setProjectId((current) => projectRows.some((row) => row.id === current) ? current : projectRows[0]?.id || '');
       setSiteForm((current) => ({ ...current, project: current.project || projectRows.find((row) => ['planned', 'active'].includes(row.status))?.id || '' }));
       setDiaryForm((current) => ({ ...current, site: current.site || siteRows.find((site) => site.project === projectRows[0]?.id)?.id || siteRows.find((site) => !site.project)?.id || '' }));
       setBoqForm((current) => ({ ...current, project: current.project || projectRows.find((row) => ['planned', 'active'].includes(row.status))?.id || '' }));
       setSubcontractForm((current) => ({ ...current, project: current.project || projectRows.find((row) => row.status === 'active')?.id || '', vendor: current.vendor || [...partyMap.keys()][0] || '' }));
+      setClaimForm((current) => ({ ...current, subcontract: current.subcontract || itemsOf(subcontractRes).find((row) => row.status === 'signed')?.id || '' }));
     } catch (reason) { setError(reason.message || 'Không tải được dữ liệu công trường.'); }
     finally { if (!quiet) setLoading(false); }
   }, []);
@@ -62,6 +66,8 @@ export default function ConstructionWorkbenchPage() {
   const committedValue = projectSubcontracts.filter((row) => ['signed', 'completed'].includes(row.status)).reduce((sum, row) => sum + Number(row.value || 0), 0);
   const currentBoq = projectBoqs.find((row) => row.status === 'approved');
   const billBySubcontract = useMemo(() => new Map(bills.filter((row) => row.source === 'subcontract').map((row) => [row.source_id, row])), [bills]);
+  const billByClaim = useMemo(() => new Map(bills.filter((row) => row.source === 'progress_claim').map((row) => [row.source_id, row])), [bills]);
+  const projectClaims = useMemo(() => claims.filter((row) => projectSubcontracts.some((contract) => contract.id === row.subcontract)), [claims, projectSubcontracts]);
   const revisionSource = boqs.find((row) => row.id === boqForm.supersedes);
 
   async function run(key, operation, success) {
@@ -98,6 +104,14 @@ export default function ConstructionWorkbenchPage() {
     event.preventDefault();
     await run('subcontract', () => api(dataPath('construction.subcontract'), { method: 'POST', body: { ...subcontractForm, project: projectId, value: Number(subcontractForm.value) } }), 'Đã lập dự thảo hợp đồng thầu phụ.');
     setSubcontractForm((current) => ({ ...current, value: '', scope: '' }));
+  }
+
+  async function createClaim(event) {
+    event.preventDefault();
+    const contract = subcontracts.find((row) => row.id === claimForm.subcontract);
+    if (!contract) return;
+    await run('claim', () => api(dataPath('construction.progress_claim'), { method: 'POST', body: { ...claimForm, vendor: contract.vendor, amount: Number(claimForm.amount), notes: claimForm.notes || undefined } }), 'Đã lập hồ sơ nghiệm thu/đề nghị thanh toán nháp.');
+    setClaimForm((current) => ({ ...current, amount: '', notes: '' }));
   }
 
   async function transition(entity, row, verb, success) {
@@ -139,6 +153,11 @@ export default function ConstructionWorkbenchPage() {
         {can('construction.subcontract.create') && <form className="form-grid" onSubmit={createSubcontract}><label className="field"><span className="label">Nhà thầu *</span><select className="select" required value={subcontractForm.vendor} onChange={(e) => setSubcontractForm({ ...subcontractForm, vendor: e.target.value })}><option value="">Chọn nhà thầu</option>{[...parties.values()].map((party) => <option key={party.id} value={party.id}>{recordLabel('master-data.party', party)}</option>)}</select></label><label className="field"><span className="label">Giá trị hợp đồng *</span><input className="input" type="number" required min="0.01" step="any" value={subcontractForm.value} onChange={(e) => setSubcontractForm({ ...subcontractForm, value: e.target.value })}/></label><label className="field full"><span className="label">Phạm vi công việc</span><textarea className="input" rows="2" value={subcontractForm.scope} onChange={(e) => setSubcontractForm({ ...subcontractForm, scope: e.target.value })}/></label><div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy) || !['planned','active'].includes(selectedProject?.status) || !subcontractForm.vendor}>Lập dự thảo thầu phụ</button></div></form>}
         <p className="muted">Ký hợp đồng ghi nhận cam kết chi phí và kiểm tra ngân sách. Hóa đơn phải trả được lập riêng khi có khối lượng nghiệm thu hoặc hồ sơ thanh toán.</p>
         <div className="table-wrap" style={{ marginTop: 14 }}><table className="table"><thead><tr><th>Nhà thầu</th><th>Phạm vi</th><th>Giá trị</th><th>Trạng thái</th><th>Thao tác / chứng từ</th></tr></thead><tbody>{projectSubcontracts.map((row) => <tr key={row.id}><td>{parties.has(row.vendor) ? recordLabel('master-data.party', parties.get(row.vendor)) : '—'}</td><td>{row.scope || '—'}</td><td>{fmtMoney(row.value)}</td><td>{statusLabel(row.status)}</td><td>{row.status === 'draft' && can('construction.subcontract.signed') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy) || selectedProject?.status !== 'active'} onClick={() => transition('construction.subcontract', row, 'signed', 'Đã ký thầu phụ và ghi nhận cam kết chi phí trong hạn mức ngân sách.')}>Ký hợp đồng</button>}{row.status === 'signed' && can('construction.subcontract.completed') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => transition('construction.subcontract', row, 'completed', 'Đã xác nhận hoàn thành phạm vi thầu phụ.')}>Hoàn thành</button>}{billBySubcontract.has(row.id) && <a className="btn btn-ghost btn-sm" style={{ marginLeft: 6 }} href={`#/e/accounting/bill/${billBySubcontract.get(row.id).id}`}>Mở hóa đơn phải trả</a>}</td></tr>)}</tbody></table></div>
+      </section>
+      <section className="card card-pad" style={{ marginTop: 16 }}><h2>Nghiệm thu và thanh toán theo đợt</h2>
+        <p className="muted">Mỗi hồ sơ được duyệt sẽ tạo một hóa đơn phải trả theo giá trị nghiệm thu. Máy chủ khóa hợp đồng và chặn lũy kế vượt giá trị hợp đồng.</p>
+        {can('construction.progress_claim.create') && <form className="form-grid" onSubmit={createClaim}><label className="field"><span className="label">Hợp đồng thầu phụ *</span><select className="select" required value={claimForm.subcontract} onChange={(e) => setClaimForm({ ...claimForm, subcontract: e.target.value })}><option value="">Chọn hợp đồng đã ký</option>{projectSubcontracts.filter((row) => ['signed','completed'].includes(row.status)).map((row) => <option key={row.id} value={row.id}>{parties.has(row.vendor) ? recordLabel('master-data.party', parties.get(row.vendor)) : 'Nhà thầu'} · {fmtMoney(row.value)}</option>)}</select></label><label className="field"><span className="label">Ngày nghiệm thu *</span><input className="input" type="date" required max={today()} value={claimForm.period} onChange={(e) => setClaimForm({ ...claimForm, period: e.target.value })}/></label><label className="field"><span className="label">Giá trị đề nghị thanh toán *</span><input className="input" type="number" required min="0.01" step="any" value={claimForm.amount} onChange={(e) => setClaimForm({ ...claimForm, amount: e.target.value })}/></label><label className="field"><span className="label">Ghi chú / số biên bản</span><input className="input" value={claimForm.notes} onChange={(e) => setClaimForm({ ...claimForm, notes: e.target.value })}/></label><div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy) || !claimForm.subcontract}>Lập hồ sơ nháp</button></div></form>}
+        <div className="table-wrap" style={{ marginTop: 14 }}><table className="table"><thead><tr><th>Ngày</th><th>Nhà thầu / hợp đồng</th><th>Hồ sơ</th><th>Giá trị</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{projectClaims.sort((a,b) => String(b.period).localeCompare(String(a.period))).map((row) => { const contract = subcontracts.find((item) => item.id === row.subcontract); const bill = billByClaim.get(row.id); return <tr key={row.id}><td>{fmtDate(row.period)}</td><td>{parties.has(row.vendor) ? recordLabel('master-data.party', parties.get(row.vendor)) : '—'}<div className="muted">{contract?.scope || 'Thầu phụ'}</div></td><td>{row.notes || '—'}</td><td>{fmtMoney(row.amount)}</td><td>{statusLabel(row.status)}</td><td>{row.status === 'draft' && can('construction.progress_claim.approved') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => transition('construction.progress_claim', row, 'approved', 'Đã duyệt nghiệm thu và tạo hóa đơn phải trả theo giá trị đợt.')}>Duyệt và lập hóa đơn</button>}{bill && <a className="btn btn-ghost btn-sm" style={{ marginLeft: 6 }} href={`#/e/accounting/bill/${bill.id}`}>Mở hóa đơn</a>}</td></tr>; })}</tbody></table></div>
       </section>
     </>}
   </div>;

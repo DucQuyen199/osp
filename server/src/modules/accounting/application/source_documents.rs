@@ -192,6 +192,16 @@ pub(super) fn source_document(event_type: &str) -> Option<SourceDocument> {
             Condition::Positive("amount"),
             true,
         ),
+        "construction.progress_claim.approved" => (
+            Target::Bill,
+            "amount",
+            None,
+            Some("vendor"),
+            "progress_claim",
+            None,
+            Condition::Positive("amount"),
+            true,
+        ),
         "lending.repayment.paid" => (
             Target::Payment,
             "amount",

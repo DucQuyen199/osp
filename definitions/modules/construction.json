@@ -1,7 +1,7 @@
 {
   "id": "construction",
   "name": "Xây dựng",
-  "description": "Dự toán (BOQ), công trường, thầu phụ, cam kết chi phí và nhật ký thi công.",
+  "description": "Dự toán, công trường, thầu phụ, nghiệm thu khối lượng và cam kết chi phí.",
   "category": "industry",
   "version": "0.1.0",
   "depends": [
@@ -181,6 +181,25 @@
         }
       ],
       "states": null,
+      "computed": {},
+      "constraints": []
+    },
+    {
+      "name": "progress_claim",
+      "label": "Nghiệm thu / đề nghị thanh toán thầu phụ",
+      "fields": [
+        { "name": "subcontract", "type": "ref", "required": true, "ref": "construction.subcontract" },
+        { "name": "vendor", "type": "ref", "required": true, "ref": "master-data.party" },
+        { "name": "period", "type": "date", "required": true },
+        { "name": "amount", "type": "money", "required": true },
+        { "name": "notes", "type": "text", "required": false },
+        { "name": "status", "type": "enum", "required": false, "options": ["draft", "approved"] }
+      ],
+      "states": {
+        "field": "status",
+        "initial": "draft",
+        "actions": { "approved": { "from": ["draft"], "to": "approved" } }
+      },
       "computed": {},
       "constraints": []
     }

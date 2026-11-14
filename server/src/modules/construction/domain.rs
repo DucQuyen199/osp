@@ -71,6 +71,20 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                 errors.push("Giá trị hợp đồng thầu phụ phải lớn hơn 0".into());
             }
         }
+        "progress_claim" => {
+            if !positive(document, "amount") {
+                errors.push("Giá trị nghiệm thu phải lớn hơn 0".into());
+            }
+            if document
+                .get("period")
+                .and_then(Value::as_str)
+                .filter(|date| date.len() == 10)
+                .and_then(|date| NaiveDate::parse_from_str(date, "%Y-%m-%d").ok())
+                .is_none_or(|date| date > chrono::Utc::now().date_naive())
+            {
+                errors.push("Kỳ nghiệm thu cần là ngày hợp lệ, không nằm trong tương lai".into());
+            }
+        }
         "site_diary" => {
             let date = document.get("date").and_then(Value::as_str);
             if date
@@ -106,6 +120,9 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
     if entity == "subcontract" && action == "signed" && !positive(document, "value") {
         return vec!["Chỉ ký hợp đồng thầu phụ có giá trị lớn hơn 0".into()];
     }
+    if entity == "progress_claim" && action == "approved" && !positive(document, "amount") {
+        return vec!["Chỉ duyệt hồ sơ nghiệm thu có giá trị lớn hơn 0".into()];
+    }
     Vec::new()
 }
 
@@ -139,6 +156,10 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
     if entity == "subcontract" && current.get("status").and_then(Value::as_str) != Some("draft") {
         return vec!["Hợp đồng thầu phụ đã ký không thể sửa điều khoản".into()];
     }
+    if entity == "progress_claim" && current.get("status").and_then(Value::as_str) != Some("draft")
+    {
+        return vec!["Hồ sơ nghiệm thu đã duyệt không thể sửa".into()];
+    }
     Vec::new()
 }
 
@@ -150,6 +171,9 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
         ("site_diary", _) => vec!["Nhật ký công trường không thể xóa khỏi lịch sử".into()],
         ("subcontract", Some("signed" | "completed")) => {
             vec!["Hợp đồng thầu phụ đã ký không thể xóa khỏi lịch sử".into()]
+        }
+        ("progress_claim", Some("approved")) => {
+            vec!["Hồ sơ nghiệm thu đã duyệt không thể xóa khỏi lịch sử".into()]
         }
         _ => Vec::new(),
     }
