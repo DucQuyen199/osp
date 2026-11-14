@@ -19,6 +19,7 @@
 - Made counted closing cash and POS session close atomic with the sales/refund/cash-movement reconciliation.
 - Made maintenance completion atomic with the repair resolution and a complete optional labor-hours/rate pair.
 - Added a tenant-scoped maintenance technician roster and assignment on open work orders, including contractor/internal type, specialty, contact, and safeguards against assigning inactive technicians or deactivating technicians with open work.
+- Prevented future-dated crop planting, input application, and harvest records from changing agricultural inventory before those field operations occur; enforced on the API and date controls.
 - Made supplier invoice dispute reasons and dispute resolution notes atomic with their state transitions.
 - Made employee termination dates atomic with termination, attendance/leave checks and payroll synchronization.
 - Made hotel no-show reasons atomic with reservation status changes and room-calendar release.

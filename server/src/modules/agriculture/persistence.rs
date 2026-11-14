@@ -117,6 +117,21 @@ async fn validate_cycle(
         return Ok(vec!["Trang trại không tồn tại trong doanh nghiệp".into()]);
     }
     let mut errors = Vec::new();
+    let today: String = tx
+        .query("SELECT current_date::text", &[])
+        .await?
+        .first()
+        .map(|row| row.get(0))
+        .ok_or_else(|| crate::error::ApiError::internal("Database did not return current date"))?;
+    if document
+        .get("planted_on")
+        .and_then(Value::as_str)
+        .is_some_and(|planted_on| planted_on > today.as_str())
+    {
+        errors.push(
+            "Vụ mùa chỉ được ghi ngày gieo trồng thực tế, không thể ghi ngày tương lai".into(),
+        );
+    }
     if action == "updated" || action == "removed" {
         if let Some(id) = id {
             if tx.query_opt(
@@ -154,19 +169,23 @@ async fn validate_harvest(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<V
         return Ok(vec!["Phiếu thu hoạch cần ngày thu hoạch hợp lệ".into()]);
     };
     let Some(row) = tx.query_opt(
-        "SELECT status, planted_on::text FROM agriculture__crop_cycle WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+        "SELECT status, planted_on::text, current_date::text FROM agriculture__crop_cycle WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
         &[&tenant.id, &cycle],
     ).await? else {
         return Ok(vec!["Vụ mùa không tồn tại trong doanh nghiệp".into()]);
     };
     let status: String = row.get(0);
     let planted: Option<String> = row.get(1);
+    let today: String = row.get(2);
     let mut errors = Vec::new();
     if status != "growing" {
         errors.push("Chỉ vụ mùa đang canh tác mới nhận thu hoạch".into());
     }
     if planted.as_deref().is_some_and(|planted| date < planted) {
         errors.push("Ngày thu hoạch không thể trước ngày gieo trồng".into());
+    }
+    if date > today.as_str() {
+        errors.push("Không thể ghi nhận nhập kho thu hoạch trước ngày thu hoạch thực tế".into());
     }
     if let Some(row) = tx
         .query_opt(
@@ -225,19 +244,23 @@ async fn validate_input(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<Vec
         return Ok(vec!["Phiếu vật tư cần ngày sử dụng hợp lệ".into()]);
     };
     let Some(row) = tx.query_opt(
-        "SELECT status, planted_on::text FROM agriculture__crop_cycle WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+        "SELECT status, planted_on::text, current_date::text FROM agriculture__crop_cycle WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
         &[&tenant.id, &cycle],
     ).await? else {
         return Ok(vec!["Vụ mùa không tồn tại trong doanh nghiệp".into()]);
     };
     let status: String = row.get(0);
     let planted: Option<String> = row.get(1);
+    let today: String = row.get(2);
     let mut errors = Vec::new();
     if status != "growing" {
         errors.push("Chỉ vụ mùa đang canh tác mới ghi nhận sử dụng vật tư".into());
     }
     if planted.as_deref().is_some_and(|planted| date < planted) {
         errors.push("Ngày sử dụng vật tư không thể trước ngày gieo trồng".into());
+    }
+    if date > today.as_str() {
+        errors.push("Không thể ghi nhận sử dụng vật tư trước ngày thực tế phát sinh".into());
     }
     if let Some(product) = parse_id(document, "product") {
         if tx
