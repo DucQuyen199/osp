@@ -32,21 +32,44 @@
  },
  "roles": {
   "dispatcher": {
-   "name": "Điều độ",
-   "permissions": [
-    "logistics.*",
-    "sales.sales_order.read"
-   ]
+    "name": "Điều độ",
+    "permissions": [
+      "logistics.*",
+      "sales.sales_order.read"
+    ]
   },
   "driver": {
-   "name": "Tài xế",
-   "permissions": [
-    "logistics.shipment.read",
-    "logistics.shipment.delivered",
-    "logistics.shipment.failed"
-   ]
+    "name": "Tài xế",
+    "permissions": [
+      "logistics.shipment.read",
+      "logistics.shipment.delivered",
+      "logistics.shipment.failed"
+    ]
+  },
+  "maintenance_technician": {
+    "name": "K? thu?t vi?n b?o tr?",
+    "permissions": [
+      "maintenance.maintenance_request.read",
+      "maintenance.maintenance_request.create",
+      "maintenance.maintenance_request.update",
+      "maintenance.maintenance_request.started",
+      "maintenance.maintenance_request.done",
+      "maintenance.maintenance_request.cancelled",
+      "asset.asset.read",
+      "master-data.product.read",
+      "inventory.warehouse.read"
+    ]
+  },
+  "maintenance_manager": {
+    "name": "Qu?n l? b?o tr?",
+    "permissions": [
+      "maintenance.*",
+      "asset.asset.read",
+      "master-data.product.read",
+      "inventory.warehouse.read"
+    ]
   }
- },
+},
  "kpis": [
   "Tỷ lệ giao đúng hẹn",
   "Chi phí/km",

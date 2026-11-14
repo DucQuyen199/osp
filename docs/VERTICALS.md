@@ -39,7 +39,7 @@ Nhà thầu, thi công, thiết kế - nội thất.
 - **Module (16):** `master-data`, `hrm`, `accounting`, `inventory`, `asset`, `bi`, `project`, `construction`, `contract`, `document`, `einvoice`, `maintenance`, `quality`, `payroll`, `purchasing`, `workflow-approval`
 - **Thuật ngữ:** `master-data.party` = Chủ đầu tư/Khách hàng; `master-data.product` = Vật tư xây dựng; `project.project` = Công trình
 - **Trường mở rộng:** `master-data.product`: norm_code, brand
-- **Vai trò riêng:** Dự toán, Qu?n l? ph? duy?t mua h?ng, Nh?n vi?n mua h?ng, Quản lý dự án, Chỉ huy công trường
+- **Vai trò riêng:** Dự toán, Qu?n l? b?o tr?, K? thu?t vi?n b?o tr?, Qu?n l? ph? duy?t mua h?ng, Nh?n vi?n mua h?ng, Quản lý dự án, Chỉ huy công trường
 - **KPI:** Tiến độ so với kế hoạch; Chi phí thực tế vs dự toán; Công nợ thầu phụ; Vật tư hao hụt
 
 ## Thương mại điện tử (`ecommerce`)
@@ -120,7 +120,7 @@ Công ty vận tải, giao nhận, kho vận, chuyển phát.
 - **Module (13):** `master-data`, `hrm`, `accounting`, `inventory`, `asset`, `bi`, `contract`, `sales`, `crm`, `einvoice`, `logistics`, `maintenance`, `payroll`
 - **Thuật ngữ:** `logistics.shipment` = Vận đơn; `master-data.party` = Chủ hàng; `master-data.product` = Dịch vụ vận chuyển
 - **Trường mở rộng:** `master-data.party`: contract_rate_tier
-- **Vai trò riêng:** Điều độ, Tài xế
+- **Vai trò riêng:** Điều độ, Tài xế, Qu?n l? b?o tr?, K? thu?t vi?n b?o tr?
 - **KPI:** Tỷ lệ giao đúng hẹn; Chi phí/km; Hiệu suất sử dụng xe; Số vận đơn/ngày
 
 ## Sản xuất (`manufacturing`)
@@ -129,7 +129,7 @@ Nhà máy, xưởng sản xuất, gia công, lắp ráp.
 - **Module (15):** `master-data`, `hrm`, `accounting`, `inventory`, `asset`, `bi`, `sales`, `crm`, `einvoice`, `maintenance`, `quality`, `manufacturing`, `payroll`, `purchasing`, `workflow-approval`
 - **Thuật ngữ:** `master-data.party` = Khách hàng; `master-data.product` = Vật tư/Thành phẩm
 - **Trường mở rộng:** `master-data.product`: drawing_no, spec, shelf_life_days
-- **Vai trò riêng:** Kế hoạch sản xuất, Qu?n l? ph? duy?t mua h?ng, Nh?n vi?n mua h?ng, QC, Kỹ thuật bảo trì
+- **Vai trò riêng:** Qu?n l? b?o tr?, K? thu?t vi?n b?o tr?, Kế hoạch sản xuất, Qu?n l? ph? duy?t mua h?ng, Nh?n vi?n mua h?ng, QC, Kỹ thuật bảo trì
 - **KPI:** OEE; Tỷ lệ phế phẩm; Tiến độ lệnh sản xuất; Giá thành đơn vị
 
 ## Tổ chức phi lợi nhuận - Cơ quan công (`ngo-government`)
