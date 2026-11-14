@@ -20,6 +20,7 @@
 - Made maintenance completion atomic with the repair resolution and a complete optional labor-hours/rate pair.
 - Made supplier invoice dispute reasons and dispute resolution notes atomic with their state transitions.
 - Made employee termination dates atomic with termination, attendance/leave checks and payroll synchronization.
+- Made hotel no-show reasons atomic with reservation status changes and room-calendar release.
 - Added contract amendments for title, terms, contract value and end-date changes, with approval-rule support, effective-date scheduling, atomic application and an immutable amendment history on the active contract.
 - Added an e-invoice operations workbench with status queues, provider error visibility, retry controls, source invoice links, provider response and attempt-history inspection, and reasoned cancellation requests.
 - Anchored subscription billing dates to the original start day, preventing month-end billing dates from drifting after short months.

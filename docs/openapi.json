@@ -64787,7 +64787,7 @@
     },
     "/api/t/{tenantId}/data/hotel/reservation/{id}/no_show": {
       "post": {
-        "description": "Phát sự kiện `hotel.reservation.no_show` cho các module khác phản ứng.",
+        "description": "Save the required no-show reason and mark the reservation no-show atomically after checking that the arrival date passed and no folio charges remain.",
         "parameters": [
           {
             "in": "path",
@@ -64807,6 +64807,27 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "no_show_reason": {
+                    "maxLength": 500,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "no_show_reason"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {

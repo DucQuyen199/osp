@@ -90,7 +90,10 @@ export default function HotelFrontDeskPage() {
       if (action === 'no_show') {
         const reason = noShowReason.trim();
         if (!reason) throw new Error('Nhập lý do trước khi ghi nhận khách vắng mặt.');
-        await api(dataPath('hotel.reservation', reservation.id), { method: 'PATCH', body: { no_show_reason: reason } });
+        await api(dataPath('hotel.reservation', reservation.id, action), { method: 'POST', body: { no_show_reason: reason } });
+        await load(true);
+        setNotice('Đã ghi nhận khách vắng mặt và giải phóng lịch phòng.');
+        return;
       }
       const result = await api(dataPath('hotel.reservation', reservation.id, action), { method: 'POST' });
       await load(true);

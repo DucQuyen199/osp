@@ -444,6 +444,22 @@ pub fn build(reg: &Registry) -> Value {
                             } } }
                         });
                     }
+                    if def.qname() == "hotel.reservation" && action == "no_show" {
+                        operation["description"] = json!(
+                            "Save the required no-show reason and mark the reservation no-show atomically after checking that the arrival date passed and no folio charges remain."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": true,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "required": ["no_show_reason"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "no_show_reason": { "type": "string", "minLength": 1, "maxLength": 500 }
+                                }
+                            } } }
+                        });
+                    }
                     paths.insert(
                         format!("{base}/{{id}}/{action}"),
                         json!({ "post": operation }),

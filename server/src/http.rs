@@ -2052,6 +2052,23 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     body.insert("termination_date".into(), serde_json::json!(date.unwrap()));
                     return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
                 }
+                if q == "hotel.reservation" && *action == "no_show" {
+                    let mut body = json_obj(&bytes)?;
+                    let reason = body
+                        .get("no_show_reason")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::trim)
+                        .unwrap_or_default()
+                        .to_owned();
+                    if body.len() != 1 || !(1..=500).contains(&reason.chars().count()) {
+                        return Err(ApiError::validation(
+                            "hotel.reservation.no_show",
+                            vec!["Cần gửi duy nhất no_show_reason có từ 1 đến 500 ký tự".into()],
+                        ));
+                    }
+                    body.insert("no_show_reason".into(), serde_json::json!(reason));
+                    return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
+                }
                 return json_ok(k.act(&actor, &t, &q, id, action).await?);
             }
             _ => {}
