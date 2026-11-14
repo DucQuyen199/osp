@@ -32,7 +32,7 @@ pub(super) struct SourceDocument {
 
 pub(super) fn source_document(event_type: &str) -> Option<SourceDocument> {
     let spec = match event_type {
-        "sales.sales_order.confirmed" => (
+        "sales.sales_order.delivered" => (
             Target::Invoice,
             "total",
             Some("party"),

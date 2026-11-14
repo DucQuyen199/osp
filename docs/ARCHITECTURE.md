@@ -202,6 +202,8 @@ Clinic follows the same layout for patient identity, encounters, prescriptions, 
 
 Construction follows the same layout for BOQs, sites, subcontracts, progress claims, and site diaries. BOQ totals are calculated from validated line quantities and prices; subcontract signing locks the project and checks total signed commitments against its budget. Signing records a commitment only. Each approved progress claim locks its subcontract, checks that cumulative approved value stays within contract value, and creates a payable bill in the same transaction. Site diaries are unique per site/day and kept as immutable project history.
 
+For sales orders with a shipping address in a tenant that uses Logistics, confirmation creates fulfillment work but does not recognize receivables. Accounting invoices the full order after the sales order reaches delivered, which is only allowed after every shipment and ordered quantity has been delivered. Counter sales without shipment workflow remain invoiced at confirmation.
+
 Construction persistence is divided into BOQ, site/diary, and subcontract checks. Budget and commitment values are read as PostgreSQL decimal text and compared with checked Decimal arithmetic before a subcontract is signed.
 
 Charity persistence is divided into program-budget, donation-receipt, and disbursement workflows. Donation amounts, program budgets, accounting payment snapshots, and cumulative approved disbursements use Decimal through Rust validation and source-event posting.

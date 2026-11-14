@@ -17,6 +17,17 @@ pub async fn handle_source_document_event(
     event_id: Uuid,
     depth: u32,
 ) -> R<bool> {
+    if event_type == "sales.sales_order.confirmed"
+        && tenant.has_module("logistics")
+        && event
+            .get("shipping_address")
+            .and_then(Value::as_str)
+            .is_some_and(|address| !address.trim().is_empty())
+    {
+        // The order is only a commitment to sell; recognize receivables when
+        // the complete shipment has been delivered successfully.
+        return Ok(true);
+    }
     let Some(spec) = source_documents::source_document(event_type) else {
         return Ok(false);
     };
@@ -83,7 +94,9 @@ pub async fn handle_source_document_event(
     data.insert("source_id".into(), source_id.clone());
     if matches!(
         event_type,
-        "sales.sales_order.confirmed" | "purchasing.purchase_order.received"
+        "sales.sales_order.confirmed"
+            | "sales.sales_order.delivered"
+            | "purchasing.purchase_order.received"
     ) {
         for field in ["tax_total", "lines"] {
             if let Some(value) = event.get(field).filter(|value| !value.is_null()) {
