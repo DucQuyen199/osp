@@ -40,7 +40,8 @@
    "name": "Bán vé",
    "permissions": [
     "events.ticket.*",
-    "events.event.read"
+    "events.event.read",
+    "master-data.party.read"
    ]
   },
   "producer": {
@@ -48,7 +49,8 @@
    "permissions": [
     "events.*",
     "project.*",
-    "contract.*"
+    "contract.*",
+    "master-data.party.read"
    ]
   }
  },
