@@ -138,6 +138,19 @@ async fn validate_harvest(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<V
     {
         errors.push("Ngày thu hoạch nằm ngoài khoảng thời gian của vụ mùa".into());
     }
+    if let Some(row) = tx
+        .query_opt(
+            "SELECT ia.date + ceil(COALESCE(p.preharvest_interval_days, 0))::int AS harvest_allowed_on, p.name FROM agriculture__input_application ia JOIN master_data__product p ON p.tenant_id = ia.tenant_id AND p.id = ia.product WHERE ia.tenant_id = $1 AND ia.cycle = $2 AND ia.kind = 'pesticide' AND ia.date + ceil(COALESCE(p.preharvest_interval_days, 0))::int > $3::date ORDER BY harvest_allowed_on DESC LIMIT 1",
+            &[&tenant.id, &cycle, &date],
+        )
+        .await?
+    {
+        let allowed_on: String = row.get(0);
+        let product_name: String = row.get(1);
+        errors.push(format!(
+            "Ургац хураах боломжгүй: {product_name} бүтээгдэхүүний шүршилтийн хүлээлгийн хугацаа {allowed_on}-нд дуусна"
+        ));
+    }
     if tx
         .query_opt(
             "SELECT id FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",

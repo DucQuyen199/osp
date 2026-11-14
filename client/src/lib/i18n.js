@@ -40,6 +40,7 @@ const FIELDS = {
   area: 'Diện tích', property: 'Bất động sản', room_type: 'Loại phòng', room: 'Phòng', floor: 'Tầng', reservation: 'Đặt phòng', check_out_: 'Trả phòng',
   seats: 'Số chỗ', station: 'Khu bếp', available: 'Còn phục vụ', ingredients: 'Nguyên liệu', table: 'Bàn', order: 'Đơn',
   farm: 'Trang trại', crop: 'Cây trồng', planted_on: 'Ngày gieo trồng', expected_harvest: 'Dự kiến thu hoạch', cycle: 'Vụ mùa', grade: 'Phân loại', lot_code: 'Mã lô',
+  preharvest_interval_days: 'Thời gian cách ly trước thu hoạch (ngày)',
   principal: 'Gốc vay', term_months: 'Kỳ hạn (tháng)', loan: 'Khoản vay', premium: 'Phí bảo hiểm', policy: 'Hợp đồng BH', case: 'Vụ việc', opened_on: 'Ngày mở', who: 'Người thực hiện',
   meter: 'Công tơ', reading: 'Chỉ số', make: 'Hãng', model: 'Dòng xe', vin: 'Số khung', odometer: 'Số km', vehicle_: 'Xe', program: 'Chương trình', venue: 'Địa điểm', event: 'Sự kiện',
   id: 'Mã', createdAt: 'Ngày tạo', updatedAt: 'Cập nhật',

@@ -10331,6 +10331,9 @@
           "name": {
             "type": "string"
           },
+          "preharvest_interval_days": {
+            "type": "number"
+          },
           "price": {
             "type": "number"
           },
@@ -10392,6 +10395,9 @@
           },
           "name": {
             "type": "string"
+          },
+          "preharvest_interval_days": {
+            "type": "number"
           },
           "price": {
             "type": "number"

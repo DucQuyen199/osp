@@ -192,6 +192,12 @@
      "required": false
     },
     {
+     "name": "preharvest_interval_days",
+     "label": "Thời gian cách ly trước thu hoạch (ngày)",
+     "type": "number",
+     "required": false
+    },
+    {
      "name": "active",
      "type": "bool",
      "required": false

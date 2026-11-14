@@ -9,13 +9,27 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
     let mut errors = Vec::new();
     let non_negative: &[&str] = match entity {
         "party" => &["credit_limit"],
-        "product" => &["price", "cost", "weight"],
+        "product" => &["price", "cost", "weight", "preharvest_interval_days"],
         _ => &[],
     };
     for field in non_negative {
         if let Some(value) = document.get(*field).filter(|value| !value.is_null()) {
             if !money::decimal(value).is_some_and(|number| number >= Decimal::ZERO) {
                 errors.push(format!("{field} must be a finite non-negative number"));
+            }
+        }
+    }
+    if entity == "product" {
+        if let Some(value) = document
+            .get("preharvest_interval_days")
+            .filter(|value| !value.is_null())
+        {
+            if !money::decimal(value)
+                .is_some_and(|number| number >= Decimal::ZERO && number.fract().is_zero())
+            {
+                errors.push(
+                    "preharvest_interval_days must be a non-negative whole number of days".into(),
+                );
             }
         }
     }
