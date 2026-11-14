@@ -40,7 +40,9 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
             }
             for field in ["labor_hours", "labor_rate"] {
                 if document.get(field).is_some_and(|value| {
-                    !money::decimal(value).is_some_and(|number| number >= Decimal::ZERO)
+                    !value.is_null() && {
+                        !money::decimal(value).is_some_and(|number| number >= Decimal::ZERO)
+                    }
                 }) {
                     errors.push(format!("{field} phải là số không âm"));
                 }
@@ -99,9 +101,20 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
         if document
             .get("resolution")
             .and_then(Value::as_str)
-            .is_none_or(str::is_empty)
+            .is_none_or(|resolution| resolution.trim().is_empty())
         {
             errors.push("Cần ghi nhận kết quả xử lý trước khi hoàn tất lệnh bảo trì".into());
+        }
+        let has_hours = document
+            .get("labor_hours")
+            .is_some_and(|value| !value.is_null());
+        let has_rate = document
+            .get("labor_rate")
+            .is_some_and(|value| !value.is_null());
+        if has_hours != has_rate {
+            errors.push(
+                "Cần ghi nhận đồng thời số giờ và đơn giá nhân công, hoặc bỏ trống cả hai".into(),
+            );
         }
         if document
             .get("parts")

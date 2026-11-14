@@ -374,6 +374,28 @@ pub fn build(reg: &Registry) -> Value {
                             } } }
                         });
                     }
+                    if def.qname() == "maintenance.maintenance_request" && action == "done" {
+                        operation["description"] = json!(
+                            "Save the repair resolution and optional labor hours/rate pair and complete the maintenance request atomically with material issue and recurring-plan synchronization."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": true,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "required": ["resolution"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "resolution": { "type": "string", "minLength": 1 },
+                                    "labor_hours": { "type": "number", "minimum": 0 },
+                                    "labor_rate": { "type": "number", "minimum": 0 }
+                                },
+                                "anyOf": [
+                                    { "required": ["labor_hours", "labor_rate"] },
+                                    { "not": { "anyOf": [ { "required": ["labor_hours"] }, { "required": ["labor_rate"] } ] } }
+                                ]
+                            } } }
+                        });
+                    }
                     paths.insert(
                         format!("{base}/{{id}}/{action}"),
                         json!({ "post": operation }),

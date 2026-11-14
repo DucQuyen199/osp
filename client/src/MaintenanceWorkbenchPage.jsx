@@ -85,12 +85,15 @@ export default function MaintenanceWorkbenchPage() {
 
   async function completeRequest(event, row) {
     event.preventDefault();
+    if ((laborHours === '') !== (laborRate === '')) {
+      setError('Nhập đồng thời giờ công và đơn giá, hoặc để trống cả hai.');
+      return;
+    }
     await run(`${row.id}:done`, async () => {
-      const updated = await api(dataPath('maintenance.maintenance_request', row.id), { method: 'PATCH', body: {
+      await api(dataPath('maintenance.maintenance_request', row.id, 'done'), { method: 'POST', body: {
         resolution: resolution.trim(), labor_hours: laborHours === '' ? undefined : Number(laborHours),
         labor_rate: laborRate === '' ? undefined : Number(laborRate),
       } });
-      await action('maintenance.maintenance_request', updated, 'done');
       setResolution(''); setLaborHours(''); setLaborRate('');
     }, 'Đã hoàn tất lệnh. Vật tư được xuất khỏi kho đã chọn và kế hoạch định kỳ được cập nhật.');
   }
@@ -120,7 +123,7 @@ export default function MaintenanceWorkbenchPage() {
     {selected && <section className="card card-pad" style={{ marginTop: 16 }}><div className="row wrap"><div><h2>{assets.get(selected.asset) ? recordLabel('asset.asset', assets.get(selected.asset)) : 'Lệnh bảo trì'}</h2><p className="small muted">{selected.description || 'Không có mô tả'} · Ưu tiên {statusLabel(selected.priority)} · Kho vật tư {warehouses.get(selected.warehouse)?.name || 'chưa chọn'}</p></div><span className="grow"/><span className="badge warning">{statusLabel(selected.status)}</span></div>
       {!!selected.parts?.length && <div className="table-wrap"><table className="table"><thead><tr><th>Vật tư</th><th>Số lượng dự kiến</th></tr></thead><tbody>{selected.parts.map((line, index) => <tr key={`${line.product}-${index}`}><td>{products.get(line.product)?.name || 'Vật tư'}</td><td>{line.qty}</td></tr>)}</tbody></table></div>}
       {selected.status === 'open' && can('maintenance.maintenance_request.started') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => startRequest(selected)}>Bắt đầu xử lý</button>}
-      {selected.status === 'in_progress' && can('maintenance.maintenance_request.update') && can('maintenance.maintenance_request.done') && <form className="card card-pad" style={{ marginTop: 12 }} onSubmit={(event) => completeRequest(event, selected)}><h3>Ghi nhận hoàn tất</h3><label className="field"><span className="label">Kết quả xử lý *</span><textarea className="input" required rows="3" value={resolution} onChange={(event) => setResolution(event.target.value)} placeholder="Nguyên nhân, công việc đã làm, tình trạng sau sửa chữa…"/></label><div className="form-grid" style={{ marginTop: 10 }}><label className="field"><span className="label">Giờ công</span><input className="input num" type="number" min="0" step="0.25" value={laborHours} onChange={(event) => setLaborHours(event.target.value)}/></label><label className="field"><span className="label">Đơn giá giờ công</span><input className="input num" type="number" min="0" step="any" value={laborRate} onChange={(event) => setLaborRate(event.target.value)}/></label></div><div className="row" style={{ marginTop: 10 }}><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy)}>Hoàn tất lệnh</button></div></form>}
+      {selected.status === 'in_progress' && can('maintenance.maintenance_request.update') && can('maintenance.maintenance_request.done') && <form className="card card-pad" style={{ marginTop: 12 }} onSubmit={(event) => completeRequest(event, selected)}><h3>Ghi nhận hoàn tất</h3><label className="field"><span className="label">Kết quả xử lý *</span><textarea className="input" required rows="3" value={resolution} onChange={(event) => setResolution(event.target.value)} placeholder="Nguyên nhân, công việc đã làm, tình trạng sau sửa chữa…"/></label><div className="form-grid" style={{ marginTop: 10 }}><label className="field"><span className="label">Giờ công (nhập cùng đơn giá)</span><input className="input num" type="number" min="0" step="0.25" value={laborHours} onChange={(event) => setLaborHours(event.target.value)}/></label><label className="field"><span className="label">Đơn giá giờ công</span><input className="input num" type="number" min="0" step="any" value={laborRate} onChange={(event) => setLaborRate(event.target.value)}/></label></div><div className="row" style={{ marginTop: 10 }}><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy)}>Hoàn tất lệnh</button></div></form>}
       {selected.resolution && <div className="alert success" style={{ marginTop: 12 }}><strong>Kết quả:</strong> {selected.resolution}{selected.labor_hours != null && <span> · {selected.labor_hours} giờ công · {fmtMoney((Number(selected.labor_hours) || 0) * (Number(selected.labor_rate) || 0))}</span>}</div>}
     </section>}
     <p className="small muted" style={{ marginTop: 12 }}>Kế hoạch đến hạn chỉ phát sinh một lệnh đang mở cho mỗi kỳ; nếu lệnh bị hủy, có thể tạo lại. Khi hoàn tất lệnh, hệ thống kiểm tra tồn kho, ghi xuất vật tư, lưu ngày bảo trì và tính kỳ kế tiếp từ ngày hoàn tất.</p>

@@ -88571,7 +88571,7 @@
     },
     "/api/t/{tenantId}/data/maintenance/maintenance_request/{id}/done": {
       "post": {
-        "description": "Phát sự kiện `maintenance.maintenance_request.done` cho các module khác phản ứng.",
+        "description": "Save the repair resolution and optional labor hours/rate pair and complete the maintenance request atomically with material issue and recurring-plan synchronization.",
         "parameters": [
           {
             "in": "path",
@@ -88591,6 +88591,58 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "anyOf": [
+                  {
+                    "required": [
+                      "labor_hours",
+                      "labor_rate"
+                    ]
+                  },
+                  {
+                    "not": {
+                      "anyOf": [
+                        {
+                          "required": [
+                            "labor_hours"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "labor_rate"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "properties": {
+                  "labor_hours": {
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "labor_rate": {
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "resolution": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "resolution"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {

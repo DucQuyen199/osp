@@ -1966,6 +1966,39 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     }
                     return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
                 }
+                if q == "maintenance.maintenance_request" && *action == "done" {
+                    let mut body = json_obj(&bytes)?;
+                    let resolution = body
+                        .get("resolution")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::trim)
+                        .unwrap_or_default()
+                        .to_owned();
+                    let has_hours = body.contains_key("labor_hours");
+                    let has_rate = body.contains_key("labor_rate");
+                    let allowed_shape =
+                        body.len() == 1 || (body.len() == 3 && has_hours && has_rate);
+                    let labor_values_valid = body
+                        .get("labor_hours")
+                        .and_then(crate::money::decimal)
+                        .is_some_and(|hours| hours >= rust_decimal::Decimal::ZERO)
+                        && body
+                            .get("labor_rate")
+                            .and_then(crate::money::decimal)
+                            .is_some_and(|rate| rate >= rust_decimal::Decimal::ZERO);
+                    if !allowed_shape
+                        || resolution.is_empty()
+                        || (has_hours != has_rate)
+                        || (has_hours && !labor_values_valid)
+                    {
+                        return Err(ApiError::validation(
+                            "maintenance.maintenance_request.done",
+                            vec!["Cần gửi resolution và nếu có nhân công thì phải gửi cả labor_hours, labor_rate không âm".into()],
+                        ));
+                    }
+                    body.insert("resolution".into(), serde_json::json!(resolution));
+                    return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
+                }
                 return json_ok(k.act(&actor, &t, &q, id, action).await?);
             }
             _ => {}
