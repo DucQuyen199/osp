@@ -292,6 +292,18 @@
      "system": true
     },
     {
+     "name": "work_weekdays",
+     "type": "json",
+     "required": true,
+     "system": true
+    },
+    {
+     "name": "standard_hours_per_day",
+     "type": "number",
+     "required": true,
+     "system": true
+    },
+    {
      "name": "gross",
      "type": "money",
      "required": true,

@@ -142,10 +142,16 @@ pub(super) async fn validate(
             return Ok(Vec::new());
         };
         let old = tx.query_opt(
-            "SELECT base_salary::text FROM hrm__employee WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+            "SELECT base_salary::text, work_weekdays::text, standard_hours_per_day::text FROM hrm__employee WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
             &[&tenant.id, &employee],
         ).await?;
-        let old_salary_text = old.map(|row| row.get::<_, Option<String>>(0)).flatten();
+        let old_work_weekdays = old.as_ref().and_then(|row| {
+            row.get::<_, Option<String>>(1)
+                .as_deref()
+                .and_then(|text| serde_json::from_str::<Value>(text).ok())
+        });
+        let old_hours_text = old.as_ref().and_then(|row| row.get::<_, Option<String>>(2));
+        let old_salary_text = old.and_then(|row| row.get::<_, Option<String>>(0));
         let old_salary = old_salary_text
             .map(|value| {
                 money::decimal_str(&value).ok_or_else(|| {
@@ -160,6 +166,26 @@ pub(super) async fn validate(
         let salary_changed = old_salary != new_salary;
         if salary_changed {
             return Ok(vec!["Mức lương sau khi tạo hồ sơ phải được thay đổi bằng điều chỉnh lương có ngày hiệu lực; không sửa trực tiếp trên hồ sơ nhân viên".into()]);
+        }
+        let new_work_weekdays = document
+            .get("work_weekdays")
+            .filter(|value| !value.is_null());
+        let old_work_weekdays = old_work_weekdays.as_ref().filter(|value| !value.is_null());
+        let work_week_changed = old_work_weekdays != new_work_weekdays;
+        let old_hours = old_hours_text.as_deref().and_then(money::decimal_str);
+        let new_hours = document
+            .get("standard_hours_per_day")
+            .and_then(money::decimal);
+        if (work_week_changed || old_hours != new_hours)
+            && tx
+                .query_opt(
+                    "SELECT 1 FROM payroll__payslip s JOIN payroll__payroll_run r ON r.tenant_id = s.tenant_id AND r.id = s.run WHERE s.tenant_id = $1 AND s.employee = $2 AND r.status = 'draft' LIMIT 1",
+                    &[&tenant.id, &employee],
+                )
+                .await?
+                .is_some()
+        {
+            return Ok(vec!["Complete or cancel draft payroll runs with this employee's payslip before changing their work schedule".into()]);
         }
     }
     if entity == "employee" && matches!(action, "created" | "updated") {

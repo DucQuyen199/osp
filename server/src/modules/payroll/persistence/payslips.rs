@@ -38,8 +38,6 @@ pub(super) async fn validate_created(
         .as_ref()
         .map(|row| row.get::<_, String>(3))
         .unwrap_or_else(|| "[1,2,3,4,5]".into());
-    let selected_weekdays: Vec<u8> =
-        serde_json::from_str(&working_weekdays_json).unwrap_or_else(|_| vec![1, 2, 3, 4, 5]);
     if let Some(period) = period.as_deref() {
         tx.query_opt(
             "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
@@ -63,7 +61,9 @@ pub(super) async fn validate_created(
                            COALESCE(adjustment.deductions, 0)::text, COALESCE(e.tax_residency, 'resident'), \
                            COALESCE(e.dependent_count, 0)::text, COALESCE(overtime.hours, 0)::text, \
                            COALESCE(overtime.weighted_hours, 0)::text, \
-                           COALESCE(e.contribution_exempt, false) \
+                           COALESCE(e.contribution_exempt, false), \
+                           COALESCE(e.work_weekdays, $4::jsonb)::text, \
+                           COALESCE(e.standard_hours_per_day::numeric, $5::numeric)::text \
                          FROM hrm__employee e LEFT JOIN LATERAL (SELECT sr.id, sr.base_salary FROM hrm__salary_revision sr \
                            WHERE sr.tenant_id = e.tenant_id AND sr.employee = e.id AND sr.status = 'approved' \
                              AND sr.effective_from <= to_date($3 || '-01', 'YYYY-MM-DD') \
@@ -81,12 +81,28 @@ pub(super) async fn validate_created(
                              AND oe.date < (to_date($3 || '-01', 'YYYY-MM-DD') + interval '1 month')::date \
                              AND oe.status = 'approved') overtime ON TRUE \
                          WHERE e.tenant_id = $1 AND e.id = $2 FOR SHARE OF e",
-                        &[&tenant.id, &employee, &period],
+                        &[&tenant.id, &employee, &period, &working_weekdays_json, &hours_per_day.to_string()],
                     )
                     .await?
         } else {
             None
         };
+        let employee_work_weekdays_json = employee_row
+            .as_ref()
+            .map(|row| row.get::<_, String>(11))
+            .unwrap_or_else(|| working_weekdays_json.clone());
+        let employee_work_weekdays: Vec<u8> = serde_json::from_str(&employee_work_weekdays_json)
+            .map_err(|_| {
+                crate::error::ApiError::validation(
+                    "hrm.employee",
+                    vec!["Employee work_weekdays must contain ISO weekdays from 1 to 7".into()],
+                )
+            })?;
+        let employee_hours_per_day = employee_row
+            .as_ref()
+            .map(|row| decimal_column(row, 12, "employee standard hours per day"))
+            .transpose()?
+            .unwrap_or(hours_per_day);
         if !employee_row
             .as_ref()
             .is_some_and(|row| matches!(row.get::<_, String>(0).as_str(), "active" | "terminated"))
@@ -106,6 +122,20 @@ pub(super) async fn validate_created(
             let expected_overtime_hours = decimal_column(&row, 8, "approved overtime hours")?;
             let overtime_weighted_hours = decimal_column(&row, 9, "weighted overtime hours")?;
             let contribution_exempt: bool = row.get(10);
+            let expected_work_weekdays: Value = serde_json::from_str(&employee_work_weekdays_json)
+                .map_err(|_| {
+                    crate::error::ApiError::validation(
+                        "hrm.employee",
+                        vec!["Employee work_weekdays must contain ISO weekdays from 1 to 7".into()],
+                    )
+                })?;
+            if document.get("work_weekdays") != Some(&expected_work_weekdays)
+                || !decimal_field(document, "standard_hours_per_day").is_some_and(|value| {
+                    money::within_tolerance(value, employee_hours_per_day, Decimal::new(1, 4))
+                })
+            {
+                errors.push("Payslip work schedule snapshots must match the employee schedule and payroll defaults".into());
+            }
             let expected_overtime_pay = if overtime_weighted_hours > Decimal::ZERO {
                 if let Some(first_day) = period.as_deref().and_then(|value| {
                     NaiveDate::parse_from_str(&format!("{value}-01"), "%Y-%m-%d").ok()
@@ -118,8 +148,8 @@ pub(super) async fn validate_created(
                     if let Some(next_month) = NaiveDate::from_ymd_opt(year, month, 1) {
                         calculate_overtime_pay(
                             expected_salary,
-                            working_weekdays(first_day, next_month, &selected_weekdays),
-                            hours_per_day,
+                            working_weekdays(first_day, next_month, &employee_work_weekdays),
+                            employee_hours_per_day,
                             overtime_weighted_hours,
                         )?
                     } else {
@@ -307,8 +337,8 @@ pub(super) async fn validate_created(
                 };
                 if let Some(next_month_start) = NaiveDate::from_ymd_opt(next_year, next_month, 1) {
                     let working_days =
-                        working_weekdays(first_day, next_month_start, &selected_weekdays);
-                    let hours_per_day_text = hours_per_day.to_string();
+                        working_weekdays(first_day, next_month_start, &employee_work_weekdays);
+                    let hours_per_day_text = employee_hours_per_day.to_string();
                     let paid_days = counted_paid_days(
                         tx,
                         tenant,
@@ -316,7 +346,7 @@ pub(super) async fn validate_created(
                         first_day,
                         next_month_start,
                         &hours_per_day_text,
-                        &working_weekdays_json,
+                        &employee_work_weekdays_json,
                     )
                     .await?;
                     let captured_paid = decimal_field(document, "paid_days");

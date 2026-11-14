@@ -91,6 +91,8 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
                 "salary_basis",
                 "paid_days",
                 "working_days",
+                "work_weekdays",
+                "standard_hours_per_day",
                 "additions",
                 "overtime_hours",
                 "overtime_pay",

@@ -201,5 +201,31 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
     if !additions.is_some_and(|amount| amount >= Decimal::ZERO) {
         errors.push("Payslip additions must be a finite non-negative amount".into());
     }
+    if let Some(Value::Array(days)) = document.get("work_weekdays") {
+        let unique: std::collections::HashSet<_> = days.iter().filter_map(Value::as_u64).collect();
+        if days.is_empty()
+            || days.len() > 7
+            || unique.len() != days.len()
+            || days
+                .iter()
+                .any(|day| !day.as_u64().is_some_and(|day| (1..=7).contains(&day)))
+        {
+            errors
+                .push("Payslip work_weekdays must contain unique ISO weekdays from 1 to 7".into());
+        }
+    } else if document
+        .get("work_weekdays")
+        .is_some_and(|value| !value.is_null())
+    {
+        errors.push("Payslip work_weekdays must be a JSON array".into());
+    }
+    if document
+        .get("standard_hours_per_day")
+        .is_some_and(|value| !value.is_null())
+        && !decimal_field(document, "standard_hours_per_day")
+            .is_some_and(|hours| (Decimal::ONE..=Decimal::from(24)).contains(&hours))
+    {
+        errors.push("Payslip standard_hours_per_day must be between 1 and 24".into());
+    }
     errors
 }

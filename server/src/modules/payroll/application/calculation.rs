@@ -88,24 +88,13 @@ pub(super) async fn calculate_from_attendance(
         .as_ref()
         .map(|row| row.get::<_, String>(2))
         .unwrap_or_else(|| "[1,2,3,4,5]".into());
-    let working_weekdays: Vec<u8> = serde_json::from_str(&working_weekdays_json).map_err(|_| {
-        crate::error::ApiError::validation(
-            "payroll.payroll_run",
-            vec!["working_weekdays must contain ISO weekdays from 1 to 7".into()],
-        )
-    })?;
-    let mut working_day_count = 0u32;
-    let mut calendar_day = first_day;
-    while calendar_day < next_month_start {
-        if working_weekdays.contains(&(calendar_day.weekday().number_from_monday() as u8)) {
-            working_day_count += 1;
-        }
-        calendar_day = calendar_day.succ_opt().unwrap_or(next_month_start);
-    }
-    let working_days = Decimal::from(working_day_count);
-    if working_days <= Decimal::ZERO {
-        return Ok(false);
-    }
+    let _working_weekdays: Vec<u8> =
+        serde_json::from_str(&working_weekdays_json).map_err(|_| {
+            crate::error::ApiError::validation(
+                "payroll.payroll_run",
+                vec!["working_weekdays must contain ISO weekdays from 1 to 7".into()],
+            )
+        })?;
     if !(Decimal::ONE..=Decimal::from(24)).contains(&hours_per_day) {
         return Err(crate::error::ApiError::validation(
             "payroll.payroll_run",
@@ -144,7 +133,10 @@ pub(super) async fn calculate_from_attendance(
                  COALESCE(overtime.weighted_hours, 0)::numeric AS overtime_weighted_hours, \
                  COALESCE(e.tax_residency, 'resident')::text AS tax_residency, \
                  COALESCE(e.dependent_count, 0)::numeric AS dependent_count, \
-                 COALESCE(e.contribution_exempt, false) AS contribution_exempt \
+                 COALESCE(e.contribution_exempt, false) AS contribution_exempt, \
+                 COALESCE(e.work_weekdays, $5::jsonb) AS work_weekdays, \
+                 COALESCE(e.standard_hours_per_day::numeric, $4::numeric) AS standard_hours_per_day, \
+                 e.hire_date, e.termination_date \
                FROM hrm__employee e \
                LEFT JOIN LATERAL (SELECT sr.id, sr.base_salary FROM hrm__salary_revision sr \
                  WHERE sr.tenant_id = e.tenant_id AND sr.employee = e.id AND sr.status = 'approved' \
@@ -165,10 +157,15 @@ pub(super) async fn calculate_from_attendance(
                WHERE e.tenant_id = $1 AND e.status IN ('active', 'terminated') \
                  AND (e.hire_date IS NULL OR e.hire_date < $3) \
                  AND (e.termination_date IS NULL OR e.termination_date >= $2) \
+             ), working_days AS ( \
+               SELECT sal.id AS employee, count(*)::numeric AS working_days \
+               FROM eligible sal CROSS JOIN LATERAL generate_series($2::date, $3::date - 1, interval '1 day') AS work_day(work_date) \
+               WHERE EXTRACT(ISODOW FROM work_day.work_date)::int IN (SELECT value::int FROM jsonb_array_elements_text(sal.work_weekdays) AS selected(value)) \
+               GROUP BY sal.id \
              ), counted_days AS ( \
                SELECT a.employee, a.date AS work_date, \
                  LEAST(1::numeric, GREATEST(0::numeric, round( \
-                   EXTRACT(EPOCH FROM (a.check_out - a.check_in))::numeric / 3600 / $4::numeric, 6 \
+                   EXTRACT(EPOCH FROM (a.check_out - a.check_in))::numeric / 3600 / sal.standard_hours_per_day, 6 \
                  ))) AS day_fraction \
                FROM hrm__attendance a \
                JOIN hrm__employee e ON e.tenant_id = a.tenant_id AND e.id = a.employee \
@@ -177,7 +174,7 @@ pub(super) async fn calculate_from_attendance(
                  AND a.date >= $2 AND a.date < $3 \
                  AND a.date >= COALESCE(e.hire_date, $2) \
                  AND a.date <= COALESCE(e.termination_date, $3 - 1) \
-                 AND EXTRACT(ISODOW FROM a.date)::int IN (SELECT value::int FROM jsonb_array_elements_text($5::jsonb) AS selected(value)) \
+                 AND EXTRACT(ISODOW FROM a.date)::int IN (SELECT value::int FROM jsonb_array_elements_text(sal.work_weekdays) AS selected(value)) \
                  AND a.check_in IS NOT NULL AND a.check_out IS NOT NULL \
                UNION \
                SELECT lr.employee, leave_day.work_date::date AS work_date, \
@@ -195,7 +192,7 @@ pub(super) async fn calculate_from_attendance(
                  AND lr.start_date < $3 AND lr.end_date >= $2 \
                  AND lr.end_date >= COALESCE(e.hire_date, $2) \
                  AND lr.start_date <= COALESCE(e.termination_date, $3 - 1) \
-                 AND EXTRACT(ISODOW FROM leave_day.work_date)::int IN (SELECT value::int FROM jsonb_array_elements_text($5::jsonb) AS selected(value)) \
+                 AND EXTRACT(ISODOW FROM leave_day.work_date)::int IN (SELECT value::int FROM jsonb_array_elements_text(sal.work_weekdays) AS selected(value)) \
                UNION \
                SELECT e.id, h.date AS work_date, 1::numeric AS day_fraction \
                FROM hrm__holiday h \
@@ -206,19 +203,21 @@ pub(super) async fn calculate_from_attendance(
                  AND h.date >= COALESCE(e.hire_date, $2) \
                  AND h.date <= COALESCE(e.termination_date, $3 - 1) \
                  AND h.pay_treatment = 'paid' \
-                 AND EXTRACT(ISODOW FROM h.date)::int IN (SELECT value::int FROM jsonb_array_elements_text($5::jsonb) AS selected(value)) \
+                 AND EXTRACT(ISODOW FROM h.date)::int IN (SELECT value::int FROM jsonb_array_elements_text(sal.work_weekdays) AS selected(value)) \
              ), paid_days AS ( \
                SELECT employee, work_date, LEAST(1::numeric, round(sum(day_fraction), 6)) AS day_fraction \
                FROM counted_days GROUP BY employee, work_date \
              ) \
              SELECT e.id, e.salary::text, e.salary_revision, e.additions::text, e.taxable_additions::text, e.deductions::text, \
                e.overtime_hours::text, e.overtime_weighted_hours::text, e.tax_residency, e.dependent_count::text, \
-               e.contribution_exempt, COALESCE(sum(d.day_fraction), 0)::text AS paid_days \
+               e.contribution_exempt, COALESCE(sum(d.day_fraction), 0)::text AS paid_days, \
+               e.standard_hours_per_day::text, wd.working_days::text, e.work_weekdays::text \
              FROM eligible e LEFT JOIN paid_days d ON e.id = d.employee \
+             JOIN working_days wd ON wd.employee = e.id \
              WHERE e.salary > 0 \
              GROUP BY e.id, e.salary, e.salary_revision, e.additions, e.taxable_additions, e.deductions, \
                e.overtime_hours, e.overtime_weighted_hours, e.tax_residency, e.dependent_count, \
-               e.contribution_exempt \
+               e.contribution_exempt, e.standard_hours_per_day, wd.working_days \
              HAVING COALESCE(sum(d.day_fraction), 0) > 0 OR e.overtime_hours > 0 ORDER BY e.id",
             &[
                 &tenant.id,
@@ -254,6 +253,15 @@ pub(super) async fn calculate_from_attendance(
         let dependent_count_value = decimal_column(&row, 9, "dependent count")?;
         let contribution_exempt: bool = row.get(10);
         let paid_days = decimal_column(&row, 11, "paid days")?;
+        let employee_hours_per_day = decimal_column(&row, 12, "employee standard hours per day")?;
+        let working_days = decimal_column(&row, 13, "employee working days")?;
+        let work_weekdays: Value =
+            serde_json::from_str(&row.get::<_, String>(14)).map_err(|_| {
+                crate::error::ApiError::validation(
+                    "hrm.employee",
+                    vec!["Employee work_weekdays must contain ISO weekdays from 1 to 7".into()],
+                )
+            })?;
         if salary <= Decimal::ZERO || paid_days < Decimal::ZERO {
             continue;
         }
@@ -280,7 +288,12 @@ pub(super) async fn calculate_from_attendance(
             .map(money::round_money)
             .ok_or_else(payroll_amount_error)?;
         let overtime_pay = if overtime_weighted_hours > Decimal::ZERO {
-            calculate_overtime_pay(salary, working_days, hours_per_day, overtime_weighted_hours)?
+            calculate_overtime_pay(
+                salary,
+                working_days,
+                employee_hours_per_day,
+                overtime_weighted_hours,
+            )?
         } else {
             Decimal::ZERO
         };
@@ -345,6 +358,11 @@ pub(super) async fn calculate_from_attendance(
         data.insert("salary_basis".into(), decimal_json(salary)?);
         data.insert("paid_days".into(), decimal_json(paid_days)?);
         data.insert("working_days".into(), decimal_json(working_days)?);
+        data.insert("work_weekdays".into(), work_weekdays);
+        data.insert(
+            "standard_hours_per_day".into(),
+            decimal_json(employee_hours_per_day)?,
+        );
         data.insert("additions".into(), decimal_json(total_additions)?);
         data.insert("overtime_hours".into(), decimal_json(overtime_hours)?);
         data.insert("overtime_pay".into(), decimal_json(overtime_pay)?);

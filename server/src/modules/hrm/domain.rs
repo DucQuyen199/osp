@@ -190,6 +190,33 @@ fn validate_employment_dates(document: &Value) -> Vec<String> {
     {
         errors.push("Dependent count must be a whole number from 0 to 1000".into());
     }
+    match document.get("work_weekdays") {
+        None | Some(Value::Null) => {}
+        Some(Value::Array(days)) => {
+            let unique: std::collections::HashSet<_> =
+                days.iter().filter_map(Value::as_u64).collect();
+            if days.is_empty()
+                || days.len() > 7
+                || unique.len() != days.len()
+                || days
+                    .iter()
+                    .any(|day| !day.as_u64().is_some_and(|day| (1..=7).contains(&day)))
+            {
+                errors.push("Employee work_weekdays must be a non-empty list of unique ISO weekdays from 1 to 7".into());
+            }
+        }
+        _ => errors.push("Employee work_weekdays must be a JSON array of ISO weekdays".into()),
+    }
+    if document
+        .get("standard_hours_per_day")
+        .is_some_and(|value| !value.is_null())
+        && !document
+            .get("standard_hours_per_day")
+            .and_then(money::decimal)
+            .is_some_and(|hours| (Decimal::ONE..=Decimal::from(24)).contains(&hours))
+    {
+        errors.push("Employee standard_hours_per_day must be between 1 and 24".into());
+    }
     errors
 }
 

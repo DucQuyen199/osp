@@ -122,6 +122,16 @@
      "required": false
     },
     {
+     "name": "work_weekdays",
+     "type": "json",
+     "required": false
+    },
+    {
+     "name": "standard_hours_per_day",
+     "type": "number",
+     "required": false
+    },
+    {
      "name": "source",
      "type": "string",
      "required": false,

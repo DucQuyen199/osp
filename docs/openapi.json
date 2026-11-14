@@ -6749,6 +6749,9 @@
             "readOnly": true,
             "type": "string"
           },
+          "standard_hours_per_day": {
+            "type": "number"
+          },
           "status": {
             "enum": [
               "active",
@@ -6773,6 +6776,9 @@
             "format": "date-time",
             "readOnly": true,
             "type": "string"
+          },
+          "work_weekdays": {
+            "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
           }
         },
         "type": "object"
@@ -6824,6 +6830,9 @@
             "readOnly": true,
             "type": "string"
           },
+          "standard_hours_per_day": {
+            "type": "number"
+          },
           "tax_residency": {
             "enum": [
               "resident",
@@ -6835,6 +6844,9 @@
           "termination_date": {
             "format": "date",
             "type": "string"
+          },
+          "work_weekdays": {
+            "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
           }
         },
         "required": [
@@ -11679,6 +11691,10 @@
             "readOnly": true,
             "type": "string"
           },
+          "standard_hours_per_day": {
+            "readOnly": true,
+            "type": "number"
+          },
           "tax_policy": {
             "description": "Tham chiếu tới payroll.tax_policy",
             "format": "uuid",
@@ -11693,6 +11709,10 @@
             "format": "date-time",
             "readOnly": true,
             "type": "string"
+          },
+          "work_weekdays": {
+            "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)",
+            "readOnly": true
           },
           "working_days": {
             "readOnly": true,
@@ -11777,6 +11797,10 @@
             "readOnly": true,
             "type": "string"
           },
+          "standard_hours_per_day": {
+            "readOnly": true,
+            "type": "number"
+          },
           "tax_policy": {
             "description": "Tham chiếu tới payroll.tax_policy",
             "format": "uuid",
@@ -11786,6 +11810,10 @@
           "taxable_income": {
             "readOnly": true,
             "type": "number"
+          },
+          "work_weekdays": {
+            "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)",
+            "readOnly": true
           },
           "working_days": {
             "readOnly": true,
@@ -11799,6 +11827,8 @@
           "paid_days",
           "additions",
           "working_days",
+          "work_weekdays",
+          "standard_hours_per_day",
           "gross"
         ],
         "type": "object"
