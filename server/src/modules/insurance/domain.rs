@@ -63,6 +63,20 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
             if !positive(document, "amount") {
                 errors.push("Số tiền yêu cầu bồi thường phải lớn hơn 0".into());
             }
+            if let Some(approved) = document
+                .get("approved_amount")
+                .filter(|value| !value.is_null())
+            {
+                let requested = document.get("amount").and_then(money::decimal);
+                let approved = money::decimal(approved);
+                if !approved.is_some_and(|amount| amount > Decimal::ZERO)
+                    || requested
+                        .zip(approved)
+                        .is_none_or(|(requested, approved)| approved > requested)
+                {
+                    errors.push("Số tiền bồi thường được duyệt phải lớn hơn 0 và không vượt số tiền yêu cầu".into());
+                }
+            }
             if date(document, "incident_date").is_none() {
                 errors.push("Ngày xảy ra sự cố phải hợp lệ".into());
             } else if date(document, "incident_date")
@@ -109,8 +123,23 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
                 return vec!["Chỉ chuyển hợp đồng sang hết hạn sau ngày kết thúc bảo hiểm".into()];
             }
         }
-        ("claim", "approved") | ("claim", "paid") if !positive(document, "amount") => {
-            return vec!["Hồ sơ bồi thường cần có số tiền hợp lệ".into()];
+        ("claim", "approved" | "paid") => {
+            let requested = document.get("amount").and_then(money::decimal);
+            let approved = document
+                .get("approved_amount")
+                .filter(|value| !value.is_null())
+                .and_then(money::decimal)
+                .or(requested);
+            if !approved.is_some_and(|amount| amount > Decimal::ZERO)
+                || requested
+                    .zip(approved)
+                    .is_none_or(|(requested, approved)| approved > requested)
+            {
+                return vec![
+                    "Số tiền bồi thường được duyệt phải lớn hơn 0 và không vượt số tiền yêu cầu"
+                        .into(),
+                ];
+            }
         }
         _ => {}
     }

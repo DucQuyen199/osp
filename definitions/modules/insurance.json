@@ -111,6 +111,12 @@
           "required": true
         },
         {
+          "name": "approved_amount",
+          "label": "Số tiền bồi thường được duyệt",
+          "type": "money",
+          "required": false
+        },
+        {
           "name": "incident_date",
           "type": "date",
           "required": true

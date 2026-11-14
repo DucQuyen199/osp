@@ -162,7 +162,9 @@ pub(super) async fn handle_event(
             Ok(Some(true))
         }
         "insurance.claim.paid" => {
-            let amount = decimal_field(event, "amount").unwrap_or(Decimal::ZERO);
+            let amount = decimal_field(event, "approved_amount")
+                .or_else(|| decimal_field(event, "amount"))
+                .unwrap_or(Decimal::ZERO);
             let source_id = event.get("id").and_then(Value::as_str).ok_or_else(|| {
                 crate::error::ApiError::validation(
                     event_type,

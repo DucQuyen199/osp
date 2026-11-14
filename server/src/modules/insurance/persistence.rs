@@ -150,11 +150,13 @@ async fn validate_claim(
     }
     if action == "approved" {
         let amount = document
-            .get("amount")
+            .get("approved_amount")
+            .filter(|value| !value.is_null())
             .and_then(money::decimal)
+            .or_else(|| document.get("amount").and_then(money::decimal))
             .unwrap_or_default();
         let existing = tx.query_opt(
-            "SELECT COALESCE(sum(amount::numeric), 0)::text FROM insurance__claim WHERE tenant_id = $1 AND policy = $2 AND status IN ('approved', 'paid') AND ($3::uuid IS NULL OR id <> $3)",
+            "SELECT COALESCE(sum(COALESCE(approved_amount, amount)::numeric), 0)::text FROM insurance__claim WHERE tenant_id = $1 AND policy = $2 AND status IN ('approved', 'paid') AND ($3::uuid IS NULL OR id <> $3)",
             &[&tenant.id, &policy, &id],
         ).await?;
         let existing = existing

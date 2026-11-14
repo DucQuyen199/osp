@@ -7183,6 +7183,9 @@
           "amount": {
             "type": "number"
           },
+          "approved_amount": {
+            "type": "number"
+          },
           "createdAt": {
             "format": "date-time",
             "readOnly": true,
@@ -7243,6 +7246,9 @@
         "description": "Bồi thường (dữ liệu gửi lên)",
         "properties": {
           "amount": {
+            "type": "number"
+          },
+          "approved_amount": {
             "type": "number"
           },
           "description": {
