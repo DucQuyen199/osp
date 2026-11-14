@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **50 module**, **189 loại dữ liệu**, **854 sự kiện**.
+Tổng: **50 module**, **190 loại dữ liệu**, **860 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|

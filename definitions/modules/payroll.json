@@ -25,6 +25,11 @@
      "required": false
     },
     {
+     "name": "working_weekdays",
+     "type": "json",
+     "required": false
+    },
+    {
      "name": "total_net",
      "type": "money",
      "required": false,

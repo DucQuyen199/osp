@@ -24,6 +24,34 @@ fn optional_decimal_field(document: &Value, field: &str) -> Option<Decimal> {
         Some(value) => crate::money::decimal(value),
     }
 }
+
+fn valid_working_weekdays(document: &Value) -> bool {
+    match document.get("working_weekdays") {
+        None | Some(Value::Null) => true,
+        Some(Value::Array(days)) => {
+            !days.is_empty()
+                && days.len() <= 7
+                && days
+                    .iter()
+                    .all(|day| day.as_u64().is_some_and(|day| (1..=7).contains(&day)))
+                && days
+                    .iter()
+                    .map(Value::as_u64)
+                    .collect::<std::collections::HashSet<_>>()
+                    .len()
+                    == days.len()
+        }
+        _ => false,
+    }
+}
+
+fn validate_run_weekdays(document: &Value, errors: &mut Vec<String>) {
+    if !valid_working_weekdays(document) {
+        errors.push(
+            "working_weekdays must be a non-empty list of unique ISO weekdays from 1 to 7".into(),
+        );
+    }
+}
 pub fn validate(entity: &str, document: &Value) -> Vec<String> {
     if entity == "tax_policy" {
         return validate_tax_policy(document);
@@ -58,6 +86,7 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
         {
             errors.push("Payroll hours_per_day must be between 1 and 24".into());
         }
+        validate_run_weekdays(document, &mut errors);
         return errors;
     }
     if entity != "payslip" {

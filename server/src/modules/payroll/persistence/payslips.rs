@@ -18,7 +18,7 @@ pub(super) async fn validate_created(
     };
     let run_row = tx
                 .query_opt(
-                    "SELECT status, period, COALESCE(hours_per_day, 8)::text FROM payroll__payroll_run WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                    "SELECT status, period, COALESCE(hours_per_day, 8)::text, COALESCE(working_weekdays, '[1,2,3,4,5]'::jsonb)::text FROM payroll__payroll_run WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
                     &[&tenant.id, &run],
                 )
                 .await?;
@@ -34,6 +34,12 @@ pub(super) async fn validate_created(
         .map(|row| decimal_column(row, 2, "hours per day"))
         .transpose()?
         .unwrap_or(Decimal::from(8));
+    let working_weekdays_json = run_row
+        .as_ref()
+        .map(|row| row.get::<_, String>(3))
+        .unwrap_or_else(|| "[1,2,3,4,5]".into());
+    let selected_weekdays: Vec<u8> =
+        serde_json::from_str(&working_weekdays_json).unwrap_or_else(|_| vec![1, 2, 3, 4, 5]);
     if let Some(period) = period.as_deref() {
         tx.query_opt(
             "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
@@ -112,7 +118,7 @@ pub(super) async fn validate_created(
                     if let Some(next_month) = NaiveDate::from_ymd_opt(year, month, 1) {
                         calculate_overtime_pay(
                             expected_salary,
-                            working_weekdays(first_day, next_month),
+                            working_weekdays(first_day, next_month, &selected_weekdays),
                             hours_per_day,
                             overtime_weighted_hours,
                         )?
@@ -300,7 +306,8 @@ pub(super) async fn validate_created(
                     (first_day.year(), first_day.month() + 1)
                 };
                 if let Some(next_month_start) = NaiveDate::from_ymd_opt(next_year, next_month, 1) {
-                    let working_days = working_weekdays(first_day, next_month_start);
+                    let working_days =
+                        working_weekdays(first_day, next_month_start, &selected_weekdays);
                     let hours_per_day_text = hours_per_day.to_string();
                     let paid_days = counted_paid_days(
                         tx,
@@ -309,6 +316,7 @@ pub(super) async fn validate_created(
                         first_day,
                         next_month_start,
                         &hours_per_day_text,
+                        &working_weekdays_json,
                     )
                     .await?;
                     let captured_paid = decimal_field(document, "paid_days");

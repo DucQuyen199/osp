@@ -20,11 +20,11 @@ mod policy_records;
 #[path = "persistence/setup_records.rs"]
 mod setup_records;
 
-fn working_weekdays(first_day: NaiveDate, next_month: NaiveDate) -> Decimal {
+fn working_weekdays(first_day: NaiveDate, next_month: NaiveDate, weekdays: &[u8]) -> Decimal {
     let mut working_days = 0_u32;
     let mut date = first_day;
     while date < next_month {
-        if !matches!(date.weekday(), chrono::Weekday::Sat | chrono::Weekday::Sun) {
+        if weekdays.contains(&(date.weekday().number_from_monday() as u8)) {
             working_days += 1;
         }
         date = date.succ_opt().unwrap_or(next_month);
@@ -62,17 +62,18 @@ async fn counted_paid_days(
     first_day: NaiveDate,
     next_month: NaiveDate,
     hours_per_day: &str,
+    working_weekdays_json: &str,
 ) -> R<Decimal> {
     let row = tx
         .query_one_row(
             "WITH counted_days AS ( \
                SELECT a.date AS work_date, LEAST(1::numeric, GREATEST(0::numeric, round( \
-                 EXTRACT(EPOCH FROM (a.check_out - a.check_in))::numeric / 3600 / $5::numeric, 6 \
+                 EXTRACT(EPOCH FROM (a.check_out - a.check_in))::numeric / 3600 / $6::numeric, 6 \
                ))) AS day_fraction FROM hrm__attendance a \
                JOIN hrm__employee e ON e.tenant_id = a.tenant_id AND e.id = a.employee \
                WHERE a.tenant_id = $1 AND a.employee = $2 AND a.date >= $3 AND a.date < $4 \
                  AND a.date >= COALESCE(e.hire_date, $3) AND a.date <= COALESCE(e.termination_date, $4 - 1) \
-                 AND EXTRACT(ISODOW FROM a.date) <= 5 AND a.check_in IS NOT NULL AND a.check_out IS NOT NULL \
+                 AND EXTRACT(ISODOW FROM a.date)::int IN (SELECT value::int FROM jsonb_array_elements_text($5::jsonb) AS selected(value)) AND a.check_in IS NOT NULL AND a.check_out IS NOT NULL \
                UNION ALL \
                SELECT leave_day.work_date::date, CASE WHEN lr.partial_day IN ('morning', 'afternoon') THEN 0.5 ELSE 1 END::numeric \
                FROM hrm__leave_request lr JOIN hrm__employee e ON e.tenant_id = lr.tenant_id AND e.id = lr.employee \
@@ -83,13 +84,13 @@ async fn counted_paid_days(
                WHERE lr.tenant_id = $1 AND lr.employee = $2 AND lr.status = 'approved' \
                  AND COALESCE(lr.pay_treatment, CASE WHEN lr.kind = 'unpaid' THEN 'unpaid' ELSE 'paid' END) = 'paid' \
                  AND lr.start_date < $4 AND lr.end_date >= $3 \
-                 AND EXTRACT(ISODOW FROM leave_day.work_date) <= 5 \
+                 AND EXTRACT(ISODOW FROM leave_day.work_date)::int IN (SELECT value::int FROM jsonb_array_elements_text($5::jsonb) AS selected(value)) \
                UNION ALL \
                SELECT h.date AS work_date, 1::numeric AS day_fraction FROM hrm__holiday h \
                JOIN hrm__employee e ON e.tenant_id = h.tenant_id \
                WHERE h.tenant_id = $1 AND e.id = $2 AND h.date >= $3 AND h.date < $4 \
                  AND h.date >= COALESCE(e.hire_date, $3) AND h.date <= COALESCE(e.termination_date, $4 - 1) \
-                 AND h.pay_treatment = 'paid' AND EXTRACT(ISODOW FROM h.date) <= 5 \
+                 AND h.pay_treatment = 'paid' AND EXTRACT(ISODOW FROM h.date)::int IN (SELECT value::int FROM jsonb_array_elements_text($5::jsonb) AS selected(value)) \
              ), per_day AS (SELECT work_date, LEAST(1::numeric, round(sum(day_fraction), 6)) AS day_fraction FROM counted_days GROUP BY work_date) \
              SELECT round(COALESCE(sum(day_fraction), 0), 6)::text FROM per_day",
             &[
@@ -97,6 +98,7 @@ async fn counted_paid_days(
                 &employee,
                 &first_day,
                 &next_month,
+                &working_weekdays_json,
                 &hours_per_day,
             ],
         )

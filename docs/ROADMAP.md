@@ -71,3 +71,5 @@ Các module CRM/Marketing, bán hàng, mua hàng, loyalty, logistics, field serv
 - Ưu tiên độ tin cậy số liệu, nhất là tiền và tồn kho.
 - Mỗi tính năng cần kiểm thử luồng và tài liệu.
 - Không cam kết tuân thủ pháp lý trước khi có tư vấn chuyên môn.
+
+- Payroll cho phép chốt bộ ngày làm việc ISO 1–7 theo từng kỳ (mặc định thứ Hai–thứ Sáu); công, phép hưởng lương, ngày lễ, mẫu số lương và kiểm tra phiếu lương dùng cùng lịch đã lưu. Lịch ca xoay theo từng nhân viên vẫn cần phát triển.

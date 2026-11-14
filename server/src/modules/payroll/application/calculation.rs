@@ -58,27 +58,11 @@ pub(super) async fn calculate_from_attendance(
     let Some(next_month_start) = NaiveDate::from_ymd_opt(next_year, next_month, 1) else {
         return Ok(false);
     };
-    let mut working_days = 0usize;
-    let mut calendar_day = first_day;
-    while calendar_day < next_month_start {
-        if !matches!(
-            calendar_day.weekday(),
-            chrono::Weekday::Sat | chrono::Weekday::Sun
-        ) {
-            working_days += 1;
-        }
-        calendar_day = calendar_day.succ_opt().unwrap_or(next_month_start);
-    }
-    let working_days = Decimal::from(working_days as u32);
-    if working_days <= Decimal::ZERO {
-        return Ok(false);
-    }
-
     // Lock the payroll run before checking for existing slips. This serializes
     // calculate requests with payslip creation and submission.
     let run = tx
         .query_opt(
-            "SELECT status, COALESCE(hours_per_day, 8)::text FROM payroll__payroll_run WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+            "SELECT status, COALESCE(hours_per_day, 8)::text, COALESCE(working_weekdays, '[1,2,3,4,5]'::jsonb)::text FROM payroll__payroll_run WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
             &[&tenant.id, &run_id],
         )
         .await?;
@@ -100,6 +84,28 @@ pub(super) async fn calculate_from_attendance(
         .map(|row| decimal_column(row, 1, "hours per day"))
         .transpose()?
         .unwrap_or(Decimal::from(8));
+    let working_weekdays_json = run
+        .as_ref()
+        .map(|row| row.get::<_, String>(2))
+        .unwrap_or_else(|| "[1,2,3,4,5]".into());
+    let working_weekdays: Vec<u8> = serde_json::from_str(&working_weekdays_json).map_err(|_| {
+        crate::error::ApiError::validation(
+            "payroll.payroll_run",
+            vec!["working_weekdays must contain ISO weekdays from 1 to 7".into()],
+        )
+    })?;
+    let mut working_day_count = 0u32;
+    let mut calendar_day = first_day;
+    while calendar_day < next_month_start {
+        if working_weekdays.contains(&(calendar_day.weekday().number_from_monday() as u8)) {
+            working_day_count += 1;
+        }
+        calendar_day = calendar_day.succ_opt().unwrap_or(next_month_start);
+    }
+    let working_days = Decimal::from(working_day_count);
+    if working_days <= Decimal::ZERO {
+        return Ok(false);
+    }
     if !(Decimal::ONE..=Decimal::from(24)).contains(&hours_per_day) {
         return Err(crate::error::ApiError::validation(
             "payroll.payroll_run",
@@ -171,7 +177,7 @@ pub(super) async fn calculate_from_attendance(
                  AND a.date >= $2 AND a.date < $3 \
                  AND a.date >= COALESCE(e.hire_date, $2) \
                  AND a.date <= COALESCE(e.termination_date, $3 - 1) \
-                 AND EXTRACT(ISODOW FROM a.date) <= 5 \
+                 AND EXTRACT(ISODOW FROM a.date)::int IN (SELECT value::int FROM jsonb_array_elements_text($5::jsonb) AS selected(value)) \
                  AND a.check_in IS NOT NULL AND a.check_out IS NOT NULL \
                UNION \
                SELECT lr.employee, leave_day.work_date::date AS work_date, \
@@ -189,7 +195,7 @@ pub(super) async fn calculate_from_attendance(
                  AND lr.start_date < $3 AND lr.end_date >= $2 \
                  AND lr.end_date >= COALESCE(e.hire_date, $2) \
                  AND lr.start_date <= COALESCE(e.termination_date, $3 - 1) \
-                 AND EXTRACT(ISODOW FROM leave_day.work_date) <= 5 \
+                 AND EXTRACT(ISODOW FROM leave_day.work_date)::int IN (SELECT value::int FROM jsonb_array_elements_text($5::jsonb) AS selected(value)) \
                UNION \
                SELECT e.id, h.date AS work_date, 1::numeric AS day_fraction \
                FROM hrm__holiday h \
@@ -200,7 +206,7 @@ pub(super) async fn calculate_from_attendance(
                  AND h.date >= COALESCE(e.hire_date, $2) \
                  AND h.date <= COALESCE(e.termination_date, $3 - 1) \
                  AND h.pay_treatment = 'paid' \
-                 AND EXTRACT(ISODOW FROM h.date) <= 5 \
+                 AND EXTRACT(ISODOW FROM h.date)::int IN (SELECT value::int FROM jsonb_array_elements_text($5::jsonb) AS selected(value)) \
              ), paid_days AS ( \
                SELECT employee, work_date, LEAST(1::numeric, round(sum(day_fraction), 6)) AS day_fraction \
                FROM counted_days GROUP BY employee, work_date \
@@ -219,6 +225,7 @@ pub(super) async fn calculate_from_attendance(
                 &first_day,
                 &next_month_start,
                 &hours_per_day.to_string(),
+                &working_weekdays_json,
             ],
         )
         .await?;

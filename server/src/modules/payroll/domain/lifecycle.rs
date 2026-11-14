@@ -113,6 +113,7 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
         "payroll_run" if current.get("status").and_then(Value::as_str) != Some("draft") => {
             if patch.get("period").is_some()
                 || patch.get("hours_per_day").is_some()
+                || patch.get("working_weekdays").is_some()
                 || patch.get("total_net").is_some()
                 || patch.get("payment_date").is_some()
                 || patch.get("payment_method").is_some()
@@ -126,7 +127,9 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
             }
         }
         "payroll_run"
-            if patch.get("total_net").is_some() || patch.get("hours_per_day").is_some() =>
+            if patch.get("total_net").is_some()
+                || patch.get("hours_per_day").is_some()
+                || patch.get("working_weekdays").is_some() =>
         {
             vec!["total_net và hours_per_day là dữ liệu chốt khi tạo bảng lương".into()]
         }
@@ -217,6 +220,11 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
                 .is_some_and(|hours| (Decimal::ONE..=Decimal::from(24)).contains(&hours))
         {
             return vec!["Payroll hours_per_day must be between 1 and 24".into()];
+        }
+        let mut errors = Vec::new();
+        validate_run_weekdays(document, &mut errors);
+        if !errors.is_empty() {
+            return errors;
         }
         return Vec::new();
     }
