@@ -21,6 +21,23 @@ pub async fn dispatch_source_events(
     inventory_orders::dispatch(kernel, tx, tenant, event, handled).await?;
     support::dispatch(kernel, tx, tenant, event, handled).await?;
     finance_commerce::dispatch(kernel, tx, tenant, event, handled).await?;
+    if crate::modules::bi::handle_source_event(
+        kernel,
+        tx,
+        tenant,
+        &event.ty,
+        &event.payload,
+        event.id,
+        event.depth,
+    )
+    .await?
+    {
+        handled.push(serde_json::json!({
+            "module": "bi",
+            "rule": "scheduled_report_snapshot",
+            "outcome": "ok"
+        }));
+    }
     if crate::modules::construction::handle_source_event(
         kernel,
         tx,

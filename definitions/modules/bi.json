@@ -42,9 +42,46 @@
     },
     {
      "name": "schedule",
-     "type": "string",
-     "required": false
+     "type": "enum",
+     "required": false,
+     "options": ["daily", "weekly"]
+    },
+    {
+     "name": "schedule_status",
+     "type": "enum",
+     "required": false,
+     "system": true,
+     "options": ["paused", "scheduled"]
+    },
+    {
+     "name": "next_run_at",
+     "type": "datetime",
+     "required": false,
+     "system": true
     }
+   ],
+   "states": {
+    "field": "schedule_status",
+    "initial": "paused",
+    "actions": {
+     "scheduled": { "from": ["paused"], "to": "scheduled" },
+     "paused": { "from": ["scheduled"], "to": "paused" },
+     "run_due": { "from": ["scheduled"], "to": "scheduled" }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "report_run",
+   "label": "Lần chạy báo cáo",
+   "systemManaged": true,
+   "fields": [
+    { "name": "report", "type": "ref", "required": true, "ref": "bi.report", "system": true },
+    { "name": "run_at", "type": "datetime", "required": true, "system": true },
+    { "name": "row_count", "type": "number", "required": true, "system": true },
+    { "name": "result", "type": "json", "required": true, "system": true },
+    { "name": "status", "type": "enum", "required": true, "system": true, "options": ["completed"] }
    ],
    "states": null,
    "computed": {},
@@ -83,6 +120,6 @@
  ],
  "rules": [],
  "seeds": [],
- "publishes": [],
+ "publishes": ["bi.report.run_due", "bi.report.paused", "bi.report.scheduled"],
  "jobs": []
 }

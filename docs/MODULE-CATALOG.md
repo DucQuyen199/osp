@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **50 module**, **185 loại dữ liệu**, **829 sự kiện**.
+Tổng: **50 module**, **186 loại dữ liệu**, **835 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -374,7 +374,8 @@ Tổng: **50 module**, **185 loại dữ liệu**, **829 sự kiện**.
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
 | `dashboard` Dashboard | — |
-| `report` Báo cáo | — |
+| `report` Báo cáo | `paused` → **paused** (scheduled→paused), **run_due** (scheduled→scheduled), **scheduled** (paused→scheduled) |
+| `report_run` Lần chạy báo cáo | — |
 | `kpi` Chỉ tiêu KPI | — |
 
 ### communication

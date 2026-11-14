@@ -30,6 +30,18 @@ pub async fn validate_persistence(
                     "A report referenced by a KPI cannot be deleted".into(),
                 ]);
             }
+            if tx
+                .query_opt(
+                    "SELECT id FROM bi__report_run WHERE tenant_id = $1 AND report = $2 LIMIT 1",
+                    &[&tenant.id, &Uuid::parse_str(id).ok()],
+                )
+                .await?
+                .is_some()
+            {
+                return Ok(vec![
+                    "A report with saved execution history cannot be deleted".into(),
+                ]);
+            }
         }
         return Ok(Vec::new());
     }

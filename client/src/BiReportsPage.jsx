@@ -104,6 +104,9 @@ export default function BiReportsPage({ route }) {
   const [draftSearch, setDraftSearch] = useState('');
   const [draftFilter, setDraftFilter] = useState('');
   const [draftFilterValue, setDraftFilterValue] = useState('');
+  const [draftSchedule, setDraftSchedule] = useState('');
+  const [reportRuns, setReportRuns] = useState([]);
+  const [selectedRun, setSelectedRun] = useState(null);
   const [creatingDashboard, setCreatingDashboard] = useState(false);
   const [savingDashboard, setSavingDashboard] = useState(false);
   const [dashboardName, setDashboardName] = useState('');
@@ -138,7 +141,7 @@ export default function BiReportsPage({ route }) {
   useEffect(() => {
     let active = true;
     setError('');
-    setDashboard(null); setReport(null); setResult(null);
+    setDashboard(null); setReport(null); setResult(null); setReportRuns([]); setSelectedRun(null);
     if (route.view === 'dashboard' && route.id) {
       api(dataPath('bi.dashboard', route.id)).then((value) => { if (active) setDashboard(value); }).catch((reason) => { if (active) setError(reason.message || 'Không tải được dashboard.'); });
     }
@@ -148,6 +151,11 @@ export default function BiReportsPage({ route }) {
         setReport(value);
         if (value.query) setResult(await api(tenantPath(`/reports/bi/${encodeURIComponent(route.id)}`)));
       }).catch((reason) => { if (active) setError(reason.message || 'Không tải được báo cáo.'); });
+      if (can('bi.report.read')) {
+        api(tenantPath(`/reports/bi/${encodeURIComponent(route.id)}/runs`))
+          .then((value) => { if (active) setReportRuns(asItems(value)); })
+          .catch((reason) => { if (active) setError(reason.message || 'Could not load report run history.'); });
+      }
     }
     return () => { active = false; };
   }, [route.view, route.id]);
@@ -188,13 +196,26 @@ export default function BiReportsPage({ route }) {
     setSavingReport(true);
     setError('');
     try {
-      const created = await api(dataPath('bi.report'), { method: 'POST', body: { name: draftName.trim(), query } });
-      setDraftName(''); setCreating(false);
+      const created = await api(dataPath('bi.report'), { method: 'POST', body: { name: draftName.trim(), query, ...(draftSchedule ? { schedule: draftSchedule } : {}) } });
+      setDraftName(''); setDraftSchedule(''); setCreating(false);
       await load();
       if (created?.id) window.location.hash = `#/reports/bi/report/${encodeURIComponent(created.id)}`;
     } catch (reason) {
       setError(reason.message || 'Could not create report.');
     } finally { setSavingReport(false); }
+  };
+
+  const runReportAction = async (action) => {
+    if (!route.id) return;
+    setError('');
+    try {
+      await api(dataPath('bi.report', route.id, action), { method: 'POST' });
+      const [updated, runs] = await Promise.all([
+        api(dataPath('bi.report', route.id)),
+        api(tenantPath(`/reports/bi/${encodeURIComponent(route.id)}/runs`)),
+      ]);
+      setReport(updated); setReportRuns(asItems(runs));
+    } catch (reason) { setError(reason.message || 'Could not update report schedule.'); }
   };
 
   const reportWidgetTypes = (item) => {
@@ -245,6 +266,8 @@ export default function BiReportsPage({ route }) {
   if (route.view === 'report' && route.id) return <div className="page">
     <div className="page-head"><div><a className="back-link" href="#/reports/bi">← Báo cáo & phân tích</a><h1>{report?.name || 'Báo cáo'}</h1><p className="sub">{report?.query?.source ? `Nguồn dữ liệu: ${report.query.source}` : 'Báo cáo chưa có truy vấn đã lưu.'}</p></div></div>
     {error && <div className="alert danger" role="alert">{error}</div>}
+    {report?.schedule && <section className="card report-section"><div className="card-head"><h2>Lịch snapshot</h2><span className="badge plain">{report.schedule === 'daily' ? 'Hằng ngày' : 'Hằng tuần'} · {report.schedule_status === 'scheduled' ? 'Đang chạy' : 'Đã tạm dừng'}</span></div><div className="card-pad row"><span className="small muted">Lần tiếp theo: {report.next_run_at || 'Chưa đặt lịch'} (UTC)</span>{report.schedule_status === 'scheduled' && can('bi.report.paused') && <button className="btn" type="button" onClick={() => runReportAction('paused')}>Tạm dừng</button>}{report.schedule_status === 'paused' && can('bi.report.scheduled') && <button className="btn btn-primary" type="button" onClick={() => runReportAction('scheduled')}>Tiếp tục</button>}</div></section>}
+    {reportRuns.length > 0 && <section className="card report-section"><div className="card-head"><h2>Lịch sử snapshot</h2><span className="faint">{reportRuns.length} lần gần nhất</span></div><div className="card-pad stack-sm">{reportRuns.map((run) => <button className="btn" type="button" key={run.id} aria-pressed={selectedRun?.id === run.id} onClick={() => setSelectedRun(run)}>{run.runAt} · {run.rowCount} dòng</button>)}</div>{selectedRun && <div className="card-pad"><DataTable items={asItems(selectedRun.result)} /></div>}</section>}
     {!report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : result ? <section className="card report-section"><div className="card-head"><h2>Kết quả</h2><span className="faint">{fmtNumber(result.total || 0)} bản ghi</span><button className="btn" type="button" disabled={exporting} onClick={exportReport}>{exporting ? 'Đang xuất…' : 'Tải CSV'}</button></div><div className="card-pad"><DataTable items={asItems(result)} /></div></section> : <div className="empty"><h3>Chưa cấu hình truy vấn</h3><p>Thêm định nghĩa truy vấn an toàn vào báo cáo để xem dữ liệu.</p></div>}
   </div>;
 
@@ -261,6 +284,7 @@ export default function BiReportsPage({ route }) {
         {draftOperation !== 'rows' && draftOperation !== 'count' && <label className="field"><span>Trường số cần tính</span><select className="input" required value={draftField} onChange={(event) => setDraftField(event.target.value)}><option value="">Chọn trường</option>{numericFields.map((field) => <option key={field.name} value={field.name}>{field.label || field.name}</option>)}</select></label>}
         {draftOperation !== 'rows' && <label className="field"><span>Nhóm theo (không bắt buộc)</span><select className="input" value={draftGroup} onChange={(event) => setDraftGroup(event.target.value)}><option value="">Không nhóm</option>{groupFields.map((field) => <option key={field.name} value={field.name}>{field.label || field.name}</option>)}</select></label>}
         <label className="field"><span>Tìm kiếm văn bản (không bắt buộc)</span><input className="input" value={draftSearch} onChange={(event) => setDraftSearch(event.target.value)} /></label>
+        <label className="field"><span>Lịch chạy snapshot</span><select className="input" value={draftSchedule} onChange={(event) => setDraftSchedule(event.target.value)}><option value="">Chạy thủ công</option><option value="daily">Hằng ngày</option><option value="weekly">Hằng tuần</option></select><span className="small muted">Lịch dùng UTC; snapshot tiếp theo chạy sau một chu kỳ.</span></label>
         <label className="field"><span>Lọc theo trường (không bắt buộc)</span><select className="input" value={draftFilter} onChange={(event) => setDraftFilter(event.target.value)}><option value="">Không lọc</option>{sourceFields.filter((field) => field.type !== 'json').map((field) => <option key={field.name} value={field.name}>{field.label || field.name}</option>)}</select></label>
         {draftFilter && <label className="field"><span>Giá trị lọc chính xác</span><input className="input" value={draftFilterValue} onChange={(event) => setDraftFilterValue(event.target.value)} /></label>}
       </div>

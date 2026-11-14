@@ -2361,10 +2361,27 @@
           "name": {
             "type": "string"
           },
+          "next_run_at": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
           "query": {
             "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
           },
           "schedule": {
+            "enum": [
+              "daily",
+              "weekly"
+            ],
+            "type": "string"
+          },
+          "schedule_status": {
+            "enum": [
+              "paused",
+              "scheduled"
+            ],
+            "readOnly": true,
             "type": "string"
           },
           "updatedAt": {
@@ -2382,15 +2399,111 @@
           "name": {
             "type": "string"
           },
+          "next_run_at": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
           "query": {
             "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
           },
           "schedule": {
+            "enum": [
+              "daily",
+              "weekly"
+            ],
             "type": "string"
           }
         },
         "required": [
           "name"
+        ],
+        "type": "object"
+      },
+      "bi_report_run": {
+        "description": "Lần chạy báo cáo",
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "report": {
+            "description": "Tham chiếu tới bi.report",
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "result": {
+            "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)",
+            "readOnly": true
+          },
+          "row_count": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "run_at": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "completed"
+            ],
+            "readOnly": true,
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "bi_report_runInput": {
+        "additionalProperties": false,
+        "description": "Lần chạy báo cáo (dữ liệu gửi lên)",
+        "properties": {
+          "report": {
+            "description": "Tham chiếu tới bi.report",
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "result": {
+            "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)",
+            "readOnly": true
+          },
+          "row_count": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "run_at": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "completed"
+            ],
+            "readOnly": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "report",
+          "run_at",
+          "row_count",
+          "result",
+          "status"
         ],
         "type": "object"
       },
@@ -31284,6 +31397,150 @@
         ]
       }
     },
+    "/api/t/{tenantId}/data/bi/report/bulk/{action}": {
+      "post": {
+        "description": "Thực hiện cùng một chuyển trạng thái cho 1–100 bản ghi trong một giao dịch. Nếu một bản ghi lỗi, toàn bộ lô được hoàn tác.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "action",
+            "required": true,
+            "schema": {
+              "enum": [
+                "paused",
+                "run_due",
+                "scheduled"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "ids": {
+                    "items": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "maxItems": 100,
+                    "minItems": 1,
+                    "type": "array",
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "ids"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "action": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "items": {
+                      "items": {
+                        "$ref": "#/components/schemas/bi_report"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "count",
+                    "items"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Ít nhất một bản ghi không ở trạng thái cho phép"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Danh sách ID hoặc dữ liệu không hợp lệ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Chuyển trạng thái hàng loạt: Báo cáo",
+        "tags": [
+          "bi"
+        ]
+      }
+    },
     "/api/t/{tenantId}/data/bi/report/{id}": {
       "delete": {
         "parameters": [
@@ -31520,6 +31777,712 @@
           }
         ],
         "summary": "Sửa Báo cáo",
+        "tags": [
+          "bi"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/bi/report/{id}/paused": {
+      "post": {
+        "description": "Phát sự kiện `bi.report.paused` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bi_report"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Báo cáo: paused (scheduled → paused)",
+        "tags": [
+          "bi"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/bi/report/{id}/run_due": {
+      "post": {
+        "description": "Phát sự kiện `bi.report.run_due` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bi_report"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Báo cáo: run_due (scheduled → scheduled)",
+        "tags": [
+          "bi"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/bi/report/{id}/scheduled": {
+      "post": {
+        "description": "Phát sự kiện `bi.report.scheduled` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bi_report"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Báo cáo: scheduled (paused → scheduled)",
+        "tags": [
+          "bi"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/bi/report_run": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Tìm văn bản trong các trường chuỗi",
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dir",
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Lọc bằng nhau theo bất kỳ trường nào, ví dụ ?status=draft",
+            "in": "query",
+            "name": "<field>",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "$ref": "#/components/schemas/bi_report_run"
+                      },
+                      "type": "array"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Danh sách Lần chạy báo cáo",
+        "tags": [
+          "bi"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/bi_report_runInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bi_report_run"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Dữ liệu không hợp lệ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tạo Lần chạy báo cáo",
+        "tags": [
+          "bi"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/bi/report_run/{id}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Đã xóa"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Đang được tham chiếu"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Xóa Lần chạy báo cáo",
+        "tags": [
+          "bi"
+        ]
+      },
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bi_report_run"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Xem Lần chạy báo cáo",
+        "tags": [
+          "bi"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/bi_report_runInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bi_report_run"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Dữ liệu không hợp lệ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sửa Lần chạy báo cáo",
         "tags": [
           "bi"
         ]

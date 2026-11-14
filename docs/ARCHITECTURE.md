@@ -170,6 +170,8 @@ Each tracked purchase receipt posts its inventory value to the GRNI clearing lia
 
 Purchase returns without a posted supplier bill debit the order's GRNI and credit inventory. A return against billed goods must select the supplier invoice being reversed; its return quantity is capped by that invoice, and the accounting workflow creates a payable debit note against the matching bill.
 
+BI report schedules support daily and weekly UTC cadences. The shared scheduled-job dispatcher locks due reports and emits the report state action in the tenant transaction; the BI event handler evaluates the saved tenant-authorized query, stores a system-managed snapshot capped at 2 MB, and advances the next-run time atomically. Report owners can pause or resume the cadence and inspect the latest 50 snapshots.
+
 The integration-hub context owns connector, webhook, and API-key configuration policy. Its domain layer validates HTTPS endpoint shape and event/scope names, its application layer normalizes configuration and enqueues subscribed events in the source transaction, and its persistence layer enforces tenant-local API-key name uniqueness. A Rust worker delivers webhook events with bounded retry and dead-letter handling; the tenant admin UI can inspect, retry, or dismiss dead letters.
 
 Project work now includes an explicit `task_dependency` entity. The persistence layer verifies both tasks belong to the same tenant and project, serializes changes through the project row, rejects cycles and duplicate links, and blocks task completion until every predecessor is done. Dependency links are immutable; users remove and recreate a link to change it. The module remains split into the standard `domain.rs`, `application.rs`, `persistence.rs`, and `mod.rs` layers.

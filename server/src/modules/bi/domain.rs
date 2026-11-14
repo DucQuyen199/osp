@@ -91,11 +91,41 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
     errors
 }
 
-pub fn validate_action(_entity: &str, _action: &str, _document: &Value) -> Vec<String> {
-    Vec::new()
+pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
+    if entity != "report" {
+        return Vec::new();
+    }
+    match action {
+        "scheduled"
+            if !matches!(
+                document.get("schedule").and_then(Value::as_str),
+                Some("daily" | "weekly")
+            ) =>
+        {
+            vec!["Choose a daily or weekly cadence before scheduling the report".into()]
+        }
+        "run_due" => {
+            let due = document
+                .get("next_run_at")
+                .and_then(Value::as_str)
+                .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok());
+            if due.is_none_or(|value| value > chrono::Utc::now()) {
+                vec!["A scheduled report can only run after its next run time".into()]
+            } else {
+                Vec::new()
+            }
+        }
+        _ => Vec::new(),
+    }
 }
 
-pub fn validate_update(_entity: &str, _current: &Value, _patch: &Value) -> Vec<String> {
+pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<String> {
+    if entity == "report"
+        && current.get("schedule_status").and_then(Value::as_str) == Some("scheduled")
+        && patch.get("schedule").is_some()
+    {
+        return vec!["Pause a scheduled report before changing its cadence".into()];
+    }
     Vec::new()
 }
 

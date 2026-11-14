@@ -80,6 +80,7 @@ pub(crate) fn scheduled_job(
 
 pub(crate) fn scheduled_jobs(module: &str) -> Vec<crate::defs::JobSpec> {
     match module {
+        "bi" => bi::scheduled_jobs(),
         "communication" => communication::scheduled_jobs(),
         "booking" => booking::scheduled_jobs(),
         "contract" => contract::scheduled_jobs(),

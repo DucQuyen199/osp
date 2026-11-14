@@ -33,6 +33,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Tối ưu chỉ mục/truy vấn theo workload, mở rộng scheduler và billing/licensing OSP.
 - Kế toán Việt Nam có mẫu tài khoản cấp 1 và các mã chi tiết được liệt kê trong phụ lục TT99/2025, TT133/2016; vẫn thiếu ánh xạ biểu mẫu, kê khai thuế chính thức, nhập ngân hàng trực tiếp và xác minh chuyên môn.
 - Hóa đơn điện tử cần adapter nhà cung cấp. Kho/sản xuất cần xác minh production và đào sâu các nghiệp vụ theo ngành.
+- BI hỗ trợ tự thiết kế báo cáo, dashboard, KPI và lưu snapshot theo lịch ngày/tuần; email gửi báo cáo và tệp đính kèm chưa được triển khai.
 - Đối chiếu hóa đơn mua còn thiếu khoản phí lệch PO, sai khác giá/thuế, điều khoản giảm giá và quy trình xử lý hóa đơn sai lệch.
 - Đối soát sao kê ngân hàng đã hỗ trợ đồng tiền giao dịch, snapshot tỷ giá từng dòng, CSV/CAMT.053 và kiểm tra với giá trị sổ cái tiền cơ sở; còn thiếu kết nối API ngân hàng trực tiếp và báo cáo hợp nhất. Còn thiếu đa công ty, accessibility với trình đọc màn hình, đa ngôn ngữ, POS/KDS chuyên dụng, PWA/offline, tải HTTP và đa trình duyệt. Bulk action cho mọi entity có state machine đã có API Rust và giao diện danh sách; giới hạn 100 bản ghi mỗi giao dịch và rollback cả lô nếu một chuyển trạng thái lỗi. Kế toán hiện snapshot tỷ giá chứng từ/thanh toán, ghi nhận FX realized và tạo nháp đánh giá lại công nợ theo ngày.
 

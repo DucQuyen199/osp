@@ -102,6 +102,32 @@ impl Kernel {
         }))
     }
 
+    pub async fn list_bi_report_runs(
+        &self,
+        actor: &Actor,
+        t: &Tenant,
+        report_id: &str,
+    ) -> R<Value> {
+        let report = self.get(actor, t, "bi.report", report_id).await?;
+        if let Some(source) = report
+            .get("query")
+            .and_then(|query| query.get("source"))
+            .and_then(Value::as_str)
+        {
+            let source = self.ent(t, source)?;
+            self.authorize(t, actor, &format!("{}.read", source.qname()))?;
+        }
+        let report_id = Uuid::parse_str(report_id).map_err(|_| ApiError::not_found("BI report"))?;
+        let mut conn = self.pool.get().await?;
+        let tx = Tx::begin(&mut conn, &t.id, false).await?;
+        let items = tx.query_json(
+            "SELECT jsonb_build_object('id', id::text, 'report', report::text, 'runAt', run_at, 'rowCount', row_count, 'result', result, 'status', status) FROM bi__report_run WHERE tenant_id=$1 AND report=$2 ORDER BY run_at DESC, id DESC LIMIT 50",
+            &[&t.id, &report_id],
+        ).await?;
+        tx.commit().await?;
+        Ok(json!({ "items": items, "total": items.len() }))
+    }
+
     /// Export all matching rows from a saved report, irrespective of its display page.
     pub async fn export_bi_report_csv(
         &self,

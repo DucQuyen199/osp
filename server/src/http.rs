@@ -849,6 +849,9 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                 "attainmentPercent": attainment.map(decimal_json).transpose()?
             }));
         }
+        (&Method::GET, ["reports", "bi", report_id, "runs"]) => {
+            return json_ok(k.list_bi_report_runs(&actor, &t, report_id).await?);
+        }
         (&Method::GET, ["reports", "bi", report_id, "export"]) => {
             let csv = k.export_bi_report_csv(&actor, &t, report_id).await?;
             return Ok(Reply::Raw {
