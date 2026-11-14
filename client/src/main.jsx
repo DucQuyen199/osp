@@ -212,7 +212,7 @@ function Sidebar({ meta, route, onNavigate, open }) {
     {meta.modules.some((module) => module.id === 'subscription') && can('subscription.subscription.read') && link('#/subscriptions', 'Thuê bao và gia hạn', route.name === 'subscription-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'charity') && can('charity.program.read') && link('#/charity', 'Chương trình và quỹ', route.name === 'charity-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'case-management') && can('case-management.case.read') && link('#/cases', 'Hồ sơ dịch vụ', route.name === 'professional-services-workbench', 'list')}
-    {meta.modules.some((module) => module.id === 'booking') && !meta.modules.some((module) => module.id === 'clinic') && can('booking.booking.read') && link('#/wellness', 'Lịch dịch vụ', route.name === 'wellness-booking-workbench', 'list')}
+    {meta.modules.some((module) => module.id === 'booking') && can('booking.booking.read') && link('#/wellness', meta.modules.some((module) => module.id === 'clinic') ? 'Lịch hẹn khám' : 'Lịch dịch vụ', route.name === 'wellness-booking-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'purchasing') && can('purchasing.purchase_order.read') && link('#/purchasing', 'Mua hàng và nhận hàng', route.name === 'purchasing-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'purchasing') && can('purchasing.rfq.read') && link('#/sourcing', 'RFQ và so sánh báo giá', route.name === 'purchasing-sourcing-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'maintenance') && can('maintenance.maintenance_request.read') && link('#/maintenance', 'Bảo trì tài sản', route.name === 'maintenance-workbench', 'list')}
@@ -421,7 +421,7 @@ function App() {
         : route.name === 'subscription-workbench' ? <SubscriptionWorkbenchPage />
         : route.name === 'charity-workbench' ? <CharityWorkbenchPage />
         : route.name === 'professional-services-workbench' ? <ProfessionalServicesWorkbenchPage />
-        : route.name === 'wellness-booking-workbench' ? <WellnessBookingPage />
+        : route.name === 'wellness-booking-workbench' ? <WellnessBookingPage healthcare={meta.modules.some((module) => module.id === 'clinic')} />
         : route.name === 'purchasing-workbench' ? <PurchasingWorkbenchPage />
         : route.name === 'purchasing-sourcing-workbench' ? <PurchasingSourcingWorkbenchPage />
         : route.name === 'maintenance-workbench' ? <MaintenanceWorkbenchPage />

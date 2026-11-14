@@ -15,7 +15,7 @@ const localDate = (value) => {
 };
 const action = (row, verb) => api(dataPath('booking.booking', row.id, verb), { method: 'POST' });
 
-export default function WellnessBookingPage() {
+export default function WellnessBookingPage({ healthcare = false }) {
   const [bookings, setBookings] = useState([]);
   const [resources, setResources] = useState([]);
   const [services, setServices] = useState([]);
@@ -100,7 +100,7 @@ export default function WellnessBookingPage() {
   const kindLabel = (kind) => ({ staff: 'Kỹ thuật viên', room: 'Phòng', equipment: 'Thiết bị', table: 'Bàn', court: 'Sân' }[kind] || 'Tài nguyên');
 
   return <div className="page">
-    <div className="page-head"><div><h1>Lịch dịch vụ và hội viên</h1><p className="sub">Điều phối kỹ thuật viên/phòng, quản lý lịch khách, check-in, hoàn tất và ghi nhận khách vắng.</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>Làm mới</button></div>
+    <div className="page-head"><div><h1>{healthcare ? 'Lịch hẹn khám' : 'Lịch dịch vụ và hội viên'}</h1><p className="sub">{healthcare ? 'Điều phối bác sĩ và phòng khám, quản lý lịch bệnh nhân, check-in và ghi nhận khách vắng.' : 'Điều phối kỹ thuật viên/phòng, quản lý lịch khách, check-in, hoàn tất và ghi nhận khách vắng.'}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>Làm mới</button></div>
     {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
     <div className="stats" style={{ marginBottom: 16 }}><div className="card stat"><span className="stat-label">Lịch hôm nay</span><strong className="stat-value">{todays.length}</strong></div><div className="card stat"><span className="stat-label">Đã xác nhận</span><strong className="stat-value">{confirmed}</strong></div><div className="card stat"><span className="stat-label">Đang phục vụ</span><strong className="stat-value">{inProgress}</strong></div><div className="card stat"><span className="stat-label">Đã hoàn tất</span><strong className="stat-value">{completed}</strong></div></div>
     {can('booking.booking.create') && resources.length > 0 && <section className="card card-pad"><h2>Đặt lịch dịch vụ</h2><form className="form-grid" onSubmit={createBooking}>
