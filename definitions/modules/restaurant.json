@@ -130,6 +130,12 @@
      ]
     },
     {
+     "name": "cancellation_reason",
+     "label": "Lý do hủy sau khi gửi bếp",
+     "type": "text",
+     "required": false
+    },
+    {
      "name": "lines",
      "type": "json",
      "required": false
@@ -189,7 +195,8 @@
      },
      "cancelled": {
       "from": [
-        "open"
+        "open",
+        "sent"
       ],
       "to": "cancelled"
      }
@@ -229,7 +236,8 @@
      "options": [
       "queued",
       "preparing",
-      "ready"
+      "ready",
+      "cancelled"
      ]
     }
    ],
@@ -248,6 +256,12 @@
        "preparing"
       ],
       "to": "ready"
+     },
+     "cancelled": {
+      "from": [
+       "queued"
+      ],
+      "to": "cancelled"
      }
     }
    },

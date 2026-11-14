@@ -19,6 +19,43 @@ pub async fn handle_source_event(
     event_id: Uuid,
     depth: u32,
 ) -> R<bool> {
+    if event_type == "restaurant.table_order.cancelled" {
+        let order_id = document
+            .get("id")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+            .ok_or_else(|| {
+                ApiError::validation(
+                    event_type,
+                    vec!["Cancelled order requires a valid id".into()],
+                )
+            })?;
+        let tickets = tx.query(
+            "SELECT id FROM restaurant__kitchen_ticket WHERE tenant_id = $1 AND \"order\" = $2 AND status = 'queued' FOR UPDATE",
+            &[&tenant.id, &order_id],
+        ).await?;
+        let ticket_entity = kernel.ent(tenant, "restaurant.kitchen_ticket")?;
+        let opts = Opts {
+            depth: Some(depth + 1),
+            causation: Some(event_id),
+            silent: false,
+        };
+        for ticket in tickets {
+            let ticket_id: Uuid = ticket.get(0);
+            kernel
+                .act_in(
+                    tx,
+                    &Actor::System,
+                    tenant,
+                    &ticket_entity,
+                    &ticket_id.to_string(),
+                    "cancelled",
+                    &opts,
+                )
+                .await?;
+        }
+        return Ok(true);
+    }
     if event_type != "restaurant.table_order.sent" {
         return Ok(false);
     }

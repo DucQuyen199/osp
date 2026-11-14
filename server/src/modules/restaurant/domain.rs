@@ -149,6 +149,23 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
+    if entity == "table_order"
+        && action == "cancelled"
+        && document.get("status").and_then(Value::as_str) == Some("sent")
+    {
+        let reason = document
+            .get("cancellation_reason")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|reason| !reason.is_empty());
+        return match reason {
+            None => vec!["Cần ghi lý do hủy order sau khi đã gửi bếp".into()],
+            Some(reason) if reason.chars().count() > 500 => {
+                vec!["Lý do hủy order không được vượt quá 500 ký tự".into()]
+            }
+            Some(_) => Vec::new(),
+        };
+    }
     if entity != "table_order" || action != "completed" {
         return Vec::new();
     }

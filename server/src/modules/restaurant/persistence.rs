@@ -126,6 +126,31 @@ pub async fn validate_persistence(
             ]);
         }
     }
+    if entity == "table_order"
+        && action == "cancelled"
+        && document.get("status").and_then(Value::as_str) == Some("sent")
+    {
+        let Some(order_id) = document
+            .get("id")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+        else {
+            return Ok(vec![
+                "Order id is required to cancel kitchen tickets".into(),
+            ]);
+        };
+        let tickets = tx.query(
+            "SELECT status FROM restaurant__kitchen_ticket WHERE tenant_id = $1 AND \"order\" = $2 FOR UPDATE",
+            &[&tenant.id, &order_id],
+        ).await?;
+        if tickets.is_empty()
+            || tickets
+                .iter()
+                .any(|row| row.get::<_, String>(0) != "queued")
+        {
+            return Ok(vec!["An order sent to the kitchen can only be cancelled before any station starts preparation".into()]);
+        }
+    }
     if entity == "menu_item" && matches!(action, "created" | "updated") {
         let Some(product_id) = document
             .get("product")
