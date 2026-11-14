@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **50 module**, **186 loại dữ liệu**, **838 sự kiện**.
+Tổng: **50 module**, **186 loại dữ liệu**, **839 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -489,7 +489,7 @@ Tổng: **50 module**, **186 loại dữ liệu**, **838 sự kiện**.
 |---|---|
 | `room_type` Loại phòng | — |
 | `room` Phòng | `vacant` → **cleaning** (occupied→cleaning), **occupied** (vacant→occupied), **ready** (cleaning→vacant) |
-| `reservation` Đặt phòng | `booked` → **cancelled** (booked→cancelled), **checked_in** (booked→checked_in), **checked_out** (checked_in→checked_out) |
+| `reservation` Đặt phòng | `booked` → **cancelled** (booked→cancelled), **checked_in** (booked→checked_in), **checked_out** (checked_in→checked_out), **no_show** (booked→no_show) |
 | `folio_charge` Phí phát sinh | — |
 
 ### insurance

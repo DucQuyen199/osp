@@ -149,6 +149,12 @@
      "system": true
     },
     {
+     "name": "no_show_reason",
+     "label": "Lý do khách vắng mặt",
+     "type": "text",
+     "required": false
+    },
+    {
      "name": "status",
      "type": "enum",
      "required": false,
@@ -156,6 +162,7 @@
       "booked",
       "checked_in",
       "checked_out",
+      "no_show",
       "cancelled"
      ]
     }
@@ -181,6 +188,12 @@
        "booked"
       ],
       "to": "cancelled"
+      },
+      "no_show": {
+       "from": [
+        "booked"
+       ],
+       "to": "no_show"
      }
     }
    },

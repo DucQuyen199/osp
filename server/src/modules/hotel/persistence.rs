@@ -426,6 +426,40 @@ pub async fn validate_persistence(
         }
         return Ok(Vec::new());
     }
+    if entity == "reservation" && action == "no_show" {
+        let id = document
+            .get("id")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+            .unwrap_or(Uuid::nil());
+        let Some(row) = tx
+            .query_opt(
+                "SELECT check_in < current_date FROM hotel__reservation WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                &[&tenant.id, &id],
+            )
+            .await?
+        else {
+            return Ok(vec!["Không tìm thấy đặt phòng trong doanh nghiệp".into()]);
+        };
+        if !row.get::<_, bool>(0) {
+            return Ok(vec![
+                "Chỉ xác nhận khách vắng mặt sau khi ngày nhận phòng đã kết thúc".into(),
+            ]);
+        }
+        if tx
+            .query_opt(
+                "SELECT 1 FROM hotel__folio_charge WHERE tenant_id = $1 AND reservation = $2 LIMIT 1",
+                &[&tenant.id, &id],
+            )
+            .await?
+            .is_some()
+        {
+            return Ok(vec![
+                "Đặt phòng có phí folio cần được xử lý trước khi ghi nhận khách vắng mặt".into(),
+            ]);
+        }
+        return Ok(Vec::new());
+    }
     if entity == "reservation" && action == "removed" {
         let id = document
             .get("id")

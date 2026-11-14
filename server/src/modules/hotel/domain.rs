@@ -88,6 +88,20 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
 
 pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<String> {
     if entity == "reservation"
+        && current.get("status").and_then(Value::as_str) == Some("no_show")
+        && patch.as_object().is_some_and(|fields| !fields.is_empty())
+    {
+        return vec!["Đặt phòng đã ghi nhận khách vắng mặt không được sửa".into()];
+    }
+    if entity == "reservation"
+        && current.get("status").and_then(Value::as_str) != Some("booked")
+        && patch.get("no_show_reason").is_some()
+    {
+        return vec![
+            "Chỉ được cập nhật lý do vắng mặt khi đặt phòng còn ở trạng thái đã đặt".into(),
+        ];
+    }
+    if entity == "reservation"
         && current.get("status").and_then(Value::as_str) != Some("booked")
         && ["party", "room", "check_in", "check_out"]
             .iter()
@@ -126,6 +140,19 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
+    if entity == "reservation" && action == "no_show" {
+        let reason = document
+            .get("no_show_reason")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .unwrap_or_default();
+        if reason.is_empty() {
+            return vec!["Cần ghi lý do trước khi xác nhận khách vắng mặt".into()];
+        }
+        if reason.chars().count() > 500 {
+            return vec!["Lý do khách vắng mặt không được vượt quá 500 ký tự".into()];
+        }
+    }
     if entity == "reservation" && action == "checked_in" {
         if room_id(document).is_none() {
             return vec!["Assign a room before checking in".into()];

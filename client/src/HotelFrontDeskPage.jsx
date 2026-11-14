@@ -15,6 +15,7 @@ export default function HotelFrontDeskPage() {
   const [charges, setCharges] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [selectedId, setSelectedId] = useState('');
+  const [noShowReasons, setNoShowReasons] = useState({});
   const [filter, setFilter] = useState('all');
   const [party, setParty] = useState('');
   const [roomType, setRoomType] = useState('');
@@ -49,6 +50,7 @@ export default function HotelFrontDeskPage() {
   useEffect(() => { document.title = 'Lễ tân khách sạn · OSP Suite'; load(); }, [load]);
 
   const selected = reservations.find((item) => item.id === selectedId) || null;
+  const noShowReason = selected ? noShowReasons[selected.id] ?? selected.no_show_reason ?? '' : '';
   const selectedCharges = useMemo(() => charges.filter((item) => item.reservation === selectedId), [charges, selectedId]);
   const selectedInvoice = invoices.find((item) => item.source === 'reservation' && item.source_id === selectedId);
   const visible = reservations.filter((item) => filter === 'all' || item.status === filter || (filter === 'arrivals' && item.check_in === today() && item.status === 'booked') || (filter === 'departures' && item.check_out === today() && item.status === 'checked_in'));
@@ -78,9 +80,14 @@ export default function HotelFrontDeskPage() {
   const transition = async (reservation, action) => {
     setBusy(`${reservation.id}:${action}`); setError(''); setNotice('');
     try {
+      if (action === 'no_show') {
+        const reason = noShowReason.trim();
+        if (!reason) throw new Error('Nhập lý do trước khi ghi nhận khách vắng mặt.');
+        await api(dataPath('hotel.reservation', reservation.id), { method: 'PATCH', body: { no_show_reason: reason } });
+      }
       const result = await api(dataPath('hotel.reservation', reservation.id, action), { method: 'POST' });
       await load(true);
-      setNotice(action === 'checked_in' ? 'Đã nhận phòng.' : action === 'checked_out' ? `Đã trả phòng và chốt folio ${fmtMoney(result.total || reservation.total || 0)}.` : 'Đã hủy đặt phòng.');
+      setNotice(action === 'checked_in' ? 'Đã nhận phòng.' : action === 'checked_out' ? `Đã trả phòng và chốt folio ${fmtMoney(result.total || reservation.total || 0)}.` : action === 'no_show' ? 'Đã ghi nhận khách vắng mặt và giải phóng lịch phòng.' : 'Đã hủy đặt phòng.');
     } catch (reason) { setError(reason.message || (action === 'checked_in' ? 'Chưa thể nhận phòng. Cần phòng trống và đúng ngày nhận.' : 'Không cập nhật được đặt phòng.')); }
     finally { setBusy(''); }
   };
@@ -110,13 +117,15 @@ export default function HotelFrontDeskPage() {
         <label className="field"><span className="label">Số lượng khách *</span><input className="input num" type="number" min="1" step="1" required value={guestCount} onChange={(event) => setGuestCount(event.target.value)} /><span className="small muted">{roomTypes.get(roomType)?.capacity ? `Sức chứa tối đa: ${roomTypes.get(roomType).capacity}` : 'Loại phòng chưa đặt giới hạn sức chứa'}</span></label>
         <button className="btn btn-primary" type="submit" disabled={Boolean(busy) || (roomTypes.get(roomType)?.capacity && Number(guestCount) > Number(roomTypes.get(roomType).capacity)) || !can('hotel.reservation.create')}>{busy === 'create' ? 'Đang đặt…' : 'Tạo đặt phòng'}</button>
       </form></section>}
-      <div className="hotel-frontdesk-layout"><section className="hotel-reservation-list"><header className="hotel-list-head"><h2>Đặt phòng</h2><select className="select" aria-label="Lọc đặt phòng" value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">Tất cả</option><option value="arrivals">Nhận hôm nay</option><option value="departures">Trả hôm nay</option><option value="booked">Đã đặt</option><option value="checked_in">Đang lưu trú</option><option value="checked_out">Đã trả</option><option value="cancelled">Đã hủy</option></select></header>
+      <div className="hotel-frontdesk-layout"><section className="hotel-reservation-list"><header className="hotel-list-head"><h2>Đặt phòng</h2><select className="select" aria-label="Lọc đặt phòng" value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">Tất cả</option><option value="arrivals">Nhận hôm nay</option><option value="departures">Trả hôm nay</option><option value="booked">Đã đặt</option><option value="checked_in">Đang lưu trú</option><option value="checked_out">Đã trả</option><option value="no_show">Vắng mặt</option><option value="cancelled">Đã hủy</option></select></header>
         {visible.length ? <div className="hotel-reservation-cards">{visible.map((reservation) => <button className={`card hotel-reservation-card${selectedId === reservation.id ? ' selected' : ''}`} type="button" key={reservation.id} onClick={() => { setSelectedId(reservation.id); setAssignment(reservation.room || ''); }}><strong>{recordLabel('master-data.party', parties.get(reservation.party))}</strong><span>{fmtDate(reservation.check_in)} → {fmtDate(reservation.check_out)} · {reservation.nights || '—'} đêm · {reservation.guest_count || 1} khách</span><span className="small muted">{roomTypes.get(reservation.room_type)?.name || 'Chưa rõ loại phòng'}{reservation.room ? ` · Phòng ${rooms.get(reservation.room)?.number || ''}` : ' · Chưa phân phòng'}</span><span className={`badge ${reservationStatus(reservation.status)}`}>{statusLabel(reservation.status)}</span><strong className="num">{fmtMoney(reservation.total || 0)}</strong></button>)}</div> : <div className="empty">Không có đặt phòng theo bộ lọc.</div>}
       </section>
       <section className="hotel-reservation-detail">{selected ? <>
         <article className="card hotel-detail-card"><header className="hotel-detail-head"><div><h2>{recordLabel('master-data.party', parties.get(selected.party))}</h2><p className="small muted">{roomTypes.get(selected.room_type)?.name || 'Loại phòng'} · {selected.guest_count || 1} khách · {selected.nights || '—'} đêm · {fmtDate(selected.check_in)} đến {fmtDate(selected.check_out)}</p></div><span className={`badge ${reservationStatus(selected.status)}`}>{statusLabel(selected.status)}</span></header>
           <div className="hotel-folio-total"><span>Phòng {selected.room ? rooms.get(selected.room)?.number || '' : 'chưa phân'} · {fmtMoney(selected.nightly_rate || 0)} / đêm</span><strong>{fmtMoney(selected.total || 0)}</strong></div>
+          {selected.status === 'no_show' && selected.no_show_reason && <div className="alert warning" role="status">Lý do khách vắng mặt: {selected.no_show_reason}</div>}
           {selected.status === 'booked' && <div className="hotel-checkin-tools"><label className="field"><span className="label">Phân phòng</span><select className="select" value={assignment} onChange={(event) => setAssignment(event.target.value)}><option value="">Chọn phòng trống</option>{availableRooms.map((room) => <option key={room.id} value={room.id}>{room.number}{room.floor ? ` · Tầng ${room.floor}` : ''}</option>)}</select></label><button className="btn btn-secondary" type="button" disabled={Boolean(busy) || !assignment || assignment === selected.room || !can('hotel.reservation.update')} onClick={() => assignRoom(selected)}>Lưu phòng</button></div>}
+          {selected.status === 'booked' && selected.check_in < today() && can('hotel.reservation.no_show') && can('hotel.reservation.update') && <div className="hotel-no-show-tools">{selectedCharges.length > 0 && <div className="alert warning" role="status">Đặt phòng còn phí folio; cần xử lý folio trước khi ghi nhận khách vắng mặt.</div>}<label className="field"><span className="label">Lý do khách vắng mặt *</span><textarea className="textarea" rows="2" maxLength="500" required value={noShowReason} onChange={(event) => setNoShowReasons((current) => ({ ...current, [selected.id]: event.target.value }))} placeholder="Ví dụ: khách không đến, không liên lạc được" /></label>{selectedCharges.length === 0 && <button className="btn btn-secondary" type="button" disabled={Boolean(busy) || !noShowReason.trim()} onClick={() => transition(selected, 'no_show')}>Ghi nhận khách vắng mặt</button>}</div>}
           <footer className="row wrap hotel-detail-actions">{selected.status === 'booked' && can('hotel.reservation.checked_in') && <button className="btn btn-primary" type="button" disabled={Boolean(busy) || !selected.room} title={!selected.room ? 'Phân phòng trước khi nhận khách' : ''} onClick={() => transition(selected, 'checked_in')}>Nhận phòng</button>}{selected.status === 'checked_in' && can('hotel.reservation.checked_out') && <button className="btn btn-primary" type="button" disabled={Boolean(busy)} onClick={() => transition(selected, 'checked_out')}>Trả phòng · chốt folio</button>}{selected.status === 'booked' && can('hotel.reservation.cancelled') && <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => transition(selected, 'cancelled')}>Hủy đặt phòng</button>}{selectedInvoice && can('accounting.invoice.read') && <a className="btn btn-secondary" href={recordHref('accounting.invoice', selectedInvoice.id)}>Mở hóa đơn · {statusLabel(selectedInvoice.status)}</a>}</footer>
         </article>
         <article className="card hotel-detail-card"><header className="hotel-detail-head"><div><h3>Folio và phí phát sinh</h3><p className="small muted">Các khoản ghi vào folio sẽ cộng vào hóa đơn khi trả phòng.</p></div><strong>{fmtMoney(selected.total || 0)}</strong></header>
