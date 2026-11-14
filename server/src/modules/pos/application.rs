@@ -1,6 +1,7 @@
 //! POS product snapshot preparation.
 use crate::money;
 use crate::{db::Tx, error::R, kernel::Tenant};
+use rust_decimal::Decimal;
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
@@ -99,25 +100,15 @@ pub async fn prepare_document(
     document: &mut Map<String, Value>,
 ) -> R<Vec<String>> {
     let is_open = document.get("status").and_then(Value::as_str) == Some("open");
-    let mut total_error = false;
-    if let Some(lines) = document.get("lines").and_then(Value::as_array) {
-        if let Some(total) = money::sum_line_totals(lines).and_then(money::json_number) {
-            document.insert("total".into(), total);
-        } else {
-            document.remove("total");
-            total_error = true;
-        }
-    }
     let Some(lines) = document.get_mut("lines").and_then(Value::as_array_mut) else {
         return Ok(Vec::new());
     };
     let mut errors = Vec::new();
-    if total_error {
-        errors.push("POS order total is invalid".into());
-    }
+    let mut total = Decimal::ZERO;
+    let mut tax_total = Decimal::ZERO;
     for (index, line) in lines.iter_mut().enumerate() {
         let Some(line) = line.as_object_mut() else {
-            errors.push(format!("lines[{}] phải là một dòng hàng", index + 1));
+            errors.push(format!("POS line {} must be an object", index + 1));
             continue;
         };
         let Some(product_id) = line
@@ -129,13 +120,13 @@ pub async fn prepare_document(
         };
         let product = tx
             .query_opt(
-                "SELECT kind, tracked, active FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                "SELECT kind, tracked, active, price::text, tax FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
                 &[&tenant.id, &product_id],
             )
             .await?;
         let Some(product) = product else {
             errors.push(format!(
-                "Không tìm thấy sản phẩm ở dòng {} trong doanh nghiệp",
+                "POS product on line {} was not found in this tenant",
                 index + 1
             ));
             continue;
@@ -143,12 +134,129 @@ pub async fn prepare_document(
         let kind: Option<String> = product.get(0);
         let tracked: Option<bool> = product.get(1);
         let active: Option<bool> = product.get(2);
+        let price_text: Option<String> = product.get(3);
+        let tax_id: Option<Uuid> = product.get(4);
         if active == Some(false) && is_open {
-            errors.push(format!("Sản phẩm ở dòng {} đã ngừng hoạt động", index + 1));
+            errors.push(format!("POS product on line {} is inactive", index + 1));
+        }
+        let Some(price) = price_text
+            .as_deref()
+            .and_then(money::decimal_str)
+            .filter(|price| *price >= Decimal::ZERO)
+        else {
+            errors.push(format!(
+                "POS product on line {} needs a valid catalog selling price",
+                index + 1
+            ));
+            continue;
+        };
+        let Some(qty) = line
+            .get("qty")
+            .and_then(money::decimal)
+            .filter(|qty| *qty > Decimal::ZERO)
+        else {
+            errors.push(format!("POS line {} needs a positive quantity", index + 1));
+            continue;
+        };
+        let (tax_rate, tax_name) = if let Some(tax_id) = tax_id {
+            let Some(tax) = tx
+                .query_opt(
+                    "SELECT name, rate::text FROM master_data__tax WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                    &[&tenant.id, &tax_id],
+                )
+                .await?
+            else {
+                errors.push(format!("POS tax on line {} was not found in this tenant", index + 1));
+                continue;
+            };
+            let name: String = tax.get(0);
+            let rate_text: String = tax.get(1);
+            let Some(rate) = money::decimal_str(&rate_text)
+                .filter(|rate| (Decimal::ZERO..=Decimal::ONE_HUNDRED).contains(rate))
+            else {
+                errors.push(format!("POS tax rate on line {} is invalid", index + 1));
+                continue;
+            };
+            (rate, Some(name))
+        } else {
+            (Decimal::ZERO, None)
+        };
+        let Some((discount, net, line_tax, line_total)) =
+            money::line_amounts(qty, price, Decimal::ZERO, tax_rate)
+        else {
+            errors.push(format!(
+                "POS line {} exceeds supported amount limits",
+                index + 1
+            ));
+            continue;
+        };
+        let (
+            Some(price_value),
+            Some(rate_value),
+            Some(discount_value),
+            Some(net_value),
+            Some(tax_value),
+            Some(total_value),
+        ) = (
+            money::json_number(price),
+            money::json_number(tax_rate),
+            money::json_number(discount),
+            money::json_number(net),
+            money::json_number(line_tax),
+            money::json_number(line_total),
+        )
+        else {
+            errors.push(format!(
+                "POS line {} amounts cannot be represented",
+                index + 1
+            ));
+            continue;
+        };
+        for field in [
+            "discount_amount",
+            "net_amount",
+            "tax_rate",
+            "tax_name",
+            "tax_amount",
+            "line_total",
+        ] {
+            line.remove(field);
+        }
+        line.insert("price".into(), price_value);
+        line.insert("discount_pct".into(), json!(0));
+        line.insert("discount_amount".into(), discount_value);
+        line.insert("net_amount".into(), net_value);
+        line.insert("tax_rate".into(), rate_value);
+        line.insert("tax_amount".into(), tax_value);
+        line.insert("line_total".into(), total_value);
+        if let Some(tax_id) = tax_id {
+            line.insert("tax".into(), json!(tax_id));
+        } else {
+            line.remove("tax");
+        }
+        if let Some(tax_name) = tax_name {
+            line.insert("tax_name".into(), json!(tax_name));
         }
         let kind = kind.unwrap_or_else(|| "goods".into());
         line.insert("kind".into(), json!(kind));
         line.insert("tracked".into(), json!(tracked.unwrap_or(kind == "goods")));
+        let Some(next_total) = total.checked_add(line_total) else {
+            errors.push("POS order total exceeds the supported amount range".into());
+            continue;
+        };
+        let Some(next_tax_total) = tax_total.checked_add(line_tax) else {
+            errors.push("POS tax total exceeds the supported amount range".into());
+            continue;
+        };
+        total = next_total;
+        tax_total = next_tax_total;
     }
+    let (Some(total), Some(tax_total)) = (money::json_number(total), money::json_number(tax_total))
+    else {
+        errors.push("POS order totals cannot be represented".into());
+        return Ok(errors);
+    };
+    document.insert("total".into(), total);
+    document.insert("tax_total".into(), tax_total);
     Ok(errors)
 }

@@ -217,6 +217,7 @@ export default function EntityDetailPage({ qname, id }) {
               {actions.map(([action, transition], index) => <button key={action} className={`btn btn-sm${index === 0 && tone(transition.to) !== 'danger' ? ' btn-primary' : ''}`} type="button" disabled={Boolean(working)} onClick={() => runAction(action, transition.to)}>
                 {working === action ? 'Đang xử lý…' : actionLabel(action)}
               </button>)}
+              {qname === 'inventory.lot' && can('inventory.lot.read') && can('inventory.stock_move.read') && <a className="btn btn-sm" href={`#/reports/inventory/lots/${encodeURIComponent(id)}/traceability`}>Truy xuất lô</a>}
               <span className="grow" />
               {can(`${qname}.update`) && <button className="btn btn-sm" type="button" disabled={Boolean(working)} onClick={edit}>Sửa</button>}
               {qname === 'accounting.bank_statement' && record?.status === 'draft' && can('accounting.bank_statement_line.create') && <>

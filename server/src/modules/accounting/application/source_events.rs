@@ -73,6 +73,11 @@ pub async fn handle_source_document_event(
                 }
             }
         }
+        if event_type == "pos.pos_order.completed"
+            && let Some(value) = event.get("tax_total").filter(|value| !value.is_null())
+        {
+            data.insert("tax_amount".into(), value.clone());
+        }
     }
     data.insert("source".into(), Value::String(spec.source.into()));
     data.insert("source_id".into(), source_id.clone());

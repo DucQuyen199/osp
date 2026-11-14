@@ -86,6 +86,324 @@ async fn replenishment_rows(
 }
 
 impl Kernel {
+    /// Creates an auditable draft stock count to write off expired lot balances.
+    /// The inventory and accounting adjustments only occur after normal review and approval.
+    pub async fn create_expiry_writeoff_count(
+        &self,
+        actor: &Actor,
+        tenant: &Tenant,
+        warehouse_id: &str,
+    ) -> R<Value> {
+        if !tenant.has_module("inventory") {
+            return Err(ApiError::new(
+                404,
+                "MODULE_DISABLED",
+                "Module inventory is not enabled for this tenant",
+            ));
+        }
+        self.authorize(tenant, actor, "inventory.lot.read")?;
+        self.authorize(tenant, actor, "inventory.stock_move.read")?;
+        self.authorize(tenant, actor, "inventory.stock_count.create")?;
+        let warehouse = Uuid::parse_str(warehouse_id).map_err(|_| {
+            ApiError::validation("inventory.stock_count", vec!["Kho không hợp lệ".into()])
+        })?;
+        let entity = self.ent(tenant, "inventory.stock_count")?;
+        let note = "Kiểm kê hủy hàng hết hạn";
+        let mut conn = self.pool.get().await?;
+        let tx = Tx::begin(&mut conn, &tenant.id, true).await?;
+        if tx
+            .query_opt(
+                "SELECT id FROM inventory__warehouse WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                &[&tenant.id, &warehouse],
+            )
+            .await?
+            .is_none()
+        {
+            return Err(ApiError::not_found("Warehouse not found for this tenant"));
+        }
+        tx.query_opt(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            &[&format!(
+                "inventory-expiry-writeoff:{}:{}",
+                tenant.id, warehouse
+            )],
+        )
+        .await?;
+        if let Some(existing) = tx
+            .query_opt(
+                "SELECT id, status FROM inventory__stock_count WHERE tenant_id = $1 AND warehouse = $2 AND reason = 'damage' AND note = $3 AND status IN ('draft', 'submitted', 'rejected') ORDER BY created_at DESC, id DESC LIMIT 1 FOR UPDATE",
+                &[&tenant.id, &warehouse, &note],
+            )
+            .await?
+        {
+            let id: Uuid = existing.get(0);
+            let status: String = existing.get(1);
+            tx.commit().await?;
+            return Ok(json!({ "id": id, "warehouseId": warehouse, "status": status, "existing": true }));
+        }
+        if tenant.has_module("quality") {
+            let held_lots = tx
+                .query_json(
+                    "SELECT jsonb_build_object('lot', qi.lot, 'heldQty', SUM(GREATEST(qi.qty::numeric - COALESCE(disposition.qty, 0) - COALESCE(returned.qty, 0), 0::numeric))) \
+                     FROM quality__inspection qi \
+                     JOIN inventory__lot lot ON lot.tenant_id = qi.tenant_id AND lot.id = qi.lot \
+                     LEFT JOIN LATERAL (SELECT SUM(qty::numeric) AS qty FROM quality__inspection_disposition WHERE tenant_id = qi.tenant_id AND inspection = qi.id AND status = 'posted') disposition ON true \
+                     LEFT JOIN LATERAL (SELECT SUM(qty::numeric) AS qty FROM inventory__stock_move WHERE tenant_id = qi.tenant_id AND source = 'quality_return' AND source_id = qi.id::text AND direction = 'out') returned ON true \
+                     WHERE qi.tenant_id = $1 AND qi.warehouse = $2 AND qi.source IN ('purchase_order', 'purchase_receipt') \
+                       AND qi.status IN ('pending', 'failed') AND lot.expiry < CURRENT_DATE \
+                     GROUP BY qi.lot \
+                     HAVING SUM(GREATEST(qi.qty::numeric - COALESCE(disposition.qty, 0) - COALESCE(returned.qty, 0), 0::numeric)) > 0.000001",
+                    &[&tenant.id, &warehouse],
+                )
+                .await?;
+            if !held_lots.is_empty() {
+                return Err(ApiError::validation(
+                    "inventory.stock_count",
+                    vec![format!(
+                        "{} lô hết hạn vẫn đang bị giữ QC; xử lý phiếu QC trước khi tạo phiếu hủy",
+                        held_lots.len()
+                    )],
+                ));
+            }
+        }
+        let lines = tx
+            .query_json(
+                "SELECT jsonb_build_object( \
+                   'product', move.product, 'lot', lot.id, 'location', move.location, 'counted_qty', 0 \
+                 ) FROM inventory__stock_move move \
+                 JOIN inventory__lot lot ON lot.tenant_id = move.tenant_id AND lot.id::text = move.lot AND lot.product = move.product \
+                 WHERE move.tenant_id = $1 AND move.warehouse = $2 AND lot.expiry < CURRENT_DATE \
+                 GROUP BY move.product, lot.id, move.location \
+                 HAVING SUM(CASE WHEN move.direction = 'in' THEN move.qty::numeric ELSE -move.qty::numeric END) > 0.000001 \
+                 ORDER BY move.product, lot.id, move.location NULLS FIRST",
+                &[&tenant.id, &warehouse],
+            )
+            .await?;
+        if lines.is_empty() {
+            return Err(ApiError::validation(
+                "inventory.stock_count",
+                vec!["Kho này không còn lô hết hạn có tồn dương".into()],
+            ));
+        }
+        if lines.len() > 5000 {
+            return Err(ApiError::validation(
+                "inventory.stock_count",
+                vec![
+                    "Có hơn 5.000 vị trí lô hết hạn; hãy chia nhỏ quy trình theo kho hoặc khu vực"
+                        .into(),
+                ],
+            ));
+        }
+        let line_count = lines.len();
+        let mut data = Map::new();
+        data.insert("warehouse".into(), json!(warehouse));
+        data.insert("adjustment_lines".into(), json!(lines));
+        data.insert("reason".into(), json!("damage"));
+        data.insert("note".into(), json!(note));
+        let count = self
+            .create_in(&tx, actor, tenant, &entity, data, &Opts::top())
+            .await?;
+        tx.commit().await?;
+        let id = count
+            .get("id")
+            .cloned()
+            .ok_or_else(|| ApiError::internal("Created expiry write-off count has no id"))?;
+        Ok(json!({
+            "id": id,
+            "warehouseId": warehouse,
+            "lineCount": line_count,
+            "status": "draft",
+            "existing": false,
+        }))
+    }
+
+    /// Lists positive on-hand stock in lots that are expired or near expiry.
+    pub async fn inventory_lot_expiry_report(
+        &self,
+        actor: &Actor,
+        tenant: &Tenant,
+        days: i32,
+        limit: usize,
+        offset: usize,
+    ) -> R<Value> {
+        if !tenant.has_module("inventory") {
+            return Err(ApiError::new(
+                404,
+                "MODULE_DISABLED",
+                "Module inventory is not enabled for this tenant",
+            ));
+        }
+        self.authorize(tenant, actor, "inventory.lot.read")?;
+        self.authorize(tenant, actor, "inventory.stock_move.read")?;
+        let mut conn = self.pool.get().await?;
+        let tx = Tx::begin(&mut conn, &tenant.id, false).await?;
+        let grouped = "SELECT lot.id AS lot_id, lot.code, lot.expiry, lot.expiry - CURRENT_DATE AS days_to_expiry, lot.expiry < CURRENT_DATE AS expired, \
+             product.id AS product_id, product.sku, product.name AS product, product.uom AS unit, \
+             warehouse.id AS warehouse_id, warehouse.name AS warehouse, \
+             SUM(CASE WHEN move.direction = 'in' THEN move.qty::numeric ELSE -move.qty::numeric END) AS quantity, \
+             SUM(CASE WHEN move.direction = 'in' THEN COALESCE(move.total_cost, 0)::numeric ELSE -COALESCE(move.total_cost, 0)::numeric END) AS value \
+           FROM inventory__lot lot \
+           JOIN master_data__product product ON product.tenant_id = lot.tenant_id AND product.id = lot.product \
+           JOIN inventory__stock_move move ON move.tenant_id = lot.tenant_id AND move.lot = lot.id::text \
+           LEFT JOIN inventory__warehouse warehouse ON warehouse.tenant_id = move.tenant_id AND warehouse.id = move.warehouse \
+           WHERE lot.tenant_id = $1 AND lot.expiry IS NOT NULL \
+             AND (lot.expiry < CURRENT_DATE OR ($2 > 0 AND lot.expiry <= CURRENT_DATE + $2)) \
+           GROUP BY lot.id, lot.code, lot.expiry, product.id, product.sku, product.name, product.uom, warehouse.id, warehouse.name \
+           HAVING SUM(CASE WHEN move.direction = 'in' THEN move.qty::numeric ELSE -move.qty::numeric END) > 0.000001";
+        let count_sql = format!("SELECT COUNT(*) AS count FROM ({grouped}) lot_balances");
+        let count = tx
+            .query_json(&count_sql, &[&tenant.id, &days])
+            .await?
+            .first()
+            .and_then(|row| row.get("count"))
+            .and_then(Value::as_i64)
+            .unwrap_or(0);
+        let limit_sql = limit as i64;
+        let offset_sql = offset as i64;
+        let rows_sql = format!(
+            "SELECT jsonb_build_object( \
+               'lotId', lot_id, 'code', code, 'expiry', expiry, 'daysToExpiry', days_to_expiry, 'expired', expired, \
+               'productId', product_id, 'sku', sku, 'product', product, 'unit', unit, \
+               'warehouseId', warehouse_id, 'warehouse', warehouse, 'quantity', quantity, 'value', value \
+             ) FROM ({grouped}) lot_balances ORDER BY expiry, product, warehouse NULLS FIRST, lot_id LIMIT $3 OFFSET $4"
+        );
+        let items = tx
+            .query_json(&rows_sql, &[&tenant.id, &days, &limit_sql, &offset_sql])
+            .await?;
+        Ok(json!({
+            "days": days,
+            "items": items,
+            "itemCount": count,
+            "limit": limit,
+            "offset": offset,
+            "hasMore": offset.saturating_add(items.len()) < count as usize,
+        }))
+    }
+
+    /// Shows the tenant-scoped movement history and remaining balance for a tracked lot.
+    pub async fn inventory_lot_traceability_report(
+        &self,
+        actor: &Actor,
+        tenant: &Tenant,
+        lot_id: &str,
+        limit: usize,
+        offset: usize,
+    ) -> R<Value> {
+        if !tenant.has_module("inventory") {
+            return Err(ApiError::new(
+                404,
+                "MODULE_DISABLED",
+                "Module inventory is not enabled for this tenant",
+            ));
+        }
+        self.authorize(tenant, actor, "inventory.lot.read")?;
+        self.authorize(tenant, actor, "inventory.stock_move.read")?;
+        let lot_id = Uuid::parse_str(lot_id)
+            .map_err(|_| ApiError::new(422, "INVALID_LOT", "lot must be a valid UUID"))?;
+        let mut conn = self.pool.get().await?;
+        let tx = Tx::begin(&mut conn, &tenant.id, false).await?;
+        let lot = tx
+            .query_json(
+                "SELECT jsonb_build_object( \
+                   'id', lot.id, 'code', lot.code, 'productId', product.id, \
+                   'sku', product.sku, 'product', product.name, 'unit', product.uom, \
+                   'expiry', lot.expiry, 'expired', lot.expiry < CURRENT_DATE \
+                 ) FROM inventory__lot lot \
+                 JOIN master_data__product product ON product.tenant_id = lot.tenant_id AND product.id = lot.product \
+                 WHERE lot.tenant_id = $1 AND lot.id = $2",
+                &[&tenant.id, &lot_id],
+            )
+            .await?
+            .into_iter()
+            .next()
+            .ok_or_else(|| ApiError::not_found("Lot not found for this tenant"))?;
+        let movement_count = tx
+            .query_json(
+                "SELECT COUNT(*) AS count FROM inventory__stock_move WHERE tenant_id = $1 AND lot = $2::text",
+                &[&tenant.id, &lot_id],
+            )
+            .await?
+            .first()
+            .and_then(|row| row.get("count"))
+            .and_then(Value::as_i64)
+            .unwrap_or(0);
+        let limit_sql = limit as i64;
+        let offset_sql = offset as i64;
+        let movements = tx
+            .query_json(
+                "SELECT jsonb_build_object( \
+                   'id', sm.id, 'at', sm.created_at, 'direction', sm.direction, \
+                   'quantity', sm.qty, 'unitCost', sm.unit_cost, 'totalCost', sm.total_cost, \
+                   'warehouseId', warehouse.id, 'warehouse', warehouse.name, \
+                   'locationId', location.id, 'locationCode', location.code, 'location', location.name, \
+                   'source', sm.source, 'sourceId', sm.source_id, \
+                   'sourceEntity', CASE sm.source \
+                     WHEN 'sales_order' THEN 'sales.sales_order' \
+                     WHEN 'sales_return' THEN 'sales.sales_return' \
+                     WHEN 'purchase_receipt' THEN 'purchasing.purchase_receipt' \
+                     WHEN 'purchase_return' THEN 'purchasing.purchase_return' \
+                     WHEN 'quality_return' THEN 'quality.inspection' \
+                     WHEN 'pos_order' THEN 'pos.pos_order' \
+                     WHEN 'pos_order_refund' THEN 'pos.pos_order' \
+                     WHEN 'stock_transfer_in' THEN 'inventory.stock_transfer' \
+                     WHEN 'stock_transfer_out' THEN 'inventory.stock_transfer' \
+                     WHEN 'stock_count' THEN 'inventory.stock_count' \
+                     WHEN 'production_order' THEN 'manufacturing.production_order' \
+                     WHEN 'production_order_bom' THEN 'manufacturing.production_order' \
+                     WHEN 'harvest' THEN 'agriculture.harvest' \
+                     WHEN 'input_application' THEN 'agriculture.input_application' \
+                     WHEN 'work_order' THEN 'field-service.work_order' \
+                     WHEN 'table_order' THEN 'restaurant.table_order' \
+                     WHEN 'repair_order' THEN 'auto-service.repair_order' \
+                     WHEN 'prescription' THEN 'clinic.prescription' \
+                     WHEN 'maintenance' THEN 'maintenance.maintenance_request' \
+                     ELSE NULL END \
+                 ) FROM inventory__stock_move sm \
+                 LEFT JOIN inventory__warehouse warehouse ON warehouse.tenant_id = sm.tenant_id AND warehouse.id = sm.warehouse \
+                 LEFT JOIN inventory__warehouse_location location ON location.tenant_id = sm.tenant_id AND location.id = sm.location \
+                 WHERE sm.tenant_id = $1 AND sm.lot = $2::text \
+                 ORDER BY sm.created_at, sm.id LIMIT $3 OFFSET $4",
+                &[&tenant.id, &lot_id, &limit_sql, &offset_sql],
+            )
+            .await?;
+        let balances = tx
+            .query_json(
+                "SELECT jsonb_build_object( \
+                   'warehouseId', warehouse.id, 'warehouse', warehouse.name, \
+                   'quantity', SUM(CASE WHEN sm.direction = 'in' THEN sm.qty::numeric ELSE -sm.qty::numeric END), \
+                   'value', SUM(CASE WHEN sm.direction = 'in' THEN COALESCE(sm.total_cost, 0)::numeric ELSE -COALESCE(sm.total_cost, 0)::numeric END) \
+                 ) FROM inventory__stock_move sm \
+                 LEFT JOIN inventory__warehouse warehouse ON warehouse.tenant_id = sm.tenant_id AND warehouse.id = sm.warehouse \
+                 WHERE sm.tenant_id = $1 AND sm.lot = $2::text \
+                 GROUP BY warehouse.id, warehouse.name \
+                 HAVING abs(SUM(CASE WHEN sm.direction = 'in' THEN sm.qty::numeric ELSE -sm.qty::numeric END)) > 0.000001 \
+                    OR abs(SUM(CASE WHEN sm.direction = 'in' THEN COALESCE(sm.total_cost, 0)::numeric ELSE -COALESCE(sm.total_cost, 0)::numeric END)) > 0.005 \
+                 ORDER BY warehouse.name NULLS FIRST, warehouse.id",
+                &[&tenant.id, &lot_id],
+            )
+            .await?;
+        let total_quantity = balances
+            .iter()
+            .filter_map(|balance| balance.get("quantity").and_then(money::decimal))
+            .sum::<Decimal>();
+        let total_value = balances
+            .iter()
+            .filter_map(|balance| balance.get("value").and_then(money::decimal))
+            .sum::<Decimal>();
+        Ok(json!({
+            "lot": lot,
+            "quantity": money::json_number(total_quantity),
+            "value": money::json_number(total_value),
+            "movementCount": movements.len(),
+            "movementCountTotal": movement_count,
+            "movementLimit": limit,
+            "movementOffset": offset,
+            "hasMoreMovements": offset.saturating_add(movements.len()) < movement_count as usize,
+            "balances": balances,
+            "movements": movements,
+        }))
+    }
+
     /// Returns pending/failed purchase inspections with their remaining held quantity and source stock layer.
     pub async fn inventory_quality_hold_report(
         &self,

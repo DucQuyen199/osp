@@ -70,6 +70,24 @@ Gửi: `Authorization: Bearer osp_…`. Token chỉ hiện **một lần** khi t
 
 Bulk action nhận `{ "ids": ["<uuid>", "…"] }`. Danh sách phải có 1–100 ID duy nhất. Máy chủ sắp khóa theo ID để tránh deadlock giữa các lô giao nhau, kiểm tra quyền và chạy đầy đủ validation/event của action trên từng bản ghi; response có `{ action, count, items }`.
 
+### Truy xuất lô hàng
+
+`GET /api/t/{tenantId}/reports/inventory/lots/{lotId}/traceability` cần `inventory.lot.read` và `inventory.stock_move.read`. Kết quả gồm thông tin và hạn dùng lô, số dư lượng/giá trị theo kho, cùng lịch sử phiếu kho và mã nguồn liên quan. Dữ liệu được giới hạn trong tenant hiện tại; lịch sử phân trang bằng `limit` (mặc định 100, tối đa 500) và `offset` (tối đa 1.000.000).
+
+`GET /api/t/{tenantId}/reports/inventory/lot-expiry?days=90` cần cùng hai quyền. Báo cáo liệt kê tồn dương theo lô/kho cho các lô đã hết hạn hoặc hết hạn trong kỳ, phân trang bằng `limit` và `offset`.
+
+`POST /api/t/{tenantId}/reports/inventory/lot-expiry/writeoff-counts` nhận `{ "warehouseId": "<uuid>" }` và cần thêm `inventory.stock_count.create`. Máy chủ tạo phiếu kiểm kê hủy hàng hết hạn dạng nháp theo lô/vị trí, giữ nguyên tồn đến khi người dùng rà soát, gửi duyệt và phê duyệt; bước duyệt dùng luồng kiểm kê hiện tại để ghi giảm kho và hạch toán hao hụt. Lô vẫn đang bị giữ QC phải được xử lý qua quy trình chất lượng trước.
+
+`GET /api/t/{tenantId}/reports/restaurant/kitchen-board?station=all` cần `restaurant.kitchen_ticket.read`; `station` nhận `all`, `kitchen` hoặc `bar`. Bảng chỉ hiện phiếu thuộc order đang gửi hoặc chờ phục vụ; order hoàn tất/hủy được ẩn. Phiếu chuyển `queued → preparing → ready` qua action dữ liệu chuẩn.
+
+`GET /api/t/{tenantId}/reports/logistics/delivery-board` cần `logistics.shipment.read`. Bảng tenant-scoped hiển thị vận đơn giao thất bại, chờ xuất phát và đang giao theo mức ưu tiên và tuổi vận đơn; có thông tin tài xế, phương tiện, khách nhận và sự kiện tracking mới nhất. Kết quả giới hạn 500 dòng. Xác nhận xuất phát/giao thành công dùng action vận đơn chuẩn và quyền tương ứng; giao thành công kích hoạt xuất kho và cập nhật tiến độ đơn bán trong cùng luồng nghiệp vụ.
+
+`POST /api/t/{tenantId}/reports/logistics/shipments/{shipmentId}/redeliver` cần `logistics.shipment.read` và `logistics.shipment.create`. Với vận đơn giao thất bại, tạo vận đơn mới ở trạng thái chờ xuất phát, giữ lại các dòng hàng và điểm giao, đồng thời giữ nguyên vận đơn lỗi làm lịch sử. Phân công lại xe/tài xế rồi dùng action xuất phát chuẩn; yêu cầu lặp lại trả về vận đơn nháp tương đương đang mở.
+
+`GET /api/t/{tenantId}/reports/hotel/housekeeping-board` cần `hotel.room.read`. Bảng hiển thị phòng đang dọn, ngày trả gần nhất và ngày nhận phòng tiếp theo; phòng có khách đến trong ngày được xếp trước. Bảng không trả về danh tính khách. Quyền `hotel.room.ready` cho phép đánh dấu phòng sẵn sàng qua action phòng hiện có, và máy chủ chặn chuyển trạng thái nếu còn lượt lưu trú đang nhận phòng.
+
+POS lấy đơn giá và thuế mặc định từ hồ sơ sản phẩm của tenant; giá, thuế dòng và tổng do client gửi không được dùng để ghi nhận bán. Máy chủ tính lại tổng từng dòng và `tax_total` bằng số thập phân; khi hoàn tất, bút toán thanh toán tách doanh thu và thuế phải nộp.
+
 Quy tắc:
 - Trường lạ, sai kiểu, thiếu trường bắt buộc, `ref` trỏ tới bản ghi không tồn tại (kể cả của tenant khác) → `422 VALIDATION`, `error.details` là mảng thông điệp theo trường.
 - Trường **trạng thái** không ghi trực tiếp (`422`), chỉ đổi qua action. Action từ sai trạng thái → `409 INVALID_STATE`.

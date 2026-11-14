@@ -153,6 +153,13 @@
      "required": false
     },
     {
+     "name": "tax",
+     "label": "Thuế bán mặc định",
+     "type": "ref",
+     "ref": "master-data.tax",
+     "required": false
+    },
+    {
      "name": "cost",
      "type": "money",
      "required": false

@@ -10,6 +10,11 @@ import ManufacturingWipPage from './ManufacturingWipPage.jsx';
 import InventoryReplenishmentPage from './InventoryReplenishmentPage.jsx';
 import InventoryLocationStockPage from './InventoryLocationStockPage.jsx';
 import InventoryQualityHoldsPage from './InventoryQualityHoldsPage.jsx';
+import InventoryLotTraceabilityPage from './InventoryLotTraceabilityPage.jsx';
+import InventoryLotExpiryPage from './InventoryLotExpiryPage.jsx';
+import RestaurantKitchenBoardPage from './RestaurantKitchenBoardPage.jsx';
+import LogisticsDeliveryBoardPage from './LogisticsDeliveryBoardPage.jsx';
+import HotelHousekeepingBoardPage from './HotelHousekeepingBoardPage.jsx';
 import AssetDepreciationSchedulePage from './AssetDepreciationSchedulePage.jsx';
 import BudgetVariancePage from './BudgetVariancePage.jsx';
 import CrmPipelinePage from './CrmPipelinePage.jsx';
@@ -54,6 +59,11 @@ function parseRoute(hash = location.hash) {
   if (a === 'reports' && b === 'inventory' && c === 'replenishment') return { name: 'inventory-replenishment' };
   if (a === 'reports' && b === 'inventory' && c === 'location-stock') return { name: 'inventory-location-stock' };
   if (a === 'reports' && b === 'inventory' && c === 'quality-holds') return { name: 'inventory-quality-holds' };
+  if (a === 'reports' && b === 'inventory' && c === 'lot-expiry') return { name: 'inventory-lot-expiry' };
+  if (a === 'reports' && b === 'restaurant' && c === 'kitchen-board') return { name: 'restaurant-kitchen-board' };
+  if (a === 'reports' && b === 'logistics' && c === 'delivery-board') return { name: 'logistics-delivery-board' };
+  if (a === 'reports' && b === 'hotel' && c === 'housekeeping-board') return { name: 'hotel-housekeeping-board' };
+  if (a === 'reports' && b === 'inventory' && c === 'lots' && d && parts[4] === 'traceability') return { name: 'inventory-lot-traceability', lotId: d };
   if (a === 'reports' && b === 'budget' && c === 'variance') return { name: 'budget-variance' };
   if (a === 'reports' && b === 'crm' && c === 'pipeline') return { name: 'crm-pipeline' };
   if (a === 'reports' && b === 'marketing' && c === 'campaign-performance') return { name: 'marketing-campaign-performance' };
@@ -114,6 +124,10 @@ function Sidebar({ meta, route, onNavigate, open }) {
     {meta.modules.some((module) => module.id === 'asset') && can('asset.asset.read') && link('#/reports/asset/depreciation-schedule', 'Lịch khấu hao tài sản', route.name === 'asset-depreciation-schedule', 'list')}
     {meta.modules.some((module) => module.id === 'inventory') && can('inventory.reorder_rule.read') && link('#/reports/inventory/replenishment', 'Bổ sung tồn kho', route.name === 'inventory-replenishment', 'list')}
     {meta.modules.some((module) => module.id === 'inventory') && can('inventory.stock_move.read') && link('#/reports/inventory/location-stock', 'Tồn theo vị trí', route.name === 'inventory-location-stock', 'list')}
+    {meta.modules.some((module) => module.id === 'inventory') && can('inventory.lot.read') && can('inventory.stock_move.read') && link('#/reports/inventory/lot-expiry', 'Lô sắp hết hạn', route.name === 'inventory-lot-expiry', 'list')}
+    {meta.modules.some((module) => module.id === 'restaurant') && can('restaurant.kitchen_ticket.read') && link('#/reports/restaurant/kitchen-board', 'Màn hình bếp', route.name === 'restaurant-kitchen-board', 'list')}
+    {meta.modules.some((module) => module.id === 'logistics') && can('logistics.shipment.read') && link('#/reports/logistics/delivery-board', 'Điều phối giao hàng', route.name === 'logistics-delivery-board', 'list')}
+    {meta.modules.some((module) => module.id === 'hotel') && can('hotel.room.read') && link('#/reports/hotel/housekeeping-board', 'Buồng phòng', route.name === 'hotel-housekeeping-board', 'list')}
     {meta.modules.some((module) => module.id === 'inventory') && meta.modules.some((module) => module.id === 'quality') && can('inventory.stock_move.read') && can('quality.inspection.read') && link('#/reports/inventory/quality-holds', 'Hàng giữ QC', route.name === 'inventory-quality-holds', 'list')}
     {meta.modules.some((module) => module.id === 'budget') && can('budget.budget.read') && link('#/reports/budget/variance', 'Thực hiện ngân sách', route.name === 'budget-variance', 'list')}
     {meta.modules.some((module) => module.id === 'crm') && can('crm.deal.read') && link('#/reports/crm/pipeline', 'Pipeline bán hàng', route.name === 'crm-pipeline', 'list')}
@@ -283,6 +297,11 @@ function App() {
         : route.name === 'inventory-replenishment' ? <InventoryReplenishmentPage />
         : route.name === 'inventory-location-stock' ? <InventoryLocationStockPage />
         : route.name === 'inventory-quality-holds' ? <InventoryQualityHoldsPage />
+        : route.name === 'inventory-lot-traceability' ? <InventoryLotTraceabilityPage lotId={route.lotId} />
+        : route.name === 'inventory-lot-expiry' ? <InventoryLotExpiryPage />
+        : route.name === 'restaurant-kitchen-board' ? <RestaurantKitchenBoardPage />
+        : route.name === 'logistics-delivery-board' ? <LogisticsDeliveryBoardPage />
+        : route.name === 'hotel-housekeeping-board' ? <HotelHousekeepingBoardPage />
         : route.name === 'budget-variance' ? <BudgetVariancePage />
         : route.name === 'crm-pipeline' ? <CrmPipelinePage />
         : route.name === 'marketing-campaign-performance' ? <MarketingCampaignPerformancePage />

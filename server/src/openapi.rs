@@ -493,6 +493,62 @@ pub fn build(reg: &Registry) -> Value {
         } }),
     );
     paths.insert(
+        "/api/t/{tenantId}/reports/inventory/lot-expiry".into(),
+        json!({
+            "get": {
+                "tags": ["inventory"], "summary": "Expired and near-expiry lot stock", "security": sec,
+                "parameters": [tid, { "name": "days", "in": "query", "schema": { "type": "integer", "minimum": 0, "maximum": 365, "default": 90 } }, { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 500, "default": 100 } }, { "name": "offset", "in": "query", "schema": { "type": "integer", "minimum": 0, "maximum": 1000000, "default": 0 } }],
+                "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Paginated positive movement-derived stock balances grouped by lot and warehouse, including expired lots and non-expired lots due within the selected horizon" })), ("403".to_string(), err("Requires inventory.lot.read and inventory.stock_move.read")), ("422".to_string(), err("Invalid days or pagination"))]))
+            },
+            "post": {
+                "tags": ["inventory", "accounting"], "summary": "Create a draft stock count to write off expired lots", "security": sec,
+                "parameters": [tid],
+                "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["warehouseId"], "properties": { "warehouseId": { "type": "string", "format": "uuid" } } } } } },
+                "responses": with_common(Map::from_iter([("201".to_string(), json!({ "description": "Draft damage stock count created from expired lot balances by location; normal submission, review and approval are required before inventory and accounting are adjusted" })), ("200".to_string(), json!({ "description": "Existing open expiry write-off count returned idempotently" })), ("403".to_string(), err("Requires inventory.lot.read, inventory.stock_move.read and inventory.stock_count.create")), ("422".to_string(), err("No eligible expired stock, an active quality hold, or more than 5,000 lot/location rows")), ("404".to_string(), err("Warehouse not found for this tenant"))]))
+            }
+        }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/reports/restaurant/kitchen-board".into(),
+        json!({ "get": {
+            "tags": ["restaurant"], "summary": "Active restaurant kitchen and bar tickets", "security": sec,
+            "parameters": [tid, { "name": "station", "in": "query", "schema": { "type": "string", "enum": ["all", "kitchen", "bar"], "default": "all" } }],
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Oldest-first kitchen tickets attached to sent or served table orders; completed and cancelled orders are omitted. Result is capped at 500 rows." })), ("403".to_string(), err("Requires restaurant.kitchen_ticket.read")), ("422".to_string(), err("Invalid kitchen station"))]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/reports/logistics/delivery-board".into(),
+        json!({ "get": {
+            "tags": ["logistics"], "summary": "Open shipment dispatch and delivery board", "security": sec,
+            "parameters": [tid],
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Tenant-scoped failed, created and dispatched shipments ordered by operational priority and age, with latest tracking event; result is capped at 500 rows" })), ("403".to_string(), err("Requires logistics.shipment.read")), ("404".to_string(), err("Logistics module is not enabled"))]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/reports/logistics/shipments/{shipmentId}/redeliver".into(),
+        json!({ "post": {
+            "tags": ["logistics"], "summary": "Create an idempotent replacement shipment from a failed delivery", "security": sec,
+            "parameters": [tid, { "name": "shipmentId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "responses": with_common(Map::from_iter([("201".to_string(), json!({ "description": "New shipment created in created state with the failed shipment lines and destination; original failure history is preserved" })), ("200".to_string(), json!({ "description": "Existing equivalent open replacement returned idempotently" })), ("403".to_string(), err("Requires logistics.shipment.read and logistics.shipment.create")), ("404".to_string(), err("Logistics module is not enabled")), ("422".to_string(), err("Shipment is not failed, has no lines, or its source order is no longer open"))]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/reports/hotel/housekeeping-board".into(),
+        json!({ "get": {
+            "tags": ["hotel"], "summary": "Rooms awaiting housekeeping", "security": sec,
+            "parameters": [tid],
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Tenant-scoped cleaning rooms prioritized by same-day arrivals, with previous checkout date and room readiness totals; guest identity is omitted and result is capped at 500 rooms" })), ("403".to_string(), err("Requires hotel.room.read")), ("404".to_string(), err("Hotel module is not enabled"))]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/reports/inventory/lots/{lotId}/traceability".into(),
+        json!({ "get": {
+            "tags": ["inventory"], "summary": "Lot traceability and remaining stock", "security": sec,
+            "parameters": [tid, { "name": "lotId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }, { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 500, "default": 100 } }, { "name": "offset", "in": "query", "schema": { "type": "integer", "minimum": 0, "maximum": 1000000, "default": 0 } }],
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Tenant-scoped lot identity, expiry status, current quantity/value by warehouse, and a paginated movement chronology" })), ("403".to_string(), err("Requires inventory.lot.read and inventory.stock_move.read")), ("404".to_string(), err("Lot not found for this tenant")), ("422".to_string(), err("Invalid lot id or pagination"))]))
+        } }),
+    );
+    paths.insert(
         "/api/t/{tenantId}/reports/inventory/quality-holds".into(),
         json!({ "get": {
             "tags": ["inventory", "quality"], "summary": "Held inventory by quality inspection and source stock layer", "security": sec,

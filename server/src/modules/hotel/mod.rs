@@ -2,6 +2,7 @@
 mod application;
 mod domain;
 mod persistence;
+mod reports;
 
 pub use application::handle_source_event;
 pub use application::prepare_document;

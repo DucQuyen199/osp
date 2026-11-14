@@ -69,13 +69,6 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
         {
             errors.push(format!("{prefix}.qty phải lớn hơn 0"));
         }
-        if !line
-            .get("price")
-            .and_then(decimal)
-            .is_some_and(|value| value >= Decimal::ZERO)
-        {
-            errors.push(format!("{prefix}.price phải là số không âm"));
-        }
     }
     errors
 }

@@ -19,6 +19,84 @@ fn decimal_json(value: Decimal) -> R<Value> {
     })
 }
 
+pub async fn validate_expiry_writeoff_quality_holds(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    document: &Value,
+) -> R<Vec<String>> {
+    if !tenant.has_module("quality")
+        || document.get("note").and_then(Value::as_str) != Some("Kiểm kê hủy hàng hết hạn")
+    {
+        return Ok(Vec::new());
+    }
+    let Some(warehouse) = document
+        .get("warehouse")
+        .and_then(Value::as_str)
+        .and_then(|value| Uuid::parse_str(value).ok())
+    else {
+        return Ok(vec![
+            "Expiry write-off count requires a valid warehouse".into(),
+        ]);
+    };
+    let mut pairs = document
+        .get("adjustment_lines")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|line| {
+            Some((
+                Uuid::parse_str(line.get("product")?.as_str()?).ok()?,
+                Uuid::parse_str(line.get("lot")?.as_str()?).ok()?,
+            ))
+        })
+        .collect::<Vec<_>>();
+    pairs.sort_unstable();
+    pairs.dedup();
+    let mut products = pairs
+        .iter()
+        .map(|(product, _)| *product)
+        .collect::<Vec<_>>();
+    products.sort_unstable();
+    products.dedup();
+    for product in products {
+        let lock_key = format!("inventory.stock:{}:{}:{}", tenant.id, product, warehouse);
+        tx.query_opt(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            &[&lock_key],
+        )
+        .await?;
+        tx.query_opt(
+            "SELECT id FROM inventory__stock_level WHERE tenant_id = $1 AND product = $2 AND warehouse = $3 FOR UPDATE",
+            &[&tenant.id, &product, &warehouse],
+        )
+        .await?;
+    }
+    let mut errors = Vec::new();
+    for (product, lot_id) in pairs {
+        let held = tx
+            .query_opt(
+                "SELECT EXISTS ( \
+                   SELECT 1 FROM quality__inspection qi \
+                   JOIN inventory__lot lot ON lot.tenant_id = qi.tenant_id AND lot.id = qi.lot \
+                   LEFT JOIN LATERAL (SELECT SUM(qty::numeric) AS qty FROM quality__inspection_disposition WHERE tenant_id = qi.tenant_id AND inspection = qi.id AND status = 'posted') disposition ON true \
+                   LEFT JOIN LATERAL (SELECT SUM(qty::numeric) AS qty FROM inventory__stock_move WHERE tenant_id = qi.tenant_id AND source = 'quality_return' AND source_id = qi.id::text AND direction = 'out') returned ON true \
+                   WHERE qi.tenant_id = $1 AND qi.product = $2 AND qi.warehouse = $3 AND qi.lot = $4 \
+                     AND qi.source IN ('purchase_order', 'purchase_receipt') AND qi.status IN ('pending', 'failed') AND lot.expiry < CURRENT_DATE \
+                   GROUP BY qi.lot \
+                   HAVING SUM(GREATEST(qi.qty::numeric - COALESCE(disposition.qty, 0) - COALESCE(returned.qty, 0), 0::numeric)) > 0.000001 \
+                 )",
+                &[&tenant.id, &product, &warehouse, &lot_id],
+            )
+            .await?;
+        if held.is_some_and(|row| row.get::<_, bool>(0)) {
+            errors.push(format!(
+                "Expired lot {lot_id} still has an active quality hold; resolve its inspection before approving the write-off"
+            ));
+        }
+    }
+    Ok(errors)
+}
+
 /// Snapshot book quantities at submission and freeze those SKU/warehouse
 /// balances until the count is approved, rejected, or cancelled.
 pub async fn prepare_stock_count(
@@ -48,6 +126,12 @@ pub async fn prepare_stock_count(
         .and_then(Value::as_str)
         .and_then(|value| Uuid::parse_str(value).ok())
         .unwrap_or(Uuid::nil());
+    let quality_errors =
+        validate_expiry_writeoff_quality_holds(tx, tenant, &Value::Object(document.clone()))
+            .await?;
+    let is_expiry_writeoff = document.get("note").and_then(Value::as_str)
+        == Some("Kiểm kê hủy hàng hết hạn")
+        && tenant.has_module("quality");
     let Some(lines) = document
         .get_mut("adjustment_lines")
         .and_then(Value::as_array_mut)
@@ -55,6 +139,45 @@ pub async fn prepare_stock_count(
         return Ok(vec!["Phiếu kiểm kê cần có dòng số lượng thực tế".into()]);
     };
     let mut errors = Vec::new();
+    errors.extend(quality_errors);
+    if is_expiry_writeoff {
+        for line in lines.iter() {
+            let Some(product) = line
+                .get("product")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+            else {
+                continue;
+            };
+            let Some(lot_id) = line
+                .get("lot")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+            else {
+                continue;
+            };
+            let held = tx
+                .query_opt(
+                    "SELECT EXISTS ( \
+                       SELECT 1 FROM quality__inspection qi \
+                       JOIN inventory__lot lot ON lot.tenant_id = qi.tenant_id AND lot.id = qi.lot \
+                       LEFT JOIN LATERAL (SELECT SUM(qty::numeric) AS qty FROM quality__inspection_disposition WHERE tenant_id = qi.tenant_id AND inspection = qi.id AND status = 'posted') disposition ON true \
+                       LEFT JOIN LATERAL (SELECT SUM(qty::numeric) AS qty FROM inventory__stock_move WHERE tenant_id = qi.tenant_id AND source = 'quality_return' AND source_id = qi.id::text AND direction = 'out') returned ON true \
+                       WHERE qi.tenant_id = $1 AND qi.product = $2 AND qi.warehouse = $3 AND qi.lot = $4 \
+                         AND qi.source IN ('purchase_order', 'purchase_receipt') AND qi.status IN ('pending', 'failed') AND lot.expiry < CURRENT_DATE \
+                       GROUP BY qi.lot \
+                       HAVING SUM(GREATEST(qi.qty::numeric - COALESCE(disposition.qty, 0) - COALESCE(returned.qty, 0), 0::numeric)) > 0.000001 \
+                     )",
+                    &[&tenant.id, &product, &warehouse_id, &lot_id],
+                )
+                .await?;
+            if held.is_some_and(|row| row.get::<_, bool>(0)) {
+                errors.push(format!(
+                    "Lô hết hạn {lot_id} vẫn đang bị giữ chất lượng; xử lý phiếu QC trước khi gửi kiểm kê hủy"
+                ));
+            }
+        }
+    }
     let mut products = lines
         .iter()
         .filter_map(|line| {

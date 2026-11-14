@@ -201,6 +201,12 @@ pub async fn validate_persistence(
                     .checked_sub(released)
                     .unwrap_or(Decimal::ZERO)
                     .max(Decimal::ZERO);
+                let lock_key = format!("inventory.stock:{}:{}:{}", tenant.id, product, warehouse);
+                tx.query_opt(
+                    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                    &[&lock_key],
+                )
+                .await?;
                 let held = tx.query_opt(
                     "SELECT held_qty::text FROM inventory__stock_level WHERE tenant_id = $1 AND product = $2 AND warehouse = $3 FOR UPDATE",
                     &[&tenant.id, &product, &warehouse],
@@ -309,6 +315,12 @@ pub async fn validate_persistence(
                     .checked_sub(released)
                     .unwrap_or(Decimal::ZERO)
                     .max(Decimal::ZERO);
+                let lock_key = format!("inventory.stock:{}:{}:{}", tenant.id, product, warehouse);
+                tx.query_opt(
+                    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                    &[&lock_key],
+                )
+                .await?;
                 let held = tx.query_opt(
                     "SELECT held_qty::text FROM inventory__stock_level WHERE tenant_id = $1 AND product = $2 AND warehouse = $3 FOR UPDATE",
                     &[&tenant.id, &product, &warehouse],

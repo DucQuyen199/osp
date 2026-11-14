@@ -121,12 +121,12 @@ async fn prepare_document_with_lock(
                 .zip(source.get("kind").and_then(Value::as_str))
                 .map(|(tracked, kind)| (tracked, kind.to_string()))
         });
-        let (tracked, kind, default_price) = if let Some(snapshot) = snapshot {
-            (snapshot.0, snapshot.1, None)
+        let (tracked, kind, default_price, default_tax) = if let Some(snapshot) = snapshot {
+            (snapshot.0, snapshot.1, None, None)
         } else {
             let row = tx
                 .query_opt(
-                    &format!("SELECT kind, tracked, active, price::text FROM master_data__product WHERE tenant_id = $1 AND id = $2{lock}"),
+                    &format!("SELECT kind, tracked, active, price::text, tax FROM master_data__product WHERE tenant_id = $1 AND id = $2{lock}"),
                     &[&tenant.id, &product],
                 )
                 .await?;
@@ -143,12 +143,13 @@ async fn prepare_document_with_lock(
             let default_price: Option<Decimal> = row
                 .get::<_, Option<String>>(3)
                 .and_then(|price| money::decimal_str(&price));
+            let default_tax: Option<Uuid> = row.get(4);
             let kind = kind.unwrap_or_else(|| "goods".into());
             if entity != "sales_return" && active == Some(false) {
                 errors.push(format!("Sản phẩm ở dòng {} đã ngừng hoạt động", index + 1));
             }
             let tracked = tracked.unwrap_or(kind == "goods");
-            (tracked, kind, default_price)
+            (tracked, kind, default_price, default_tax)
         };
         line_map.insert("kind".into(), json!(kind));
         line_map.insert("tracked".into(), json!(tracked));
@@ -184,6 +185,11 @@ async fn prepare_document_with_lock(
             }
         } else if !line_map.contains_key("discount_pct") {
             line_map.insert("discount_pct".into(), json!(0));
+        }
+        if entity != "sales_return" && line_map.get("tax").is_none() {
+            if let Some(default_tax) = default_tax {
+                line_map.insert("tax".into(), json!(default_tax));
+            }
         }
         let (tax_rate, tax_name) = if entity == "sales_return" {
             (

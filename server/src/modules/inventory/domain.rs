@@ -167,6 +167,14 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<String> {
+    if entity == "stock_count"
+        && current.get("note").and_then(Value::as_str) == Some("Kiểm kê hủy hàng hết hạn")
+        && patch
+            .get("note")
+            .is_some_and(|note| note.as_str() != Some("Kiểm kê hủy hàng hết hạn"))
+    {
+        return vec!["Không được đổi dấu nhận diện phiếu kiểm kê hủy hàng hết hạn".into()];
+    }
     let (protected, message): (&[&str], &str) = match entity {
         "stock_move" | "stock_level" => (
             &["*"],

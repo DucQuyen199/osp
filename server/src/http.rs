@@ -140,6 +140,31 @@ fn parse_query(q: Option<&str>) -> Vec<(String, String)> {
         .collect()
 }
 
+fn query_usize(query: &[(String, String)], name: &str, default: usize, max: usize) -> R<usize> {
+    let Some(value) = query
+        .iter()
+        .find(|(key, _)| key == name)
+        .map(|(_, value)| value)
+    else {
+        return Ok(default);
+    };
+    let parsed = value.parse::<usize>().map_err(|_| {
+        ApiError::new(
+            422,
+            "INVALID_PAGINATION",
+            format!("{name} must be a non-negative integer"),
+        )
+    })?;
+    if parsed > max {
+        return Err(ApiError::new(
+            422,
+            "INVALID_PAGINATION",
+            format!("{name} must not exceed {max}"),
+        ));
+    }
+    Ok(parsed)
+}
+
 fn reply_to_response(r: Reply) -> Response {
     match r {
         Reply::Json(status, v) => {
@@ -1002,6 +1027,82 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
         }
         (&Method::GET, ["reports", "inventory", "replenishment"]) => {
             return json_ok(k.inventory_replenishment_report(&actor, &t).await?);
+        }
+        (&Method::GET, ["reports", "inventory", "lot-expiry"]) => {
+            let days = query_usize(&query, "days", 90, 365)? as i32;
+            let limit = query_usize(&query, "limit", 100, 500)?;
+            if limit == 0 {
+                return Err(ApiError::new(
+                    422,
+                    "INVALID_PAGINATION",
+                    "limit must be between 1 and 500",
+                ));
+            }
+            let offset = query_usize(&query, "offset", 0, 1_000_000)?;
+            return json_ok(
+                k.inventory_lot_expiry_report(&actor, &t, days, limit, offset)
+                    .await?,
+            );
+        }
+        (&Method::POST, ["reports", "inventory", "lot-expiry", "writeoff-counts"]) => {
+            let body = json_obj(&bytes)?;
+            let result = k
+                .create_expiry_writeoff_count(&actor, &t, &s(&body, "warehouseId"))
+                .await?;
+            let status = if result.get("existing") == Some(&Value::Bool(true)) {
+                200
+            } else {
+                201
+            };
+            return Ok(Reply::Json(status, result));
+        }
+        (&Method::GET, ["reports", "restaurant", "kitchen-board"]) => {
+            let station = query
+                .iter()
+                .find(|(key, _)| key == "station")
+                .map(|(_, value)| value.as_str());
+            return json_ok(k.restaurant_kitchen_board(&actor, &t, station).await?);
+        }
+        (&Method::GET, ["reports", "logistics", "delivery-board"]) => {
+            return json_ok(k.logistics_delivery_board(&actor, &t).await?);
+        }
+        (&Method::GET, ["reports", "hotel", "housekeeping-board"]) => {
+            return json_ok(k.hotel_housekeeping_board(&actor, &t).await?);
+        }
+        (
+            &Method::POST,
+            [
+                "reports",
+                "logistics",
+                "shipments",
+                shipment_id,
+                "redeliver",
+            ],
+        ) => {
+            let result = k
+                .create_logistics_redelivery(&actor, &t, shipment_id)
+                .await?;
+            let status = if result.get("existing") == Some(&Value::Bool(true)) {
+                200
+            } else {
+                201
+            };
+            return Ok(Reply::Json(status, result));
+        }
+        (&Method::GET, ["reports", "inventory", "lots", lot_id, "traceability"]) => {
+            let limit = query_usize(&query, "limit", 100, 500)?;
+            if limit == 0 {
+                return Err(ApiError::new(
+                    422,
+                    "INVALID_PAGINATION",
+                    "limit must be between 1 and 500",
+                ));
+            }
+            let offset = query_usize(&query, "offset", 0, 1_000_000)?;
+            return json_ok(
+                k.inventory_lot_traceability_report(&actor, &t, lot_id, limit, offset)
+                    .await?,
+            );
         }
         (&Method::GET, ["reports", "inventory", "location-stock"]) => {
             let warehouse = query

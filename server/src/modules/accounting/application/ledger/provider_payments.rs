@@ -369,7 +369,10 @@ pub(super) async fn handle_event(
                     lines.push(journal_line_decimal(loss, loss_amount, Decimal::ZERO)?);
                 }
             }
-            if event.get("source").and_then(Value::as_str) == Some("ticket") {
+            if matches!(
+                event.get("source").and_then(Value::as_str),
+                Some("ticket" | "pos_order")
+            ) {
                 let tax = event
                     .get("base_tax_amount")
                     .filter(|value| !value.is_null())

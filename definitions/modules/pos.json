@@ -22,6 +22,12 @@
      "ref": "master-data.branch"
     },
     {
+     "name": "warehouse",
+     "type": "ref",
+     "required": true,
+     "ref": "inventory.warehouse"
+    },
+    {
      "name": "cashier",
      "type": "string",
      "required": false
@@ -118,6 +124,12 @@
      "type": "money",
     "required": false,
     "system": true
+    },
+    {
+     "name": "tax_total",
+     "type": "money",
+     "required": false,
+     "system": true
     },
     {
      "name": "method",

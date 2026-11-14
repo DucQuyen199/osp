@@ -10,6 +10,23 @@ pub async fn validate_persistence(
     document: &Value,
 ) -> R<Vec<String>> {
     if entity == "pos_session" && action == "created" {
+        let warehouse = document
+            .get("warehouse")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok());
+        let Some(warehouse) = warehouse else {
+            return Ok(vec!["POS session requires a valid warehouse".into()]);
+        };
+        if tx
+            .query_opt(
+                "SELECT id FROM inventory__warehouse WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                &[&tenant.id, &warehouse],
+            )
+            .await?
+            .is_none()
+        {
+            return Ok(vec!["POS warehouse was not found in this tenant".into()]);
+        }
         let branch = document
             .get("branch")
             .and_then(Value::as_str)
