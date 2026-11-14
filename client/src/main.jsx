@@ -48,6 +48,7 @@ const AutoServiceWorkshopPage = lazy(() => import('./AutoServiceWorkshopPage.jsx
 const RestaurantServicePage = lazy(() => import('./RestaurantServicePage.jsx'));
 const WholesaleSalesDeskPage = lazy(() => import('./WholesaleSalesDeskPage.jsx'));
 const PharmacyWorkbenchPage = lazy(() => import('./PharmacyWorkbenchPage.jsx'));
+const EducationWorkbenchPage = lazy(() => import('./EducationWorkbenchPage.jsx'));
 
 function parseRoute(hash = location.hash) {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
@@ -63,6 +64,7 @@ function parseRoute(hash = location.hash) {
   if (a === 'pos') return { name: 'pos-terminal' };
   if (a === 'clinic') return { name: 'clinic-workbench' };
   if (a === 'pharmacy') return { name: 'pharmacy-workbench' };
+  if (a === 'education') return { name: 'education-workbench' };
   if (a === 'ecommerce') return { name: 'ecommerce-order-desk' };
   if (a === 'agriculture') return { name: 'agriculture-operations' };
   if (a === 'hotel') return { name: 'hotel-frontdesk' };
@@ -150,6 +152,7 @@ function Sidebar({ meta, route, onNavigate, open }) {
     {meta.modules.some((module) => module.id === 'pos') && can('pos.pos_session.read') && can('pos.pos_order.create') && link('#/pos', 'Quầy bán hàng POS', route.name === 'pos-terminal', 'list')}
     {meta.modules.some((module) => module.id === 'clinic') && can('clinic.encounter.read') && can('clinic.encounter.create') && link('#/clinic', 'Điều phối phòng khám', route.name === 'clinic-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'pharmacy') && can('pharmacy.prescription.read') && link('#/pharmacy', 'Đơn thuốc nhà thuốc', route.name === 'pharmacy-workbench', 'list')}
+    {meta.modules.some((module) => module.id === 'school') && can('school.class_session.read') && link('#/education', 'Lịch lớp và điểm danh', route.name === 'education-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'ecommerce') && can('ecommerce.web_order.read') && link('#/ecommerce', 'Đơn hàng online', route.name === 'ecommerce-order-desk', 'list')}
     {meta.modules.some((module) => module.id === 'agriculture') && can('agriculture.crop_cycle.read') && link('#/agriculture', 'Điều hành mùa vụ', route.name === 'agriculture-operations', 'list')}
     {meta.modules.some((module) => module.id === 'hotel') && can('hotel.reservation.read') && link('#/hotel', 'Lễ tân khách sạn', route.name === 'hotel-frontdesk', 'list')}
@@ -334,6 +337,7 @@ function App() {
         : route.name === 'pos-terminal' ? <PosTerminalPage />
         : route.name === 'clinic-workbench' ? <ClinicWorkbenchPage />
         : route.name === 'pharmacy-workbench' ? <PharmacyWorkbenchPage />
+        : route.name === 'education-workbench' ? <EducationWorkbenchPage />
         : route.name === 'ecommerce-order-desk' ? <EcommerceOrderDeskPage />
         : route.name === 'agriculture-operations' ? <AgricultureOperationsPage />
         : route.name === 'hotel-frontdesk' ? <HotelFrontDeskPage />
