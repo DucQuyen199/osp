@@ -64,6 +64,33 @@ pub async fn validate_persistence(
             ]);
         }
     }
+    if tenant.has_module("workflow-approval")
+        && matches!(entity, "purchase_order" | "purchase_requisition")
+        && action == "rejected"
+    {
+        let Some(id) = document
+            .get("id")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+        else {
+            return Ok(vec![
+                "Cannot identify the purchasing document being rejected".into(),
+            ]);
+        };
+        let qname = format!("purchasing.{entity}");
+        let rejected = tx
+            .query_opt(
+                "SELECT 1 FROM workflow_approval__approval_request WHERE tenant_id = $1 AND entity = $2 AND record_id = $3 AND status = 'rejected' LIMIT 1",
+                &[&tenant.id, &qname, &id.to_string()],
+            )
+            .await?
+            .is_some();
+        if !rejected {
+            return Ok(vec![
+                "Reject purchasing documents through their shared approval request".into(),
+            ]);
+        }
+    }
     if (entity == "purchase_order" && matches!(action, "submitted" | "approved" | "received"))
         || (entity == "purchase_requisition" && matches!(action, "submitted" | "approved"))
         || (entity == "rfq" && matches!(action, "sent" | "accepted"))
