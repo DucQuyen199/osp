@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **50 module**, **188 loại dữ liệu**, **851 sự kiện**.
+Tổng: **50 module**, **189 loại dữ liệu**, **854 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -202,6 +202,7 @@ Tổng: **50 module**, **188 loại dữ liệu**, **851 sự kiện**.
 |---|---|
 | `maintenance_request` Yêu cầu bảo trì | `open` → **cancelled** (open/in_progress→cancelled), **done** (in_progress→done), **started** (open→in_progress) |
 | `maintenance_plan` Kế hoạch bảo trì | `active` → **due** (active→active), **paused** (active→paused), **resumed** (paused→active) |
+| `maintenance_technician` Kỹ thuật viên bảo trì | — |
 
 ### quality
 **Quản lý chất lượng** — Kiểm tra chất lượng đầu vào/thành phẩm, ghi nhận sự không phù hợp.

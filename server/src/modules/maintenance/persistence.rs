@@ -54,6 +54,19 @@ pub async fn validate_persistence(
                 errors.push("Chỉ tạo hoặc xử lý bảo trì cho tài sản đang hoạt động".into());
             }
 
+            if let Some(technician_id) = id(document, "technician") {
+                let technician = tx
+                    .query_opt(
+                        "SELECT COALESCE(active, true) FROM maintenance__maintenance_technician WHERE tenant_id=$1 AND id=$2 FOR SHARE",
+                        &[&tenant.id, &technician_id],
+                    )
+                    .await?;
+                if !technician.is_some_and(|row| row.get::<_, bool>(0)) {
+                    errors
+                        .push("Kỹ thuật viên phải thuộc doanh nghiệp này và đang hoạt động".into());
+                }
+            }
+
             if matches!(action, "done" | "updated") {
                 if let Some(parts) = document.get("parts").and_then(Value::as_array) {
                     for part in parts {
@@ -96,6 +109,40 @@ pub async fn validate_persistence(
                 .await?;
             if !asset.is_some_and(|row| row.get::<_, String>(0) == "active") {
                 errors.push("Kế hoạch bảo trì chỉ áp dụng cho tài sản đang hoạt động".into());
+            }
+        }
+        "maintenance_technician" if action == "updated" => {
+            if document.get("active") == Some(&Value::Bool(false)) {
+                let Some(technician_id) = id(document, "id") else {
+                    return Ok(vec![
+                        "Không xác định được kỹ thuật viên cần cập nhật".into(),
+                    ]);
+                };
+                if tx
+                    .query_opt(
+                        "SELECT id FROM maintenance__maintenance_request WHERE tenant_id=$1 AND technician=$2 AND status IN ('open','in_progress') LIMIT 1 FOR UPDATE",
+                        &[&tenant.id, &technician_id],
+                    )
+                    .await?
+                    .is_some()
+                {
+                    errors.push("Không thể ngừng hoạt động kỹ thuật viên đang được phân công cho lệnh còn mở".into());
+                }
+            }
+        }
+        "maintenance_technician" if action == "removed" => {
+            let Some(technician_id) = id(document, "id") else {
+                return Ok(vec!["Không xác định được kỹ thuật viên cần xóa".into()]);
+            };
+            if tx
+                .query_opt(
+                    "SELECT id FROM maintenance__maintenance_request WHERE tenant_id=$1 AND technician=$2 LIMIT 1 FOR UPDATE",
+                    &[&tenant.id, &technician_id],
+                )
+                .await?
+                .is_some()
+            {
+                errors.push("Kỹ thuật viên đã có lịch sử phân công; hãy ngừng hoạt động để giữ dấu vết lệnh bảo trì".into());
             }
         }
         _ => {}

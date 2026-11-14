@@ -13,11 +13,15 @@ export default function MaintenanceWorkbenchPage() {
   const [assets, setAssets] = useState(new Map());
   const [products, setProducts] = useState(new Map());
   const [warehouses, setWarehouses] = useState(new Map());
+  const [technicians, setTechnicians] = useState(new Map());
   const [selectedId, setSelectedId] = useState('');
   const [assetId, setAssetId] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('normal');
   const [warehouse, setWarehouse] = useState('');
+  const [technician, setTechnician] = useState('');
+  const [assignedTechnician, setAssignedTechnician] = useState('');
+  const [technicianForm, setTechnicianForm] = useState({ name: '', kind: 'internal', specialty: '', phone: '' });
   const [parts, setParts] = useState([]);
   const [resolution, setResolution] = useState('');
   const [laborHours, setLaborHours] = useState('');
@@ -30,16 +34,17 @@ export default function MaintenanceWorkbenchPage() {
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
-      const [planRes, requestRes, assetMap, productMap, warehouseMap] = await Promise.all([
+      const [planRes, requestRes, assetMap, productMap, warehouseMap, technicianMap] = await Promise.all([
         can('maintenance.maintenance_plan.read') ? api(`${dataPath('maintenance.maintenance_plan')}?limit=1000`) : Promise.resolve({ items: [] }),
         can('maintenance.maintenance_request.read') ? api(`${dataPath('maintenance.maintenance_request')}?limit=1000`) : Promise.resolve({ items: [] }),
         can('asset.asset.read') ? loadRefs('asset.asset') : Promise.resolve(new Map()),
         can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
         can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
+        can('maintenance.maintenance_technician.read') ? loadRefs('maintenance.maintenance_technician') : Promise.resolve(new Map()),
       ]);
       const planRows = itemsOf(planRes).sort((a, b) => String(a.next_due || '9999').localeCompare(String(b.next_due || '9999')));
       const requestRows = itemsOf(requestRes).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
-      setPlans(planRows); setRequests(requestRows); setAssets(assetMap); setProducts(productMap); setWarehouses(warehouseMap);
+      setPlans(planRows); setRequests(requestRows); setAssets(assetMap); setProducts(productMap); setWarehouses(warehouseMap); setTechnicians(technicianMap);
       setSelectedId((id) => requestRows.some((row) => row.id === id) ? id : requestRows[0]?.id || '');
       setAssetId((id) => id || [...assetMap.keys()][0] || '');
       setWarehouse((id) => id || [...warehouseMap.keys()][0] || '');
@@ -49,6 +54,7 @@ export default function MaintenanceWorkbenchPage() {
 
   useEffect(() => { document.title = 'Bảo trì tài sản · OSP Suite'; load(); }, [load]);
   const selected = requests.find((row) => row.id === selectedId);
+  useEffect(() => { setAssignedTechnician(selected?.technician || ''); }, [selectedId, selected?.technician]);
   const openRequests = requests.filter((row) => ['open', 'in_progress'].includes(row.status));
   const requestForPlan = (plan) => requests.find((request) => request.source_plan === plan.id
     && request.scheduled_for === plan.next_due
@@ -68,11 +74,29 @@ export default function MaintenanceWorkbenchPage() {
     await run('create', async () => {
       const row = await api(dataPath('maintenance.maintenance_request'), { method: 'POST', body: {
         asset: assetId, description: description.trim() || undefined, priority,
+        technician: technician || undefined,
         warehouse: materialLines.length ? warehouse : undefined, parts: materialLines.length ? materialLines : undefined,
         requested_by: app.user?.name || app.user?.email || undefined,
       } });
       setSelectedId(row.id); setDescription(''); setPriority('normal'); setParts([]);
     }, 'Đã ghi nhận yêu cầu bảo trì. Lệnh được đưa vào hàng đợi để kỹ thuật viên tiếp nhận.');
+  }
+
+  async function createTechnician(event) {
+    event.preventDefault();
+    await run('technician', async () => {
+      await api(dataPath('maintenance.maintenance_technician'), { method: 'POST', body: {
+        ...technicianForm, name: technicianForm.name.trim(), specialty: technicianForm.specialty.trim() || undefined,
+        phone: technicianForm.phone.trim() || undefined, active: true,
+      } });
+      setTechnicianForm({ name: '', kind: 'internal', specialty: '', phone: '' });
+    }, 'Đã thêm kỹ thuật viên vào danh mục phân công.');
+  }
+
+  async function saveAssignment(row) {
+    await run(`${row.id}:assignment`, () => api(dataPath('maintenance.maintenance_request', row.id), {
+      method: 'PATCH', body: { technician: assignedTechnician || null },
+    }), 'Đã cập nhật người phụ trách lệnh bảo trì.');
   }
 
   async function runPlan(plan) {
@@ -106,10 +130,13 @@ export default function MaintenanceWorkbenchPage() {
     {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
     <div className="stats" style={{ marginBottom: 16 }}><div className="card stat"><span className="stat-label">Lịch đã đến hạn</span><strong className="stat-value">{overduePlans.length}</strong></div><div className="card stat"><span className="stat-label">Lệnh đang mở</span><strong className="stat-value">{openRequests.length}</strong></div><div className="card stat"><span className="stat-label">Đang xử lý</span><strong className="stat-value">{requests.filter((row) => row.status === 'in_progress').length}</strong></div><div className="card stat"><span className="stat-label">Đã hoàn tất</span><strong className="stat-value">{requests.filter((row) => row.status === 'done').length}</strong></div></div>
 
+    {can('maintenance.maintenance_technician.create') && <section className="card card-pad" style={{ marginBottom: 16 }}><h2>Danh mục kỹ thuật viên</h2><form className="form-grid" onSubmit={createTechnician}><label className="field"><span className="label">Tên *</span><input className="input" required maxLength="200" value={technicianForm.name} onChange={(event) => setTechnicianForm((form) => ({ ...form, name: event.target.value }))}/></label><label className="field"><span className="label">Loại</span><select className="select" value={technicianForm.kind} onChange={(event) => setTechnicianForm((form) => ({ ...form, kind: event.target.value }))}><option value="internal">Nội bộ</option><option value="contractor">Nhà thầu</option></select></label><label className="field"><span className="label">Chuyên môn</span><input className="input" maxLength="200" value={technicianForm.specialty} onChange={(event) => setTechnicianForm((form) => ({ ...form, specialty: event.target.value }))}/></label><label className="field"><span className="label">Điện thoại</span><input className="input" maxLength="50" value={technicianForm.phone} onChange={(event) => setTechnicianForm((form) => ({ ...form, phone: event.target.value }))}/></label><div className="row"><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy)}>Thêm kỹ thuật viên</button></div></form></section>}
+
     {can('maintenance.maintenance_request.create') && <section className="card card-pad"><h2>Tiếp nhận yêu cầu bảo trì</h2><form onSubmit={createRequest}><div className="form-grid">
       <label className="field"><span className="label">Tài sản / thiết bị *</span><select className="select" required value={assetId} onChange={(event) => setAssetId(event.target.value)}><option value="">Chọn tài sản</option>{[...assets.values()].filter((row) => row.active !== false).map((row) => <option key={row.id} value={row.id}>{recordLabel('asset.asset', row)}</option>)}</select></label>
       <label className="field"><span className="label">Mức ưu tiên</span><select className="select" value={priority} onChange={(event) => setPriority(event.target.value)}><option value="low">Thấp</option><option value="normal">Bình thường</option><option value="high">Cao</option></select></label>
       <label className="field"><span className="label">Kho xuất vật tư</span><select className="select" value={warehouse} onChange={(event) => setWarehouse(event.target.value)}><option value="">Chọn kho khi có vật tư</option>{[...warehouses.values()].map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
+      {can('maintenance.maintenance_technician.read') && <label className="field"><span className="label">Kỹ thuật viên phụ trách</span><select className="select" value={technician} onChange={(event) => setTechnician(event.target.value)}><option value="">Chưa phân công</option>{[...technicians.values()].filter((row) => row.active !== false).map((row) => <option key={row.id} value={row.id}>{row.name}{row.specialty ? ` · ${row.specialty}` : ''}</option>)}</select></label>}
       </div><label className="field" style={{ marginTop: 10 }}><span className="label">Mô tả sự cố / công việc</span><textarea className="input" rows="2" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Triệu chứng, vị trí, điều kiện vận hành…"/></label>
       <div className="row wrap" style={{ marginTop: 12 }}><strong>Vật tư dự kiến</strong><span className="grow"/><button className="btn btn-secondary btn-sm" type="button" disabled={!products.size} onClick={addPart}>Thêm vật tư</button></div>
       {parts.map((line, index) => <div className="row wrap" key={index} style={{ marginTop: 8 }}><select className="select" required value={line.product} onChange={(event) => updatePart(index, 'product', event.target.value)}><option value="">Chọn vật tư</option>{[...products.values()].filter((row) => row.active !== false && (row.tracked ?? row.kind === 'goods')).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select><input className="input num" aria-label="Số lượng vật tư" type="number" min="0.000001" step="any" required value={line.qty} onChange={(event) => updatePart(index, 'qty', event.target.value)} style={{ maxWidth: 140 }}/><button className="btn btn-ghost btn-sm" type="button" onClick={() => setParts((current) => current.filter((_, i) => i !== index))}>Bỏ</button></div>)}
@@ -118,9 +145,10 @@ export default function MaintenanceWorkbenchPage() {
 
     <div className="layout-split" style={{ marginTop: 16 }}>
       <section className="card card-pad"><h2>Kế hoạch định kỳ</h2>{loading ? <div className="skeleton" data-h="row"/> : !plans.length ? <div className="empty">Chưa có kế hoạch bảo trì. Tạo kế hoạch trong module Tài sản và bảo trì.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Kế hoạch / tài sản</th><th>Đến hạn</th><th>Trạng thái</th><th/></tr></thead><tbody>{plans.map((row) => { const activeRequest = requestForPlan(row); return <tr key={row.id}><td><strong>{row.title}</strong><div className="small muted">{assets.get(row.asset) ? recordLabel('asset.asset', assets.get(row.asset)) : 'Tài sản'}</div></td><td>{fmtDate(row.next_due)}</td><td>{statusLabel(row.status)}{row.status === 'active' && row.next_due && row.next_due <= today() && <span className="badge danger" style={{ marginLeft: 6 }}>Quá hạn</span>}</td><td>{activeRequest ? <button className="btn btn-secondary btn-sm" type="button" onClick={() => setSelectedId(activeRequest.id)}>Mở lệnh · {statusLabel(activeRequest.status)}</button> : row.status === 'active' && can('maintenance.maintenance_plan.due') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy) || !row.next_due || row.next_due > today()} onClick={() => runPlan(row)}>Tạo lệnh</button>}</td></tr>; })}</tbody></table></div>}</section>
-      <section className="card card-pad"><h2>Hàng đợi lệnh bảo trì</h2>{loading ? <div className="skeleton" data-h="row"/> : !requests.length ? <div className="empty">Chưa có lệnh bảo trì.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Tài sản / mô tả</th><th>Ưu tiên</th><th>Ngày</th><th>Trạng thái</th></tr></thead><tbody>{requests.map((row) => <tr key={row.id} className={selectedId === row.id ? 'selected' : ''} onClick={() => setSelectedId(row.id)} style={{ cursor: 'pointer' }}><td><strong>{assets.get(row.asset) ? recordLabel('asset.asset', assets.get(row.asset)) : 'Tài sản'}</strong><div className="small muted">{row.description || (row.source_plan ? 'Bảo trì định kỳ' : 'Yêu cầu mới')}</div></td><td>{statusLabel(row.priority)}</td><td>{fmtDate(row.scheduled_for || row.created_at)}</td><td>{statusLabel(row.status)}</td></tr>)}</tbody></table></div>}</section>
+      <section className="card card-pad"><h2>Hàng đợi lệnh bảo trì</h2>{loading ? <div className="skeleton" data-h="row"/> : !requests.length ? <div className="empty">Chưa có lệnh bảo trì.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Tài sản / mô tả</th><th>Kỹ thuật viên</th><th>Ưu tiên</th><th>Ngày</th><th>Trạng thái</th></tr></thead><tbody>{requests.map((row) => <tr key={row.id} className={selectedId === row.id ? 'selected' : ''} onClick={() => setSelectedId(row.id)} style={{ cursor: 'pointer' }}><td><strong>{assets.get(row.asset) ? recordLabel('asset.asset', assets.get(row.asset)) : 'Tài sản'}</strong><div className="small muted">{row.description || (row.source_plan ? 'Bảo trì định kỳ' : 'Yêu cầu mới')}</div></td><td>{technicians.get(row.technician)?.name || 'Chưa phân công'}</td><td>{statusLabel(row.priority)}</td><td>{fmtDate(row.scheduled_for || row.created_at)}</td><td>{statusLabel(row.status)}</td></tr>)}</tbody></table></div>}</section>
     </div>
     {selected && <section className="card card-pad" style={{ marginTop: 16 }}><div className="row wrap"><div><h2>{assets.get(selected.asset) ? recordLabel('asset.asset', assets.get(selected.asset)) : 'Lệnh bảo trì'}</h2><p className="small muted">{selected.description || 'Không có mô tả'} · Ưu tiên {statusLabel(selected.priority)} · Kho vật tư {warehouses.get(selected.warehouse)?.name || 'chưa chọn'}</p></div><span className="grow"/><span className="badge warning">{statusLabel(selected.status)}</span></div>
+      {can('maintenance.maintenance_request.update') && ['open', 'in_progress'].includes(selected.status) && can('maintenance.maintenance_technician.read') && <div className="row wrap" style={{ margin: '10px 0' }}><label className="field grow"><span className="label">Kỹ thuật viên phụ trách</span><select className="select" value={assignedTechnician} onChange={(event) => setAssignedTechnician(event.target.value)}><option value="">Chưa phân công</option>{[...technicians.values()].filter((row) => row.active !== false).map((row) => <option key={row.id} value={row.id}>{row.name}{row.specialty ? ` · ${row.specialty}` : ''}</option>)}</select></label><button className="btn btn-secondary btn-sm" type="button" disabled={Boolean(busy) || assignedTechnician === (selected.technician || '')} onClick={() => saveAssignment(selected)}>Lưu phân công</button></div>}
       {!!selected.parts?.length && <div className="table-wrap"><table className="table"><thead><tr><th>Vật tư</th><th>Số lượng dự kiến</th></tr></thead><tbody>{selected.parts.map((line, index) => <tr key={`${line.product}-${index}`}><td>{products.get(line.product)?.name || 'Vật tư'}</td><td>{line.qty}</td></tr>)}</tbody></table></div>}
       {selected.status === 'open' && can('maintenance.maintenance_request.started') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => startRequest(selected)}>Bắt đầu xử lý</button>}
       {selected.status === 'in_progress' && can('maintenance.maintenance_request.update') && can('maintenance.maintenance_request.done') && <form className="card card-pad" style={{ marginTop: 12 }} onSubmit={(event) => completeRequest(event, selected)}><h3>Ghi nhận hoàn tất</h3><label className="field"><span className="label">Kết quả xử lý *</span><textarea className="input" required rows="3" value={resolution} onChange={(event) => setResolution(event.target.value)} placeholder="Nguyên nhân, công việc đã làm, tình trạng sau sửa chữa…"/></label><div className="form-grid" style={{ marginTop: 10 }}><label className="field"><span className="label">Giờ công (nhập cùng đơn giá)</span><input className="input num" type="number" min="0" step="0.25" value={laborHours} onChange={(event) => setLaborHours(event.target.value)}/></label><label className="field"><span className="label">Đơn giá giờ công</span><input className="input num" type="number" min="0" step="any" value={laborRate} onChange={(event) => setLaborRate(event.target.value)}/></label></div><div className="row" style={{ marginTop: 10 }}><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy)}>Hoàn tất lệnh</button></div></form>}

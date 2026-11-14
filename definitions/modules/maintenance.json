@@ -3,7 +3,7 @@
  "name": "Bảo trì",
  "description": "Kế hoạch bảo trì định kỳ và yêu cầu sửa chữa cho tài sản/thiết bị.",
  "category": "supply",
- "version": "0.1.0",
+ "version": "0.2.0",
  "depends": [
   "asset",
   "inventory"
@@ -52,6 +52,12 @@
      "name": "requested_by",
      "type": "string",
      "required": false
+    },
+    {
+     "name": "technician",
+     "type": "ref",
+     "required": false,
+     "ref": "maintenance.maintenance_technician"
     },
     {
      "name": "warehouse",
@@ -166,6 +172,20 @@
      "due": {"from": ["active"], "to": "active"}
     }
    },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "maintenance_technician",
+   "label": "Kỹ thuật viên bảo trì",
+   "fields": [
+    { "name": "name", "type": "string", "required": true },
+    { "name": "kind", "type": "enum", "required": true, "options": ["internal", "contractor"] },
+    { "name": "specialty", "type": "string", "required": false },
+    { "name": "phone", "type": "string", "required": false },
+    { "name": "active", "type": "boolean", "required": false }
+   ],
+   "states": null,
    "computed": {},
    "constraints": []
   }

@@ -125,6 +125,7 @@
   "maintenance_technician": {
     "name": "K? thu?t vi?n b?o tr?",
     "permissions": [
+      "maintenance.maintenance_technician.read",
       "maintenance.maintenance_request.read",
       "maintenance.maintenance_request.create",
       "maintenance.maintenance_request.update",

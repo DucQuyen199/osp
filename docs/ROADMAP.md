@@ -4,7 +4,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 
 ## Đã có
 
-- 50 module, 188 loại dữ liệu, 851 sự kiện, 22 gói ngành; nghiệp vụ liên module chạy trong Rust bounded contexts.
+- 50 module, 189 loại dữ liệu, 854 sự kiện, 22 gói ngành; nghiệp vụ liên module chạy trong Rust bounded contexts.
 - PostgreSQL, transaction/savepoint, tenant lock, migration, RLS, backup.
 - Tài sản cố định có vốn hóa, khấu hao theo hai phương pháp, thanh lý và báo cáo lịch dự báo theo tháng dùng chung công thức Decimal với luồng ghi sổ.
 - Application của module tài sản cố định chia facade và use case nhỏ cho chuẩn hóa tài sản, khấu hao, vốn hóa, thanh lý và cập nhật sổ cái.
@@ -34,6 +34,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Hóa đơn điện tử lưu lý do hủy cùng giao dịch chuyển sang chờ provider xử lý hủy.
 - POS ghi nhận tiền thực đếm và chốt ca trong cùng giao dịch sau khi kiểm tra đơn/phiếu quỹ nháp và tính chênh lệch tiền.
 - Bảo trì lưu kết quả sửa chữa và cặp giờ công/đơn giá đầy đủ cùng lần hoàn tất, xuất vật tư và cập nhật lịch định kỳ.
+- Bảo trì có danh mục kỹ thuật viên nội bộ/nhà thầu, chuyên môn và liên hệ; lệnh mở có thể được phân công và chỉ gán kỹ thuật viên còn hoạt động thuộc tenant.
 - Mua hàng lưu lý do tranh chấp hóa đơn nhà cung cấp và ghi chú xử lý cùng lần chuyển trạng thái, tránh tạo công nợ khi hóa đơn đang tranh chấp.
 - Nhân sự ghi ngày nghỉ việc cùng action chấm dứt sau khi kiểm tra chấm công/nghỉ phép và đồng bộ payroll trong một giao dịch.
 - Khách sạn lưu lý do vắng mặt cùng action no-show sau khi kiểm tra ngày đến và phí folio, rồi giải phóng lịch phòng trong cùng giao dịch.
