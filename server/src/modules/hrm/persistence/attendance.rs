@@ -36,13 +36,21 @@ pub(super) async fn validate(
         .unwrap_or(uuid::Uuid::nil());
     let employee_row = tx
         .query_opt(
-            "SELECT status FROM hrm__employee WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+            "SELECT status, hire_date FROM hrm__employee WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
             &[&tenant.id, &employee],
         )
-        .await?
-        .filter(|row| row.get::<_, String>(0) == "active");
+        .await?;
     let mut errors = Vec::new();
-    if employee_row.is_none() {
+    if let Some(employee_row) = employee_row {
+        let status: String = employee_row.get(0);
+        let hire_date: Option<NaiveDate> = employee_row.get(1);
+        if status != "active" {
+            errors.push("Chỉ chấm công cho nhân viên đang làm việc".into());
+        }
+        if hire_date.is_some_and(|hire_date| date < hire_date) {
+            errors.push("Không thể chấm công trước ngày nhân viên nhận việc".into());
+        }
+    } else {
         errors.push("Chỉ chấm công cho nhân viên đang làm việc".into());
     }
     if tx

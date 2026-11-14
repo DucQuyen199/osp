@@ -1,6 +1,6 @@
 //! Pure hrm rules and lifecycle policies.
 use crate::money;
-use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime};
+use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, Utc};
 use rust_decimal::Decimal;
 use serde_json::Value;
 fn validate_period(document: &Value) -> Vec<String> {
@@ -80,24 +80,47 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                     .and_then(Value::as_str)
                     .and_then(|value| {
                         DateTime::parse_from_rfc3339(value)
-                            .map(|date| date.timestamp_millis())
+                            .map(|date| (date.timestamp_millis(), date.date_naive()))
                             .or_else(|_| {
                                 NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S%.f")
-                                    .map(|date| date.and_utc().timestamp_millis())
+                                    .map(|date| (date.and_utc().timestamp_millis(), date.date()))
                             })
                             .or_else(|_| {
                                 NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M")
-                                    .map(|date| date.and_utc().timestamp_millis())
+                                    .map(|date| (date.and_utc().timestamp_millis(), date.date()))
                             })
                             .ok()
                     })
             };
-            match (parse("check_in"), parse("check_out")) {
-                (Some(start), Some(end)) if end <= start => {
-                    vec!["Giờ kết thúc phải sau giờ bắt đầu".into()]
-                }
-                _ => Vec::new(),
+            let check_in = parse("check_in");
+            let check_out = parse("check_out");
+            let attendance_date = document
+                .get("date")
+                .and_then(Value::as_str)
+                .and_then(|value| NaiveDate::parse_from_str(value, "%Y-%m-%d").ok());
+            let mut errors = Vec::new();
+            if check_in
+                .zip(check_out)
+                .is_some_and(|((start, _), (end, _))| end <= start)
+            {
+                errors.push("Giờ kết thúc phải sau giờ bắt đầu".into());
             }
+            if check_out.is_some() && check_in.is_none() {
+                errors.push("Cần ghi nhận giờ vào trước giờ ra".into());
+            }
+            let now = Utc::now().timestamp_millis();
+            if check_in.is_some_and(|(timestamp, _)| timestamp > now)
+                || check_out.is_some_and(|(timestamp, _)| timestamp > now)
+            {
+                errors.push("Không thể ghi nhận giờ chấm công trong tương lai".into());
+            }
+            if check_in
+                .zip(attendance_date)
+                .is_some_and(|((_, local_date), work_date)| local_date != work_date)
+            {
+                errors.push("Ngày chấm công phải trùng ngày địa phương của giờ vào".into());
+            }
+            errors
         }
         _ => Vec::new(),
     }
