@@ -58,7 +58,22 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
-    if entity != "repair_order" || action != "completed" {
+    if entity != "repair_order" {
+        return Vec::new();
+    }
+    if action == "quote_declined" {
+        let reason = document
+            .get("declined_reason")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .unwrap_or_default();
+        return if (5..=500).contains(&reason.chars().count()) {
+            Vec::new()
+        } else {
+            vec!["Cần ghi lý do khách từ chối báo giá (5–500 ký tự)".into()]
+        };
+    }
+    if action != "completed" {
         return Vec::new();
     }
     if document
@@ -80,6 +95,18 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
 }
 
 pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<String> {
+    if entity == "repair_order"
+        && current.get("status").and_then(Value::as_str) == Some("quote_declined")
+        && patch.as_object().is_some_and(|fields| !fields.is_empty())
+    {
+        return vec!["Báo giá khách đã từ chối là lịch sử và không thể sửa".into()];
+    }
+    if entity == "repair_order"
+        && patch.get("declined_reason").is_some()
+        && current.get("status").and_then(Value::as_str) != Some("intake")
+    {
+        return vec!["Chỉ ghi lý do từ chối khi lệnh đang chờ khách duyệt".into()];
+    }
     if entity == "repair_order"
         && matches!(
             current.get("status").and_then(Value::as_str),
@@ -112,10 +139,13 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
     if entity == "repair_order"
         && matches!(
             document.get("status").and_then(Value::as_str),
-            Some("completed" | "delivered")
+            Some("completed" | "delivered" | "quote_declined")
         )
     {
-        vec!["Lệnh sửa chữa đã hoàn tất hoặc giao xe không thể xóa khỏi lịch sử".into()]
+        vec![
+            "Lệnh đã hoàn tất, bàn giao hoặc khách từ chối báo giá không thể xóa khỏi lịch sử"
+                .into(),
+        ]
     } else {
         Vec::new()
     }

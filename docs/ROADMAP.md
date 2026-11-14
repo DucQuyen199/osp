@@ -24,6 +24,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Bàn bán buôn cho phép lập thêm vận đơn theo số lượng còn lại, tính cả chuyến nháp/đang giao/đã giao và loại phần giao thất bại khỏi lượng đã phân công.
 - Lịch hẹn ở trạng thái yêu cầu tính lại giờ kết thúc và giá mặc định khi đổi dịch vụ hoặc giờ bắt đầu; khung giờ mới tiếp tục qua kiểm tra khóa tài nguyên và trùng lịch.
 - Lễ tân khách sạn có thể gia hạn ngày trả cho khách đang lưu trú; máy chủ khóa thông tin khách/phòng/giá, kiểm tra chồng lịch và sức chứa, rồi tính lại số đêm cùng folio theo giá đã chốt.
+- Xưởng sửa chữa lưu trạng thái khách từ chối báo giá kèm lý do; lệnh được giữ làm lịch sử nhưng không còn khóa xe, xuất phụ tùng hay lập hóa đơn.
 - Ký thầu phụ chỉ ghi nhận cam kết chi phí; hồ sơ nghiệm thu/đề nghị thanh toán có giá trị lũy kế được giới hạn trong hợp đồng và chỉ phát sinh hóa đơn phải trả sau khi duyệt.
 - Mua hàng chỉ ghi nhận GRNI khi nhận kho; nhiều hóa đơn nhà cung cấp theo từng đợt nhận được đối chiếu lũy kế với số lượng nhận/trả và GRNI, công nợ chỉ phát sinh sau khi duyệt từng hóa đơn; hàng trả trước hóa đơn giảm GRNI, hàng trả sau hóa đơn gắn với bill để điều chỉnh giảm phải trả.
 - BI hỗ trợ tự thiết kế báo cáo dòng/tổng hợp, dashboard, KPI, snapshot theo lịch ngày/tuần và gửi CSV qua hàng đợi email; lịch chạy được ràng buộc với người tạo/lên lịch và tự dừng khi người đó mất quyền đọc dữ liệu hoặc bị khóa.

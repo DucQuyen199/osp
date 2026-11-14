@@ -79,6 +79,12 @@
      "required": false
     },
     {
+     "name": "declined_reason",
+     "label": "Lý do khách từ chối báo giá",
+     "type": "text",
+     "required": false
+    },
+    {
      "name": "lines",
      "type": "json",
      "required": false
@@ -98,7 +104,8 @@
       "approved",
       "in_progress",
       "completed",
-      "delivered"
+      "delivered",
+      "quote_declined"
      ]
     }
    ],
@@ -129,6 +136,12 @@
        "completed"
       ],
       "to": "delivered"
+     },
+     "quote_declined": {
+      "from": [
+       "intake"
+      ],
+      "to": "quote_declined"
      }
     }
    },

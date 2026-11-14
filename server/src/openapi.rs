@@ -142,6 +142,22 @@ pub fn build(reg: &Registry) -> Value {
                             } } }
                         });
                     }
+                    if def.qname() == "auto-service.repair_order" && action == "quote_declined" {
+                        operation["description"] = json!(
+                            "Record a customer's estimate rejection, retain the reason, and release the vehicle for a new intake in one transaction. No stock is consumed and no invoice is created."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": true,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "required": ["declined_reason"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "declined_reason": { "type": "string", "minLength": 5, "maxLength": 500 }
+                                }
+                            } } }
+                        });
+                    }
                     paths.insert(
                         format!("{base}/{{id}}/{action}"),
                         json!({ "post": operation }),

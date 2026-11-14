@@ -1752,6 +1752,16 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                             .await?,
                     );
                 }
+                if q == "auto-service.repair_order" && *action == "quote_declined" {
+                    let body = json_obj(&bytes)?;
+                    if body.len() != 1 || !body.contains_key("declined_reason") {
+                        return Err(ApiError::validation(
+                            "auto-service.repair_order.quote_declined",
+                            vec!["Cần gửi duy nhất trường declined_reason".into()],
+                        ));
+                    }
+                    return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
+                }
                 return json_ok(k.act(&actor, &t, &q, id, action).await?);
             }
             _ => {}

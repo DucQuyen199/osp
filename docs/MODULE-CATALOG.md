@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **50 module**, **188 loại dữ liệu**, **850 sự kiện**.
+Tổng: **50 module**, **188 loại dữ liệu**, **851 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -434,7 +434,7 @@ Tổng: **50 module**, **188 loại dữ liệu**, **850 sự kiện**.
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
 | `vehicle` Xe | — |
-| `repair_order` Lệnh sửa chữa | `intake` → **approved** (intake→approved), **completed** (in_progress→completed), **delivered** (completed→delivered), **started** (approved→in_progress) |
+| `repair_order` Lệnh sửa chữa | `intake` → **approved** (intake→approved), **completed** (in_progress→completed), **delivered** (completed→delivered), **quote_declined** (intake→quote_declined), **started** (approved→in_progress) |
 
 ### case-management
 **Quản lý hồ sơ vụ việc** — Hồ sơ/vụ việc, ghi chú, chấm giờ tính phí. Dùng cho luật, tư vấn, kế toán dịch vụ, cơ quan nhà nước, tổ chức phi lợi nhuận.

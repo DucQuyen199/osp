@@ -187,7 +187,7 @@ async fn validate_repair_order(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -
                 let order_id = parse_id(document, "id");
                 let active_order = tx
                     .query_opt(
-                        "SELECT id FROM auto_service__repair_order WHERE tenant_id = $1 AND vehicle = $2 AND status <> 'delivered' AND ($3::uuid IS NULL OR id <> $3) LIMIT 1",
+                        "SELECT id FROM auto_service__repair_order WHERE tenant_id = $1 AND vehicle = $2 AND status NOT IN ('delivered', 'quote_declined') AND ($3::uuid IS NULL OR id <> $3) LIMIT 1",
                         &[&tenant.id, &vehicle, &order_id],
                     )
                     .await?

@@ -104,6 +104,41 @@ impl Kernel {
         Ok(out)
     }
 
+    pub async fn update_and_act(
+        &self,
+        actor: &Actor,
+        t: &Tenant,
+        qname: &str,
+        id: &str,
+        action: &str,
+        patch: Obj,
+    ) -> R<Value> {
+        let ent = self.ent(t, qname)?;
+        if !ent
+            .def
+            .states
+            .as_ref()
+            .is_some_and(|states| states.actions.contains_key(action))
+        {
+            return Err(ApiError::new(
+                404,
+                "UNKNOWN_ACTION",
+                format!("{qname} không có action \"{action}\""),
+            ));
+        }
+        self.authorize(t, actor, &format!("{qname}.update"))?;
+        self.authorize(t, actor, &format!("{qname}.{action}"))?;
+        let mut conn = self.pool.get().await?;
+        let tx = Tx::begin(&mut conn, &t.id, true).await?;
+        self.update_in(&tx, actor, t, &ent, id, patch, &Opts::top())
+            .await?;
+        let out = self
+            .act_in(&tx, actor, t, &ent, id, action, &Opts::top())
+            .await?;
+        tx.commit().await?;
+        Ok(out)
+    }
+
     pub async fn remove(&self, actor: &Actor, t: &Tenant, qname: &str, id: &str) -> R<()> {
         let ent = self.ent(t, qname)?;
         self.authorize(t, actor, &format!("{qname}.delete"))?;

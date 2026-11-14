@@ -2113,6 +2113,9 @@
             "readOnly": true,
             "type": "string"
           },
+          "declined_reason": {
+            "type": "string"
+          },
           "id": {
             "format": "uuid",
             "readOnly": true,
@@ -2132,7 +2135,8 @@
               "approved",
               "in_progress",
               "completed",
-              "delivered"
+              "delivered",
+              "quote_declined"
             ],
             "readOnly": true,
             "type": "string"
@@ -2164,6 +2168,9 @@
         "description": "Lệnh sửa chữa (dữ liệu gửi lên)",
         "properties": {
           "complaint": {
+            "type": "string"
+          },
+          "declined_reason": {
             "type": "string"
           },
           "lines": {
@@ -30142,6 +30149,7 @@
                 "approved",
                 "completed",
                 "delivered",
+                "quote_declined",
                 "started"
               ],
               "type": "string"
@@ -30757,6 +30765,112 @@
           }
         ],
         "summary": "Lệnh sửa chữa: delivered (completed → delivered)",
+        "tags": [
+          "auto-service"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/auto-service/repair_order/{id}/quote_declined": {
+      "post": {
+        "description": "Record a customer's estimate rejection, retain the reason, and release the vehicle for a new intake in one transaction. No stock is consumed and no invoice is created.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "declined_reason": {
+                    "maxLength": 500,
+                    "minLength": 5,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "declined_reason"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/auto_service_repair_order"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lệnh sửa chữa: quote_declined (intake → quote_declined)",
         "tags": [
           "auto-service"
         ]

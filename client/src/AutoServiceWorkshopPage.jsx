@@ -20,6 +20,7 @@ export default function AutoServiceWorkshopPage() {
   const [model, setModel] = useState('');
   const [vin, setVin] = useState('');
   const [odometer, setOdometer] = useState('');
+  const [declineReasons, setDeclineReasons] = useState({});
   const [vehicleId, setVehicleId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
   const [complaint, setComplaint] = useState('');
@@ -54,7 +55,7 @@ export default function AutoServiceWorkshopPage() {
   const canCreateVehicle = can('auto-service.vehicle.create');
   const canCreateOrder = can('auto-service.repair_order.create');
   const vehicleById = useMemo(() => new Map(vehicles.map((item) => [item.id, item])), [vehicles]);
-  const openOrders = orders.filter((item) => !['completed', 'delivered'].includes(item.status));
+  const openOrders = orders.filter((item) => !['completed', 'delivered', 'quote_declined'].includes(item.status));
   const productChoices = [...products.values()].filter((item) => item.active !== false && ['goods', 'service', undefined].includes(item.kind)).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
   const needsWarehouse = draftLines.some((line) => {
     const product = products.get(line.product);
@@ -94,11 +95,21 @@ export default function AutoServiceWorkshopPage() {
   };
 
   const transition = async (order, action) => {
+    if (action === 'quote_declined') {
+      const reason = declineReasons[order.id]?.trim() || '';
+      if (reason.length < 5 || reason.length > 500) {
+        setError('Nhập lý do khách từ chối báo giá (5–500 ký tự).');
+        return;
+      }
+    }
     setBusy(`${order.id}:${action}`); setError(''); setNotice('');
     try {
-      await api(dataPath('auto-service.repair_order', order.id, action), { method: 'POST' });
+      await api(dataPath('auto-service.repair_order', order.id, action), {
+        method: 'POST',
+        ...(action === 'quote_declined' ? { body: { declined_reason: declineReasons[order.id].trim() } } : {}),
+      });
       await load(true);
-      const messages = { approved: 'Đã ghi nhận khách duyệt báo giá.', started: 'Đã đưa xe vào sửa chữa.', completed: 'Đã hoàn tất sửa chữa; hệ thống ghi nhận xuất kho và lập hóa đơn.', delivered: 'Đã ghi nhận bàn giao xe.' };
+      const messages = { approved: 'Đã ghi nhận khách duyệt báo giá.', quote_declined: 'Đã lưu lý do khách từ chối; có thể tiếp nhận lệnh mới cho xe này.', started: 'Đã đưa xe vào sửa chữa.', completed: 'Đã hoàn tất sửa chữa; hệ thống ghi nhận xuất kho và lập hóa đơn.', delivered: 'Đã ghi nhận bàn giao xe.' };
       setNotice(messages[action]);
     } catch (reason) { setError(reason.message || 'Không chuyển được trạng thái. Kiểm tra tồn kho phụ tùng và dữ liệu liên quan.'); await load(true); }
     finally { setBusy(''); }
@@ -139,20 +150,22 @@ export default function AutoServiceWorkshopPage() {
     <div className="workshop-layout">
       <section className="workshop-order-list"><header><h2>Lệnh sửa chữa</h2><span className="badge warning">{openOrders.length} đang xử lý</span></header>
         {loading ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : orders.length ? <div className="workshop-orders">{orders.map((order) => { const vehicle = vehicleById.get(order.vehicle); return <button key={order.id} className={`card workshop-order${selectedId === order.id ? ' selected' : ''}`} onClick={() => setSelectedId(order.id)}>
-          <span className="workshop-order-title"><strong>{vehicle?.plate || 'Xe'} · {vehicle ? [vehicle.make, vehicle.model].filter(Boolean).join(' ') : ''}</strong><span className={`badge ${['completed', 'delivered'].includes(order.status) ? 'success' : 'warning'}`}>{statusLabel(order.status)}</span></span>
+          <span className="workshop-order-title"><strong>{vehicle?.plate || 'Xe'} · {vehicle ? [vehicle.make, vehicle.model].filter(Boolean).join(' ') : ''}</strong><span className={`badge ${['completed', 'delivered'].includes(order.status) ? 'success' : order.status === 'quote_declined' ? 'plain' : 'warning'}`}>{statusLabel(order.status)}</span></span>
           <span>{recordLabel('master-data.party', parties.get(order.party))}</span><span className="small muted">{fmtDateTime(order.created_at)}</span><strong className="num">{fmtMoney(order.total || 0)}</strong>
         </button>; })}</div> : <div className="card-pad muted">Chưa có lệnh sửa chữa.</div>}
       </section>
 
       <section className="workshop-detail card">{selected ? <>
-        <header className="workshop-section-head"><div><h2>{orderVehicle?.plate || 'Lệnh sửa chữa'}</h2><div className="muted">{recordLabel('master-data.party', parties.get(selected.party))} · {warehouses.get(selected.warehouse)?.name || 'Chưa chọn kho'}</div></div><span className={`badge ${['completed', 'delivered'].includes(selected.status) ? 'success' : 'warning'}`}>{statusLabel(selected.status)}</span></header>
+        <header className="workshop-section-head"><div><h2>{orderVehicle?.plate || 'Lệnh sửa chữa'}</h2><div className="muted">{recordLabel('master-data.party', parties.get(selected.party))} · {warehouses.get(selected.warehouse)?.name || 'Chưa chọn kho'}</div></div><span className={`badge ${['completed', 'delivered'].includes(selected.status) ? 'success' : selected.status === 'quote_declined' ? 'plain' : 'warning'}`}>{statusLabel(selected.status)}</span></header>
         <dl className="workshop-summary"><div><dt>Xe</dt><dd>{[orderVehicle?.make, orderVehicle?.model].filter(Boolean).join(' ') || 'Chưa khai báo'} · {orderVehicle?.odometer || '—'} km</dd></div><div><dt>VIN</dt><dd>{orderVehicle?.vin || '—'}</dd></div><div><dt>Ngày nhận</dt><dd>{fmtDateTime(selected.created_at)}</dd></div></dl>
         {selected.complaint && <p className="workshop-complaint"><strong>Yêu cầu:</strong> {selected.complaint}</p>}
+        {selected.status === 'quote_declined' && selected.declined_reason && <div className="alert">Khách từ chối báo giá: {selected.declined_reason}</div>}
         <h3>Báo giá</h3><ul className="workshop-estimate">{(selected.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{line.product_name || products.get(line.product)?.name || 'Sản phẩm'} × {line.qty}</span><strong className="num">{fmtMoney((Number(line.qty) || 0) * (Number(line.price) || 0))}</strong></li>)}</ul>
         <div className="workshop-total"><span>Tổng cộng</span><strong className="num">{fmtMoney(selected.total || 0)}</strong></div>
         {selectedInvoice && <a className="button" href={recordHref('accounting.invoice', selectedInvoice.id)}>Mở hóa đơn {String(selectedInvoice.id).slice(0, 8)}</a>}
         <div className="workshop-actions">
           {selected.status === 'intake' && <button className="button primary" onClick={() => transition(selected, 'approved')} disabled={!!busy}>Khách duyệt báo giá</button>}
+          {selected.status === 'intake' && can('auto-service.repair_order.quote_declined') && can('auto-service.repair_order.update') && <div className="workshop-decline"><label className="field"><span>Lý do khách từ chối báo giá *</span><textarea className="input textarea" rows="2" minLength="5" maxLength="500" value={declineReasons[selected.id] || ''} onChange={(event) => setDeclineReasons((current) => ({ ...current, [selected.id]: event.target.value }))} placeholder="Ví dụ: khách chưa đồng ý chi phí sửa chữa" /></label><button className="button" type="button" disabled={!!busy || (declineReasons[selected.id] || '').trim().length < 5} onClick={() => transition(selected, 'quote_declined')}>Ghi nhận khách từ chối</button></div>}
           {selected.status === 'approved' && <button className="button primary" onClick={() => transition(selected, 'started')} disabled={!!busy}>Bắt đầu sửa chữa</button>}
           {selected.status === 'in_progress' && <button className="button primary" onClick={() => transition(selected, 'completed')} disabled={!!busy}>Hoàn tất, xuất phụ tùng và lập hóa đơn</button>}
           {selected.status === 'completed' && <button className="button primary" onClick={() => transition(selected, 'delivered')} disabled={!!busy}>Bàn giao xe</button>}
