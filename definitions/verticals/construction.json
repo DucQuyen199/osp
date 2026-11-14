@@ -46,7 +46,8 @@
     "construction.subcontract.*",
     "construction.boq.read",
     "project.*",
-    "inventory.stock_move.*"
+    "inventory.stock_move.*",
+    "master-data.party.read"
    ]
   },
   "estimator": {
