@@ -146,6 +146,72 @@
       "hrm.department.read",
       "hrm.position.read"
     ]
+  },
+  "payroll_clerk": {
+    "name": "Chuy?n vi?n ti?n l??ng",
+    "permissions": [
+      "payroll.payroll_run.read",
+      "payroll.payroll_run.create",
+      "payroll.payroll_run.calculated",
+      "payroll.payroll_run.submitted",
+      "payroll.payroll_run.cancelled",
+      "payroll.payslip.read",
+      "payroll.overtime_entry.read",
+      "payroll.overtime_entry.create",
+      "payroll.overtime_entry.update",
+      "payroll.overtime_entry.submitted",
+      "payroll.payroll_adjustment.read",
+      "payroll.payroll_adjustment.create",
+      "payroll.payroll_adjustment.update",
+      "payroll.payroll_adjustment.submitted",
+      "payroll.tax_policy.read",
+      "payroll.contribution_policy.read",
+      "hrm.employee.read",
+      "hrm.attendance.read",
+      "hrm.leave_request.read"
+    ]
+  },
+  "payroll_approver": {
+    "name": "Qu?n l? ph? duy?t v? chi l??ng",
+    "permissions": [
+      "payroll.payroll_run.read",
+      "payroll.payroll_run.approved",
+      "payroll.payroll_run.rejected",
+      "payroll.payroll_run.paid",
+      "payroll.payroll_run.cancelled",
+      "payroll.payslip.read",
+      "payroll.overtime_entry.read",
+      "payroll.overtime_entry.approved",
+      "payroll.overtime_entry.rejected",
+      "payroll.payroll_adjustment.read",
+      "payroll.payroll_adjustment.approved",
+      "payroll.payroll_adjustment.rejected",
+      "payroll.tax_policy.read",
+      "payroll.contribution_policy.read",
+      "hrm.employee.read"
+    ]
+  },
+  "payroll_policy_manager": {
+    "name": "Qu?n l? ch?nh s?ch l??ng v? kho?n n?p",
+    "permissions": [
+      "payroll.tax_policy.read",
+      "payroll.tax_policy.create",
+      "payroll.tax_policy.update",
+      "payroll.tax_policy.approved",
+      "payroll.contribution_policy.read",
+      "payroll.contribution_policy.create",
+      "payroll.contribution_policy.update",
+      "payroll.contribution_policy.approved",
+      "payroll.contribution_remittance.read",
+      "payroll.contribution_remittance.create",
+      "payroll.contribution_remittance.update",
+      "payroll.contribution_remittance.submitted",
+      "payroll.contribution_remittance.approved",
+      "payroll.contribution_remittance.rejected",
+      "payroll.contribution_remittance.paid",
+      "payroll.contribution_remittance.cancelled",
+      "accounting.account.read"
+    ]
   }
 },
  "kpis": [
