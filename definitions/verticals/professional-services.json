@@ -39,9 +39,20 @@
   "consultant": {
    "name": "Chuyên viên",
    "permissions": [
-    "case-management.*",
+    "case-management.case.read",
+    "case-management.case.create",
+    "case-management.case.update",
+    "case-management.case.on_hold",
+    "case-management.case.resumed",
+    "case-management.case_note.read",
+    "case-management.case_note.create",
+    "case-management.time_entry.read",
+    "case-management.time_entry.create",
+    "case-management.time_entry.update",
     "project.timesheet.*",
-    "document.*"
+    "document.*",
+    "master-data.party.read",
+    "accounting.invoice.read"
    ]
   },
   "partner": {
@@ -49,7 +60,9 @@
    "permissions": [
     "case-management.*",
     "contract.*",
-    "crm.*"
+    "crm.*",
+    "master-data.party.read",
+    "accounting.invoice.read"
    ]
   }
  },
