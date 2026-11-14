@@ -5,6 +5,18 @@ use serde_json::Value;
 use uuid::Uuid;
 
 pub fn validate(entity: &str, document: &Value) -> Vec<String> {
+    if entity == "table" {
+        return if document.get("seats").is_some_and(|value| !value.is_null())
+            && !document
+                .get("seats")
+                .and_then(money::decimal)
+                .is_some_and(|seats| seats > Decimal::ZERO && seats.fract().is_zero())
+        {
+            vec!["Số chỗ của bàn phải là số nguyên dương".into()]
+        } else {
+            Vec::new()
+        };
+    }
     if entity == "recipe" {
         let mut errors = Vec::new();
         if document
@@ -57,6 +69,17 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
         return vec!["Order cần ít nhất một món".into()];
     }
     let mut errors = Vec::new();
+    if document
+        .get("table")
+        .and_then(Value::as_str)
+        .is_some_and(|table| !table.is_empty())
+        && !document
+            .get("guest_count")
+            .and_then(money::decimal)
+            .is_some_and(|guests| guests > Decimal::ZERO && guests.fract().is_zero())
+    {
+        errors.push("Số khách ngồi tại bàn phải là số nguyên dương".into());
+    }
     for (index, line) in lines.iter().enumerate() {
         let prefix = format!("lines[{}]", index + 1);
         if line

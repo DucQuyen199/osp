@@ -14332,6 +14332,9 @@
             "readOnly": true,
             "type": "string"
           },
+          "guest_count": {
+            "type": "number"
+          },
           "id": {
             "format": "uuid",
             "readOnly": true,
@@ -14398,6 +14401,9 @@
           "consumptions": {
             "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)",
             "readOnly": true
+          },
+          "guest_count": {
+            "type": "number"
           },
           "lines": {
             "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"

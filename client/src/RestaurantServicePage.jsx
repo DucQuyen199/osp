@@ -17,6 +17,7 @@ export default function RestaurantServicePage() {
   const [warehouses, setWarehouses] = useState(new Map());
   const [quantities, setQuantities] = useState({});
   const [tableId, setTableId] = useState('');
+  const [guestCount, setGuestCount] = useState('1');
   const [warehouseId, setWarehouseId] = useState('');
   const [method, setMethod] = useState('cash');
   const [selectedId, setSelectedId] = useState('');
@@ -47,6 +48,8 @@ export default function RestaurantServicePage() {
 
   const occupiedTableIds = useMemo(() => new Set(orders.filter((order) => ['open', 'sent', 'served'].includes(order.status)).map((order) => order.table).filter(Boolean)), [orders]);
   const availableTables = tables.filter((table) => !occupiedTableIds.has(table.id));
+  const selectedTable = tables.find((table) => table.id === tableId);
+  const exceedsTableCapacity = Boolean(tableId && selectedTable?.seats && Number(guestCount) > Number(selectedTable.seats));
   const availableMenu = menuItems.filter((item) => item.available !== false).map((item) => ({ item, product: products.get(item.product) })).filter(({ product }) => product && product.active !== false).sort((a, b) => String(a.product.name).localeCompare(String(b.product.name), 'vi'));
   const selected = orders.find((order) => order.id === selectedId) || null;
   const selectedPayment = selected && invoices.find((payment) => payment.source === 'table_order' && payment.source_id === selected.id);
@@ -63,9 +66,10 @@ export default function RestaurantServicePage() {
     try {
       const created = await api(dataPath('restaurant.table_order'), { method: 'POST', body: {
         table: tableId || undefined, warehouse: warehouseId || undefined,
+        ...(tableId ? { guest_count: Number(guestCount) } : {}),
         lines: cart.map(({ product, qty }) => ({ product: product.id, qty })),
       } });
-      setQuantities({}); setTableId(''); await load(true); setSelectedId(created.id);
+      setQuantities({}); setTableId(''); setGuestCount('1'); await load(true); setSelectedId(created.id);
       setNotice(`Đã tạo order ${String(created.id).slice(0, 8)}. Giá món do server lấy từ danh mục.`);
     } catch (reason) { setError(reason.message || 'Không tạo được order. Kiểm tra món, thực đơn và giá bán.'); }
     finally { setBusy(''); }
@@ -90,6 +94,7 @@ export default function RestaurantServicePage() {
       <section className="restaurant-order-create card"><h2>Tạo order</h2><form onSubmit={createOrder}>
         <div className="restaurant-order-tools">
           <label className="field"><span>Bàn</span><select className="select" value={tableId} onChange={(event) => setTableId(event.target.value)}><option value="">Mang đi / không chọn bàn</option>{availableTables.map((table) => <option key={table.id} value={table.id}>{table.name}{table.seats ? ` · ${table.seats} chỗ` : ''}</option>)}</select></label>
+          {tableId && <label className="field"><span>Số khách</span><input className="input num" type="number" min="1" step="1" required value={guestCount} onChange={(event) => setGuestCount(event.target.value)} /><span className="small muted">{selectedTable?.seats ? `Tối đa ${selectedTable.seats} chỗ` : 'Bàn chưa đặt sức chứa'}</span></label>}
           <label className="field"><span>Kho nguyên liệu</span><select className="select" value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)}><option value="">Chọn kho khi order có hàng tồn</option>{[...warehouses.values()].map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}</select></label>
         </div>
         <div className="restaurant-menu-grid">{availableMenu.map(({ item, product }) => <article className="restaurant-menu-item card" key={item.id}>
@@ -98,7 +103,8 @@ export default function RestaurantServicePage() {
           <label className="field"><span>Số lượng</span><input className="input" type="number" min="0" step="1" value={quantities[item.id] || ''} onChange={(event) => setQuantity(item.id, event.target.value)} /></label>
         </article>)}</div>
         <div className="restaurant-cart-total"><span>Tạm tính chưa gồm thuế</span><strong className="num">{fmtMoney(indicativeTotal)}</strong></div>
-        <button className="button primary" disabled={busy === 'create' || !cart.length}>{busy === 'create' ? 'Đang tạo…' : 'Mở order'}</button>
+        {exceedsTableCapacity && <div className="alert warning" role="status">Bàn chỉ có {selectedTable.seats} chỗ; chọn bàn lớn hơn hoặc giảm số khách.</div>}
+        <button className="button primary" disabled={busy === 'create' || !cart.length || exceedsTableCapacity}>{busy === 'create' ? 'Đang tạo…' : 'Mở order'}</button>
       </form></section>
 
       <section className="restaurant-order-list"><header><h2>Orders</h2><span className="badge warning">{orders.filter((order) => ['open', 'sent', 'served'].includes(order.status)).length} đang mở</span></header>
@@ -106,13 +112,13 @@ export default function RestaurantServicePage() {
           const table = tables.find((item) => item.id === order.table);
           return <button className={`card restaurant-order-card${selectedId === order.id ? ' selected' : ''}`} key={order.id} onClick={() => setSelectedId(order.id)}>
             <span className="restaurant-order-card-head"><strong>{table?.name || 'Mang đi'}</strong><span className={`badge ${order.status === 'completed' ? 'success' : order.status === 'cancelled' ? 'plain' : 'warning'}`}>{statusLabel(order.status)}</span></span>
-            <span className="small muted">{fmtDateTime(order.created_at)}</span><strong className="num">{fmtMoney(order.total || 0)}</strong>
+            <span className="small muted">{fmtDateTime(order.created_at)}{order.table ? ` · ${order.guest_count || 1} khách` : ''}</span><strong className="num">{fmtMoney(order.total || 0)}</strong>
           </button>;
         })}{!orders.length && <div className="empty">Chưa có order.</div>}</div>}
       </section>
 
       <section className="restaurant-order-detail card">{selected ? <>
-        <header className="restaurant-order-card-head"><div><h2>{tables.find((table) => table.id === selected.table)?.name || 'Mang đi'}</h2><span className="small muted">{fmtDateTime(selected.created_at)}</span></div><span className="badge warning">{statusLabel(selected.status)}</span></header>
+        <header className="restaurant-order-card-head"><div><h2>{tables.find((table) => table.id === selected.table)?.name || 'Mang đi'}</h2><span className="small muted">{fmtDateTime(selected.created_at)}{selected.table ? ` · ${selected.guest_count || 1} khách` : ''}</span></div><span className="badge warning">{statusLabel(selected.status)}</span></header>
         <ul className="restaurant-detail-lines">{(selected.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{line.product_name || products.get(line.product)?.name || 'Món'} × {line.qty}{Number(line.tax_rate) > 0 && <small className="small muted"> · Thuế {line.tax_rate}%</small>}</span><strong className="num">{fmtMoney(line.line_total ?? (Number(line.price || 0) * Number(line.qty || 0)))}</strong></li>)}</ul>
         {Number(selected.tax_total) > 0 && <div className="restaurant-tax-total"><span>Thuế bán hàng</span><strong className="num">{fmtMoney(selected.tax_total)}</strong></div>}
         <div className="restaurant-cart-total"><span>Tổng đã gồm thuế</span><strong className="num">{fmtMoney(selected.total || 0)}</strong></div>

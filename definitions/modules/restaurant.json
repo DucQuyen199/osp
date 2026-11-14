@@ -101,6 +101,12 @@
      "ref": "restaurant.table"
     },
     {
+     "name": "guest_count",
+     "label": "Số khách",
+     "type": "number",
+     "required": false
+    },
+    {
      "name": "party",
      "type": "ref",
      "required": false,

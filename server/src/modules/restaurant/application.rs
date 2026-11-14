@@ -89,6 +89,13 @@ pub async fn prepare_order(
     document: &mut Map<String, Value>,
     refresh: bool,
 ) -> R<Vec<String>> {
+    if document
+        .get("table")
+        .and_then(Value::as_str)
+        .is_some_and(|table| !table.is_empty())
+    {
+        document.entry("guest_count").or_insert(json!(1));
+    }
     let mut price_errors = Vec::new();
     if refresh {
         if let Some(lines) = document.get_mut("lines").and_then(Value::as_array_mut) {

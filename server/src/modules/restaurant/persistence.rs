@@ -25,6 +25,31 @@ pub async fn validate_persistence(
     action: &str,
     document: &Value,
 ) -> R<Vec<String>> {
+    if entity == "table" && action == "updated" {
+        let Some(table_id) = document
+            .get("id")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+        else {
+            return Ok(vec!["Table id is required".into()]);
+        };
+        if let Some(seats) = document.get("seats").and_then(crate::money::decimal) {
+            let seats = seats.normalize().to_string();
+            if tx
+                .query_opt(
+                    "SELECT id FROM restaurant__table_order WHERE tenant_id = $1 AND \"table\" = $2 AND status IN ('open', 'sent', 'served') AND COALESCE(guest_count, 1)::double precision > $3::double precision LIMIT 1 FOR UPDATE",
+                    &[&tenant.id, &table_id, &seats],
+                )
+                .await?
+                .is_some()
+            {
+                return Ok(vec![
+                    "Không thể giảm số chỗ thấp hơn số khách trong order đang mở".into(),
+                ]);
+            }
+        }
+        return Ok(Vec::new());
+    }
     if entity == "table_order" && matches!(action, "created" | "updated") {
         if let Some(table) = document
             .get("table")
@@ -51,6 +76,38 @@ pub async fn validate_persistence(
                 .is_some()
             {
                 return Ok(vec!["Bàn đang có order chưa thanh toán hoặc chưa hủy".into()]);
+            }
+            let Some(row) = tx
+                .query_opt(
+                    "SELECT seats::text FROM restaurant__table WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                    &[&tenant.id, &table],
+                )
+                .await?
+            else {
+                return Ok(vec!["Không tìm thấy bàn trong doanh nghiệp".into()]);
+            };
+            let seats: Option<String> = row.get(0);
+            let seats = seats
+                .map(|value| {
+                    crate::money::decimal_str(&value).ok_or_else(|| {
+                        crate::error::ApiError::validation(
+                            "restaurant.table.seats",
+                            vec!["Sức chứa của bàn không phải số hợp lệ".into()],
+                        )
+                    })
+                })
+                .transpose()?;
+            let guests = document
+                .get("guest_count")
+                .and_then(crate::money::decimal)
+                .unwrap_or(rust_decimal::Decimal::ONE);
+            if let Some(seats) = seats
+                && guests > seats
+            {
+                return Ok(vec![format!(
+                    "Bàn này chỉ có {} chỗ; hãy chọn bàn lớn hơn hoặc giảm số khách",
+                    seats.normalize()
+                )]);
             }
         }
     }
