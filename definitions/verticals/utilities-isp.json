@@ -168,6 +168,61 @@
       "payroll.contribution_remittance.cancelled",
       "accounting.account.read"
     ]
+  },
+  "hr_staff": {
+    "name": "Chuy?n vi?n nh?n s?",
+    "permissions": [
+      "hrm.employee.read",
+      "hrm.employee.create",
+      "hrm.employee.update",
+      "hrm.department.read",
+      "hrm.position.read",
+      "hrm.attendance.read",
+      "hrm.attendance.create",
+      "hrm.attendance.update",
+      "hrm.leave_request.read",
+      "hrm.leave_request.create",
+      "hrm.leave_request.update",
+      "hrm.leave_request.submitted",
+      "hrm.leave_allocation.read",
+      "hrm.holiday.read",
+      "hrm.salary_revision.read",
+      "hrm.salary_revision.create",
+      "hrm.salary_revision.update",
+      "hrm.salary_revision.submitted"
+    ]
+  },
+  "hr_manager": {
+    "name": "Qu?n l? nh?n s?",
+    "permissions": [
+      "hrm.employee.read",
+      "hrm.employee.create",
+      "hrm.employee.update",
+      "hrm.employee.terminated",
+      "hrm.department.read",
+      "hrm.position.read",
+      "hrm.attendance.read",
+      "hrm.attendance.create",
+      "hrm.attendance.update",
+      "hrm.leave_request.read",
+      "hrm.leave_request.create",
+      "hrm.leave_request.update",
+      "hrm.leave_request.submitted",
+      "hrm.leave_request.approved",
+      "hrm.leave_request.rejected",
+      "hrm.leave_allocation.read",
+      "hrm.leave_allocation.create",
+      "hrm.leave_allocation.update",
+      "hrm.holiday.read",
+      "hrm.holiday.create",
+      "hrm.holiday.update",
+      "hrm.salary_revision.read",
+      "hrm.salary_revision.create",
+      "hrm.salary_revision.update",
+      "hrm.salary_revision.submitted",
+      "hrm.salary_revision.approved",
+      "hrm.salary_revision.rejected"
+    ]
   }
 },
  "kpis": [

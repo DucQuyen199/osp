@@ -157,17 +157,9 @@ pub(super) async fn validate(
             })
             .transpose()?;
         let new_salary = document.get("base_salary").and_then(money::decimal);
-        let salary_changed = old_salary.is_some_and(|old_salary| Some(old_salary) != new_salary);
-        if salary_changed
-            && tx
-                .query_opt(
-                    "SELECT 1 FROM payroll__payslip WHERE tenant_id = $1 AND employee = $2 LIMIT 1",
-                    &[&tenant.id, &employee],
-                )
-                .await?
-                .is_some()
-        {
-            return Ok(vec!["Đã có phiếu lương cho nhân viên này; dùng Điều chỉnh lương để ghi nhận mức lương mới có hiệu lực theo tháng".into()]);
+        let salary_changed = old_salary != new_salary;
+        if salary_changed {
+            return Ok(vec!["Mức lương sau khi tạo hồ sơ phải được thay đổi bằng điều chỉnh lương có ngày hiệu lực; không sửa trực tiếp trên hồ sơ nhân viên".into()]);
         }
     }
     if entity == "employee" && matches!(action, "created" | "updated") {
