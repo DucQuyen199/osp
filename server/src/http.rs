@@ -1829,6 +1829,56 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     }
                     return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
                 }
+                if q == "accounting.bank_statement_line"
+                    && *action == "matched"
+                    && !bytes.is_empty()
+                {
+                    let body = json_obj(&bytes)?;
+                    let valid_shape = body.len() == 2
+                        && body.contains_key("payment")
+                        && body.contains_key("journal_entry");
+                    let payment = body.get("payment").is_some_and(|value| {
+                        value.is_null()
+                            || value
+                                .as_str()
+                                .is_some_and(|id| uuid::Uuid::parse_str(id).is_ok())
+                    });
+                    let journal_entry = body.get("journal_entry").is_some_and(|value| {
+                        value.is_null()
+                            || value
+                                .as_str()
+                                .is_some_and(|id| uuid::Uuid::parse_str(id).is_ok())
+                    });
+                    let exactly_one = body.get("payment").is_some_and(|value| !value.is_null())
+                        != body
+                            .get("journal_entry")
+                            .is_some_and(|value| !value.is_null());
+                    if !valid_shape || !payment || !journal_entry || !exactly_one {
+                        return Err(ApiError::validation(
+                            "accounting.bank_statement_line.matched",
+                            vec!["Cần gửi đúng một payment hoặc journal_entry hợp lệ; trường còn lại phải là null".into()],
+                        ));
+                    }
+                    return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
+                }
+                if q == "accounting.bank_statement_line"
+                    && *action == "ignored"
+                    && !bytes.is_empty()
+                {
+                    let body = json_obj(&bytes)?;
+                    let reason = body
+                        .get("ignore_reason")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::trim)
+                        .unwrap_or_default();
+                    if body.len() != 1 || !(1..=500).contains(&reason.chars().count()) {
+                        return Err(ApiError::validation(
+                            "accounting.bank_statement_line.ignored",
+                            vec!["Cần gửi duy nhất ignore_reason có từ 1 đến 500 ký tự".into()],
+                        ));
+                    }
+                    return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
+                }
                 return json_ok(k.act(&actor, &t, &q, id, action).await?);
             }
             _ => {}

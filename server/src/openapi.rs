@@ -271,6 +271,43 @@ pub fn build(reg: &Registry) -> Value {
                             } } }
                         });
                     }
+                    if def.qname() == "accounting.bank_statement_line" && action == "matched" {
+                        operation["description"] = json!(
+                            "Link exactly one payment or posted journal entry and match the bank statement line atomically. Empty-body requests continue to use the unique automatic matcher."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": false,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "required": ["payment", "journal_entry"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "payment": { "type": ["string", "null"], "format": "uuid" },
+                                    "journal_entry": { "type": ["string", "null"], "format": "uuid" }
+                                },
+                                "oneOf": [
+                                    { "properties": { "payment": { "type": "string", "format": "uuid" }, "journal_entry": { "type": "null" } } },
+                                    { "properties": { "payment": { "type": "null" }, "journal_entry": { "type": "string", "format": "uuid" } } }
+                                ]
+                            } } }
+                        });
+                    }
+                    if def.qname() == "accounting.bank_statement_line" && action == "ignored" {
+                        operation["description"] = json!(
+                            "Save the required audit reason and ignore the bank statement line atomically."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": true,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "required": ["ignore_reason"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "ignore_reason": { "type": "string", "minLength": 1, "maxLength": 500 }
+                                }
+                            } } }
+                        });
+                    }
                     paths.insert(
                         format!("{base}/{{id}}/{action}"),
                         json!({ "post": operation }),

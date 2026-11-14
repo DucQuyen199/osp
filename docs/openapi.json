@@ -19452,7 +19452,7 @@
     },
     "/api/t/{tenantId}/data/accounting/bank_statement_line/{id}/ignored": {
       "post": {
-        "description": "Phát sự kiện `accounting.bank_statement_line.ignored` cho các module khác phản ứng.",
+        "description": "Save the required audit reason and ignore the bank statement line atomically.",
         "parameters": [
           {
             "in": "path",
@@ -19472,6 +19472,27 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "ignore_reason": {
+                    "maxLength": 500,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "ignore_reason"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -19537,7 +19558,7 @@
     },
     "/api/t/{tenantId}/data/accounting/bank_statement_line/{id}/matched": {
       "post": {
-        "description": "Phát sự kiện `accounting.bank_statement_line.matched` cho các module khác phản ứng.",
+        "description": "Link exactly one payment or posted journal entry and match the bank statement line atomically. Empty-body requests continue to use the unique automatic matcher.",
         "parameters": [
           {
             "in": "path",
@@ -19557,6 +19578,61 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "oneOf": [
+                  {
+                    "properties": {
+                      "journal_entry": {
+                        "type": "null"
+                      },
+                      "payment": {
+                        "format": "uuid",
+                        "type": "string"
+                      }
+                    }
+                  },
+                  {
+                    "properties": {
+                      "journal_entry": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "payment": {
+                        "type": "null"
+                      }
+                    }
+                  }
+                ],
+                "properties": {
+                  "journal_entry": {
+                    "format": "uuid",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "payment": {
+                    "format": "uuid",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "payment",
+                  "journal_entry"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": false
+        },
         "responses": {
           "200": {
             "content": {

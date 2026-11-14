@@ -13,6 +13,7 @@
 - Made event ticket sale and refund atomic with the payment method or refund reason, so accounting entries and ticket status commit or roll back together.
 - Made restaurant order settlement and post-send cancellation atomic with the payment method or cancellation reason, including inventory, payment, and queued kitchen-ticket updates.
 - Added required reasons to insurance claim denials and made claim approval amounts and payout details atomic with approval, rejection, and accounting payout.
+- Made manual bank-statement matching and reasoned line ignoring atomic with the status change, while preserving unique automatic matching.
 - Added contract amendments for title, terms, contract value and end-date changes, with approval-rule support, effective-date scheduling, atomic application and an immutable amendment history on the active contract.
 - Added an e-invoice operations workbench with status queues, provider error visibility, retry controls, source invoice links, provider response and attempt-history inspection, and reasoned cancellation requests.
 - Anchored subscription billing dates to the original start day, preventing month-end billing dates from drifting after short months.
