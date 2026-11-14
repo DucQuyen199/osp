@@ -1,6 +1,7 @@
 use super::super::database_amount;
-use super::shared::{amount, refund_matches};
+use super::shared::{amount, amount_tolerance, refund_matches};
 use crate::{db::Tx, error::R, kernel::Tenant};
+use rust_decimal::Decimal;
 use serde_json::Value;
 use uuid::Uuid;
 
@@ -156,6 +157,91 @@ pub(super) async fn validate(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> 
                     {
                         errors.push("Vé này đã có payment hoàn tiền kế toán".into());
                     }
+        }
+    }
+    let source = document
+        .get("source")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if matches!(source, "credit_note_refund" | "debit_note_refund") {
+        let (note_field, note_table, doc_field, doc_table, party_field, refund_field) =
+            if source == "credit_note_refund" {
+                (
+                    "refund_credit_note",
+                    "accounting__credit_note",
+                    "invoice",
+                    "accounting__invoice",
+                    "party",
+                    "invoice",
+                )
+            } else {
+                (
+                    "refund_debit_note",
+                    "accounting__debit_note",
+                    "bill",
+                    "accounting__bill",
+                    "supplier",
+                    "bill",
+                )
+            };
+        let note_id = document
+            .get(note_field)
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok());
+        let note_sql = format!(
+            "SELECT note.total::text, note.status, note.{refund_field}, document.{party_field} FROM {note_table} note JOIN {doc_table} document ON document.tenant_id = note.tenant_id AND document.id = note.{refund_field} WHERE note.tenant_id = $1 AND note.id = $2 FOR UPDATE OF note, document"
+        );
+        let note = if let Some(id) = note_id {
+            tx.query_opt(&note_sql, &[&tenant.id, &id]).await?
+        } else {
+            None
+        };
+        let valid_note = if let Some(note) = note {
+            let note_total = database_amount(&note, 0)?;
+            let status: String = note.get(1);
+            let document_id: Uuid = note.get(2);
+            let party: Uuid = note.get(3);
+            let linked_document = document
+                .get(doc_field)
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok());
+            let supplied_party = document
+                .get("party")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok());
+            let payment_id = document
+                .get("id")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+                .unwrap_or(Uuid::nil());
+            let duplicate = tx.query_opt("SELECT 1 FROM accounting__payment WHERE tenant_id = $1 AND source = $2 AND source_id = $3 AND id <> $4 LIMIT 1", &[&tenant.id, &source, &document.get("source_id").and_then(Value::as_str).unwrap_or_default(), &payment_id]).await?.is_some();
+            let prior_sql = format!(
+                "SELECT COALESCE(SUM(amount), 0)::text FROM accounting__payment WHERE tenant_id = $1 AND {note_field} = $2 AND id <> $3"
+            );
+            let prior = tx
+                .query_one_row(
+                    &prior_sql,
+                    &[&tenant.id, &note_id.unwrap_or(Uuid::nil()), &payment_id],
+                )
+                .await?;
+            let refunded = database_amount(&prior, 0)?.abs();
+            let remaining = note_total
+                .checked_sub(refunded)
+                .unwrap_or_default()
+                .max(Decimal::ZERO);
+            let valid = status == "posted"
+                && linked_document == Some(document_id)
+                && supplied_party == Some(party)
+                && amount(document, "amount").is_some_and(|value| {
+                    value < Decimal::ZERO && value.abs() <= remaining + amount_tolerance()
+                })
+                && !duplicate;
+            valid
+        } else {
+            false
+        };
+        if !valid_note {
+            errors.push("Adjustment refund must match a posted note and its source document, stay within the note balance, and use a unique request id".into());
         }
     }
     Ok(errors)

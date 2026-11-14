@@ -112,7 +112,12 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
             if document.get("amount").is_some() {
                 let refund = matches!(
                     document.get("source").and_then(Value::as_str),
-                    Some("payment_refund" | "event_ticket_refund")
+                    Some(
+                        "payment_refund"
+                            | "event_ticket_refund"
+                            | "credit_note_refund"
+                            | "debit_note_refund"
+                    )
                 );
                 if !amount(document, "amount").is_some_and(|value| {
                     if refund {
@@ -144,6 +149,34 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                     .is_none_or(str::is_empty)
             {
                 errors.push("Khoản hoàn vé cần mã vé nguồn".into());
+            }
+            if matches!(
+                document.get("source").and_then(Value::as_str),
+                Some("credit_note_refund" | "debit_note_refund")
+            ) {
+                let credit_refund =
+                    document.get("source").and_then(Value::as_str) == Some("credit_note_refund");
+                let valid_link = if credit_refund {
+                    document
+                        .get("refund_credit_note")
+                        .is_some_and(|v| !v.is_null())
+                        && document.get("invoice").is_some_and(|v| !v.is_null())
+                        && document.get("bill").is_none_or(Value::is_null)
+                } else {
+                    document
+                        .get("refund_debit_note")
+                        .is_some_and(|v| !v.is_null())
+                        && document.get("bill").is_some_and(|v| !v.is_null())
+                        && document.get("invoice").is_none_or(Value::is_null)
+                };
+                if !valid_link
+                    || document
+                        .get("source_id")
+                        .and_then(Value::as_str)
+                        .is_none_or(str::is_empty)
+                {
+                    errors.push("Adjustment refund requires its note, matching invoice or bill, and idempotency id".into());
+                }
             }
             if document.get("invoice").is_some_and(|v| !v.is_null())
                 && document.get("bill").is_some_and(|v| !v.is_null())

@@ -147,7 +147,7 @@ export default function BankReconciliationWorkbenchPage() {
       const journal = journalsByPayment.get(payment.id);
       const currency = payment.currency || baseCurrency?.id;
       return journal && ['bank', 'transfer'].includes(payment.method) && currency === statementCurrency
-        && sameAmount(payment.amount, line.amount) && sameAmount(payment.base_amount ?? payment.amount, line.base_amount ?? line.amount)
+        && sameAmount(Math.abs(money(payment.amount)), line.amount) && sameAmount(Math.abs(money(payment.base_amount ?? payment.amount)), line.base_amount ?? line.amount)
         && sameAmount(bankNet(journal, bankAccount.id), expected) && !matchedJournalIds.has(journal.id) && !matchedPaymentIds.has(payment.id);
     });
     const journalCandidates = source.journals.filter((entry) => entry.status === 'posted' && !matchedJournalIds.has(entry.id)

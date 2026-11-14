@@ -202,6 +202,127 @@ pub(super) async fn handle_event(
                 // history and reconciliation without posting a second journal.
                 return Ok(Some(true));
             }
+            if matches!(
+                event.get("source").and_then(Value::as_str),
+                Some("credit_note_refund" | "debit_note_refund")
+            ) {
+                let credit_refund =
+                    event.get("source").and_then(Value::as_str) == Some("credit_note_refund");
+                let method = event
+                    .get("method")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                let cash_code = match method {
+                    "cash" => "111",
+                    "card" | "transfer" | "ewallet" | "bank" => "112",
+                    _ => {
+                        return Err(crate::error::ApiError::validation(
+                            event_type,
+                            vec![
+                                "Adjustment refund requires a valid cash or bank settlement method"
+                                    .into(),
+                            ],
+                        ));
+                    }
+                };
+                let cash = account_id(tx, tenant, cash_code).await?;
+                let control =
+                    account_id(tx, tenant, if credit_refund { "131" } else { "331" }).await?;
+                let cash_amount = decimal_field(event, "base_amount")
+                    .unwrap_or(Decimal::ZERO)
+                    .abs();
+                let applied_amount = decimal_field(event, "applied_base_amount")
+                    .unwrap_or(cash_amount)
+                    .abs();
+                if cash_amount <= Decimal::ZERO || applied_amount <= Decimal::ZERO {
+                    return Err(crate::error::ApiError::validation(
+                        event_type,
+                        vec!["Refund base-currency amounts must be positive".into()],
+                    ));
+                }
+                let difference = cash_amount.checked_sub(applied_amount).ok_or_else(|| {
+                    crate::error::ApiError::validation(
+                        event_type,
+                        vec!["Refund exchange difference exceeds the supported range".into()],
+                    )
+                })?;
+                let mut lines = if credit_refund {
+                    vec![
+                        journal_line_decimal(control, applied_amount, Decimal::ZERO)?,
+                        journal_line_decimal(cash, Decimal::ZERO, cash_amount)?,
+                    ]
+                } else {
+                    vec![
+                        journal_line_decimal(cash, cash_amount, Decimal::ZERO)?,
+                        journal_line_decimal(control, Decimal::ZERO, applied_amount)?,
+                    ]
+                };
+                if difference > amount_tolerance() {
+                    let fx = ensure_account(
+                        kernel,
+                        tx,
+                        tenant,
+                        if credit_refund { "635" } else { "515" },
+                        if credit_refund {
+                            "Foreign exchange loss"
+                        } else {
+                            "Foreign exchange gain"
+                        },
+                        if credit_refund { "expense" } else { "revenue" },
+                    )
+                    .await?;
+                    lines.push(if credit_refund {
+                        journal_line_decimal(fx, difference, Decimal::ZERO)?
+                    } else {
+                        journal_line_decimal(fx, Decimal::ZERO, difference)?
+                    });
+                } else if difference < -amount_tolerance() {
+                    let gain_or_loss = Decimal::ZERO.checked_sub(difference).ok_or_else(|| {
+                        crate::error::ApiError::validation(
+                            event_type,
+                            vec!["Refund exchange difference exceeds the supported range".into()],
+                        )
+                    })?;
+                    let fx = ensure_account(
+                        kernel,
+                        tx,
+                        tenant,
+                        if credit_refund { "515" } else { "635" },
+                        if credit_refund {
+                            "Foreign exchange gain"
+                        } else {
+                            "Foreign exchange loss"
+                        },
+                        if credit_refund { "revenue" } else { "expense" },
+                    )
+                    .await?;
+                    lines.push(if credit_refund {
+                        journal_line_decimal(fx, Decimal::ZERO, gain_or_loss)?
+                    } else {
+                        journal_line_decimal(fx, gain_or_loss, Decimal::ZERO)?
+                    });
+                }
+                let payment_id = event.get("id").and_then(Value::as_str).unwrap_or_default();
+                create_posted_journal_decimal_at(
+                    kernel,
+                    tx,
+                    tenant,
+                    event_id,
+                    depth,
+                    if credit_refund {
+                        "Customer credit note cash refund"
+                    } else {
+                        "Supplier debit note reimbursement"
+                    },
+                    cash_amount,
+                    "payment",
+                    payment_id,
+                    lines,
+                    event.get("payment_date").and_then(Value::as_str),
+                )
+                .await?;
+                return Ok(Some(true));
+            }
             if event.get("source").and_then(Value::as_str) == Some("repayment") {
                 let method = event
                     .get("method")

@@ -413,6 +413,26 @@ pub fn build(reg: &Registry) -> Value {
         } }),
     );
     paths.insert(
+        "/api/t/{tenantId}/accounting/adjustment-refunds".into(),
+        json!({ "post": {
+            "tags": ["accounting"], "summary": "Refund a posted credit/debit note", "security": sec,
+            "parameters": [tid],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["kind", "adjustmentId", "amount", "method", "paymentDate", "requestId"], "properties": {
+                "kind": { "type": "string", "enum": ["credit_note", "debit_note"] },
+                "adjustmentId": { "type": "string", "format": "uuid" },
+                "amount": { "type": "number", "exclusiveMinimum": 0 },
+                "method": { "type": "string", "enum": ["cash", "card", "transfer", "ewallet", "bank"] },
+                "paymentDate": { "type": "string", "format": "date" },
+                "requestId": { "type": "string", "format": "uuid", "description": "Idempotency key reused for retries" }
+            } } } } },
+            "responses": with_common(Map::from_iter([
+                ("201".to_string(), json!({ "description": "Payment and accounting journal created" })),
+                ("200".to_string(), json!({ "description": "Idempotent replay returned the existing payment" })),
+                ("422".to_string(), err("Invalid note, amount, date, method, or insufficient refundable balance"))
+            ]))
+        } }),
+    );
+    paths.insert(
         "/api/t/{tenantId}/accounting/bank-statements/{statementId}/import".into(),
         json!({ "post": {
             "tags": ["accounting"], "summary": "Import bank statement CSV", "security": sec,

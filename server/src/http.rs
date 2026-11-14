@@ -937,6 +937,33 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     .await?,
             );
         }
+        (&Method::POST, ["accounting", "adjustment-refunds"]) => {
+            let body = json_obj(&bytes)?;
+            let amount = body.get("amount").and_then(money::decimal).ok_or_else(|| {
+                ApiError::validation(
+                    "accounting.adjustment_refund",
+                    vec!["Refund amount must be a valid decimal".into()],
+                )
+            })?;
+            let result = crate::modules::accounting::create_adjustment_refund(
+                &k,
+                &actor,
+                &t,
+                &s(&body, "kind"),
+                &s(&body, "adjustmentId"),
+                amount,
+                &s(&body, "method"),
+                &s(&body, "paymentDate"),
+                &s(&body, "requestId"),
+            )
+            .await?;
+            let status = if result.get("existing") == Some(&Value::Bool(true)) {
+                200
+            } else {
+                201
+            };
+            return Ok(Reply::Json(status, result));
+        }
         (&Method::GET, ["reports", "accounting", "chart-templates"]) => {
             return json_ok(k.accounting_chart_templates(&actor, &t).await?);
         }

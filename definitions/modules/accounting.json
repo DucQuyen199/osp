@@ -792,6 +792,20 @@
      "type": "string",
      "required": false,
      "system": true
+    },
+    {
+     "name": "refund_credit_note",
+     "type": "ref",
+     "required": false,
+     "ref": "accounting.credit_note",
+     "system": true
+    },
+    {
+     "name": "refund_debit_note",
+     "type": "ref",
+     "required": false,
+     "ref": "accounting.debit_note",
+     "system": true
     }
    ],
    "states": null,

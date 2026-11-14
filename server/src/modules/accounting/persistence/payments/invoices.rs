@@ -7,7 +7,10 @@ use uuid::Uuid;
 
 pub(super) async fn validate(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<Vec<String>> {
     let mut errors = Vec::new();
-    let refund = document.get("source").and_then(Value::as_str) == Some("payment_refund");
+    let refund = matches!(
+        document.get("source").and_then(Value::as_str),
+        Some("payment_refund" | "credit_note_refund" | "debit_note_refund")
+    );
     let has_invoice = document.get("invoice").and_then(Value::as_str).is_some();
     let has_bill = document.get("bill").and_then(Value::as_str).is_some();
     let payment_method = document.get("method").and_then(Value::as_str);

@@ -331,6 +331,18 @@
       "master-data.party.read"
     ]
   },
+  "accounting_settlement_operator": {
+    "name": "Nhân viên thu chi điều chỉnh",
+    "permissions": [
+      "accounting.payment.read",
+      "accounting.payment.create",
+      "accounting.invoice.read",
+      "accounting.bill.read",
+      "accounting.credit_note.read",
+      "accounting.debit_note.read",
+      "master-data.party.read"
+    ]
+  },
   "accounting_period_manager": {
     "name": "Qu?n l? kh?a s? k? to?n",
     "permissions": [

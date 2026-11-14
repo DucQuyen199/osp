@@ -17,12 +17,14 @@ pub fn prepare_document(entity: &str, document: &mut Map<String, Value>) {
     }
 }
 
+mod adjustment_refunds;
 mod bank_reconciliation;
 mod chart_templates;
 mod currency;
 mod ledger;
 mod source_documents;
 mod source_events;
+pub use adjustment_refunds::create_adjustment_refund;
 pub use bank_reconciliation::{prepare_bank_statement, prepare_bank_statement_line, prepare_match};
 pub use currency::{prepare_currency_posting, prepare_payment_currency};
 pub use source_events::handle_source_document_event;
