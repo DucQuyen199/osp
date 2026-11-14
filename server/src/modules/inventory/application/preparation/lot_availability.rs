@@ -15,7 +15,7 @@ pub(super) async fn validate(
 ) -> R<Vec<String>> {
     let lot = tx
         .query_opt(
-            "SELECT (expiry IS NULL OR expiry >= CURRENT_DATE) FROM inventory__lot WHERE tenant_id = $1 AND id = $2 AND product = $3 FOR SHARE",
+            "SELECT (expiry IS NULL OR expiry >= CURRENT_DATE), expiry IS NOT NULL FROM inventory__lot WHERE tenant_id = $1 AND id = $2 AND product = $3 FOR SHARE",
             &[&tenant.id, &lot_id, &product_id],
         )
         .await?;
@@ -24,6 +24,19 @@ pub(super) async fn validate(
             "Selected lot does not belong to this product and tenant".into(),
         ]);
     };
+
+    let expiry_required = tx
+        .query_opt(
+            "SELECT COALESCE(expiry_required, false) FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+            &[&tenant.id, &product_id],
+        )
+        .await?
+        .is_some_and(|row| row.get::<_, bool>(0));
+    if expiry_required && !lot.get::<_, bool>(1) {
+        return Ok(vec![
+            "This product requires an expiry date on every lot".into(),
+        ]);
+    }
 
     if direction != "out" || source == "quality_return" {
         return Ok(Vec::new());

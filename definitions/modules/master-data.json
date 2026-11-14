@@ -186,6 +186,12 @@
      "required": false
     },
     {
+     "name": "expiry_required",
+     "label": "Bắt buộc hạn sử dụng",
+     "type": "bool",
+     "required": false
+    },
+    {
      "name": "active",
      "type": "bool",
      "required": false

@@ -371,6 +371,31 @@ pub async fn validate_persistence(
                     .and_then(Value::as_str)
                     .unwrap_or_default();
                 if let Some(product) = product {
+                    let expiry_required = tx
+                        .query_opt(
+                            "SELECT COALESCE(expiry_required, false), COALESCE(lot_tracked, false) FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                            &[&tenant.id, &product],
+                        )
+                        .await?;
+                    if let Some(product_policy) = expiry_required {
+                        let expiry_required: bool = product_policy.get(0);
+                        let lot_tracked: bool = product_policy.get(1);
+                        if expiry_required && !lot_tracked {
+                            errors.push(
+                                "Expiry-date policy requires the product to be lot-tracked".into(),
+                            );
+                        }
+                        if expiry_required
+                            && document
+                                .get("expiry")
+                                .and_then(Value::as_str)
+                                .is_none_or(str::is_empty)
+                        {
+                            errors.push("This product requires an expiry date on every lot".into());
+                        }
+                    } else {
+                        errors.push("Lot product must belong to this tenant".into());
+                    }
                     tx.query_opt(
                         "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
                         &[&format!(

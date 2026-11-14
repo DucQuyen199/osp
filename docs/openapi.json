@@ -10293,6 +10293,9 @@
             "readOnly": true,
             "type": "string"
           },
+          "expiry_required": {
+            "type": "boolean"
+          },
           "id": {
             "format": "uuid",
             "readOnly": true,
@@ -10356,6 +10359,9 @@
           },
           "cost": {
             "type": "number"
+          },
+          "expiry_required": {
+            "type": "boolean"
           },
           "kind": {
             "enum": [

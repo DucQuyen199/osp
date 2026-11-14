@@ -128,7 +128,7 @@ Inventory valuation supports tenant-wide moving-average and FIFO methods. FIFO r
 
 Inventory application workflows are separated into count snapshots, event handlers, stock-move preparation, stock-level application, and FEFO/FIFO valuation. Stock quantities and costs stay Decimal across these boundaries; PostgreSQL `numeric` values are read as decimal text and serialized to JSON numbers before system-managed stock balances are updated.
 
-Products can opt into lot tracking before their first inventory movement. Rust validates that every movement lot belongs to the same product and tenant, uses FEFO for unassigned issues, records lot-specific stock-count snapshots, and prevents changing the policy once movements, balances, or lots exist.
+Products can opt into lot tracking before their first inventory movement. Expiry-sensitive products can additionally require an expiry date on every lot; that policy can be enabled only when existing movements and lots already have complete lot/expiry traceability, and it cannot be disabled after inventory history exists. Rust enforces the policy when lots are created and when movements use them, validates tenant/product ownership, uses FEFO for unassigned issues, records lot-specific stock-count snapshots, and prevents changing lot tracking once movements, balances, or lots exist.
 
 Physical stock counts enter observed quantities, snapshot book balances on submission, and serialize through the same product/warehouse locks as stock moves. The Rust event handler derives and posts only the variance after approval; while a submitted count is pending, new movements for its products are rejected. Submitted and approved count records remain audit evidence.
 

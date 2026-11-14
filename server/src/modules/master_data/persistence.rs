@@ -50,8 +50,8 @@ pub async fn validate_persistence(
                     .await?;
                 }
             }
-            if action == "updated" && tenant.has_module("inventory") {
-                product::validate_lot_tracking_change(tx, tenant, document, &mut errors).await?;
+            if matches!(action, "created" | "updated") && tenant.has_module("inventory") {
+                product::validate_expiry_policy(tx, tenant, action, document, &mut errors).await?;
             }
         }
         "branch" => {
