@@ -234,6 +234,29 @@
       "accounting.account.read",
       "accounting.payment.read"
     ]
+  },
+  "bank_reconciliation_clerk": {
+    "name": "Nh?n vi?n ??i so?t ng?n h?ng",
+    "permissions": [
+      "accounting.bank_statement.read",
+      "accounting.bank_statement.create",
+      "accounting.bank_statement.update",
+      "accounting.bank_statement.reconciled",
+      "accounting.bank_statement.cancelled",
+      "accounting.bank_statement.delete",
+      "accounting.bank_statement_line.read",
+      "accounting.bank_statement_line.create",
+      "accounting.bank_statement_line.update",
+      "accounting.bank_statement_line.matched",
+      "accounting.bank_statement_line.ignored",
+      "accounting.bank_statement_line.delete",
+      "accounting.payment.read",
+      "accounting.journal_entry.read",
+      "accounting.account.read",
+      "master-data.currency.read",
+      "master-data.currency_rate.read",
+      "master-data.party.read"
+    ]
   }
 },
  "kpis": [
