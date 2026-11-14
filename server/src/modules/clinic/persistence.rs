@@ -32,7 +32,7 @@ async fn validate_patient(
     let mut errors = Vec::new();
     if tx
         .query_opt(
-            "SELECT id FROM master_data__party WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+            "SELECT id FROM master_data__party WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
             &[&tenant.id, &party],
         )
         .await?

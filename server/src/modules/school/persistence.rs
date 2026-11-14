@@ -172,7 +172,7 @@ async fn validate_student(
     let mut errors = Vec::new();
     if tx
         .query_opt(
-            "SELECT id FROM master_data__party WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+            "SELECT id FROM master_data__party WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
             &[&tenant.id, &party],
         )
         .await?
@@ -191,6 +191,12 @@ async fn validate_student(
         .and_then(Value::as_str)
         .filter(|code| !code.is_empty())
     {
+        let lock_key = format!("school-student-code:{}:{}", tenant.id, code.to_lowercase());
+        tx.query_opt(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            &[&lock_key],
+        )
+        .await?;
         if tx.query_opt(
             "SELECT id FROM school__student WHERE tenant_id = $1 AND lower(btrim(student_code)) = lower($2) AND ($3::uuid IS NULL OR id <> $3) LIMIT 1 FOR UPDATE",
             &[&tenant.id, &code, &id],
@@ -242,6 +248,12 @@ async fn validate_class(
         .and_then(Value::as_str)
         .unwrap_or_default()
         .trim();
+    let lock_key = format!("school-course-class:{}:{}", tenant.id, name.to_lowercase());
+    tx.query_opt(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        &[&lock_key],
+    )
+    .await?;
     let mut errors = Vec::new();
     if tx.query_opt(
         "SELECT id FROM school__course_class WHERE tenant_id = $1 AND lower(btrim(name)) = lower($2) AND ($3::uuid IS NULL OR id <> $3) LIMIT 1 FOR UPDATE",

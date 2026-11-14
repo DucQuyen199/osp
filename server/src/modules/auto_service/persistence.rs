@@ -51,6 +51,31 @@ async fn validate_vehicle(
         .and_then(Value::as_str)
         .unwrap_or_default()
         .trim();
+    let mut unique_keys = vec![format!(
+        "auto-service-vehicle-plate:{}:{}",
+        tenant.id,
+        plate.to_ascii_uppercase()
+    )];
+    if let Some(vin) = document
+        .get("vin")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|vin| !vin.is_empty())
+    {
+        unique_keys.push(format!(
+            "auto-service-vehicle-vin:{}:{}",
+            tenant.id,
+            vin.to_ascii_uppercase()
+        ));
+    }
+    unique_keys.sort();
+    for lock_key in unique_keys {
+        tx.query_opt(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            &[&lock_key],
+        )
+        .await?;
+    }
     if tx
         .query_opt(
             "SELECT id FROM auto_service__vehicle WHERE tenant_id = $1 AND upper(btrim(plate)) = upper($2) AND ($3::uuid IS NULL OR id <> $3) LIMIT 1 FOR UPDATE",
