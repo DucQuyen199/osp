@@ -11,6 +11,7 @@
 - Added lot code and optional expiry traceability for lot-tracked manufacturing outputs, and aligned production QC quantities with accepted good output when recording scrap.
 - Added partial-shipment creation from wholesale sales orders, showing remaining quantities after open and completed shipments and delegating final over-shipment checks to the server.
 - Recalculated appointment end time and default service price when an editable booking request changes service or start time, preserving no-overlap scheduling.
+- Stopped creating a full-value payable bill when a construction subcontract is signed; signing now records a budget commitment, while payable documents are entered through accounting when supported by work/payment documentation.
 
 ### Changed
 - Scoped the runtime data ignore rule to the repository root so nested application source such as `server/src/kernel/data` is tracked and included in source releases.
