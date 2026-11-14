@@ -13,9 +13,10 @@
   "accounting",
   "einvoice",
   "hrm",
+  "recruitment",
   "payroll",
   "bi"
- ],
+],
  "terminology": {
   "master-data.party": "Khách hàng",
   "master-data.product": "Vật tư/Dịch vụ",
@@ -37,29 +38,68 @@
  },
  "roles": {
   "technician": {
-   "name": "Kỹ thuật viên",
-   "permissions": [
-    "field-service.work_order.read",
-    "field-service.work_order.done",
-    "inventory.stock_level.read",
-    "master-data.party.read",
-    "master-data.product.read",
-    "inventory.warehouse.read"
-   ]
+    "name": "Kỹ thuật viên",
+    "permissions": [
+      "field-service.work_order.read",
+      "field-service.work_order.done",
+      "inventory.stock_level.read",
+      "master-data.party.read",
+      "master-data.product.read",
+      "inventory.warehouse.read"
+    ]
   },
   "dispatcher": {
-   "name": "Điều phối",
-   "permissions": [
-    "field-service.*",
-    "booking.*",
-    "helpdesk.*",
-    "master-data.party.read",
-    "master-data.product.read",
-    "inventory.warehouse.read",
-    "accounting.invoice.read"
-   ]
+    "name": "Điều phối",
+    "permissions": [
+      "field-service.*",
+      "booking.*",
+      "helpdesk.*",
+      "master-data.party.read",
+      "master-data.product.read",
+      "inventory.warehouse.read",
+      "accounting.invoice.read"
+    ]
+  },
+  "recruiter": {
+    "name": "Chuy?n vi?n tuy?n d?ng",
+    "permissions": [
+      "recruitment.job_opening.read",
+      "recruitment.job_opening.create",
+      "recruitment.job_opening.update",
+      "recruitment.job_opening.closed",
+      "recruitment.candidate.read",
+      "recruitment.candidate.create",
+      "recruitment.candidate.update",
+      "recruitment.application.read",
+      "recruitment.application.create",
+      "recruitment.application.update",
+      "recruitment.application.applied",
+      "recruitment.application.rejected",
+      "hrm.department.read",
+      "hrm.position.read"
+    ]
+  },
+  "hiring_manager": {
+    "name": "Qu?n l? tuy?n d?ng",
+    "permissions": [
+      "recruitment.job_opening.read",
+      "recruitment.job_opening.create",
+      "recruitment.job_opening.update",
+      "recruitment.job_opening.closed",
+      "recruitment.candidate.read",
+      "recruitment.candidate.create",
+      "recruitment.candidate.update",
+      "recruitment.application.read",
+      "recruitment.application.create",
+      "recruitment.application.update",
+      "recruitment.application.applied",
+      "recruitment.application.hired",
+      "recruitment.application.rejected",
+      "hrm.department.read",
+      "hrm.position.read"
+    ]
   }
- },
+},
  "kpis": [
   "Tỷ lệ xử lý lần đầu",
   "Thời gian đến hiện trường",

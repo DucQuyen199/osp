@@ -13,9 +13,10 @@
   "accounting",
   "einvoice",
   "hrm",
+  "recruitment",
   "payroll",
   "bi"
- ],
+],
  "terminology": {
   "master-data.party": "Khách hàng",
   "master-data.product": "Gói/Add-on",
@@ -42,25 +43,64 @@
  },
  "roles": {
   "customer_success": {
-   "name": "Customer Success",
-   "permissions": [
-    "crm.*",
-    "helpdesk.*",
-    "subscription.subscription.*",
-    "subscription.plan.read",
-    "subscription.billing_cycle.read",
-    "master-data.party.read",
-    "accounting.invoice.read"
-   ]
+    "name": "Customer Success",
+    "permissions": [
+      "crm.*",
+      "helpdesk.*",
+      "subscription.subscription.*",
+      "subscription.plan.read",
+      "subscription.billing_cycle.read",
+      "master-data.party.read",
+      "accounting.invoice.read"
+    ]
   },
   "engineer": {
-   "name": "Kỹ sư",
-   "permissions": [
-    "project.*",
-    "integration-hub.*"
-   ]
+    "name": "Kỹ sư",
+    "permissions": [
+      "project.*",
+      "integration-hub.*"
+    ]
+  },
+  "recruiter": {
+    "name": "Chuy?n vi?n tuy?n d?ng",
+    "permissions": [
+      "recruitment.job_opening.read",
+      "recruitment.job_opening.create",
+      "recruitment.job_opening.update",
+      "recruitment.job_opening.closed",
+      "recruitment.candidate.read",
+      "recruitment.candidate.create",
+      "recruitment.candidate.update",
+      "recruitment.application.read",
+      "recruitment.application.create",
+      "recruitment.application.update",
+      "recruitment.application.applied",
+      "recruitment.application.rejected",
+      "hrm.department.read",
+      "hrm.position.read"
+    ]
+  },
+  "hiring_manager": {
+    "name": "Qu?n l? tuy?n d?ng",
+    "permissions": [
+      "recruitment.job_opening.read",
+      "recruitment.job_opening.create",
+      "recruitment.job_opening.update",
+      "recruitment.job_opening.closed",
+      "recruitment.candidate.read",
+      "recruitment.candidate.create",
+      "recruitment.candidate.update",
+      "recruitment.application.read",
+      "recruitment.application.create",
+      "recruitment.application.update",
+      "recruitment.application.applied",
+      "recruitment.application.hired",
+      "recruitment.application.rejected",
+      "hrm.department.read",
+      "hrm.position.read"
+    ]
   }
- },
+},
  "kpis": [
   "MRR / ARR",
   "Churn",

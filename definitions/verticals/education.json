@@ -13,9 +13,10 @@
   "accounting",
   "einvoice",
   "hrm",
+  "recruitment",
   "payroll",
   "bi"
- ],
+],
  "terminology": {
   "master-data.party": "Phụ huynh/Học viên",
   "master-data.product": "Khóa học/Dịch vụ",
@@ -38,33 +39,72 @@
  },
  "roles": {
   "teacher": {
-   "name": "Giáo viên",
-   "permissions": [
-    "school.grade.*",
-    "school.class_enrollment.read",
-    "school.course_class.read",
-    "school.class_session.*",
-    "school.attendance.*",
-    "lms.*"
-   ]
+    "name": "Giáo viên",
+    "permissions": [
+      "school.grade.*",
+      "school.class_enrollment.read",
+      "school.course_class.read",
+      "school.class_session.*",
+      "school.attendance.*",
+      "lms.*"
+    ]
   },
   "admissions": {
-   "name": "Tuyển sinh",
-   "permissions": [
-    "crm.*",
-    "school.student.*",
-    "school.class_enrollment.*"
-   ]
+    "name": "Tuyển sinh",
+    "permissions": [
+      "crm.*",
+      "school.student.*",
+      "school.class_enrollment.*"
+    ]
   },
   "bursar": {
-   "name": "Thu học phí",
-   "permissions": [
-    "school.fee.*",
-    "accounting.invoice.read",
-    "accounting.payment.*"
-   ]
+    "name": "Thu học phí",
+    "permissions": [
+      "school.fee.*",
+      "accounting.invoice.read",
+      "accounting.payment.*"
+    ]
+  },
+  "recruiter": {
+    "name": "Chuy?n vi?n tuy?n d?ng",
+    "permissions": [
+      "recruitment.job_opening.read",
+      "recruitment.job_opening.create",
+      "recruitment.job_opening.update",
+      "recruitment.job_opening.closed",
+      "recruitment.candidate.read",
+      "recruitment.candidate.create",
+      "recruitment.candidate.update",
+      "recruitment.application.read",
+      "recruitment.application.create",
+      "recruitment.application.update",
+      "recruitment.application.applied",
+      "recruitment.application.rejected",
+      "hrm.department.read",
+      "hrm.position.read"
+    ]
+  },
+  "hiring_manager": {
+    "name": "Qu?n l? tuy?n d?ng",
+    "permissions": [
+      "recruitment.job_opening.read",
+      "recruitment.job_opening.create",
+      "recruitment.job_opening.update",
+      "recruitment.job_opening.closed",
+      "recruitment.candidate.read",
+      "recruitment.candidate.create",
+      "recruitment.candidate.update",
+      "recruitment.application.read",
+      "recruitment.application.create",
+      "recruitment.application.update",
+      "recruitment.application.applied",
+      "recruitment.application.hired",
+      "recruitment.application.rejected",
+      "hrm.department.read",
+      "hrm.position.read"
+    ]
   }
- },
+},
  "kpis": [
   "Tỷ lệ chuyển đổi tuyển sinh",
   "Tỷ lệ giữ chân học viên",

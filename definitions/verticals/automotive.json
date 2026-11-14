@@ -12,9 +12,10 @@
   "accounting",
   "einvoice",
   "hrm",
+  "recruitment",
   "payroll",
   "bi"
- ],
+],
  "terminology": {
   "master-data.party": "Chủ xe",
   "master-data.product": "Phụ tùng/Dịch vụ",
@@ -105,6 +106,45 @@
       "master-data.party.read",
       "master-data.product.read",
       "inventory.warehouse.read"
+    ]
+  },
+  "recruiter": {
+    "name": "Chuy?n vi?n tuy?n d?ng",
+    "permissions": [
+      "recruitment.job_opening.read",
+      "recruitment.job_opening.create",
+      "recruitment.job_opening.update",
+      "recruitment.job_opening.closed",
+      "recruitment.candidate.read",
+      "recruitment.candidate.create",
+      "recruitment.candidate.update",
+      "recruitment.application.read",
+      "recruitment.application.create",
+      "recruitment.application.update",
+      "recruitment.application.applied",
+      "recruitment.application.rejected",
+      "hrm.department.read",
+      "hrm.position.read"
+    ]
+  },
+  "hiring_manager": {
+    "name": "Qu?n l? tuy?n d?ng",
+    "permissions": [
+      "recruitment.job_opening.read",
+      "recruitment.job_opening.create",
+      "recruitment.job_opening.update",
+      "recruitment.job_opening.closed",
+      "recruitment.candidate.read",
+      "recruitment.candidate.create",
+      "recruitment.candidate.update",
+      "recruitment.application.read",
+      "recruitment.application.create",
+      "recruitment.application.update",
+      "recruitment.application.applied",
+      "recruitment.application.hired",
+      "recruitment.application.rejected",
+      "hrm.department.read",
+      "hrm.position.read"
     ]
   }
 },
