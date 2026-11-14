@@ -26,7 +26,14 @@ pub async fn validate_persistence(
             errors.push(format!("{label} phải là mã hợp lệ"));
             continue;
         };
-        let sql = format!("SELECT id FROM {table} WHERE tenant_id = $1 AND id = $2 FOR SHARE");
+        let lock_mode = if field == "source_ticket" {
+            // Serialize work-order creation for a ticket before checking for an existing link.
+            "UPDATE"
+        } else {
+            "SHARE"
+        };
+        let sql =
+            format!("SELECT id FROM {table} WHERE tenant_id = $1 AND id = $2 FOR {lock_mode}");
         if tx.query_opt(&sql, &[&tenant.id, &id]).await?.is_none() {
             errors.push(format!("{label} không tồn tại trong doanh nghiệp"));
         }
@@ -140,14 +147,18 @@ pub async fn validate_persistence(
     Ok(errors)
 }
 
-/// Serialize ticket conversion and detect a previously created linked work order.
+/// Serialize ticket conversion with direct work-order creation and detect an existing link.
 pub async fn existing_ticket_work_order(tx: &Tx<'_>, tenant: &Tenant, ticket: Uuid) -> R<bool> {
-    let _lock = tx
-        .query_one_row(
-            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-            &[&format!("field-service:{}:{ticket}", tenant.id)],
+    if tx
+        .query_opt(
+            "SELECT id FROM helpdesk__ticket WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+            &[&tenant.id, &ticket],
         )
-        .await?;
+        .await?
+        .is_none()
+    {
+        return Ok(false);
+    }
     Ok(tx
         .query_opt(
             "SELECT id FROM field_service__work_order WHERE tenant_id = $1 AND source_ticket = $2 FOR UPDATE",
