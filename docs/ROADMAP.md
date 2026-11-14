@@ -39,6 +39,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Bảo trì có danh mục kỹ thuật viên nội bộ/nhà thầu, chuyên môn và liên hệ; lệnh mở có thể được phân công và chỉ gán kỹ thuật viên còn hoạt động thuộc tenant.
 - Mua hàng lưu lý do tranh chấp hóa đơn nhà cung cấp và ghi chú xử lý cùng lần chuyển trạng thái, tránh tạo công nợ khi hóa đơn đang tranh chấp.
 - Nhân sự ghi ngày nghỉ việc cùng action chấm dứt sau khi kiểm tra chấm công/nghỉ phép và đồng bộ payroll trong một giao dịch.
+- Payroll quy đổi thời lượng chấm công đã đủ giờ vào/ra thành ngày công tương đương theo số giờ chuẩn của kỳ; ngày công một phần được kết hợp với nghỉ hưởng lương/ngày lễ nhưng không vượt một ngày.
 - Khách sạn lưu lý do vắng mặt cùng action no-show sau khi kiểm tra ngày đến và phí folio, rồi giải phóng lịch phòng trong cùng giao dịch.
 - Mua hàng lưu dòng giá, tham chiếu và ngày hết hạn báo giá cùng lần chuyển RFQ sang đã nhận báo giá; đối chiếu đủ mặt hàng/số lượng theo đề nghị.
 - Ký thầu phụ chỉ ghi nhận cam kết chi phí; hồ sơ nghiệm thu/đề nghị thanh toán có giá trị lũy kế được giới hạn trong hợp đồng và chỉ phát sinh hóa đơn phải trả sau khi duyệt.
@@ -56,7 +57,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Hóa đơn nhà cung cấp cho phép ghi giá/thuế thực tế, phí/chiết khấu có thuế riêng, tranh chấp và phê duyệt; phí có thể phân bổ theo số lượng hoặc giá trị trên các phiếu nhận đã chọn. Landed cost được thêm vào valuation layer, phần hàng còn tồn tăng giá trị kho và phần đã tiêu thụ ở lại chi phí; khi trả hàng, giá trị xuất kho và debit note lấy giá vốn đã gồm landed cost theo FIFO hoặc bình quân, phần chênh với giá nhà cung cấp hoàn được ghi nhận riêng. Cách xử lý thuế từng trường hợp vẫn cần chuyên gia xác minh.
 - Đối soát sao kê ngân hàng đã hỗ trợ đồng tiền giao dịch, snapshot tỷ giá từng dòng, CSV/CAMT.053 và kiểm tra với giá trị sổ cái tiền cơ sở; còn thiếu kết nối API ngân hàng trực tiếp và báo cáo hợp nhất. Còn thiếu đa công ty, accessibility với trình đọc màn hình, đa ngôn ngữ, kết nối thiết bị POS/KDS, PWA/offline, tải HTTP và đa trình duyệt. Bulk action cho mọi entity có state machine đã có API Rust và giao diện danh sách; giới hạn 100 bản ghi mỗi giao dịch và rollback cả lô nếu một chuyển trạng thái lỗi. Kế toán hiện snapshot tỷ giá chứng từ/thanh toán, ghi nhận FX realized và tạo nháp đánh giá lại công nợ theo ngày.
 
-Các module CRM/Marketing, bán hàng, mua hàng, loyalty, logistics, field service, helpdesk, LMS, performance, ngân sách, lịch, nhà hàng, lương và bán vé đã có luồng Rust nền tảng; cần hoàn thiện theo ngành và phản hồi khách hàng. Payroll hiện có thuế, khoản đóng góp theo policy tenant, giờ làm thêm đã duyệt và thanh toán công nợ khoản đóng; cần chuyên môn hóa bảng thuế/bảo hiểm, điều kiện tham gia, khai báo và quyết toán theo từng pháp vực.
+Các module CRM/Marketing, bán hàng, mua hàng, loyalty, logistics, field service, helpdesk, LMS, performance, ngân sách, lịch, nhà hàng, lương và bán vé đã có luồng Rust nền tảng; cần hoàn thiện theo ngành và phản hồi khách hàng. Payroll hiện có thuế, khoản đóng góp theo policy tenant, giờ công một phần, giờ làm thêm đã duyệt và thanh toán công nợ khoản đóng; cần chuyên môn hóa bảng thuế/bảo hiểm, điều kiện tham gia, lịch làm việc theo ca, khai báo và quyết toán theo từng pháp vực.
 
 ## Thứ tự đề xuất
 

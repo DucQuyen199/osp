@@ -55,17 +55,20 @@ fn payroll_amount_error() -> crate::error::ApiError {
     )
 }
 
-async fn counted_paid_weekdays(
+async fn counted_paid_days(
     tx: &Tx<'_>,
     tenant: &Tenant,
     employee: Uuid,
     first_day: NaiveDate,
     next_month: NaiveDate,
+    hours_per_day: &str,
 ) -> R<Decimal> {
     let row = tx
         .query_one_row(
             "WITH counted_days AS ( \
-               SELECT a.date AS work_date, 1::numeric AS day_fraction FROM hrm__attendance a \
+               SELECT a.date AS work_date, LEAST(1::numeric, GREATEST(0::numeric, round( \
+                 EXTRACT(EPOCH FROM (a.check_out - a.check_in))::numeric / 3600 / $5::numeric, 6 \
+               ))) AS day_fraction FROM hrm__attendance a \
                JOIN hrm__employee e ON e.tenant_id = a.tenant_id AND e.id = a.employee \
                WHERE a.tenant_id = $1 AND a.employee = $2 AND a.date >= $3 AND a.date < $4 \
                  AND a.date >= COALESCE(e.hire_date, $3) AND a.date <= COALESCE(e.termination_date, $4 - 1) \
@@ -87,12 +90,18 @@ async fn counted_paid_weekdays(
                WHERE h.tenant_id = $1 AND e.id = $2 AND h.date >= $3 AND h.date < $4 \
                  AND h.date >= COALESCE(e.hire_date, $3) AND h.date <= COALESCE(e.termination_date, $4 - 1) \
                  AND h.pay_treatment = 'paid' AND EXTRACT(ISODOW FROM h.date) <= 5 \
-             ), per_day AS (SELECT work_date, max(day_fraction) AS day_fraction FROM counted_days GROUP BY work_date) \
-             SELECT COALESCE(sum(day_fraction), 0)::text FROM per_day",
-            &[&tenant.id, &employee, &first_day, &next_month],
+             ), per_day AS (SELECT work_date, LEAST(1::numeric, round(sum(day_fraction), 6)) AS day_fraction FROM counted_days GROUP BY work_date) \
+             SELECT round(COALESCE(sum(day_fraction), 0), 6)::text FROM per_day",
+            &[
+                &tenant.id,
+                &employee,
+                &first_day,
+                &next_month,
+                &hours_per_day,
+            ],
         )
         .await?;
-    decimal_column(&row, 0, "paid weekdays")
+    decimal_column(&row, 0, "paid days")
 }
 
 pub async fn validate_persistence(

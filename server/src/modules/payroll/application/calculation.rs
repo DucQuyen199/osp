@@ -26,7 +26,7 @@ fn decimal_json(value: Decimal) -> R<Value> {
 }
 
 /// Creates draft payslips from attendance, approved leave, holidays and overtime.
-/// Monthly base salary is prorated by counted weekdays in the calendar month.
+/// Monthly base salary is prorated by paid weekday-equivalent days in the month.
 /// Insurance and jurisdiction-specific policies remain explicit inputs.
 pub(super) async fn calculate_from_attendance(
     kernel: &Kernel,
@@ -160,7 +160,10 @@ pub(super) async fn calculate_from_attendance(
                  AND (e.hire_date IS NULL OR e.hire_date < $3) \
                  AND (e.termination_date IS NULL OR e.termination_date >= $2) \
              ), counted_days AS ( \
-               SELECT a.employee, a.date AS work_date, 1::numeric AS day_fraction \
+               SELECT a.employee, a.date AS work_date, \
+                 LEAST(1::numeric, GREATEST(0::numeric, round( \
+                   EXTRACT(EPOCH FROM (a.check_out - a.check_in))::numeric / 3600 / $4::numeric, 6 \
+                 ))) AS day_fraction \
                FROM hrm__attendance a \
                JOIN hrm__employee e ON e.tenant_id = a.tenant_id AND e.id = a.employee \
                JOIN eligible sal ON sal.id = e.id \
@@ -199,7 +202,7 @@ pub(super) async fn calculate_from_attendance(
                  AND h.pay_treatment = 'paid' \
                  AND EXTRACT(ISODOW FROM h.date) <= 5 \
              ), paid_days AS ( \
-               SELECT employee, work_date, max(day_fraction) AS day_fraction \
+               SELECT employee, work_date, LEAST(1::numeric, round(sum(day_fraction), 6)) AS day_fraction \
                FROM counted_days GROUP BY employee, work_date \
              ) \
              SELECT e.id, e.salary::text, e.salary_revision, e.additions::text, e.taxable_additions::text, e.deductions::text, \
@@ -211,7 +214,12 @@ pub(super) async fn calculate_from_attendance(
                e.overtime_hours, e.overtime_weighted_hours, e.tax_residency, e.dependent_count, \
                e.contribution_exempt \
              HAVING COALESCE(sum(d.day_fraction), 0) > 0 OR e.overtime_hours > 0 ORDER BY e.id",
-            &[&tenant.id, &first_day, &next_month_start],
+            &[
+                &tenant.id,
+                &first_day,
+                &next_month_start,
+                &hours_per_day.to_string(),
+            ],
         )
         .await?;
     if rows.is_empty() {

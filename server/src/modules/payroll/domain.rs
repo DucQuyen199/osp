@@ -137,12 +137,7 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
     let overtime_pay = optional_decimal_field(document, "overtime_pay").unwrap_or(Decimal::ZERO);
     if !salary_basis.is_some_and(|amount| amount > Decimal::ZERO)
         || !additions.is_some_and(|amount| amount >= Decimal::ZERO)
-        || !paid_days.is_some_and(|days| {
-            days >= Decimal::ZERO
-                && days
-                    .checked_mul(Decimal::from(2))
-                    .is_some_and(|half_days| half_days.fract() == Decimal::ZERO)
-        })
+        || !paid_days.is_some_and(|days| days >= Decimal::ZERO && days == days.round_dp(6))
         || !working_days.is_some_and(|days| {
             days.fract() == Decimal::ZERO
                 && days > Decimal::ZERO

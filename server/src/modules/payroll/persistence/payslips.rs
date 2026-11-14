@@ -301,9 +301,16 @@ pub(super) async fn validate_created(
                 };
                 if let Some(next_month_start) = NaiveDate::from_ymd_opt(next_year, next_month, 1) {
                     let working_days = working_weekdays(first_day, next_month_start);
-                    let paid_days =
-                        counted_paid_weekdays(tx, tenant, employee, first_day, next_month_start)
-                            .await?;
+                    let hours_per_day_text = hours_per_day.to_string();
+                    let paid_days = counted_paid_days(
+                        tx,
+                        tenant,
+                        employee,
+                        first_day,
+                        next_month_start,
+                        &hours_per_day_text,
+                    )
+                    .await?;
                     let captured_paid = decimal_field(document, "paid_days");
                     let captured_working = decimal_field(document, "working_days");
                     let day_tolerance = Decimal::new(1, 6);
