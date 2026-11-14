@@ -1,6 +1,6 @@
 //! Meter, reading, and issued utility-bill invariants.
 use crate::money;
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
 use rust_decimal::Decimal;
 use serde_json::Value;
 
@@ -34,15 +34,22 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
             if !decimal(document, "reading").is_some_and(|value| value >= Decimal::ZERO) {
                 errors.push("Chỉ số công tơ phải là số không âm".into());
             }
-            if document
+            let period = document
                 .get("period")
                 .and_then(Value::as_str)
                 .filter(|value| value.len() == 7)
                 .and_then(|period| {
                     NaiveDate::parse_from_str(&format!("{period}-01"), "%Y-%m-%d").ok()
-                })
-                .is_none()
-            {
+                });
+            if let Some(period) = period {
+                let current_period = chrono::Utc::now()
+                    .date_naive()
+                    .with_day(1)
+                    .expect("the first day of a valid date exists");
+                if period > current_period {
+                    errors.push("Không thể ghi chỉ số cho kỳ trong tương lai".into());
+                }
+            } else {
                 errors.push("Kỳ ghi chỉ số phải theo định dạng YYYY-MM".into());
             }
             let consumption = decimal(document, "consumption");
