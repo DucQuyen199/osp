@@ -389,7 +389,7 @@ pub async fn validate_persistence(
         };
         let row = tx
             .query_opt(
-                "SELECT room.status, reservation.check_in <= current_date FROM hotel__room room CROSS JOIN hotel__reservation reservation WHERE room.tenant_id = $1 AND room.id = $2 AND reservation.tenant_id = $1 AND reservation.id = $3 FOR UPDATE OF room",
+                "SELECT room.status, reservation.check_in <= current_date AND reservation.check_out > current_date FROM hotel__room room CROSS JOIN hotel__reservation reservation WHERE room.tenant_id = $1 AND room.id = $2 AND reservation.tenant_id = $1 AND reservation.id = $3 FOR UPDATE OF room",
                 &[&tenant.id, &room_id, &document.get("id").and_then(Value::as_str).and_then(|id| Uuid::parse_str(id).ok()).unwrap_or(Uuid::nil())],
             )
             .await?;
@@ -397,13 +397,13 @@ pub async fn validate_persistence(
             return Ok(vec!["Reservation room was not found in this tenant".into()]);
         };
         let status: String = row.get(0);
-        let check_in_reached: bool = row.get(1);
+        let within_stay: bool = row.get(1);
         if status != "vacant" {
             return Ok(vec!["Room must be vacant before guest check-in".into()]);
         }
-        if !check_in_reached {
+        if !within_stay {
             return Ok(vec![
-                "Guest cannot check in before the reservation date".into(),
+                "Guest can only check in on or after the reservation date and before its checkout date".into(),
             ]);
         }
         return Ok(Vec::new());
