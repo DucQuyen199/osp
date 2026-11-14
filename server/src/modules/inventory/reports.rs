@@ -14,8 +14,44 @@ async fn replenishment_rows(
     tenant: &Tenant,
     warehouse: Option<Uuid>,
 ) -> R<Vec<Value>> {
+    let sales_demand = if tenant.has_module("sales") {
+        let shipments = if tenant.has_module("logistics") {
+            "sales_shipments AS ( \
+               SELECT shipment.source_id::uuid AS order_id, (line->>'product')::uuid AS product, \
+                 sum((line->>'qty')::numeric) AS qty \
+               FROM logistics__shipment shipment \
+               CROSS JOIN LATERAL jsonb_array_elements(COALESCE(shipment.lines, '[]'::jsonb)) line \
+               WHERE shipment.tenant_id = $1 AND shipment.source = 'sales_order' \
+                 AND shipment.status = 'delivered' AND line->>'tracked' = 'true' \
+               GROUP BY shipment.source_id, (line->>'product')::uuid \
+             ), "
+        } else {
+            "sales_shipments AS (SELECT NULL::uuid AS order_id, NULL::uuid AS product, 0::numeric AS qty WHERE FALSE), "
+        };
+        format!(
+            "sales_order_lines AS ( \
+               SELECT orders.id AS order_id, orders.warehouse, (line->>'product')::uuid AS product, \
+                 sum((line->>'qty')::numeric) AS qty \
+               FROM sales__sales_order orders \
+               CROSS JOIN LATERAL jsonb_array_elements(COALESCE(orders.lines, '[]'::jsonb)) line \
+               WHERE orders.tenant_id = $1 AND orders.status IN ('confirmed', 'partially_delivered') \
+                 AND line->>'tracked' = 'true' \
+               GROUP BY orders.id, orders.warehouse, (line->>'product')::uuid \
+             ), {shipments} \
+             sales_demand AS ( \
+               SELECT order_lines.warehouse, order_lines.product, \
+                 sum(GREATEST(order_lines.qty - COALESCE(shipments.qty, 0), 0)) AS qty \
+               FROM sales_order_lines order_lines \
+               LEFT JOIN sales_shipments shipments ON shipments.order_id = order_lines.order_id \
+                 AND shipments.product = order_lines.product \
+               GROUP BY order_lines.warehouse, order_lines.product \
+             ),"
+        )
+    } else {
+        "sales_demand AS (SELECT NULL::uuid AS warehouse, NULL::uuid AS product, 0::numeric AS qty WHERE FALSE),".into()
+    };
     tx.query_json(
-        "WITH ordered_lines AS ( \
+        &format!("WITH {sales_demand} ordered_lines AS ( \
            SELECT po.id AS order_id, po.tenant_id, po.warehouse, \
              (line->>'product')::uuid AS product, (line->>'price')::numeric AS price, \
              sum((line->>'qty')::numeric) AS ordered_qty \
@@ -69,17 +105,24 @@ async fn replenishment_rows(
            'availableQty', COALESCE(balance.available_qty, 0), \
            'incomingQty', COALESCE(incoming.qty, 0), \
            'requisitionQty', COALESCE(open_requisitions.qty, 0), \
+           'committedQty', COALESCE(sales_demand.qty, 0), \
+           'projectedQty', COALESCE(balance.available_qty, 0) + COALESCE(incoming.qty, 0) \
+             + COALESCE(open_requisitions.qty, 0) - COALESCE(sales_demand.qty, 0), \
            'suggestedQty', GREATEST(rule.target_qty - COALESCE(balance.available_qty, 0) \
-             - COALESCE(incoming.qty, 0) - COALESCE(open_requisitions.qty, 0), 0) \
+             - COALESCE(incoming.qty, 0) - COALESCE(open_requisitions.qty, 0) \
+             + COALESCE(sales_demand.qty, 0), 0) \
          ) FROM inventory__reorder_rule rule \
          JOIN master_data__product product ON product.tenant_id = rule.tenant_id AND product.id = rule.product \
          JOIN inventory__warehouse warehouse ON warehouse.tenant_id = rule.tenant_id AND warehouse.id = rule.warehouse \
          LEFT JOIN balances balance ON balance.product = rule.product AND balance.warehouse = rule.warehouse \
          LEFT JOIN incoming ON incoming.product = rule.product AND incoming.warehouse = rule.warehouse \
          LEFT JOIN open_requisitions ON open_requisitions.product = rule.product AND open_requisitions.warehouse = rule.warehouse \
+         LEFT JOIN sales_demand ON sales_demand.product = rule.product AND sales_demand.warehouse = rule.warehouse \
          WHERE rule.tenant_id = $1 AND ($2::uuid IS NULL OR rule.warehouse = $2) \
-           AND COALESCE(balance.available_qty, 0) < rule.minimum_qty \
+           AND COALESCE(balance.available_qty, 0) + COALESCE(incoming.qty, 0) \
+             + COALESCE(open_requisitions.qty, 0) - COALESCE(sales_demand.qty, 0) < rule.minimum_qty \
          ORDER BY product.name, warehouse.name, rule.id",
+        ),
         &[&tenant.id, &warehouse],
     )
     .await
