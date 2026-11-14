@@ -115,6 +115,7 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                     Some(
                         "payment_refund"
                             | "event_ticket_refund"
+                            | "pos_order_refund"
                             | "credit_note_refund"
                             | "debit_note_refund"
                     )
@@ -149,6 +150,14 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                     .is_none_or(str::is_empty)
             {
                 errors.push("Khoản hoàn vé cần mã vé nguồn".into());
+            }
+            if document.get("source").and_then(Value::as_str) == Some("pos_order_refund")
+                && document
+                    .get("source_id")
+                    .and_then(Value::as_str)
+                    .is_none_or(str::is_empty)
+            {
+                errors.push("POS refund payment requires the source order id".into());
             }
             if matches!(
                 document.get("source").and_then(Value::as_str),

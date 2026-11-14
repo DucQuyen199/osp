@@ -159,6 +159,70 @@ pub(super) async fn validate(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> 
                     }
         }
     }
+    if document.get("source").and_then(Value::as_str) == Some("pos_order_refund") {
+        let source_id = document
+            .get("source_id")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok());
+        let order = if let Some(source_id) = source_id {
+            tx.query_opt("SELECT party, method FROM pos__pos_order WHERE tenant_id = $1 AND id = $2 AND status = 'refunded' FOR UPDATE", &[&tenant.id, &source_id]).await?
+        } else {
+            None
+        };
+        let original = if let Some(source_id) = source_id {
+            tx.query_opt("SELECT amount::text, party, method, tax_amount::text FROM accounting__payment WHERE tenant_id = $1 AND source = 'pos_order' AND source_id = $2 FOR UPDATE", &[&tenant.id, &source_id.to_string()]).await?
+        } else {
+            None
+        };
+        let reversal = if let Some(source_id) = source_id {
+            tx.query_opt("SELECT 1 FROM accounting__journal_entry WHERE tenant_id = $1 AND source = 'pos_refund' AND source_id = $2 AND status = 'posted' FOR SHARE", &[&tenant.id, &source_id.to_string()]).await?
+        } else {
+            None
+        };
+        let matches_original = match (order, original) {
+            (Some(order), Some(original)) => {
+                let original_amount = database_amount(&original, 0)?;
+                amount(document, "amount")
+                    .is_some_and(|refund| refund_matches(original_amount, refund))
+                    && order.get::<_, Option<Uuid>>(0) == original.get::<_, Option<Uuid>>(1)
+                    && order.get::<_, Option<String>>(1) == original.get::<_, Option<String>>(2)
+                    && document
+                        .get("party")
+                        .and_then(Value::as_str)
+                        .and_then(|v| Uuid::parse_str(v).ok())
+                        == original.get::<_, Option<Uuid>>(1)
+                    && document.get("method").and_then(Value::as_str)
+                        == original.get::<_, Option<String>>(2).as_deref()
+                    && match (
+                        amount(document, "tax_amount"),
+                        original.get::<_, Option<String>>(3),
+                    ) {
+                        (Some(refund_tax), Some(original_tax)) => {
+                            crate::money::decimal_str(&original_tax)
+                                .is_some_and(|tax| refund_matches(tax, refund_tax))
+                        }
+                        (None, None) => true,
+                        (None, Some(tax)) => crate::money::decimal_str(&tax)
+                            .is_some_and(|tax| tax.abs() <= amount_tolerance()),
+                        _ => false,
+                    }
+            }
+            _ => false,
+        };
+        if !matches_original || reversal.is_none() {
+            errors.push("POS refund must match its refunded order, original payment and posted reversing journal".into());
+        }
+        if let Some(source_id) = source_id {
+            let payment_id = document
+                .get("id")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+                .unwrap_or(Uuid::nil());
+            if tx.query_opt("SELECT 1 FROM accounting__payment WHERE tenant_id = $1 AND source = 'pos_order_refund' AND source_id = $2 AND id <> $3 LIMIT 1", &[&tenant.id, &source_id.to_string(), &payment_id]).await?.is_some() {
+                errors.push("POS order already has an accounting refund payment".into());
+            }
+        }
+    }
     let source = document
         .get("source")
         .and_then(Value::as_str)

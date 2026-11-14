@@ -106,16 +106,18 @@ SELECT p.id::text, abs(COALESCE(p.base_amount, p.amount))::text, abs(COALESCE(p.
            'tax_name', COALESCE(NULLIF(p.tax_name, ''), 'Ticket VAT')
          )) END,
        COALESCE(j.posting_date, (j.created_at AT TIME ZONE 'UTC')::date),
-       CASE WHEN p.source = 'ticket' THEN 1 ELSE -1 END::int,
-       CASE WHEN p.source = 'ticket' THEN 'invoice'::text ELSE 'credit_note'::text END,
+       CASE WHEN p.source IN ('ticket', 'pos_order') THEN 1 ELSE -1 END::int,
+       CASE WHEN p.source IN ('ticket', 'pos_order') THEN 'invoice'::text ELSE 'credit_note'::text END,
        COALESCE(party.name, ''), COALESCE(party.tax_code, ''), COALESCE(currency.code, ''), COALESCE(p.exchange_rate, 1)::text
 FROM accounting__payment p
 JOIN accounting__journal_entry j ON j.tenant_id = p.tenant_id AND j.status = 'posted'
   AND ((p.source = 'ticket' AND j.source = 'payment' AND j.source_id = p.id::text)
-    OR (p.source = 'event_ticket_refund' AND j.source = 'ticket_refund' AND j.source_id = p.source_id))
+    OR (p.source = 'event_ticket_refund' AND j.source = 'ticket_refund' AND j.source_id = p.source_id)
+    OR (p.source = 'pos_order' AND j.source = 'payment' AND j.source_id = p.id::text)
+    OR (p.source = 'pos_order_refund' AND j.source = 'pos_refund' AND j.source_id = p.source_id))
 LEFT JOIN master_data__party party ON party.tenant_id = p.tenant_id AND party.id = p.party
 LEFT JOIN master_data__currency currency ON currency.tenant_id = p.tenant_id AND currency.id = p.currency
-WHERE p.tenant_id = $1 AND p.source IN ('ticket', 'event_ticket_refund')
+WHERE p.tenant_id = $1 AND p.source IN ('ticket', 'event_ticket_refund', 'pos_order', 'pos_order_refund')
   AND abs(COALESCE(p.tax_amount, 0)) > 0.005
   AND ($2::date IS NULL OR COALESCE(j.posting_date, (j.created_at AT TIME ZONE 'UTC')::date) >= $2::date)
   AND ($3::date IS NULL OR COALESCE(j.posting_date, (j.created_at AT TIME ZONE 'UTC')::date) <= $3::date)
