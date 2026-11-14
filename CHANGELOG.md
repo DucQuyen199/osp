@@ -20,6 +20,7 @@
 - Added a supplier invoice dispute state with a required reason, cancellation of any pending approval, a required resolution note before resubmission, and an option to mark an invoice as disputed before submission so tolerance rules do not auto-approve it.
 - Added inline dispute and resolution controls to the purchasing workbench, gated by invoice update and transition permissions.
 - Added configurable pesticide pre-harvest intervals to product records, snapshotting the interval on each spray log and enforcing it on the server before harvest while showing the earliest permitted date in the crop-cycle workbench.
+- Added guest counts to hotel reservations, enforcing room-type capacity on create and update and preventing capacity reductions below active bookings.
 - Linked purchase returns to the supplier invoice they reverse; returns before invoicing reduce GRNI directly, while billed returns create a debit note against the selected payable.
 - Serialized supplier invoice number uniqueness checks per tenant and supplier so concurrent approvals on different purchase orders cannot create duplicate payable documents.
 - Added permission-aware BI authoring for saved row and aggregate reports, dashboards with validated report widgets, and KPIs with aggregate sources and optional formulas, using enabled tenant entities and field metadata without manual JSON editing.

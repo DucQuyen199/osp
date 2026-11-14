@@ -203,6 +203,31 @@ pub async fn validate_persistence(
         }
         return Ok(Vec::new());
     }
+    if entity == "room_type" && action == "updated" {
+        let Some(room_type) = document
+            .get("id")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+        else {
+            return Ok(vec!["Room type id is required".into()]);
+        };
+        if let Some(capacity) = document.get("capacity").and_then(crate::money::decimal) {
+            let capacity_text = capacity.normalize().to_string();
+            if tx
+                .query_opt(
+                    "SELECT id FROM hotel__reservation WHERE tenant_id = $1 AND room_type = $2 AND status IN ('booked', 'checked_in') AND COALESCE(guest_count, 1)::numeric > $3::numeric LIMIT 1 FOR UPDATE",
+                    &[&tenant.id, &room_type, &capacity_text],
+                )
+                .await?
+                .is_some()
+            {
+                return Ok(vec![
+                    "Không thể giảm sức chứa xuống thấp hơn số khách của một đặt phòng đang hoạt động".into(),
+                ]);
+            }
+        }
+        return Ok(Vec::new());
+    }
     if entity == "reservation" && matches!(action, "created" | "updated") {
         let Some(party) = document
             .get("party")
@@ -280,15 +305,31 @@ pub async fn validate_persistence(
         } else {
             return Ok(vec!["Select a room type or assign a room".into()]);
         };
-        if tx
+        let Some(type_row) = tx
             .query_opt(
-                "SELECT id FROM hotel__room_type WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                "SELECT capacity::text FROM hotel__room_type WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
                 &[&tenant.id, &room_type],
             )
             .await?
-            .is_none()
-        {
+        else {
             return Ok(vec!["Room type was not found in this tenant".into()]);
+        };
+        let guest_count = document
+            .get("guest_count")
+            .and_then(Value::as_i64)
+            .unwrap_or(1);
+        if let Some(capacity_text) = type_row.get::<_, Option<String>>(0) {
+            let Some(capacity) = crate::money::decimal_str(&capacity_text) else {
+                return Err(crate::error::ApiError::validation(
+                    "hotel.room_type.capacity",
+                    vec!["Sức chứa lưu trong loại phòng không phải số nguyên hợp lệ".into()],
+                ));
+            };
+            if Decimal::from(guest_count) > capacity {
+                return Ok(vec![format!(
+                    "Энэ төрлийн өрөө дээд тал нь {capacity} зочин хүлээн авна"
+                )]);
+            }
         }
         let room_count: i64 = tx
             .query_one_row(

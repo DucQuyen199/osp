@@ -38,6 +38,7 @@ pub async fn prepare_document(
             "Check-out date must be later than check-in date".into(),
         ]);
     }
+    document.entry("guest_count").or_insert(json!(1));
     let room = document
         .get("room")
         .and_then(Value::as_str)

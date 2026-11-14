@@ -125,6 +125,12 @@
      "required": true
     },
     {
+     "name": "guest_count",
+     "label": "Số lượng khách",
+     "type": "number",
+     "required": false
+    },
+    {
      "name": "total",
      "type": "money",
      "required": false,

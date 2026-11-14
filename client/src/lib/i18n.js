@@ -38,6 +38,7 @@ const FIELDS = {
   patient: 'Bệnh nhân', doctor: 'Bác sĩ', complaint: 'Lý do khám', diagnosis: 'Chẩn đoán', fee: 'Phí khám', encounter: 'Lượt khám', test: 'Xét nghiệm',
   student: 'Học viên', student_code: 'Mã học viên', guardian: 'Phụ huynh', subject_: 'Môn', teacher: 'Giáo viên', tuition: 'Học phí', class: 'Lớp', enrollment: 'Ghi danh', term: 'Học kỳ',
   area: 'Diện tích', property: 'Bất động sản', room_type: 'Loại phòng', room: 'Phòng', floor: 'Tầng', reservation: 'Đặt phòng', check_out_: 'Trả phòng',
+  guest_count: 'Số lượng khách',
   seats: 'Số chỗ', station: 'Khu bếp', available: 'Còn phục vụ', ingredients: 'Nguyên liệu', table: 'Bàn', order: 'Đơn',
   farm: 'Trang trại', crop: 'Cây trồng', planted_on: 'Ngày gieo trồng', expected_harvest: 'Dự kiến thu hoạch', cycle: 'Vụ mùa', grade: 'Phân loại', lot_code: 'Mã lô',
   preharvest_interval_days: 'Thời gian cách ly trước thu hoạch (ngày)',

@@ -64,6 +64,13 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
             } else if check_in >= check_out {
                 errors.push("Check-out date must be later than check-in date".into());
             }
+            if !document
+                .get("guest_count")
+                .and_then(Value::as_i64)
+                .is_some_and(|guests| guests > 0)
+            {
+                errors.push("Số lượng khách phải là số nguyên dương".into());
+            }
         }
         "folio_charge" => {
             if !document

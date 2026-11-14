@@ -6298,6 +6298,9 @@
             "readOnly": true,
             "type": "string"
           },
+          "guest_count": {
+            "type": "number"
+          },
           "id": {
             "format": "uuid",
             "readOnly": true,
@@ -6359,6 +6362,9 @@
           "check_out": {
             "format": "date",
             "type": "string"
+          },
+          "guest_count": {
+            "type": "number"
           },
           "nightly_rate": {
             "readOnly": true,
