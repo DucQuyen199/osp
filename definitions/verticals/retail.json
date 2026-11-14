@@ -49,23 +49,78 @@
  },
  "roles": {
   "cashier": {
-   "name": "Thu ngân",
-   "permissions": [
-    "pos.*",
-    "master-data.*.read",
-    "loyalty.member.*",
-    "inventory.stock_level.read"
-   ]
+    "name": "Thu ngân",
+    "permissions": [
+      "pos.*",
+      "master-data.*.read",
+      "loyalty.member.*",
+      "inventory.stock_level.read"
+    ]
   },
   "stock_keeper": {
-   "name": "Thủ kho",
-   "permissions": [
-    "inventory.*",
-    "purchasing.*.read",
-    "master-data.*.read"
-   ]
+    "name": "Thủ kho",
+    "permissions": [
+      "inventory.*",
+      "purchasing.*.read",
+      "master-data.*.read",
+      "purchasing.purchase_order.read",
+      "purchasing.purchase_receipt.read",
+      "purchasing.purchase_receipt.create",
+      "purchasing.purchase_receipt.received"
+    ]
+  },
+  "procurement_buyer": {
+    "name": "Nh?n vi?n mua h?ng",
+    "permissions": [
+      "purchasing.purchase_requisition.read",
+      "purchasing.purchase_requisition.create",
+      "purchasing.purchase_requisition.update",
+      "purchasing.purchase_requisition.submitted",
+      "purchasing.rfq.read",
+      "purchasing.rfq.create",
+      "purchasing.rfq.update",
+      "purchasing.rfq.sent",
+      "purchasing.rfq.awarded",
+      "purchasing.purchase_order.read",
+      "purchasing.purchase_order.create",
+      "purchasing.purchase_order.update",
+      "purchasing.purchase_order.submitted",
+      "purchasing.purchase_order.cancelled",
+      "purchasing.purchase_receipt.read",
+      "purchasing.purchase_receipt.create",
+      "purchasing.purchase_receipt.received",
+      "purchasing.purchase_receipt.cancelled",
+      "purchasing.purchase_return.read",
+      "purchasing.purchase_return.create",
+      "purchasing.purchase_return.update",
+      "purchasing.purchase_return.submitted",
+      "master-data.party.read",
+      "master-data.product.read",
+      "master-data.tax.read",
+      "inventory.warehouse.read",
+      "accounting.bill.read"
+    ]
+  },
+  "procurement_approver": {
+    "name": "Qu?n l? ph? duy?t mua h?ng",
+    "permissions": [
+      "purchasing.purchase_requisition.read",
+      "purchasing.purchase_requisition.approved",
+      "purchasing.purchase_requisition.rejected",
+      "purchasing.rfq.read",
+      "purchasing.rfq.awarded",
+      "purchasing.purchase_order.read",
+      "purchasing.purchase_order.approved",
+      "purchasing.purchase_order.rejected",
+      "purchasing.purchase_return.read",
+      "purchasing.purchase_return.approved",
+      "purchasing.purchase_return.rejected",
+      "master-data.party.read",
+      "master-data.product.read",
+      "inventory.warehouse.read"
+    ]
   }
- },
+},
  "kpis": [
   "Doanh thu theo cửa hàng",
   "Giá trị đơn trung bình",

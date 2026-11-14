@@ -12,7 +12,7 @@ Trang trại, hợp tác xã, chế biến nông sản, truy xuất nguồn gố
 - **Module (12):** `master-data`, `hrm`, `accounting`, `inventory`, `agriculture`, `bi`, `sales`, `einvoice`, `logistics`, `quality`, `payroll`, `purchasing`
 - **Thuật ngữ:** `master-data.party` = Đối tác thu mua/bán; `master-data.product` = Nông sản/Vật tư nông nghiệp
 - **Trường mở rộng:** `master-data.product`: vietgap_code, origin
-- **Vai trò riêng:** Quản lý trang trại
+- **Vai trò riêng:** Quản lý trang trại, Qu?n l? ph? duy?t mua h?ng, Nh?n vi?n mua h?ng
 - **KPI:** Năng suất/ha; Chi phí vật tư/ha; Sản lượng theo vụ; Tồn kho nông sản
 
 ## Ô tô - Xe máy (`automotive`)
@@ -21,7 +21,7 @@ Trang trại, hợp tác xã, chế biến nông sản, truy xuất nguồn gố
 - **Module (14):** `master-data`, `hrm`, `accounting`, `inventory`, `auto-service`, `bi`, `booking`, `sales`, `crm`, `einvoice`, `loyalty`, `quality`, `payroll`, `purchasing`
 - **Thuật ngữ:** `auto-service.vehicle` = Xe; `master-data.party` = Chủ xe; `master-data.product` = Phụ tùng/Dịch vụ
 - **Trường mở rộng:** `master-data.product`: oem_code, compatible_models
-- **Vai trò riêng:** Kỹ thuật viên, Cố vấn dịch vụ
+- **Vai trò riêng:** Kỹ thuật viên, Qu?n l? ph? duy?t mua h?ng, Nh?n vi?n mua h?ng, Cố vấn dịch vụ
 - **KPI:** Số xe vào xưởng; Thời gian sửa chữa trung bình; Doanh thu phụ tùng; Tỷ lệ quay lại bảo dưỡng
 
 ## Làm đẹp - Spa - Gym (`beauty-wellness`)
@@ -39,7 +39,7 @@ Nhà thầu, thi công, thiết kế - nội thất.
 - **Module (16):** `master-data`, `hrm`, `accounting`, `inventory`, `asset`, `bi`, `project`, `construction`, `contract`, `document`, `einvoice`, `maintenance`, `quality`, `payroll`, `purchasing`, `workflow-approval`
 - **Thuật ngữ:** `master-data.party` = Chủ đầu tư/Khách hàng; `master-data.product` = Vật tư xây dựng; `project.project` = Công trình
 - **Trường mở rộng:** `master-data.product`: norm_code, brand
-- **Vai trò riêng:** Dự toán, Quản lý dự án, Chỉ huy công trường
+- **Vai trò riêng:** Dự toán, Qu?n l? ph? duy?t mua h?ng, Nh?n vi?n mua h?ng, Quản lý dự án, Chỉ huy công trường
 - **KPI:** Tiến độ so với kế hoạch; Chi phí thực tế vs dự toán; Công nợ thầu phụ; Vật tư hao hụt
 
 ## Thương mại điện tử (`ecommerce`)
@@ -48,7 +48,7 @@ Shop online, thương hiệu D2C, bán trên sàn.
 - **Module (18):** `master-data`, `hrm`, `accounting`, `inventory`, `bi`, `communication`, `sales`, `crm`, `ecommerce`, `einvoice`, `helpdesk`, `logistics`, `loyalty`, `quality`, `marketing`, `payments`, `payroll`, `purchasing`
 - **Thuật ngữ:** `ecommerce.web_order` = Đơn online; `master-data.party` = Khách hàng; `master-data.product` = Sản phẩm
 - **Trường mở rộng:** `master-data.product`: seo_title, weight_g, marketplace_sku
-- **Vai trò riêng:** CSKH, Đóng gói - Giao hàng, Vận hành đơn online
+- **Vai trò riêng:** CSKH, Đóng gói - Giao hàng, Vận hành đơn online, Qu?n l? ph? duy?t mua h?ng, Nh?n vi?n mua h?ng
 - **KPI:** Tỷ lệ chuyển đổi; AOV; Tỷ lệ hoàn trả; Chi phí thu hút khách hàng
 
 ## Giáo dục - Đào tạo (`education`)
@@ -84,7 +84,7 @@ Nhà hàng, quán cà phê, chuỗi đồ uống, bếp trung tâm.
 - **Module (14):** `master-data`, `hrm`, `accounting`, `inventory`, `bi`, `booking`, `communication`, `einvoice`, `loyalty`, `quality`, `payroll`, `pos`, `purchasing`, `restaurant`
 - **Thuật ngữ:** `master-data.party` = Thực khách; `master-data.product` = Món/Nguyên liệu; `restaurant.table_order` = Order bàn
 - **Trường mở rộng:** `master-data.product`: allergens, prep_time_min
-- **Vai trò riêng:** Thu ngân, Bếp, Phục vụ
+- **Vai trò riêng:** Thu ngân, Bếp, Qu?n l? ph? duy?t mua h?ng, Nh?n vi?n mua h?ng, Phục vụ
 - **KPI:** Doanh thu theo ca; Thời gian lên món; Food cost %; Số lượt khách/bàn
 
 ## Y tế - Phòng khám (`healthcare`)
@@ -129,7 +129,7 @@ Nhà máy, xưởng sản xuất, gia công, lắp ráp.
 - **Module (15):** `master-data`, `hrm`, `accounting`, `inventory`, `asset`, `bi`, `sales`, `crm`, `einvoice`, `maintenance`, `quality`, `manufacturing`, `payroll`, `purchasing`, `workflow-approval`
 - **Thuật ngữ:** `master-data.party` = Khách hàng; `master-data.product` = Vật tư/Thành phẩm
 - **Trường mở rộng:** `master-data.product`: drawing_no, spec, shelf_life_days
-- **Vai trò riêng:** Kế hoạch sản xuất, QC, Kỹ thuật bảo trì
+- **Vai trò riêng:** Kế hoạch sản xuất, Qu?n l? ph? duy?t mua h?ng, Nh?n vi?n mua h?ng, QC, Kỹ thuật bảo trì
 - **KPI:** OEE; Tỷ lệ phế phẩm; Tiến độ lệnh sản xuất; Giá thành đơn vị
 
 ## Tổ chức phi lợi nhuận - Cơ quan công (`ngo-government`)
@@ -147,7 +147,7 @@ Nhà thuốc, chuỗi nhà thuốc, thiết bị y tế.
 - **Module (14):** `master-data`, `hrm`, `accounting`, `inventory`, `bi`, `sales`, `crm`, `einvoice`, `loyalty`, `quality`, `payroll`, `pos`, `pharmacy`, `purchasing`
 - **Thuật ngữ:** `master-data.party` = Khách hàng; `master-data.product` = Thuốc/Vật tư y tế
 - **Trường mở rộng:** `master-data.product`: active_ingredient, registration_no, requires_prescription, storage_condition
-- **Vai trò riêng:** Dược sĩ
+- **Vai trò riêng:** Dược sĩ, Qu?n l? ph? duy?t mua h?ng, Nh?n vi?n mua h?ng
 - **KPI:** Hàng cận date; Doanh thu theo nhóm thuốc; Biên lợi nhuận; Tồn kho an toàn
 
 ## Dịch vụ chuyên nghiệp (`professional-services`)
@@ -174,7 +174,7 @@ Cửa hàng, chuỗi bán lẻ, siêu thị mini, thời trang, điện máy.
 - **Module (16):** `master-data`, `hrm`, `accounting`, `inventory`, `bi`, `communication`, `sales`, `crm`, `ecommerce`, `einvoice`, `loyalty`, `quality`, `marketing`, `payroll`, `pos`, `purchasing`
 - **Thuật ngữ:** `master-data.branch` = Cửa hàng; `master-data.party` = Khách hàng; `master-data.product` = Hàng hóa
 - **Trường mở rộng:** `master-data.product`: brand, barcode, size, color
-- **Vai trò riêng:** Thu ngân, Thủ kho
+- **Vai trò riêng:** Thu ngân, Qu?n l? ph? duy?t mua h?ng, Nh?n vi?n mua h?ng, Thủ kho
 - **KPI:** Doanh thu theo cửa hàng; Giá trị đơn trung bình; Vòng quay tồn kho; Tỷ lệ khách quay lại
 
 ## Công nghệ - SaaS (`saas-technology`)
@@ -201,6 +201,6 @@ Nhà phân phối, đại lý, bán sỉ, FMCG.
 - **Module (14):** `master-data`, `hrm`, `accounting`, `inventory`, `bi`, `contract`, `sales`, `crm`, `einvoice`, `logistics`, `quality`, `payroll`, `purchasing`, `workflow-approval`
 - **Thuật ngữ:** `master-data.party` = Khách hàng/Đại lý; `master-data.product` = Mặt hàng
 - **Trường mở rộng:** `master-data.party`: credit_limit, payment_term_days, sales_region
-- **Vai trò riêng:** Điều phối giao hàng, Trưởng kinh doanh
+- **Vai trò riêng:** Điều phối giao hàng, Qu?n l? ph? duy?t mua h?ng, Nh?n vi?n mua h?ng, Trưởng kinh doanh
 - **KPI:** Doanh số theo khu vực/NVKD; Công nợ quá hạn; Tỷ lệ giao đúng hẹn; Tồn kho theo kho
 

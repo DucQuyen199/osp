@@ -41,27 +41,81 @@
  },
  "roles": {
   "sales_manager": {
-   "name": "Trưởng kinh doanh",
-   "permissions": [
-    "crm.*",
-    "sales.*",
-    "workflow-approval.*",
-    "master-data.*",
-    "inventory.warehouse.read",
-    "inventory.stock_level.read",
-    "logistics.shipment.read",
-    "accounting.invoice.read",
-    "accounting.credit_note.read"
-   ]
+    "name": "Trưởng kinh doanh",
+    "permissions": [
+      "crm.*",
+      "sales.*",
+      "workflow-approval.*",
+      "master-data.*",
+      "inventory.warehouse.read",
+      "inventory.stock_level.read",
+      "logistics.shipment.read",
+      "accounting.invoice.read",
+      "accounting.credit_note.read"
+    ]
   },
   "dispatcher": {
-   "name": "Điều phối giao hàng",
-   "permissions": [
-    "logistics.*",
-    "sales.sales_order.read"
-   ]
+    "name": "Điều phối giao hàng",
+    "permissions": [
+      "logistics.*",
+      "sales.sales_order.read"
+    ]
+  },
+  "procurement_buyer": {
+    "name": "Nh?n vi?n mua h?ng",
+    "permissions": [
+      "purchasing.purchase_requisition.read",
+      "purchasing.purchase_requisition.create",
+      "purchasing.purchase_requisition.update",
+      "purchasing.purchase_requisition.submitted",
+      "purchasing.rfq.read",
+      "purchasing.rfq.create",
+      "purchasing.rfq.update",
+      "purchasing.rfq.sent",
+      "purchasing.rfq.awarded",
+      "purchasing.purchase_order.read",
+      "purchasing.purchase_order.create",
+      "purchasing.purchase_order.update",
+      "purchasing.purchase_order.submitted",
+      "purchasing.purchase_order.cancelled",
+      "purchasing.purchase_receipt.read",
+      "purchasing.purchase_receipt.create",
+      "purchasing.purchase_receipt.received",
+      "purchasing.purchase_receipt.cancelled",
+      "purchasing.purchase_return.read",
+      "purchasing.purchase_return.create",
+      "purchasing.purchase_return.update",
+      "purchasing.purchase_return.submitted",
+      "master-data.party.read",
+      "master-data.product.read",
+      "master-data.tax.read",
+      "inventory.warehouse.read",
+      "accounting.bill.read"
+    ]
+  },
+  "procurement_approver": {
+    "name": "Qu?n l? ph? duy?t mua h?ng",
+    "permissions": [
+      "purchasing.purchase_requisition.read",
+      "purchasing.purchase_requisition.approved",
+      "purchasing.purchase_requisition.rejected",
+      "purchasing.rfq.read",
+      "purchasing.rfq.awarded",
+      "purchasing.purchase_order.read",
+      "purchasing.purchase_order.approved",
+      "purchasing.purchase_order.rejected",
+      "purchasing.purchase_return.read",
+      "purchasing.purchase_return.approved",
+      "purchasing.purchase_return.rejected",
+      "workflow-approval.approval_request.read",
+      "workflow-approval.approval_request.approved",
+      "workflow-approval.approval_request.rejected",
+      "master-data.party.read",
+      "master-data.product.read",
+      "inventory.warehouse.read"
+    ]
   }
- },
+},
  "kpis": [
   "Doanh số theo khu vực/NVKD",
   "Công nợ quá hạn",
