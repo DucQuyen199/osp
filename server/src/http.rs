@@ -1762,6 +1762,25 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     }
                     return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
                 }
+                if q == "events.ticket" && matches!(*action, "sold" | "refunded") {
+                    let body = json_obj(&bytes)?;
+                    let field = if *action == "sold" {
+                        "method"
+                    } else {
+                        "refund_reason"
+                    };
+                    if body.len() != 1 || !body.contains_key(field) {
+                        return Err(ApiError::validation(
+                            if *action == "sold" {
+                                "events.ticket.sold"
+                            } else {
+                                "events.ticket.refunded"
+                            },
+                            vec![format!("Cần gửi duy nhất trường {field}")],
+                        ));
+                    }
+                    return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
+                }
                 return json_ok(k.act(&actor, &t, &q, id, action).await?);
             }
             _ => {}

@@ -10,6 +10,7 @@
 - Added a hotel front-desk stay-extension flow that checks room conflicts and capacity, preserves the reserved nightly-rate snapshot, and recalculates nights and folio totals before checkout.
 - Added a reasoned customer quote-decline state to automotive repair orders, preserving the rejected estimate while releasing the vehicle for a new intake without consuming stock or billing.
 - Added an education fee ledger for enrollment tuition and other student charges, with due dates carried into accounting invoices and fee status automatically synchronized when invoices are fully paid.
+- Made event ticket sale and refund atomic with the payment method or refund reason, so accounting entries and ticket status commit or roll back together.
 - Added contract amendments for title, terms, contract value and end-date changes, with approval-rule support, effective-date scheduling, atomic application and an immutable amendment history on the active contract.
 - Added an e-invoice operations workbench with status queues, provider error visibility, retry controls, source invoice links, provider response and attempt-history inspection, and reasoned cancellation requests.
 - Anchored subscription billing dates to the original start day, preventing month-end billing dates from drifting after short months.

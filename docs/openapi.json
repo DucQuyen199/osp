@@ -59491,7 +59491,7 @@
     },
     "/api/t/{tenantId}/data/events/ticket/{id}/refunded": {
       "post": {
-        "description": "Phát sự kiện `events.ticket.refunded` cho các module khác phản ứng.",
+        "description": "Record the required refund reason and refund the sold, not-yet-checked-in ticket in one transaction. The accounting refund record is generated atomically.",
         "parameters": [
           {
             "in": "path",
@@ -59511,6 +59511,27 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "refund_reason": {
+                    "maxLength": 500,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "refund_reason"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -59576,7 +59597,7 @@
     },
     "/api/t/{tenantId}/data/events/ticket/{id}/sold": {
       "post": {
-        "description": "Phát sự kiện `events.ticket.sold` cho các module khác phản ứng.",
+        "description": "Set the validated payment method and sell the reserved ticket atomically. Ticket payment and tax records are generated in the same transaction.",
         "parameters": [
           {
             "in": "path",
@@ -59596,6 +59617,32 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "method": {
+                    "enum": [
+                      "cash",
+                      "card",
+                      "transfer",
+                      "ewallet",
+                      "bank"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "method"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {

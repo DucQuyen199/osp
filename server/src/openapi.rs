@@ -158,6 +158,38 @@ pub fn build(reg: &Registry) -> Value {
                             } } }
                         });
                     }
+                    if def.qname() == "events.ticket" && action == "sold" {
+                        operation["description"] = json!(
+                            "Set the validated payment method and sell the reserved ticket atomically. Ticket payment and tax records are generated in the same transaction."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": true,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "required": ["method"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "method": { "type": "string", "enum": ["cash", "card", "transfer", "ewallet", "bank"] }
+                                }
+                            } } }
+                        });
+                    }
+                    if def.qname() == "events.ticket" && action == "refunded" {
+                        operation["description"] = json!(
+                            "Record the required refund reason and refund the sold, not-yet-checked-in ticket in one transaction. The accounting refund record is generated atomically."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": true,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "required": ["refund_reason"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "refund_reason": { "type": "string", "minLength": 1, "maxLength": 500 }
+                                }
+                            } } }
+                        });
+                    }
                     paths.insert(
                         format!("{base}/{{id}}/{action}"),
                         json!({ "post": operation }),

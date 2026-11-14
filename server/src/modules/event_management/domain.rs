@@ -151,12 +151,13 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
             if document.get("status").and_then(Value::as_str) != Some("sold") {
                 return vec!["Chỉ được hoàn vé đã bán và chưa check-in".into()];
             }
-            if document
+            let reason = document
                 .get("refund_reason")
                 .and_then(Value::as_str)
-                .is_none_or(|reason| reason.trim().is_empty())
-            {
-                return vec!["Cần ghi lý do hoàn vé".into()];
+                .map(str::trim)
+                .unwrap_or_default();
+            if !(1..=500).contains(&reason.chars().count()) {
+                return vec!["Cần ghi lý do hoàn vé (1–500 ký tự)".into()];
             }
         }
         _ => {}
@@ -167,6 +168,15 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
 pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<String> {
     if !patch.as_object().is_some_and(|patch| !patch.is_empty()) {
         return Vec::new();
+    }
+    if entity == "ticket"
+        && current.get("status").and_then(Value::as_str) == Some("sold")
+        && let Some(reason) = patch.get("refund_reason")
+    {
+        let reason = reason.as_str().map(str::trim).unwrap_or_default();
+        if !(1..=500).contains(&reason.chars().count()) {
+            return vec!["Lý do hoàn vé phải có từ 1 đến 500 ký tự".into()];
+        }
     }
     match (entity, current.get("status").and_then(Value::as_str)) {
         ("event", Some("draft")) => Vec::new(),
