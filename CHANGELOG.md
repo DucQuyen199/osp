@@ -7,6 +7,7 @@
 - Added contract amendments for title, terms, contract value and end-date changes, with approval-rule support, effective-date scheduling, atomic application and an immutable amendment history on the active contract.
 - Added an e-invoice operations workbench with status queues, provider error visibility, retry controls, source invoice links, provider response and attempt-history inspection, and reasoned cancellation requests.
 - Anchored subscription billing dates to the original start day, preventing month-end billing dates from drifting after short months.
+- Routed pharmacy prescription dispensing through the prescription state machine and event handler after a completed POS sale, keeping dispense timestamps and audit history in the same transaction.
 
 ### Changed
 - Scoped the runtime data ignore rule to the repository root so nested application source such as `server/src/kernel/data` is tracked and included in source releases.

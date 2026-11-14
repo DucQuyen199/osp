@@ -234,6 +234,23 @@ pub(super) async fn dispatch(
             "outcome": "ok"
         }));
     }
+    if crate::modules::pharmacy::handle_source_event(
+        kernel,
+        tx,
+        tenant,
+        &event.ty,
+        &event.payload,
+        event.id,
+        event.depth,
+    )
+    .await?
+    {
+        handled.push(json!({
+            "module": "pharmacy",
+            "rule": "completed_pos_order_dispenses_prescription",
+            "outcome": "ok"
+        }));
+    }
 
     Ok(())
 }

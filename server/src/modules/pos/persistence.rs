@@ -312,8 +312,6 @@ pub async fn validate_persistence(
                     let already = tx.query_opt("SELECT id FROM pos__pos_order WHERE tenant_id=$1 AND prescription=$2::text AND status='completed' LIMIT 1", &[&tenant.id, &rx_id]).await?.is_some();
                     if already {
                         errors.push("Đơn thuốc đã được dùng cho giao dịch khác".into());
-                    } else {
-                        tx.execute("UPDATE pharmacy__prescription SET status='dispensed', dispensed_at=now() WHERE tenant_id=$1 AND id=$2 AND status='verified'", &[&tenant.id, &rx_id]).await?;
                     }
                 }
             } else {

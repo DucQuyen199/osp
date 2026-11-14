@@ -71,9 +71,7 @@ pub async fn validate_persistence(
             errors.push("Không thể xác minh đơn thuốc đã hết hạn".into());
         }
     }
-    if action == "dispensed" {
-        errors.push("Đơn thuốc chỉ được đánh dấu đã cấp khi hoàn tất giao dịch POS".into());
-    }
+    errors.extend(super::application::validate_dispense(tx, tenant, action, doc).await?);
     Ok(errors)
 }
 fn id(doc: &Value, field: &str) -> Option<Uuid> {
