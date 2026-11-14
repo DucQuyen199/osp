@@ -4,6 +4,7 @@ use serde_json::{Map, Value, json};
 
 const APPROVAL_TARGETS: &[&str] = &[
     "purchasing.purchase_order",
+    "purchasing.supplier_invoice",
     "purchasing.purchase_requisition",
     "payroll.payroll_run",
     "inventory.stock_count",
@@ -65,6 +66,12 @@ pub fn request_for_event(event_type: &str, event: &Value) -> Option<Map<String, 
         "purchasing.purchase_order.submitted" => (
             "purchasing.purchase_order",
             "Duyệt đơn mua hàng",
+            event.get("total"),
+            None,
+        ),
+        "purchasing.supplier_invoice.submitted" => (
+            "purchasing.supplier_invoice",
+            "Duyệt hóa đơn nhà cung cấp",
             event.get("total"),
             None,
         ),
@@ -150,6 +157,7 @@ pub fn decision_for_event(event_type: &str, event: &Value) -> Option<(&'static s
     };
     let entity = match event.get("entity")?.as_str()? {
         "purchasing.purchase_order" => "purchasing.purchase_order",
+        "purchasing.supplier_invoice" => "purchasing.supplier_invoice",
         "purchasing.purchase_requisition" => "purchasing.purchase_requisition",
         "payroll.payroll_run" => "payroll.payroll_run",
         "inventory.stock_count" => "inventory.stock_count",

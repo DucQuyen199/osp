@@ -185,6 +185,29 @@ pub(super) async fn validate(
     action: &str,
     document: &Value,
 ) -> R<Vec<String>> {
+    let invoice_id = id(document, "id").unwrap_or(Uuid::nil());
+    if tenant.has_module("workflow-approval") && matches!(action, "approved" | "rejected") {
+        let required_status = if action == "approved" {
+            "approved"
+        } else {
+            "rejected"
+        };
+        let request_exists = tx
+            .query_opt(
+                "SELECT id FROM workflow_approval__approval_request WHERE tenant_id=$1 AND entity='purchasing.supplier_invoice' AND record_id=$2 AND status=$3 LIMIT 1 FOR SHARE",
+                &[&tenant.id, &invoice_id.to_string(), &required_status],
+            )
+            .await?
+            .is_some();
+        if !request_exists {
+            let message = if action == "approved" {
+                "Supplier invoices must be approved through their shared approval request"
+            } else {
+                "Reject supplier invoices through their shared approval request"
+            };
+            return Ok(vec![message.into()]);
+        }
+    }
     let Some(order_id) = id(document, "purchase_order") else {
         return Ok(vec![
             "Supplier invoice requires a valid purchase order".into(),
@@ -215,7 +238,6 @@ pub(super) async fn validate(
         errors.push("Department on the supplier invoice must match the purchase order".into());
     }
 
-    let invoice_id = id(document, "id").unwrap_or(Uuid::nil());
     let invoice_number = document
         .get("invoice_number")
         .and_then(Value::as_str)
@@ -240,7 +262,7 @@ pub(super) async fn validate(
         errors.push("Supplier invoice number already exists for this supplier".into());
     }
 
-    if action == "approved" {
+    if matches!(action, "submitted" | "approved") {
         let total = amount(document, "total").ok_or_else(|| {
             ApiError::validation(
                 "purchasing.supplier_invoice.total",
@@ -337,10 +359,17 @@ pub(super) async fn validate(
                 .max(Decimal::ZERO);
         }
 
-        let prior = tx.query(
-            "SELECT lines FROM purchasing__supplier_invoice WHERE tenant_id=$1 AND purchase_order=$2 AND status='approved' AND id<>$3 FOR UPDATE",
-            &[&tenant.id, &order_id, &invoice_id],
-        ).await?;
+        let prior_statuses = if action == "submitted" {
+            "IN ('submitted','approved')"
+        } else {
+            "= 'approved'"
+        };
+        let prior = tx
+            .query(
+                &format!("SELECT lines FROM purchasing__supplier_invoice WHERE tenant_id=$1 AND purchase_order=$2 AND status {prior_statuses} AND id<>$3 FOR UPDATE"),
+                &[&tenant.id, &order_id, &invoice_id],
+            )
+            .await?;
         let mut billed = BTreeMap::new();
         for invoice in prior {
             let lines: Value = invoice.get(0);

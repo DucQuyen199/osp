@@ -189,6 +189,7 @@ pub async fn validate_persistence(
 pub fn table_for(entity: &str) -> Option<&'static str> {
     match entity {
         "purchasing.purchase_order" => Some("purchasing__purchase_order"),
+        "purchasing.supplier_invoice" => Some("purchasing__supplier_invoice"),
         "purchasing.purchase_requisition" => Some("purchasing__purchase_requisition"),
         "payroll.payroll_run" => Some("payroll__payroll_run"),
         "inventory.stock_count" => Some("inventory__stock_count"),

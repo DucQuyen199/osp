@@ -15,6 +15,7 @@
 - Added construction progress claims with approval-gated payable bills and tenant-transactional cumulative checks against the signed subcontract value.
 - Deferred receivables for shipped sales orders until all deliveries succeed; counter sales continue to invoice at confirmation.
 - Added supplier invoice capture for partial and complete receipts; approval checks unique invoice numbers and cumulative received quantities after dispatched returns before posting each matched payable bill against remaining GRNI.
+- Routed supplier invoices through the shared approval workflow when enabled, including rejection and resubmission, while reserving received quantities at submission and locking invoice terms until a decision.
 - Linked purchase returns to the supplier invoice they reverse; returns before invoicing reduce GRNI directly, while billed returns create a debit note against the selected payable.
 - Serialized supplier invoice number uniqueness checks per tenant and supplier so concurrent approvals on different purchase orders cannot create duplicate payable documents.
 - Added permission-aware BI authoring for saved row and aggregate reports, dashboards with validated report widgets, and KPIs with aggregate sources and optional formulas, using enabled tenant entities and field metadata without manual JSON editing.

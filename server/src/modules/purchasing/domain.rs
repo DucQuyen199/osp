@@ -128,17 +128,25 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
         "purchase_receipt" if current.get("status").and_then(Value::as_str) != Some("draft") => {
             &["purchase_order", "warehouse", "lines", "total", "note"]
         }
-        "supplier_invoice" if current.get("status").and_then(Value::as_str) != Some("draft") => &[
-            "purchase_order",
-            "supplier",
-            "department",
-            "invoice_number",
-            "issue_date",
-            "due_date",
-            "total",
-            "tax_total",
-            "lines",
-        ],
+        "supplier_invoice"
+            if !matches!(
+                current.get("status").and_then(Value::as_str),
+                Some("draft" | "rejected")
+            ) =>
+        {
+            &[
+                "purchase_order",
+                "supplier",
+                "department",
+                "invoice_number",
+                "issue_date",
+                "due_date",
+                "total",
+                "tax_total",
+                "adjustments",
+                "lines",
+            ]
+        }
         "purchase_order"
             if !matches!(
                 current.get("status").and_then(Value::as_str),
@@ -215,7 +223,7 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
             | ("purchase_requisition", "submitted" | "approved")
             | ("purchase_return", "submitted" | "approved" | "dispatched")
             | ("purchase_receipt", "received")
-            | ("supplier_invoice", "approved")
+            | ("supplier_invoice", "submitted" | "approved")
     ) {
         return Vec::new();
     }
@@ -298,7 +306,7 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
     {
         errors.push("Purchase receipt total must be greater than zero".into());
     }
-    if entity == "supplier_invoice" && action == "approved" {
+    if entity == "supplier_invoice" && matches!(action, "submitted" | "approved") {
         if document
             .get("invoice_number")
             .and_then(Value::as_str)

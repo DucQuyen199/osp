@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **50 module**, **186 loại dữ liệu**, **835 sự kiện**.
+Tổng: **50 module**, **186 loại dữ liệu**, **837 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -228,7 +228,7 @@ Tổng: **50 module**, **186 loại dữ liệu**, **835 sự kiện**.
 | `rfq` Yêu cầu báo giá | `draft` → **accepted** (quoted→accepted), **cancelled** (draft/sent→cancelled), **quoted** (sent→quoted), **rejected** (sent/quoted→rejected), **sent** (draft→sent) |
 | `purchase_order` Đơn mua hàng | `draft` → **approved** (submitted→approved), **cancelled** (draft/submitted/approved/rejected→cancelled), **partially_received** (approved→partially_received), **received** (approved/partially_received→received), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 | `purchase_receipt` Phiếu nhận hàng mua | `draft` → **cancelled** (draft→cancelled), **received** (draft→received) |
-| `supplier_invoice` Hóa đơn nhà cung cấp | `draft` → **approved** (draft→approved) |
+| `supplier_invoice` Hóa đơn nhà cung cấp | `draft` → **approved** (draft/submitted→approved), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 | `purchase_requisition` Đề nghị mua | `draft` → **approved** (submitted→approved), **rejected** (submitted→rejected), **sourced** (approved→sourced), **submitted** (draft/rejected→submitted) |
 | `purchase_return` Phiếu trả hàng mua | `draft` → **approved** (submitted→approved), **cancelled** (draft/rejected→cancelled), **dispatched** (approved→dispatched), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 

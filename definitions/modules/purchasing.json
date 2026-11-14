@@ -333,12 +333,16 @@
     { "name": "adjustment_net", "type": "money", "required": false, "system": true },
     { "name": "adjustment_tax", "type": "money", "required": false, "system": true },
     { "name": "lines", "type": "json", "required": true },
-    { "name": "status", "type": "enum", "required": false, "options": ["draft", "approved"] }
+    { "name": "status", "type": "enum", "required": false, "options": ["draft", "submitted", "rejected", "approved"] }
    ],
    "states": {
     "field": "status",
     "initial": "draft",
-    "actions": { "approved": { "from": ["draft"], "to": "approved" } }
+    "actions": {
+     "submitted": { "from": ["draft", "rejected"], "to": "submitted" },
+     "approved": { "from": ["draft", "submitted"], "to": "approved" },
+     "rejected": { "from": ["submitted"], "to": "rejected" }
+    }
    },
    "computed": {},
    "constraints": []
