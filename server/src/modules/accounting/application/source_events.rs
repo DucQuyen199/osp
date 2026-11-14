@@ -125,6 +125,9 @@ pub async fn handle_source_document_event(
         if let Some(value) = event.get("department").filter(|value| !value.is_null()) {
             data.insert("department".into(), value.clone());
         }
+        if let Some(value) = event.get("matched_net").filter(|value| !value.is_null()) {
+            data.insert("grni_match_amount".into(), value.clone());
+        }
     }
     if event_type == "purchasing.purchase_order.received"
         && let Some(department) = event.get("department").filter(|value| !value.is_null())

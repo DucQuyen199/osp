@@ -234,7 +234,7 @@ pub(super) async fn validate_return_persistence(
         }
     }
 
-    let mut requested: HashMap<(String, Decimal), Decimal> = HashMap::new();
+    let mut requested: HashMap<(String, Decimal, Decimal), Decimal> = HashMap::new();
     for line in &return_lines {
         let Some(product) = line.get("product").and_then(Value::as_str) else {
             continue;
@@ -242,11 +242,15 @@ pub(super) async fn validate_return_persistence(
         let Some(price) = line.get("price").and_then(money::decimal) else {
             continue;
         };
+        let order_price = line
+            .get("po_price")
+            .and_then(money::decimal)
+            .unwrap_or(price);
         let Some(qty) = line.get("qty").and_then(money::decimal) else {
             continue;
         };
         let requested_qty = requested
-            .entry((product.to_string(), price))
+            .entry((product.to_string(), price, order_price))
             .or_insert(Decimal::ZERO);
         *requested_qty = requested_qty
             .checked_add(qty)
@@ -259,7 +263,7 @@ pub(super) async fn validate_return_persistence(
     else {
         return Ok(vec!["Could not identify the purchase return record".into()]);
     };
-    for ((product, price), return_qty) in requested {
+    for ((product, price, order_price), return_qty) in requested {
         let mut bought_qty = Decimal::ZERO;
         for line in &bought_lines {
             if line.get("product").and_then(Value::as_str) == Some(product.as_str())
@@ -267,7 +271,7 @@ pub(super) async fn validate_return_persistence(
                     .get("price")
                     .and_then(money::decimal)
                     .is_some_and(|bought_price| {
-                        money::within_tolerance(bought_price, price, Decimal::new(5, 3))
+                        money::within_tolerance(bought_price, order_price, Decimal::new(5, 3))
                     })
             {
                 bought_qty = bought_qty
@@ -281,7 +285,7 @@ pub(super) async fn validate_return_persistence(
         }
         if bought_qty == Decimal::ZERO {
             errors.push(format!(
-                "Product {product} at price {price} is not present in the source purchase order"
+                "Product {product} at PO price {order_price} is not present in the source purchase order"
             ));
             continue;
         }
@@ -325,10 +329,10 @@ pub(super) async fn validate_return_persistence(
                 errors.push(format!("Return quantity for {product} exceeds the quantity on the selected supplier invoice"));
             }
         }
-        let price_text = price.normalize().to_string();
+        let price_text = order_price.normalize().to_string();
         let prior_row = tx
             .query_opt(
-                "SELECT COALESCE(SUM((item.line->>'qty')::numeric), 0)::text FROM purchasing__purchase_return pr CROSS JOIN LATERAL jsonb_array_elements(COALESCE(pr.lines, '[]'::jsonb)) AS item(line) WHERE pr.tenant_id = $1 AND pr.purchase_order = $2 AND pr.id <> $3 AND pr.status IN ('submitted', 'approved', 'dispatched') AND item.line->>'product' = $4 AND abs((item.line->>'price')::numeric - $5::text::numeric) <= 0.005",
+                "SELECT COALESCE(SUM((item.line->>'qty')::numeric), 0)::text FROM purchasing__purchase_return pr CROSS JOIN LATERAL jsonb_array_elements(COALESCE(pr.lines, '[]'::jsonb)) AS item(line) WHERE pr.tenant_id = $1 AND pr.purchase_order = $2 AND pr.id <> $3 AND pr.status IN ('submitted', 'approved', 'dispatched') AND item.line->>'product' = $4 AND abs(COALESCE((item.line->>'po_price')::numeric, (item.line->>'price')::numeric) - $5::text::numeric) <= 0.005",
                 &[&tenant.id, &order_id, &return_id, &product, &price_text],
             )
             .await?;

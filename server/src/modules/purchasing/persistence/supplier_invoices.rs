@@ -23,7 +23,11 @@ fn amount(document: &Value, field: &str) -> Option<Decimal> {
     document.get(field).and_then(money::decimal)
 }
 
-fn add_lines(totals: &mut BTreeMap<LineKey, Decimal>, lines: &Value) -> R<()> {
+fn add_lines(
+    totals: &mut BTreeMap<LineKey, Decimal>,
+    lines: &Value,
+    supplier_invoice: bool,
+) -> R<()> {
     let Some(lines) = lines.as_array() else {
         return Err(ApiError::validation(
             "purchasing.supplier_invoice.lines",
@@ -35,7 +39,14 @@ fn add_lines(totals: &mut BTreeMap<LineKey, Decimal>, lines: &Value) -> R<()> {
             .get("product")
             .and_then(Value::as_str)
             .and_then(|value| Uuid::parse_str(value).ok());
-        let price = line.get("price").and_then(money::decimal);
+        let price = line
+            .get(if supplier_invoice {
+                "po_price"
+            } else {
+                "price"
+            })
+            .and_then(money::decimal);
+        let invoice_price = line.get("price").and_then(money::decimal);
         let tax_rate = line
             .get("tax_rate")
             .and_then(money::decimal)
@@ -48,6 +59,7 @@ fn add_lines(totals: &mut BTreeMap<LineKey, Decimal>, lines: &Value) -> R<()> {
             ));
         };
         if price < Decimal::ZERO
+            || invoice_price.is_none_or(|value| value < Decimal::ZERO)
             || !(Decimal::ZERO..=Decimal::ONE_HUNDRED).contains(&tax_rate)
             || qty <= Decimal::ZERO
         {
@@ -60,7 +72,7 @@ fn add_lines(totals: &mut BTreeMap<LineKey, Decimal>, lines: &Value) -> R<()> {
             ));
         }
         let current = totals
-            .entry((product, price, tax_rate))
+            .entry((product, price, Decimal::ZERO))
             .or_insert(Decimal::ZERO);
         *current = current.checked_add(qty).ok_or_else(|| {
             ApiError::validation(
@@ -134,6 +146,50 @@ pub(super) async fn validate(
     }
 
     if action == "approved" {
+        let total = amount(document, "total").ok_or_else(|| {
+            ApiError::validation(
+                "purchasing.supplier_invoice.total",
+                vec!["Prepared supplier invoice total is invalid".into()],
+            )
+        })?;
+        let tax = amount(document, "tax_total").ok_or_else(|| {
+            ApiError::validation(
+                "purchasing.supplier_invoice.tax_total",
+                vec!["Prepared supplier invoice tax is invalid".into()],
+            )
+        })?;
+        let matched_net = amount(document, "matched_net").ok_or_else(|| {
+            ApiError::validation(
+                "purchasing.supplier_invoice.matched_net",
+                vec!["Matched receipt value is missing".into()],
+            )
+        })?;
+        let net = total.checked_sub(tax).ok_or_else(|| {
+            ApiError::validation(
+                "purchasing.supplier_invoice.total",
+                vec!["Supplier invoice net value is outside the supported range".into()],
+            )
+        })?;
+        let expected_variance = net.checked_sub(matched_net).ok_or_else(|| {
+            ApiError::validation(
+                "purchasing.supplier_invoice.price_variance",
+                vec!["Supplier invoice price variance is outside the supported range".into()],
+            )
+        })?;
+        if total <= Decimal::ZERO
+            || tax < Decimal::ZERO
+            || tax > total
+            || matched_net < Decimal::ZERO
+        {
+            errors.push("Supplier invoice total, tax, or matched receipt value is invalid".into());
+        }
+        if !amount(document, "price_variance").is_some_and(|variance| variance == expected_variance)
+        {
+            errors.push(
+                "Supplier invoice price variance must equal invoice net less matched receipt value"
+                    .into(),
+            );
+        }
         let receipts = tx.query(
             "SELECT lines FROM purchasing__purchase_receipt WHERE tenant_id=$1 AND purchase_order=$2 AND status='received' FOR UPDATE",
             &[&tenant.id, &order_id],
@@ -141,7 +197,7 @@ pub(super) async fn validate(
         let mut received = BTreeMap::new();
         for receipt in receipts {
             let lines: Value = receipt.get(0);
-            add_lines(&mut received, &lines)?;
+            add_lines(&mut received, &lines, false)?;
         }
 
         let returns = tx.query(
@@ -151,7 +207,7 @@ pub(super) async fn validate(
         let mut returned = BTreeMap::new();
         for purchase_return in returns {
             let lines: Value = purchase_return.get(0);
-            add_lines(&mut returned, &lines)?;
+            add_lines(&mut returned, &lines, false)?;
         }
         for (key, qty) in returned {
             let available = received.entry(key).or_insert(Decimal::ZERO);
@@ -173,14 +229,14 @@ pub(super) async fn validate(
         let mut billed = BTreeMap::new();
         for invoice in prior {
             let lines: Value = invoice.get(0);
-            add_lines(&mut billed, &lines)?;
+            add_lines(&mut billed, &lines, true)?;
         }
         let Some(current_lines) = document.get("lines") else {
             return Ok(vec![
                 "Supplier invoice requires at least one matched line".into(),
             ]);
         };
-        add_lines(&mut billed, current_lines)?;
+        add_lines(&mut billed, current_lines, true)?;
         if billed.is_empty()
             || billed.iter().any(|(key, qty)| {
                 received
@@ -198,21 +254,6 @@ pub(super) async fn validate(
             &[&tenant.id, &order_id.to_string()],
         ).await?.is_some() {
             errors.push("This order already has a legacy payable bill without supplier invoice matching".into());
-        }
-        let total = amount(document, "total").ok_or_else(|| {
-            ApiError::validation(
-                "purchasing.supplier_invoice.total",
-                vec!["Prepared supplier invoice total is invalid".into()],
-            )
-        })?;
-        let tax = amount(document, "tax_total").ok_or_else(|| {
-            ApiError::validation(
-                "purchasing.supplier_invoice.tax_total",
-                vec!["Prepared supplier invoice tax is invalid".into()],
-            )
-        })?;
-        if total <= Decimal::ZERO || tax < Decimal::ZERO || tax > total {
-            errors.push("Supplier invoice total and tax values are invalid".into());
         }
     }
     Ok(errors)

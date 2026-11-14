@@ -98,7 +98,33 @@ pub(super) async fn handle(
                 vec!["Purchase receipt clearing balance is invalid".into()],
             ));
         }
-        let clear_amount = net.min(accrued.max(Decimal::ZERO));
+        let supplier_invoice_id = event
+            .get("supplier_invoice_id")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty());
+        let clear_amount = if supplier_invoice_id.is_some() {
+            let matched = event
+                .get("grni_match_amount")
+                .and_then(crate::money::decimal)
+                .ok_or_else(|| {
+                    crate::error::ApiError::validation(
+                        "accounting.bill",
+                        vec!["Supplier-invoice bill requires its matched receipt value".into()],
+                    )
+                })?;
+            let max_match = accrued
+                .checked_add(amount_tolerance())
+                .ok_or_else(|| overflow_error(event_type))?;
+            if matched < Decimal::ZERO || matched > max_match {
+                return Err(crate::error::ApiError::validation(
+                    "accounting.bill",
+                    vec!["Matched receipt value exceeds the remaining GRNI balance".into()],
+                ));
+            }
+            matched.min(accrued.max(Decimal::ZERO))
+        } else {
+            net.min(accrued.max(Decimal::ZERO))
+        };
         if clear_amount > amount_tolerance() {
             lines.push(journal_line_decimal_with_department(
                 grni,
@@ -107,18 +133,44 @@ pub(super) async fn handle(
                 department,
             )?);
         }
-        let unaccrued_amount = net
-            .checked_sub(clear_amount)
-            .ok_or_else(|| overflow_error(event_type))?
-            .max(Decimal::ZERO);
-        if unaccrued_amount > amount_tolerance() {
-            let inventory = account_id(tx, tenant, "156").await?;
-            lines.push(journal_line_decimal_with_department(
-                inventory,
-                unaccrued_amount,
-                Decimal::ZERO,
-                department,
-            )?);
+        if supplier_invoice_id.is_some() {
+            let variance = net
+                .checked_sub(clear_amount)
+                .ok_or_else(|| overflow_error(event_type))?;
+            if variance.abs() > amount_tolerance() {
+                let price_variance =
+                    ensure_account(kernel, tx, tenant, "632", "Chênh lệch giá mua", "expense")
+                        .await?;
+                if variance > Decimal::ZERO {
+                    lines.push(journal_line_decimal_with_department(
+                        price_variance,
+                        variance,
+                        Decimal::ZERO,
+                        department,
+                    )?);
+                } else {
+                    lines.push(journal_line_decimal_with_department(
+                        price_variance,
+                        Decimal::ZERO,
+                        variance.abs(),
+                        department,
+                    )?);
+                }
+            }
+        } else {
+            let unaccrued_amount = net
+                .checked_sub(clear_amount)
+                .ok_or_else(|| overflow_error(event_type))?
+                .max(Decimal::ZERO);
+            if unaccrued_amount > amount_tolerance() {
+                let inventory = account_id(tx, tenant, "156").await?;
+                lines.push(journal_line_decimal_with_department(
+                    inventory,
+                    unaccrued_amount,
+                    Decimal::ZERO,
+                    department,
+                )?);
+            }
         }
     } else if net > amount_tolerance() {
         let inventory = account_id(tx, tenant, "156").await?;

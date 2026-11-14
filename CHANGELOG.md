@@ -20,6 +20,7 @@
 - Added permission-aware BI authoring for saved row and aggregate reports, dashboards with validated report widgets, and KPIs with aggregate sources and optional formulas, using enabled tenant entities and field metadata without manual JSON editing.
 - Implemented daily and weekly BI report schedules with pause/resume actions, transactional report-run snapshots, a 2 MB snapshot limit, and report history.
 - Added a product expiry-required policy for perishable goods, enforcing dated lots at lot creation and stock movement while protecting existing traceability history.
+- Added supplier invoice price and tax variance capture against received purchase-order lines, with quantity matching at PO cost and posting purchase price differences separately from GRNI.
 
 ### Changed
 - Scoped the runtime data ignore rule to the repository root so nested application source such as `server/src/kernel/data` is tracked and included in source releases.

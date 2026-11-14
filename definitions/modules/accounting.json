@@ -327,6 +327,12 @@
      "required": false,
      "system": true
     },
+    {
+     "name": "grni_match_amount",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
    {
     "name": "department",
     "type": "ref",

@@ -386,6 +386,10 @@
             "readOnly": true,
             "type": "string"
           },
+          "grni_match_amount": {
+            "readOnly": true,
+            "type": "number"
+          },
           "id": {
             "format": "uuid",
             "readOnly": true,
@@ -488,6 +492,10 @@
             "format": "date",
             "readOnly": true,
             "type": "string"
+          },
+          "grni_match_amount": {
+            "readOnly": true,
+            "type": "number"
           },
           "issue_date": {
             "format": "date",
@@ -12959,6 +12967,14 @@
           "lines": {
             "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
           },
+          "matched_net": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "price_variance": {
+            "readOnly": true,
+            "type": "number"
+          },
           "purchase_order": {
             "description": "Tham chiếu tới purchasing.purchase_order",
             "format": "uuid",
@@ -13015,6 +13031,14 @@
           },
           "lines": {
             "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
+          },
+          "matched_net": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "price_variance": {
+            "readOnly": true,
+            "type": "number"
           },
           "purchase_order": {
             "description": "Tham chiếu tới purchasing.purchase_order",

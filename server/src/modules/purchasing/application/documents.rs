@@ -46,7 +46,7 @@ async fn prepare_document_with_lock(
         return Ok(Vec::new());
     }
     let lock = if lock_rows { " FOR SHARE" } else { "" };
-    let (source_lines, source_department) = if matches!(
+    let (mut source_lines, source_department) = if matches!(
         entity,
         "purchase_return" | "purchase_receipt" | "supplier_invoice"
     ) {
@@ -73,6 +73,37 @@ async fn prepare_document_with_lock(
     } else {
         (Vec::new(), None)
     };
+    if entity == "purchase_return"
+        && let Some(invoice_id) = document
+            .get("supplier_invoice")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+    {
+        let order_id = document
+            .get("purchase_order")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok());
+        let invoice = tx
+            .query_opt(
+                &format!("SELECT purchase_order, status, lines FROM purchasing__supplier_invoice WHERE tenant_id = $1 AND id = $2{lock}"),
+                &[&tenant.id, &invoice_id],
+            )
+            .await?;
+        let Some(invoice) = invoice else {
+            return Ok(vec![
+                "Hóa đơn nhà cung cấp không tồn tại trong doanh nghiệp".into(),
+            ]);
+        };
+        let invoice_order: Uuid = invoice.get(0);
+        let invoice_status: String = invoice.get(1);
+        if Some(invoice_order) != order_id || invoice_status != "approved" {
+            return Ok(vec![
+                "Hóa đơn được chọn phải đã duyệt và thuộc cùng đơn mua".into(),
+            ]);
+        }
+        let lines: Value = invoice.get(2);
+        source_lines = lines.as_array().cloned().unwrap_or_default();
+    }
     if matches!(entity, "purchase_return" | "supplier_invoice") {
         if let Some(department) = source_department {
             document.insert("department".into(), json!(department));
@@ -108,6 +139,8 @@ async fn prepare_document_with_lock(
     let mut errors = Vec::new();
     let mut total = Decimal::ZERO;
     let mut tax_total = Decimal::ZERO;
+    let mut net_total = Decimal::ZERO;
+    let mut matched_net = Decimal::ZERO;
     for (index, line) in lines.iter_mut().enumerate() {
         let Some(line) = line.as_object_mut() else {
             errors.push(format!("lines[{}] phải là một dòng hàng", index + 1));
@@ -161,7 +194,20 @@ async fn prepare_document_with_lock(
                             money::within_tolerance(source_price, price, Decimal::new(5, 3))
                         })
                 }),
-                "purchase_receipt" | "supplier_invoice" => unit_price.is_some_and(|price| {
+                "supplier_invoice" => {
+                    line.get("order_price")
+                        .and_then(money::decimal)
+                        .or_else(|| line.get("po_price").and_then(money::decimal))
+                        .or(unit_price)
+                        .is_some_and(|price| {
+                            source.get("price").and_then(money::decimal).is_some_and(
+                                |source_price| {
+                                    money::within_tolerance(source_price, price, Decimal::new(5, 3))
+                                },
+                            )
+                        })
+                }
+                "purchase_receipt" => unit_price.is_some_and(|price| {
                     source
                         .get("price")
                         .and_then(money::decimal)
@@ -171,12 +217,8 @@ async fn prepare_document_with_lock(
                 }),
                 _ => true,
             };
-            let matches_tax = entity != "supplier_invoice"
-                || source.get("tax").and_then(Value::as_str)
-                    == line.get("tax").and_then(Value::as_str);
             source.get("product").and_then(Value::as_str) == Some(product_id.to_string().as_str())
                 && matches_price
-                && matches_tax
         });
         if entity == "purchase_return" {
             if unit_price.is_some() && source_line.is_none() {
@@ -194,20 +236,36 @@ async fn prepare_document_with_lock(
                         line.remove(field);
                     }
                 }
+                if entity == "purchase_return"
+                    && let Some(po_price) = source.get("po_price")
+                {
+                    line.insert("po_price".into(), po_price.clone());
+                }
             }
         }
         if matches!(entity, "purchase_receipt" | "supplier_invoice") {
             if let Some(source) = source_line {
-                for field in ["tax", "tax_rate", "tax_name"] {
-                    if let Some(value) = source.get(field) {
-                        line.insert(field.into(), value.clone());
-                    } else {
-                        line.remove(field);
+                if entity == "supplier_invoice" {
+                    if let Some(order_price) = source.get("price") {
+                        line.insert("po_price".into(), order_price.clone());
+                    }
+                } else {
+                    for field in ["tax", "tax_rate", "tax_name"] {
+                        if let Some(value) = source.get(field) {
+                            line.insert(field.into(), value.clone());
+                        } else {
+                            line.remove(field);
+                        }
                     }
                 }
             } else {
+                let document_name = if entity == "supplier_invoice" {
+                    "Supplier invoice"
+                } else {
+                    "Purchase receipt"
+                };
                 errors.push(format!(
-                    "Purchase receipt line {} must match a product from its source order",
+                    "{document_name} line {} must identify a product and source-order price",
                     index + 1
                 ));
                 continue;
@@ -250,10 +308,42 @@ async fn prepare_document_with_lock(
             entity,
             "purchase_order" | "purchase_return" | "purchase_receipt" | "supplier_invoice"
         ) {
-            let tax_rate = if matches!(
-                entity,
-                "purchase_return" | "purchase_receipt" | "supplier_invoice"
-            ) {
+            let tax_rate = if entity == "supplier_invoice"
+                && let Some(tax_id) = line.get("tax").and_then(Value::as_str)
+            {
+                let Some(tax_id) = Uuid::parse_str(tax_id).ok() else {
+                    errors.push(format!("Tax on invoice line {} is invalid", index + 1));
+                    continue;
+                };
+                let tax = tx.query_opt(
+                    &format!("SELECT name, rate::text FROM master_data__tax WHERE tenant_id = $1 AND id = $2{lock}"),
+                    &[&tenant.id, &tax_id],
+                ).await?;
+                let Some(tax) = tax else {
+                    errors.push(format!(
+                        "Tax on invoice line {} does not belong to this tenant",
+                        index + 1
+                    ));
+                    continue;
+                };
+                line.insert("tax_name".into(), json!(tax.get::<_, String>(0)));
+                let Some(rate) = money::decimal_str(&tax.get::<_, String>(1)) else {
+                    errors.push(format!("Tax rate on invoice line {} is invalid", index + 1));
+                    continue;
+                };
+                if !(Decimal::ZERO..=Decimal::ONE_HUNDRED).contains(&rate) {
+                    errors.push(format!(
+                        "Tax rate on invoice line {} must be between 0 and 100",
+                        index + 1
+                    ));
+                    continue;
+                }
+                rate
+            } else if entity == "supplier_invoice" {
+                line.remove("tax");
+                line.remove("tax_name");
+                Decimal::ZERO
+            } else if matches!(entity, "purchase_return" | "purchase_receipt") {
                 let rate = line
                     .get("tax_rate")
                     .and_then(money::decimal)
@@ -327,6 +417,12 @@ async fn prepare_document_with_lock(
                         .push("Purchase document totals exceed supported financial limits".into());
                     continue;
                 };
+                net_total = net_total.checked_add(net).ok_or_else(|| {
+                    crate::error::ApiError::validation(
+                        "purchasing.supplier_invoice.total",
+                        vec!["Purchase invoice net amount exceeds the supported range".into()],
+                    )
+                })?;
                 let (Some(net), Some(tax), Some(line_total), Some(rate)) = (
                     money::json_number(net),
                     money::json_number(tax),
@@ -345,6 +441,25 @@ async fn prepare_document_with_lock(
                 line.insert("line_total".into(), line_total);
                 total = next_total;
                 tax_total = next_tax_total;
+                if entity == "supplier_invoice"
+                    && let (Some(qty), Some(po_price)) = (
+                        line.get("qty").and_then(money::decimal),
+                        line.get("po_price").and_then(money::decimal),
+                    )
+                {
+                    let line_match = qty.checked_mul(po_price).ok_or_else(|| {
+                        crate::error::ApiError::validation(
+                            "purchasing.supplier_invoice.matched_net",
+                            vec!["Matched receipt value exceeds the supported range".into()],
+                        )
+                    })?;
+                    matched_net = matched_net.checked_add(line_match).ok_or_else(|| {
+                        crate::error::ApiError::validation(
+                            "purchasing.supplier_invoice.matched_net",
+                            vec!["Matched receipt value exceeds the supported range".into()],
+                        )
+                    })?;
+                }
             }
         }
     }
@@ -359,6 +474,23 @@ async fn prepare_document_with_lock(
             document.insert("tax_total".into(), tax_total);
         } else {
             errors.push("Purchase document totals cannot be serialized".into());
+        }
+    }
+    if entity == "supplier_invoice" {
+        let variance = net_total.checked_sub(matched_net).ok_or_else(|| {
+            crate::error::ApiError::validation(
+                "purchasing.supplier_invoice.price_variance",
+                vec!["Purchase price variance exceeds the supported range".into()],
+            )
+        })?;
+        if let (Some(matched), Some(variance)) = (
+            money::json_number(matched_net),
+            money::json_number(variance),
+        ) {
+            document.insert("matched_net".into(), matched);
+            document.insert("price_variance".into(), variance);
+        } else {
+            errors.push("Purchase invoice matched value cannot be serialized".into());
         }
     }
     Ok(errors)
