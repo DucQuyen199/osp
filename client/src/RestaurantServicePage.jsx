@@ -77,17 +77,19 @@ export default function RestaurantServicePage() {
   };
 
   const transition = async (order, action) => {
-    if (action === 'cancelled' && order.status === 'sent' && !cancellationReasons[order.id]?.trim()) {
-      setError('Nhập lý do trước khi hủy order đã gửi bếp.');
-      return;
+    if (action === 'cancelled' && order.status === 'sent') {
+      const reason = cancellationReasons[order.id]?.trim() || '';
+      if (!reason || reason.length > 500) {
+        setError('Nhập lý do từ 1 đến 500 ký tự trước khi hủy order đã gửi bếp.');
+        return;
+      }
     }
     setBusy(`${order.id}:${action}`); setError(''); setNotice('');
     try {
-      const patch = {};
-      if (action === 'completed') patch.method = method;
-      if (action === 'cancelled' && order.status === 'sent') patch.cancellation_reason = cancellationReasons[order.id].trim();
-      if (Object.keys(patch).length) await api(dataPath('restaurant.table_order', order.id), { method: 'PATCH', body: patch });
-      await api(dataPath('restaurant.table_order', order.id, action), { method: 'POST' });
+      const body = {};
+      if (action === 'completed') body.method = method;
+      if (action === 'cancelled' && order.status === 'sent') body.cancellation_reason = cancellationReasons[order.id].trim();
+      await api(dataPath('restaurant.table_order', order.id, action), { method: 'POST', ...(Object.keys(body).length ? { body } : {}) });
       if (action === 'cancelled') setCancellationReasons((current) => { const next = { ...current }; delete next[order.id]; return next; });
       await load(true);
       const messages = { sent: 'Đã gửi món đến bếp và quầy pha chế.', served: 'Tất cả phiếu đã sẵn sàng; order đã chuyển sang phục vụ.', completed: 'Đã thanh toán; hệ thống ghi nhận xuất kho nguyên liệu và doanh thu.', cancelled: order.status === 'sent' ? 'Đã hủy order và các phiếu còn chờ bếp; lý do được lưu vào lịch sử.' : 'Đã hủy order trước khi gửi bếp.' };
@@ -134,8 +136,8 @@ export default function RestaurantServicePage() {
         <div className="restaurant-cart-total"><span>Tổng đã gồm thuế</span><strong className="num">{fmtMoney(selected.total || 0)}</strong></div>
         {selectedTickets.length > 0 && <div className="restaurant-ticket-status"><h3>Tiến độ bếp</h3>{selectedTickets.map((ticket) => <div key={ticket.id}><span>{ticket.station === 'bar' ? 'Quầy pha chế' : 'Bếp'}</span><strong>{statusLabel(ticket.status)}</strong></div>)}</div>}
         {selected.status === 'open' && can('restaurant.table_order.sent') && <div className="restaurant-actions"><button className="button primary" disabled={!!busy} onClick={() => transition(selected, 'sent')}>Gửi bếp và quầy pha chế</button>{can('restaurant.table_order.cancelled') && <button className="button" disabled={!!busy} onClick={() => transition(selected, 'cancelled')}>Hủy order</button>}</div>}
-        {selected.status === 'sent' && <div className="restaurant-actions">{can('restaurant.table_order.served') && <><button className="button primary" disabled={!!busy || (tickets.length > 0 && !ticketsReady)} onClick={() => transition(selected, 'served')}>Chuyển sang phục vụ</button>{tickets.length > 0 && !ticketsReady && <span className="small muted">Chờ tất cả phiếu bếp / quầy báo món xong.</span>}</>}{can('restaurant.table_order.cancelled') && <><label className="field"><span>Lý do hủy (chỉ hủy được khi các trạm chưa bắt đầu)</span><input className="input" maxLength="500" value={cancellationReasons[selected.id] || ''} onChange={(event) => setCancellationReasons((current) => ({ ...current, [selected.id]: event.target.value }))} /></label><button className="button" disabled={!!busy || !cancellationReasons[selected.id]?.trim()} onClick={() => transition(selected, 'cancelled')}>Hủy order đã gửi</button></>}</div>}
-        {selected.status === 'served' && can('restaurant.table_order.completed') && <div className="restaurant-payment"><label className="field"><span>Phương thức thanh toán</span><select className="select" value={method} onChange={(event) => setMethod(event.target.value)}>{METHODS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><button className="button primary" disabled={!!busy || (selectedNeedsWarehouse && !selected.warehouse)} onClick={() => transition(selected, 'completed')}>Thanh toán, xuất kho và đóng order</button>{selectedNeedsWarehouse && !selected.warehouse && <span className="small muted">Order có nguyên liệu theo dõi tồn nhưng chưa gắn kho. Cập nhật order trước khi thanh toán.</span>}</div>}
+        {selected.status === 'sent' && <div className="restaurant-actions">{can('restaurant.table_order.served') && <><button className="button primary" disabled={!!busy || (tickets.length > 0 && !ticketsReady)} onClick={() => transition(selected, 'served')}>Chuyển sang phục vụ</button>{tickets.length > 0 && !ticketsReady && <span className="small muted">Chờ tất cả phiếu bếp / quầy báo món xong.</span>}</>}{can('restaurant.table_order.cancelled') && can('restaurant.table_order.update') && <><label className="field"><span>Lý do hủy (chỉ hủy được khi các trạm chưa bắt đầu)</span><input className="input" maxLength="500" value={cancellationReasons[selected.id] || ''} onChange={(event) => setCancellationReasons((current) => ({ ...current, [selected.id]: event.target.value }))} /></label><button className="button" disabled={!!busy || !cancellationReasons[selected.id]?.trim()} onClick={() => transition(selected, 'cancelled')}>Hủy order đã gửi</button></>}</div>}
+        {selected.status === 'served' && can('restaurant.table_order.completed') && can('restaurant.table_order.update') && <div className="restaurant-payment"><label className="field"><span>Phương thức thanh toán</span><select className="select" value={method} onChange={(event) => setMethod(event.target.value)}>{METHODS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><button className="button primary" disabled={!!busy || (selectedNeedsWarehouse && !selected.warehouse)} onClick={() => transition(selected, 'completed')}>Thanh toán, xuất kho và đóng order</button>{selectedNeedsWarehouse && !selected.warehouse && <span className="small muted">Order có nguyên liệu theo dõi tồn nhưng chưa gắn kho. Cập nhật order trước khi thanh toán.</span>}</div>}
         {selectedPayment && <a className="button" href={recordHref('accounting.payment', selectedPayment.id)}>Mở phiếu thanh toán {String(selectedPayment.id).slice(0, 8)}</a>}
       </> : <div className="card-pad muted">Chọn order để theo dõi và xử lý.</div>}</section>
     </div>

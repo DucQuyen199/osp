@@ -128041,7 +128041,7 @@
     },
     "/api/t/{tenantId}/data/restaurant/table_order/{id}/cancelled": {
       "post": {
-        "description": "Phát sự kiện `restaurant.table_order.cancelled` cho các module khác phản ứng.",
+        "description": "An order sent to the kitchen requires a cancellation reason. The reason, order transition, and cancellation of queued kitchen tickets commit together. An unsent open order may be cancelled without a reason.",
         "parameters": [
           {
             "in": "path",
@@ -128061,6 +128061,27 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "cancellation_reason": {
+                    "maxLength": 500,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "cancellation_reason"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": false
+        },
         "responses": {
           "200": {
             "content": {
@@ -128126,7 +128147,7 @@
     },
     "/api/t/{tenantId}/data/restaurant/table_order/{id}/completed": {
       "post": {
-        "description": "Phát sự kiện `restaurant.table_order.completed` cho các module khác phản ứng.",
+        "description": "Set the payment method and settle the served order atomically. Inventory consumption and the accounting payment are created only if settlement succeeds.",
         "parameters": [
           {
             "in": "path",
@@ -128146,6 +128167,31 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "method": {
+                    "enum": [
+                      "cash",
+                      "card",
+                      "transfer",
+                      "ewallet"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "method"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {

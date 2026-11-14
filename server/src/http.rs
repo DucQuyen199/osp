@@ -1781,6 +1781,30 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     }
                     return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
                 }
+                if q == "restaurant.table_order" && *action == "completed" {
+                    let body = json_obj(&bytes)?;
+                    if body.len() != 1 || !body.contains_key("method") {
+                        return Err(ApiError::validation(
+                            "restaurant.table_order.completed",
+                            vec!["Cần gửi duy nhất trường method".into()],
+                        ));
+                    }
+                    return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
+                }
+                if q == "restaurant.table_order" && *action == "cancelled" && !bytes.is_empty() {
+                    let body = json_obj(&bytes)?;
+                    if !body.is_empty()
+                        && (body.len() != 1 || !body.contains_key("cancellation_reason"))
+                    {
+                        return Err(ApiError::validation(
+                            "restaurant.table_order.cancelled",
+                            vec!["Chỉ chấp nhận trường cancellation_reason".into()],
+                        ));
+                    }
+                    if !body.is_empty() {
+                        return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
+                    }
+                }
                 return json_ok(k.act(&actor, &t, &q, id, action).await?);
             }
             _ => {}

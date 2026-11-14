@@ -190,6 +190,38 @@ pub fn build(reg: &Registry) -> Value {
                             } } }
                         });
                     }
+                    if def.qname() == "restaurant.table_order" && action == "completed" {
+                        operation["description"] = json!(
+                            "Set the payment method and settle the served order atomically. Inventory consumption and the accounting payment are created only if settlement succeeds."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": true,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "required": ["method"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "method": { "type": "string", "enum": ["cash", "card", "transfer", "ewallet"] }
+                                }
+                            } } }
+                        });
+                    }
+                    if def.qname() == "restaurant.table_order" && action == "cancelled" {
+                        operation["description"] = json!(
+                            "An order sent to the kitchen requires a cancellation reason. The reason, order transition, and cancellation of queued kitchen tickets commit together. An unsent open order may be cancelled without a reason."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": false,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "required": ["cancellation_reason"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "cancellation_reason": { "type": "string", "minLength": 1, "maxLength": 500 }
+                                }
+                            } } }
+                        });
+                    }
                     paths.insert(
                         format!("{base}/{{id}}/{action}"),
                         json!({ "post": operation }),
