@@ -34,6 +34,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .layer(CompressionLayer::new())
         .with_state(state.cfg.public_dir.clone());
     Router::new()
+        .route("/metrics", get(http::handle))
         .route("/api/health", get(http::handle))
         .route("/api/catalog", get(http::handle))
         .route("/api/openapi.json", get(http::handle))

@@ -17,6 +17,8 @@ Tài liệu mô tả những gì hệ thống **đã làm**, những gì **chưa
 - **Mật khẩu:** Argon2id (`m=19456 KiB`, `t=2`, `p=1`, salt 16 byte ngẫu nhiên, khóa 32 byte), so sánh bằng `subtle::ConstantTimeEq` và chạy trong `spawn_blocking`. Tối thiểu 8 ký tự. Khi tài khoản không tồn tại vẫn chạy Argon2id với giá trị giả để giảm khả năng dò tài khoản qua thời gian phản hồi.
 - **Token:** tiền tố `osp_` và hai UUID v4 ngẫu nhiên ở dạng hex. Chỉ lưu **SHA-256** của token; DB bị lộ không đủ để dùng lại token. Danh sách token chỉ trả 12 ký tự đầu của băm làm mã định danh.
 - **Phiên** hết hạn sau 12 giờ; bị thu hồi khi đăng xuất, đổi mật khẩu, khóa tài khoản. **API token** có thể đặt hạn.
+- Người dùng có thể xem thời gian bắt đầu/hết hạn và tự thu hồi mọi phiên trình duyệt khác trong **Bảo mật tài khoản**; thao tác này chỉ tác động các phiên của chính họ.
+- Endpoint Prometheus `/metrics` tắt mặc định; khi bật cần bearer token ngẫu nhiên ≥32 ký tự và chỉ nên được scrape qua mạng riêng/HTTPS. Metrics chỉ dùng nhãn status class, không có tenant hoặc user labels.
 - **Chống dò mật khẩu:** 5 lần sai / 15 phút cho mỗi (doanh nghiệp, email), thêm 30 lần đăng nhập/phút/IP.
 - Luôn còn ít nhất một quản trị viên hoạt động (không thể tự khóa mình ra khỏi hệ thống).
 
@@ -73,6 +75,7 @@ Giao diện chỉ chèn dữ liệu vào DOM bằng `textContent`; không dùng 
 - [ ] `OSP_DEMO=0`. Cân nhắc `OSP_SIGNUP=0` nếu không cho tự đăng ký.
 - [ ] Đặt volume PostgreSQL trên ổ đĩa riêng, **sao lưu định kỳ** và thử khôi phục (xem [DEPLOYMENT.md](DEPLOYMENT.md)).
 - [ ] Proxy thêm giới hạn tốc độ theo IP thật (ứng dụng thấy IP của proxy). Thêm `Strict-Transport-Security` ở proxy.
+- [ ] Nếu bật `/metrics`, đặt `OSP_METRICS_TOKEN` riêng và chỉ cho phép hệ thống giám sát truy cập qua mạng riêng/HTTPS.
 - [ ] Không dùng token quản trị cho tích hợp: tạo vai trò riêng quyền tối thiểu + API token có hạn.
 - [ ] Giám sát: log truy cập, nhật ký kiểm toán, lỗi `EVENT_LOOP`/`INTERNAL`.
 - [ ] Cập nhật image Rust/PostgreSQL theo bản vá bảo mật.

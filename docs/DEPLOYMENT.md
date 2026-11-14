@@ -36,6 +36,10 @@ Initial email verification and password reset use the same worker and can use ei
 
 Before users enable TOTP, configure `OSP_TOTP_ENCRYPTION_KEY` with the Base64 encoding of 32 random bytes (generate with `openssl rand -base64 32`). Keep the same value in the secret manager and every app replica; do not commit it or change it during an ordinary deployment. The key encrypts each authenticator secret with AES-256-GCM. If it is missing or changed, users with MFA enabled cannot complete login until an administrator resets their MFA. A tenant admin can reset a user's MFA from **Settings → Users** with a recorded reason; this revokes that user's sessions and API tokens. Each user enables MFA from the account menu, confirms a live TOTP code, then must save the one-time recovery codes. Login challenges expire after five minutes and allow five attempts.
 
+### Optional Prometheus metrics
+
+Set `OSP_METRICS_TOKEN` to a random secret of at least 32 characters to enable `GET /metrics`. Without it, the endpoint returns 404. Scrapes require `Authorization: Bearer <token>`. The endpoint exposes aggregate HTTP request counts by status class and response-time histogram only; it does not label or reveal tenant data. Keep the scrape on a private network or use HTTPS through the reverse proxy, and store the token in the secret manager.
+
 ### E-invoice provider (optional)
 
 The Rust worker issues posted accounting invoices and processes cancellation requests through the configured HTTPS REST contract. Set `OSP_EINVOICE_ENDPOINT`, `OSP_EINVOICE_PROVIDER`, and `OSP_EINVOICE_TOKEN` in `.env`; `OSP_EINVOICE_TIMEOUT_SEC` accepts 1–120 seconds and `OSP_EINVOICE_INTERVAL_SEC=0` disables the worker. Without an endpoint, requests remain pending. The provider must honor the `Idempotency-Key` header for safe recovery after a worker restart. The generic adapter is not certified for a vendor API; map the payload and response to the actual provider contract before enabling production issuance.
@@ -62,6 +66,7 @@ Doanh nghiệp tạo ra chỉ chọn được trong số module đã cài; modul
 | `OSP_DEMO` | `1` (dev) · `0` (production) | Bật `POST /api/demo` và nút "Dùng thử" |
 | `OSP_SIGNUP` | `0` trong Compose; script khởi tạo đặt `1` | Tắt sau khi tạo tenant/quản trị viên đầu tiên |
 | `OSP_TOTP_ENCRYPTION_KEY` | rỗng | Khóa Base64 32 byte để mã hóa bí mật TOTP; bắt buộc trước khi bất kỳ người dùng nào bật MFA |
+| `OSP_METRICS_TOKEN` | rỗng | Bật `/metrics` khi là bí mật ngẫu nhiên từ 32 ký tự; giữ endpoint trong mạng giám sát riêng |
 | `OSP_OUTBOX_INTERVAL_SEC` | `2` | Chu kỳ worker webhook outbox; đặt `0` để tạm dừng worker |
 | `NODE_ENV=production` | — | Tắt demo mặc định, bật log truy cập JSON (mỗi dòng: thời gian, request id, IP, phương thức, đường dẫn, trạng thái, ms) |
 

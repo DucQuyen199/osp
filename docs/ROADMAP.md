@@ -30,7 +30,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 
 ## Còn thiếu
 
-- SSO/OIDC, mã hóa at-rest toàn hệ thống, lưu audit độc lập/WORM chống DBA, metrics/traces/alerts và kiểm thử xâm nhập.
+- SSO/OIDC, mã hóa at-rest toàn hệ thống, lưu audit độc lập/WORM chống DBA, distributed traces/alerts và kiểm thử xâm nhập. Prometheus HTTP metrics có endpoint tùy chọn, bearer token riêng và không gắn nhãn dữ liệu tenant.
 - Email xác thực/thông báo đã hỗ trợ HTTPS provider hoặc SMTP mã hóa; còn cần cấu hình DNS email (SPF/DKIM/DMARC), API ngân hàng/thanh toán trực tiếp và adapter vận chuyển. Đối soát ngân hàng hiện nhận CSV và ISO 20022 CAMT.053 từ tệp.
 - Tối ưu chỉ mục/truy vấn theo workload, mở rộng scheduler và billing/licensing OSP.
 - Kế toán Việt Nam có mẫu tài khoản cấp 1 và các mã chi tiết được liệt kê trong phụ lục TT99/2025, TT133/2016; vẫn thiếu ánh xạ biểu mẫu, kê khai thuế chính thức, nhập ngân hàng trực tiếp và xác minh chuyên môn.

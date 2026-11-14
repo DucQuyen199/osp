@@ -67,12 +67,26 @@ pub async fn build_kernel(
 
 pub fn app_state(k: Arc<kernel::Kernel>, cfg: http::AppConfig) -> Arc<http::AppState> {
     let limit = cfg.rate_limit_per_min;
+    let metrics_token = std::env::var("OSP_METRICS_TOKEN")
+        .ok()
+        .map(|token| token.trim().to_owned())
+        .filter(|token| !token.is_empty());
+    let metrics_token = metrics_token.and_then(|token| {
+        if token.len() >= 32 {
+            Some(token)
+        } else {
+            tracing::warn!("OSP_METRICS_TOKEN must contain at least 32 characters; metrics endpoint is disabled");
+            None
+        }
+    });
     Arc::new(http::AppState {
         kernel: k,
         cfg,
         api_limiter: http::RateLimiter::new(limit, Duration::from_secs(60)),
         auth_limiter: http::RateLimiter::new(30, Duration::from_secs(60)),
         create_limiter: http::RateLimiter::new(20, Duration::from_secs(60)),
+        metrics: http::HttpMetrics::default(),
+        metrics_token,
     })
 }
 

@@ -15,7 +15,8 @@ use serde_json::{Value, json};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, Instant};
 use uuid::Uuid;
 
 pub struct AppConfig {
@@ -24,6 +25,65 @@ pub struct AppConfig {
     pub log: bool,
     pub rate_limit_per_min: u32,
     pub public_dir: PathBuf,
+}
+
+const HTTP_DURATION_BUCKETS_MS: [u64; 9] = [5, 10, 25, 50, 100, 250, 500, 1_000, 2_500];
+
+#[derive(Default)]
+pub struct HttpMetrics {
+    requests: AtomicU64,
+    responses: [AtomicU64; 5],
+    duration_sum_ns: AtomicU64,
+    duration_buckets: [AtomicU64; HTTP_DURATION_BUCKETS_MS.len() + 1],
+}
+
+impl HttpMetrics {
+    fn observe(&self, status: u16, elapsed: Duration) {
+        self.requests.fetch_add(1, Ordering::Relaxed);
+        if (100..600).contains(&status) {
+            self.responses[usize::from(status / 100 - 1)].fetch_add(1, Ordering::Relaxed);
+        }
+        let nanos = elapsed.as_nanos().min(u128::from(u64::MAX)) as u64;
+        self.duration_sum_ns.fetch_add(nanos, Ordering::Relaxed);
+        for (index, limit) in HTTP_DURATION_BUCKETS_MS.iter().enumerate() {
+            if elapsed.as_nanos() <= u128::from(*limit) * 1_000_000 {
+                self.duration_buckets[index].fetch_add(1, Ordering::Relaxed);
+            }
+        }
+        self.duration_buckets[HTTP_DURATION_BUCKETS_MS.len()].fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn prometheus_text(&self) -> String {
+        let mut output = String::from(
+            "# HELP osp_http_requests_total Total HTTP requests handled by OSP.\n# TYPE osp_http_requests_total counter\n",
+        );
+        output.push_str(&format!(
+            "osp_http_requests_total {}\n",
+            self.requests.load(Ordering::Relaxed)
+        ));
+        output.push_str("# HELP osp_http_responses_total HTTP responses grouped by status class.\n# TYPE osp_http_responses_total counter\n");
+        for (index, class) in ["1xx", "2xx", "3xx", "4xx", "5xx"].iter().enumerate() {
+            output.push_str(&format!(
+                "osp_http_responses_total{{status_class=\"{class}\"}} {}\n",
+                self.responses[index].load(Ordering::Relaxed),
+            ));
+        }
+        output.push_str("# HELP osp_http_request_duration_seconds HTTP request duration in seconds.\n# TYPE osp_http_request_duration_seconds histogram\n");
+        for (index, limit) in HTTP_DURATION_BUCKETS_MS.iter().enumerate() {
+            output.push_str(&format!(
+                "osp_http_request_duration_seconds_bucket{{le=\"{}\"}} {}\n",
+                f64::from(*limit as u32) / 1_000.0,
+                self.duration_buckets[index].load(Ordering::Relaxed),
+            ));
+        }
+        output.push_str(&format!(
+            "osp_http_request_duration_seconds_bucket{{le=\"+Inf\"}} {}\nosp_http_request_duration_seconds_sum {}\nosp_http_request_duration_seconds_count {}\n",
+            self.duration_buckets[HTTP_DURATION_BUCKETS_MS.len()].load(Ordering::Relaxed),
+            self.duration_sum_ns.load(Ordering::Relaxed) as f64 / 1_000_000_000.0,
+            self.requests.load(Ordering::Relaxed),
+        ));
+        output
+    }
 }
 
 fn decimal_json(value: Decimal) -> R<Value> {
@@ -118,6 +178,8 @@ pub struct AppState {
     pub api_limiter: RateLimiter,
     pub auth_limiter: RateLimiter,
     pub create_limiter: RateLimiter,
+    pub metrics: HttpMetrics,
+    pub metrics_token: Option<String>,
 }
 
 enum Reply {
@@ -241,14 +303,21 @@ pub async fn handle(
 ) -> Response {
     // Axum strips HEAD bodies; run the same read operation as GET so headers
     // and authorization remain identical on every registered read endpoint.
+    let is_metrics = req.uri().path() == "/metrics";
+    let started = Instant::now();
     if req.method() == Method::HEAD {
         *req.method_mut() = Method::GET;
     }
     let ip = addr.ip().to_string();
-    match route(&st, req, &ip).await {
+    let response = match route(&st, req, &ip).await {
         Ok(reply) => reply_to_response(reply),
         Err(error) => error.into_response(),
+    };
+    if !is_metrics {
+        st.metrics
+            .observe(response.status().as_u16(), started.elapsed());
     }
+    response
 }
 
 async fn auth(
@@ -301,6 +370,33 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
         .collect::<R<Vec<_>>>()?;
     let k = &st.kernel;
 
+    if path == "/metrics" {
+        if method != Method::GET {
+            return Err(ApiError::new(
+                405,
+                "METHOD_NOT_ALLOWED",
+                "Phương thức HTTP không được hỗ trợ",
+            ));
+        }
+        let Some(expected_token) = st.metrics_token.as_deref() else {
+            return Err(ApiError::new(404, "NOT_FOUND", "Không tìm thấy"));
+        };
+        let supplied_token = parts
+            .headers
+            .get(header::AUTHORIZATION)
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.strip_prefix("Bearer "))
+            .unwrap_or("");
+        if !constant_time_token_eq(supplied_token.as_bytes(), expected_token.as_bytes()) {
+            return Err(ApiError::new(404, "NOT_FOUND", "Không tìm thấy"));
+        }
+        return Ok(Reply::Raw {
+            status: 200,
+            content_type: "text/plain; version=0.0.4; charset=utf-8",
+            body: st.metrics.prometheus_text().into_bytes(),
+            extra: vec![],
+        });
+    }
     if segs.first().map(|x| x.as_str()) != Some("api") {
         return Err(ApiError::new(404, "NOT_FOUND", "Không tìm thấy"));
     }
@@ -1662,6 +1758,11 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
         }
     }
     Err(ApiError::new(404, "NOT_FOUND", "Đường dẫn không hợp lệ"))
+}
+
+fn constant_time_token_eq(left: &[u8], right: &[u8]) -> bool {
+    use subtle::ConstantTimeEq;
+    left.len() == right.len() && bool::from(left.ct_eq(right))
 }
 
 fn safe_download_name(value: &str) -> String {
