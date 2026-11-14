@@ -104,6 +104,12 @@
      "system": true
     },
     {
+     "name": "recipient_email",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
      "name": "subject",
      "type": "string",
      "required": false,

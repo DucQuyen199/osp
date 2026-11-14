@@ -221,7 +221,7 @@ pub async fn handle_source_event(
                     }
                     let mut message = Map::new();
                     message.insert("channel".into(), json!("email"));
-                    message.insert("recipient".into(), json!(address));
+                    message.insert("recipient_email".into(), json!(address));
                     message.insert(
                         "subject".into(),
                         json!(format!(

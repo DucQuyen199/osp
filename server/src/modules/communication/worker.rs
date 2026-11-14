@@ -22,6 +22,7 @@ struct Message {
     id: Uuid,
     channel: String,
     recipient: Option<String>,
+    recipient_email: Option<String>,
     subject: Option<String>,
     body: Option<String>,
     attempts: i64,
@@ -159,6 +160,7 @@ async fn claim_auth_mail(kernel: &Kernel, tenant_id: &str) -> R<Vec<Message>> {
             id: row.get(0),
             channel: "email".into(),
             recipient: row.get(1),
+            recipient_email: Some(row.get(1)),
             subject: row.get(2),
             body: row.get(3),
             attempts: row.get(4),
@@ -194,7 +196,7 @@ async fn claim(kernel: &Kernel, tenant_id: &str, channel: &str) -> R<Vec<Message
     let tx = Tx::begin(&mut conn, tenant_id, true).await?;
     let rows = tx
         .query(
-            "WITH ready AS (SELECT id FROM communication__message_log WHERE tenant_id = $1 AND channel = $2 AND ((status IN ('queued', 'retry') AND (available_at IS NULL OR available_at <= now())) OR (status = 'processing' AND (available_at IS NULL OR available_at <= now()))) ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT $3) UPDATE communication__message_log m SET status = 'processing', attempts = COALESCE(m.attempts, 0) + 1, available_at = now() + interval '2 minutes', last_error = NULL, updated_at = now() FROM ready WHERE m.tenant_id = $1 AND m.id = ready.id RETURNING m.id, m.channel, m.recipient, m.subject, m.body, COALESCE(m.attempts, 1)::bigint",
+            "WITH ready AS (SELECT id FROM communication__message_log WHERE tenant_id = $1 AND channel = $2 AND ((status IN ('queued', 'retry') AND (available_at IS NULL OR available_at <= now())) OR (status = 'processing' AND (available_at IS NULL OR available_at <= now()))) ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT $3) UPDATE communication__message_log m SET status = 'processing', attempts = COALESCE(m.attempts, 0) + 1, available_at = now() + interval '2 minutes', last_error = NULL, updated_at = now() FROM ready WHERE m.tenant_id = $1 AND m.id = ready.id RETURNING m.id, m.channel, m.recipient, m.recipient_email, m.subject, m.body, COALESCE(m.attempts, 1)::bigint",
             &[&tenant_id, &channel, &BATCH_SIZE],
         )
         .await?;
@@ -206,9 +208,10 @@ async fn claim(kernel: &Kernel, tenant_id: &str, channel: &str) -> R<Vec<Message
             id: row.get(0),
             channel: row.get(1),
             recipient: row.get(2),
-            subject: row.get(3),
-            body: row.get(4),
-            attempts: row.get(5),
+            recipient_email: row.get(3),
+            subject: row.get(4),
+            body: row.get(5),
+            attempts: row.get(6),
             is_auth: false,
         })
         .collect())
@@ -289,6 +292,20 @@ async fn resolve_destination(
     message: &Message,
     channel: &str,
 ) -> Result<String, Failure> {
+    if let Some(address) = message
+        .recipient_email
+        .as_deref()
+        .map(str::trim)
+        .filter(|address| !address.is_empty())
+    {
+        if channel != "email" || address.parse::<lettre::message::Mailbox>().is_err() {
+            return Err(Failure {
+                retryable: false,
+                message: "direct recipient address is invalid for this channel",
+            });
+        }
+        return Ok(address.to_owned());
+    }
     if message.is_auth {
         if channel != "email" {
             return Err(Failure {
@@ -307,14 +324,23 @@ async fn resolve_destination(
                 message: "authentication message has no email recipient",
             });
     }
-    let recipient_id = message
+    let recipient_value = message
         .recipient
         .as_deref()
-        .and_then(|value| Uuid::parse_str(value).ok())
-        .ok_or(Failure {
+        .map(str::trim)
+        .unwrap_or_default();
+    let Some(recipient_id) = Uuid::parse_str(recipient_value).ok() else {
+        // Older BI snapshots stored literal email addresses in `recipient`.
+        // Continue delivering those queued rows while all new messages use
+        // the explicit recipient_email field.
+        if channel == "email" && recipient_value.parse::<lettre::message::Mailbox>().is_ok() {
+            return Ok(recipient_value.to_owned());
+        }
+        return Err(Failure {
             retryable: false,
             message: "message has no valid tenant recipient",
-        })?;
+        });
+    };
     let tenant = kernel
         .tenant(&message.tenant_id)
         .await
