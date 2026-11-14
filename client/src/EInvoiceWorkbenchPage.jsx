@@ -100,8 +100,7 @@ export default function EInvoiceWorkbenchPage() {
       return;
     }
     run(row, 'cancel_requested', 'Đã đưa yêu cầu hủy vào hàng đợi xử lý.', async () => {
-      await api(dataPath('einvoice.einvoice', row.id), { method: 'PATCH', body: { cancellation_reason: value } });
-      await api(dataPath('einvoice.einvoice', row.id, 'cancel_requested'), { method: 'POST' });
+      await api(dataPath('einvoice.einvoice', row.id, 'cancel_requested'), { method: 'POST', body: { cancellation_reason: value } });
       setReason('');
     });
   }
@@ -131,7 +130,7 @@ export default function EInvoiceWorkbenchPage() {
           <td>{Number(row.attempts || 0)} lần<div className="small muted">{formatDateTime(timestamp(row))}</div></td>
           <td onClick={(event) => event.stopPropagation()}><div className="row wrap">
             {row.status === 'failed' && can('einvoice.einvoice.retry') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => run(row, 'retry', 'Đã đưa yêu cầu vào hàng đợi thử lại.')}>Thử lại</button>}
-            {row.status === 'issued' && can('einvoice.einvoice.cancel_requested') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => { setSelectedId(row.id); setReason(row.cancellation_reason || ''); document.getElementById('einvoice-cancellation-reason')?.focus(); }}>Yêu cầu hủy</button>}
+            {row.status === 'issued' && can('einvoice.einvoice.cancel_requested') && can('einvoice.einvoice.update') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => { setSelectedId(row.id); setReason(row.cancellation_reason || ''); document.getElementById('einvoice-cancellation-reason')?.focus(); }}>Yêu cầu hủy</button>}
             <button className="btn btn-ghost btn-sm" type="button" onClick={() => setSelectedId(row.id)}>Chi tiết</button>
           </div></td>
         </tr>;
@@ -149,7 +148,7 @@ export default function EInvoiceWorkbenchPage() {
         {selected.provider_error && <div className="full"><span className="label">Lỗi gần nhất</span><div className="alert danger">{selected.provider_error}</div></div>}
         {selected.cancellation_reason && <div className="full"><span className="label">Lý do hủy</span><p>{selected.cancellation_reason}</p></div>}
       </div>
-      {selected.status === 'issued' && can('einvoice.einvoice.cancel_requested') && <form className="form-grid" style={{ marginTop: 16 }} onSubmit={(event) => { event.preventDefault(); requestCancellation(selected); }}>
+      {selected.status === 'issued' && can('einvoice.einvoice.cancel_requested') && can('einvoice.einvoice.update') && <form className="form-grid" style={{ marginTop: 16 }} onSubmit={(event) => { event.preventDefault(); requestCancellation(selected); }}>
         <label className="field full"><span className="label">Lý do yêu cầu hủy *</span><textarea id="einvoice-cancellation-reason" className="input" rows="3" maxLength="2000" required value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Nêu lý do nghiệp vụ để gửi đến nhà cung cấp hóa đơn điện tử."/></label>
         <div className="row full"><span className="small muted">Yêu cầu chỉ chuyển sang đã hủy sau khi provider xác nhận.</span><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy) || !reason.trim()}>Gửi yêu cầu hủy</button></div>
       </form>}

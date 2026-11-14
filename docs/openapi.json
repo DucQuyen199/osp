@@ -57668,7 +57668,7 @@
     },
     "/api/t/{tenantId}/data/einvoice/einvoice/{id}/cancel_requested": {
       "post": {
-        "description": "Phát sự kiện `einvoice.einvoice.cancel_requested` cho các module khác phản ứng.",
+        "description": "Save the cancellation reason and queue the provider cancellation request atomically; the invoice remains pending cancellation until the provider confirms.",
         "parameters": [
           {
             "in": "path",
@@ -57688,6 +57688,27 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "cancellation_reason": {
+                    "maxLength": 2000,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "cancellation_reason"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {

@@ -1932,6 +1932,26 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     body.insert("result".into(), serde_json::json!(result));
                     return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
                 }
+                if q == "einvoice.einvoice" && *action == "cancel_requested" {
+                    let mut body = json_obj(&bytes)?;
+                    let reason = body
+                        .get("cancellation_reason")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::trim)
+                        .unwrap_or_default()
+                        .to_owned();
+                    if body.len() != 1 || !(1..=2000).contains(&reason.chars().count()) {
+                        return Err(ApiError::validation(
+                            "einvoice.einvoice.cancel_requested",
+                            vec![
+                                "Cần gửi duy nhất cancellation_reason có từ 1 đến 2.000 ký tự"
+                                    .into(),
+                            ],
+                        ));
+                    }
+                    body.insert("cancellation_reason".into(), serde_json::json!(reason));
+                    return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
+                }
                 return json_ok(k.act(&actor, &t, &q, id, action).await?);
             }
             _ => {}

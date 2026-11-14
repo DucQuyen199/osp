@@ -342,6 +342,22 @@ pub fn build(reg: &Registry) -> Value {
                             } } }
                         });
                     }
+                    if def.qname() == "einvoice.einvoice" && action == "cancel_requested" {
+                        operation["description"] = json!(
+                            "Save the cancellation reason and queue the provider cancellation request atomically; the invoice remains pending cancellation until the provider confirms."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": true,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "required": ["cancellation_reason"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "cancellation_reason": { "type": "string", "minLength": 1, "maxLength": 2000 }
+                                }
+                            } } }
+                        });
+                    }
                     paths.insert(
                         format!("{base}/{{id}}/{action}"),
                         json!({ "post": operation }),
