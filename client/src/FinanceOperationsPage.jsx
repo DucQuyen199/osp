@@ -18,6 +18,7 @@ export default function FinanceOperationsPage() {
   const [claims, setClaims] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [claimPay, setClaimPay] = useState({});
+  const [policyCancellationReasons, setPolicyCancellationReasons] = useState({});
   const [claimApprovalAmounts, setClaimApprovalAmounts] = useState({});
   const [claimRejectionReasons, setClaimRejectionReasons] = useState({});
   const [repaymentMethods, setRepaymentMethods] = useState({});
@@ -153,8 +154,15 @@ export default function FinanceOperationsPage() {
   async function policyAction(policy, action) {
     setBusy(true); setError(''); setNotice('');
     try {
-      await actions('insurance.policy', policy, action);
-      setNotice(action === 'activated' ? 'Đã kích hoạt hợp đồng và tạo hóa đơn phí phải thu.' : 'Đã cập nhật trạng thái hợp đồng.'); await load();
+      if (action === 'cancelled') {
+        const cancellationReason = (policyCancellationReasons[policy.id] || '').trim();
+        if (cancellationReason.length < 5 || cancellationReason.length > 500) throw new Error('Nhập lý do hủy hợp đồng từ 5 đến 500 ký tự.');
+        await api(dataPath('insurance.policy', policy.id, action), { method: 'POST', body: { cancellation_reason: cancellationReason } });
+        setPolicyCancellationReasons((current) => { const next = { ...current }; delete next[policy.id]; return next; });
+      } else {
+        await actions('insurance.policy', policy, action);
+      }
+      setNotice(action === 'activated' ? 'Đã kích hoạt hợp đồng và tạo hóa đơn phí phải thu.' : action === 'cancelled' ? 'Đã hủy hợp đồng và lưu lý do.' : 'Đã cập nhật trạng thái hợp đồng.'); await load();
     } catch (reason) { setError(reason.message || 'Không thể cập nhật hợp đồng.'); }
     finally { setBusy(false); }
   }
@@ -188,7 +196,7 @@ export default function FinanceOperationsPage() {
         <label className="field"><span className="label">Đến ngày *</span><input className="input" type="date" required min={policyForm.start_date} value={policyForm.end_date} onChange={(e) => setPolicyForm((x) => ({ ...x, end_date: e.target.value }))} /></label>
         <div className="row full"><span className="grow" /><button className="btn btn-primary" disabled={busy || loading || !policyForm.party}>Tạo báo giá</button></div>
       </form>}
-      {!policies.length && !loading ? <div className="empty">Chưa có hợp đồng bảo hiểm.</div> : <div className="table-wrap" style={{ marginTop: 12 }}><table className="table"><thead><tr><th>Số hợp đồng</th><th>Khách hàng</th><th>Sản phẩm</th><th>Phí</th><th>Thời hạn</th><th>Trạng thái / hóa đơn phí</th><th>Thao tác</th></tr></thead><tbody>{policies.map((policy) => { const invoice = invoiceByPolicy.get(policy.id); return <tr key={policy.id}><td>{policy.number}</td><td>{parties.get(policy.party) ? recordLabel('master-data.party', parties.get(policy.party)) : 'Khách hàng'}</td><td>{policy.product}</td><td>{money(policy.premium)}</td><td>{fmtDate(policy.start_date)} – {fmtDate(policy.end_date)}</td><td>{statusLabel(policy.status)}{invoice && <div><a href={`#/e/accounting/invoice/${invoice.id}`}>{statusLabel(invoice.status)} · xem hóa đơn phí</a></div>}</td><td className="row wrap">{policy.status === 'quoted' && can('insurance.policy.activated') && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => policyAction(policy, 'activated')}>Kích hoạt</button>}{['quoted', 'active'].includes(policy.status) && can('insurance.policy.cancelled') && <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => policyAction(policy, 'cancelled')}>Hủy</button>}</td></tr>; })}</tbody></table></div>}
+      {!policies.length && !loading ? <div className="empty">Chưa có hợp đồng bảo hiểm.</div> : <div className="table-wrap" style={{ marginTop: 12 }}><table className="table"><thead><tr><th>Số hợp đồng</th><th>Khách hàng</th><th>Sản phẩm</th><th>Phí</th><th>Thời hạn</th><th>Trạng thái / hóa đơn phí</th><th>Thao tác</th></tr></thead><tbody>{policies.map((policy) => { const invoice = invoiceByPolicy.get(policy.id); return <tr key={policy.id}><td>{policy.number}</td><td>{parties.get(policy.party) ? recordLabel('master-data.party', parties.get(policy.party)) : 'Khách hàng'}</td><td>{policy.product}</td><td>{money(policy.premium)}</td><td>{fmtDate(policy.start_date)} – {fmtDate(policy.end_date)}</td><td>{statusLabel(policy.status)}{policy.cancellation_reason && <div className="small muted">Lý do hủy: {policy.cancellation_reason}</div>}{invoice && <div><a href={`#/e/accounting/invoice/${invoice.id}`}>{statusLabel(invoice.status)} · xem hóa đơn phí</a></div>}</td><td className="row wrap">{policy.status === 'quoted' && can('insurance.policy.activated') && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => policyAction(policy, 'activated')}>Kích hoạt</button>}{['quoted', 'active'].includes(policy.status) && can('insurance.policy.cancelled') && <><label className="field"><span className="small muted">Lý do hủy (5–500 ký tự)</span><input className="input" maxLength={500} value={policyCancellationReasons[policy.id] || ''} onChange={(event) => setPolicyCancellationReasons((current) => ({ ...current, [policy.id]: event.target.value }))} /></label><button className="btn btn-ghost btn-sm" disabled={busy || (policyCancellationReasons[policy.id] || '').trim().length < 5} onClick={() => policyAction(policy, 'cancelled')}>Hủy</button></>}</td></tr>; })}</tbody></table></div>}
     </section>}
 
     {can('insurance.claim.read') && <section className="card card-pad" style={{ marginTop: 20 }}><h2>Hồ sơ bồi thường</h2>

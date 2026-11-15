@@ -141,6 +141,20 @@ pub fn build(reg: &Registry) -> Value {
                             } } }
                         });
                     }
+                    if def.qname() == "insurance.policy" && action == "cancelled" {
+                        operation["description"] = json!(
+                            "Record the cancellation reason and cancel the policy atomically."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": true,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "required": ["cancellation_reason"],
+                                "additionalProperties": false,
+                                "properties": { "cancellation_reason": { "type": "string", "minLength": 5, "maxLength": 500 } }
+                            } } }
+                        });
+                    }
                     if def.qname() == "logistics.shipment" && action == "delivered" {
                         operation["description"] = json!(
                             "Hoàn tất vận đơn và ghi POD trong cùng giao dịch. Nhập số lượng thực nhận theo từng dòng; nếu giao thiếu cần nêu lý do."

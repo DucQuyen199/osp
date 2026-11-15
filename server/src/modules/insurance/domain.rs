@@ -117,6 +117,16 @@ pub fn validate_action_at(
         ];
     }
     match (entity, action) {
+        ("policy", "cancelled") => {
+            let reason = document
+                .get("cancellation_reason")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .unwrap_or_default();
+            if !(5..=500).contains(&reason.chars().count()) {
+                return vec!["Cần ghi lý do hủy hợp đồng từ 5 đến 500 ký tự".into()];
+            }
+        }
         ("claim", "rejected") => {
             let reason = document
                 .get("rejection_reason")

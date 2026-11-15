@@ -1836,6 +1836,21 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                 return json_ok(k.act_bulk(&actor, &t, &q, action, ids).await?);
             }
             (&Method::POST, [id, action]) => {
+                if q == "insurance.policy" && *action == "cancelled" {
+                    let body = json_obj(&bytes)?;
+                    let reason = body
+                        .get("cancellation_reason")
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .unwrap_or_default();
+                    if body.len() != 1 || !(5..=500).contains(&reason.chars().count()) {
+                        return Err(ApiError::validation(
+                            "insurance.policy.cancelled",
+                            vec!["Cần gửi duy nhất cancellation_reason từ 5 đến 500 ký tự".into()],
+                        ));
+                    }
+                    return json_ok(k.insurance_cancel_policy(&actor, &t, id, reason).await?);
+                }
                 if (q == "payments.payment_txn" && matches!(*action, "succeeded" | "failed"))
                     || (q == "payments.payment_refund" && matches!(*action, "succeeded" | "failed"))
                 {

@@ -51,6 +51,13 @@
           "required": false
         },
         {
+          "name": "cancellation_reason",
+          "label": "Lý do hủy hợp đồng",
+          "type": "text",
+          "required": false,
+          "system": true
+        },
+        {
           "name": "status",
           "type": "enum",
           "required": false,
