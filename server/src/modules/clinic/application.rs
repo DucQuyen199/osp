@@ -1,7 +1,185 @@
 //! Derive patient identity for encounters from tenant-owned patient records.
-use crate::{db::Tx, error::R, kernel::Tenant};
-use serde_json::{Map, Value};
+use crate::{
+    db::Tx,
+    error::{ApiError, R},
+    kernel::{Actor, Kernel, Opts, Tenant},
+};
+use serde_json::{Map, Value, json};
 use uuid::Uuid;
+
+pub async fn handle_source_event(
+    kernel: &Kernel,
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    event_type: &str,
+    document: &Value,
+    event_id: Uuid,
+    depth: u32,
+) -> R<bool> {
+    if !tenant.has_module("clinic") {
+        return Ok(false);
+    }
+    match event_type {
+        "booking.booking.checked_in" => {
+            let Some(appointment) = document
+                .get("id")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+            else {
+                return Err(ApiError::validation(
+                    event_type,
+                    vec!["Check-in lịch hẹn cần mã hợp lệ".into()],
+                ));
+            };
+            let Some(booking) = tx
+                .query_opt(
+                    "SELECT party, resource, note, status FROM booking__booking WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                    &[&tenant.id, &appointment],
+                )
+                .await?
+            else {
+                return Err(ApiError::validation(
+                    event_type,
+                    vec!["Lịch hẹn đã check-in không tồn tại trong doanh nghiệp".into()],
+                ));
+            };
+            let party: Option<Uuid> = booking.get(0);
+            let resource: Option<Uuid> = booking.get(1);
+            let note: Option<String> = booking.get(2);
+            let status: String = booking.get(3);
+            if status != "checked_in" {
+                return Err(ApiError::validation(
+                    event_type,
+                    vec!["Lịch hẹn phải được check-in trước khi tạo lượt khám".into()],
+                ));
+            }
+            let Some(party) = party else {
+                return Err(ApiError::validation(
+                    event_type,
+                    vec!["Lịch khám cần gắn hồ sơ bệnh nhân đã đăng ký".into()],
+                ));
+            };
+            let Some(patient_row) = tx
+                .query_opt(
+                    "SELECT id FROM clinic__patient WHERE tenant_id = $1 AND party = $2 FOR SHARE",
+                    &[&tenant.id, &party],
+                )
+                .await?
+            else {
+                return Err(ApiError::validation(
+                    event_type,
+                    vec!["Hãy đăng ký người này thành bệnh nhân trước khi check-in".into()],
+                ));
+            };
+            if tx
+                .query_opt(
+                    "SELECT id FROM clinic__encounter WHERE tenant_id = $1 AND appointment = $2 LIMIT 1 FOR UPDATE",
+                    &[&tenant.id, &appointment],
+                )
+                .await?
+                .is_some()
+            {
+                return Ok(true);
+            }
+            let patient: Uuid = patient_row.get(0);
+            let mut encounter = Map::new();
+            encounter.insert("patient".into(), json!(patient));
+            encounter.insert("appointment".into(), json!(appointment));
+            if let Some(note) = note
+                .map(|value| value.trim().to_owned())
+                .filter(|value| !value.is_empty())
+            {
+                encounter.insert("complaint".into(), json!(note));
+            }
+            if let Some(resource) = resource
+                && let Some(resource_row) = tx
+                    .query_opt(
+                        "SELECT name FROM booking__resource WHERE tenant_id = $1 AND id = $2 AND kind = 'staff' FOR SHARE",
+                        &[&tenant.id, &resource],
+                    )
+                    .await?
+            {
+                let doctor: String = resource_row.get(0);
+                encounter.insert("doctor".into(), json!(doctor));
+            }
+            let encounter_entity = kernel.ent(tenant, "clinic.encounter")?;
+            kernel
+                .create_in(
+                    tx,
+                    &Actor::System,
+                    tenant,
+                    &encounter_entity,
+                    encounter,
+                    &Opts {
+                        depth: Some(depth + 1),
+                        causation: Some(event_id),
+                        silent: false,
+                    },
+                )
+                .await?;
+            Ok(true)
+        }
+        "clinic.encounter.completed" => {
+            let Some(encounter) = document
+                .get("id")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+            else {
+                return Ok(false);
+            };
+            let Some(appointment) = tx
+                .query_opt(
+                    "SELECT appointment FROM clinic__encounter WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                    &[&tenant.id, &encounter],
+                )
+                .await?
+                .and_then(|row| row.get::<_, Option<Uuid>>(0))
+            else {
+                return Ok(false);
+            };
+            let Some(status) = tx
+                .query_opt(
+                    "SELECT status FROM booking__booking WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                    &[&tenant.id, &appointment],
+                )
+                .await?
+                .map(|row| row.get::<_, String>(0))
+            else {
+                return Err(ApiError::validation(
+                    event_type,
+                    vec!["Lịch hẹn của lượt khám không tồn tại trong doanh nghiệp".into()],
+                ));
+            };
+            if status == "completed" {
+                return Ok(true);
+            }
+            if status != "checked_in" {
+                return Err(ApiError::validation(
+                    event_type,
+                    vec!["Chỉ hoàn tất lịch hẹn đang check-in cùng với lượt khám".into()],
+                ));
+            }
+            let booking_entity = kernel.ent(tenant, "booking.booking")?;
+            kernel
+                .act_in(
+                    tx,
+                    &Actor::System,
+                    tenant,
+                    &booking_entity,
+                    &appointment.to_string(),
+                    "completed",
+                    &Opts {
+                        depth: Some(depth + 1),
+                        causation: Some(event_id),
+                        silent: false,
+                    },
+                )
+                .await?;
+            Ok(true)
+        }
+        _ => Ok(false),
+    }
+}
 
 pub async fn prepare_document(
     tx: &Tx<'_>,

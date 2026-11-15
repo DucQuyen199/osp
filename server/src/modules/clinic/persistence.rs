@@ -52,7 +52,11 @@ async fn validate_patient(
                 "SELECT id FROM clinic__encounter WHERE tenant_id = $1 AND patient = $2 LIMIT 1 FOR UPDATE",
                 &[&tenant.id, &id],
             ).await?.is_some();
-            if has_encounters {
+            let has_appointments = tx.query_opt(
+                "SELECT id FROM booking__booking WHERE tenant_id = $1 AND party = (SELECT party FROM clinic__patient WHERE tenant_id = $1 AND id = $2) LIMIT 1",
+                &[&tenant.id, &id],
+            ).await?.is_some();
+            if has_encounters || has_appointments {
                 if let Some(old) = tx.query_opt(
                     "SELECT party FROM clinic__patient WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
                     &[&tenant.id, &id],
@@ -67,10 +71,15 @@ async fn validate_patient(
     }
     if action == "removed" {
         if let Some(id) = id {
-            if tx.query_opt(
+            let has_encounters = tx.query_opt(
                 "SELECT id FROM clinic__encounter WHERE tenant_id = $1 AND patient = $2 LIMIT 1 FOR UPDATE",
                 &[&tenant.id, &id],
-            ).await?.is_some() {
+            ).await?.is_some();
+            let has_appointments = tx.query_opt(
+                "SELECT id FROM booking__booking WHERE tenant_id = $1 AND party = (SELECT party FROM clinic__patient WHERE tenant_id = $1 AND id = $2) LIMIT 1",
+                &[&tenant.id, &id],
+            ).await?.is_some();
+            if has_encounters || has_appointments {
                 errors.push("Bệnh nhân đã có lượt khám nên không thể xóa hồ sơ".into());
             }
         }
@@ -98,6 +107,37 @@ async fn validate_encounter(
     };
     let patient_party: Uuid = row.get(0);
     let mut errors = Vec::new();
+    if action == "created"
+        && let Some(appointment) = parse_id(document, "appointment")
+    {
+        let Some(booking) = tx
+            .query_opt(
+                "SELECT party, status FROM booking__booking WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                &[&tenant.id, &appointment],
+            )
+            .await?
+        else {
+            return Ok(vec!["Lịch hẹn không tồn tại trong doanh nghiệp".into()]);
+        };
+        let appointment_party: Option<Uuid> = booking.get(0);
+        let appointment_status: String = booking.get(1);
+        if appointment_party != Some(patient_party) {
+            errors.push("Bệnh nhân trên lịch hẹn không trùng với lượt khám".into());
+        }
+        if appointment_status != "checked_in" {
+            errors.push("Chỉ tạo lượt khám từ lịch hẹn đã check-in".into());
+        }
+        if tx
+            .query_opt(
+                "SELECT id FROM clinic__encounter WHERE tenant_id = $1 AND appointment = $2 LIMIT 1 FOR UPDATE",
+                &[&tenant.id, &appointment],
+            )
+            .await?
+            .is_some()
+        {
+            errors.push("Lịch hẹn này đã có lượt khám".into());
+        }
+    }
     if parse_id(document, "party") != Some(patient_party) {
         errors.push("Khách hàng trên lượt khám phải trùng với bệnh nhân".into());
     }

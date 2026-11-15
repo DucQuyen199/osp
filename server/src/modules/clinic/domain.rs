@@ -166,6 +166,15 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
 }
 
 pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
+    if entity == "encounter"
+        && document
+            .get("appointment")
+            .is_some_and(|appointment| !appointment.is_null())
+    {
+        return vec![
+            "LÆ°á»£t khÃ¡m táº¡o tá»« lá»‹ch háº¹n pháº£i Ä‘Æ°á»£c giá»¯ cÃ¹ng lá»‹ch sá»­".into(),
+        ];
+    }
     match (entity, document.get("status").and_then(Value::as_str)) {
         ("encounter", Some("completed")) => {
             vec!["Lượt khám hoàn tất không thể xóa khỏi hồ sơ bệnh án".into()]

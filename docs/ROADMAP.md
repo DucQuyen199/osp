@@ -40,6 +40,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Bảo hiểm lưu lý do từ chối bồi thường; số tiền duyệt, quyết định bồi thường và thông tin chi trả cùng kiểm tra hạn mức/bút toán trong giao dịch.
 - Hồ sơ cho vay chốt ngày đến hạn kỳ đầu theo hợp đồng trước khi duyệt; lịch niên kim bắt đầu đúng ngày này và giữ ngày trong tháng cho các kỳ sau, đồng thời khoản vay cũ chưa có ngày vẫn dùng được quy tắc lịch trước đây.
 - Đối soát ngân hàng lưu liên kết payment/bút toán khớp thủ công và lý do bỏ qua cùng lần đổi trạng thái của dòng sao kê.
+- Phòng khám check-in lịch hẹn sẽ tạo lượt khám gắn đúng hồ sơ bệnh nhân trong cùng giao dịch; lượt khám hoàn tất tự hoàn tất lịch và chỉ lập hóa đơn theo phí khám, tránh thu trùng giá lịch hẹn.
 - Phòng khám hoàn tất lượt khám cùng thông tin bác sĩ, chẩn đoán, phí và hóa đơn phải thu; kết quả xét nghiệm lưu cùng trạng thái hoàn tất.
 - Báo cáo SLA Helpdesk chỉ dừng thời gian phản hồi đầu tiên khi có sự kiện phản hồi gửi khách hàng; sự kiện giải quyết ticket không bị tính thay cho phản hồi.
 - Hóa đơn điện tử lưu lý do hủy cùng giao dịch chuyển sang chờ provider xử lý hủy.

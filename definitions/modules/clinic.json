@@ -7,7 +7,8 @@
  "depends": [
   "master-data",
   "inventory",
-  "accounting"
+  "accounting",
+  "booking"
  ],
  "core": false,
  "entities": [
@@ -71,6 +72,14 @@
      "type": "ref",
      "required": true,
      "ref": "master-data.party"
+    },
+    {
+     "name": "appointment",
+     "label": "Lịch hẹn",
+     "type": "ref",
+     "required": false,
+     "ref": "booking.booking",
+     "system": true
     },
     {
      "name": "doctor",

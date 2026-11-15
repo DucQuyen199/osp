@@ -28,6 +28,24 @@ pub async fn handle_source_document_event(
         // the complete shipment has been delivered successfully.
         return Ok(true);
     }
+    if event_type == "booking.booking.completed"
+        && tenant.has_module("clinic")
+        && let Some(appointment) = event
+            .get("id")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+        && tx
+            .query_opt(
+                "SELECT id FROM clinic__encounter WHERE tenant_id = $1 AND appointment = $2 LIMIT 1 FOR SHARE",
+                &[&tenant.id, &appointment],
+            )
+            .await?
+            .is_some()
+    {
+        // Clinic visits bill from the completed encounter fee, not from the
+        // appointment's quoted service price. Avoid creating a second invoice.
+        return Ok(true);
+    }
     let Some(spec) = source_documents::source_document(event_type) else {
         return Ok(false);
     };

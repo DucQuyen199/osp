@@ -89,5 +89,22 @@ pub async fn dispatch_source_events(
             "outcome": "ok"
         }));
     }
+    if crate::modules::clinic::handle_source_event(
+        kernel,
+        tx,
+        tenant,
+        &event.ty,
+        &event.payload,
+        event.id,
+        event.depth,
+    )
+    .await?
+    {
+        handled.push(serde_json::json!({
+            "module": "clinic",
+            "rule": "appointment-checkin-and-encounter-lifecycle",
+            "outcome": "ok"
+        }));
+    }
     Ok(())
 }
