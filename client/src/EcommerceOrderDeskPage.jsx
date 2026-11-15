@@ -84,6 +84,18 @@ export default function EcommerceOrderDeskPage() {
     finally { setBusy(''); }
   };
 
+  const refreshCartPrice = async (order) => {
+    setBusy(`${order.id}:reprice`); setError(''); setNotice('');
+    try {
+      const refreshed = await api(dataPath('ecommerce.web_order', order.id), { method: 'PATCH', body: {
+        lines: (order.lines || []).map((line) => ({ product: line.product, qty: line.qty })),
+      } });
+      await load(true);
+      setNotice(`Đã cập nhật giá giỏ hàng: ${fmtMoney(order.total || 0)} → ${fmtMoney(refreshed.total || 0)}. Hãy kiểm tra lại trước khi đặt đơn.`);
+    } catch (reason) { setError(reason.message || 'Không cập nhật được giá giỏ hàng.'); await load(true); }
+    finally { setBusy(''); }
+  };
+
   const renderOrder = (order) => {
     const sale = relatedSalesOrder(order.id);
     const orderShipments = sale ? relatedShipments(sale.id) : [];
@@ -98,6 +110,7 @@ export default function EcommerceOrderDeskPage() {
         {orderShipments.map((shipment) => can('logistics.shipment.read') && <a className="small" key={shipment.id} href={recordHref('logistics.shipment', shipment.id)}>Vận đơn {shipment.tracking_number || String(shipment.id).slice(0, 8)} · {statusLabel(shipment.status)}</a>)}
         {invoice && can('accounting.invoice.read') && <a className="small" href={recordHref('accounting.invoice', invoice.id)}>Hóa đơn · {statusLabel(invoice.status)}</a>}
         <span className="grow" />
+        {order.status === 'cart' && can('ecommerce.web_order.update') && <button className="btn btn-secondary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => refreshCartPrice(order)}>{busy === `${order.id}:reprice` ? 'Đang cập nhật…' : 'Cập nhật giá'}</button>}
         {order.status === 'cart' && can('ecommerce.web_order.placed') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => transition(order, 'placed')}>{busy === `${order.id}:placed` ? 'Đang đặt…' : 'Xác nhận đặt đơn'}</button>}
         {order.status === 'cart' && can('ecommerce.web_order.cancelled') && <button className="btn btn-secondary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => transition(order, 'cancelled')}>{busy === `${order.id}:cancelled` ? 'Đang hủy…' : 'Hủy giỏ'}</button>}
         {order.status === 'placed' && sale?.status === 'confirmed' && can('ecommerce.web_order.cancelled') && <button className="btn btn-secondary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => transition(order, 'cancelled')}>{busy === `${order.id}:cancelled` ? 'Đang hủy…' : 'Hủy đơn chưa giao'}</button>}

@@ -180,6 +180,23 @@ pub async fn handle_source_event(
     let warehouse: Option<Uuid> = storefront.get(0);
     let price_list: Option<Uuid> = storefront.get(1);
     let tax: Option<Uuid> = storefront.get(2);
+    let current_lines = price_lines(tx, tenant, document, price_list, tax).await?;
+    let mut current_price = Map::from_iter([("lines".into(), Value::Array(current_lines))]);
+    if let Some(price_list) = price_list {
+        current_price.insert("price_list".into(), json!(price_list));
+    }
+    let price_errors =
+        crate::modules::sales::prepare_document(tx, tenant, "sales_order", &mut current_price)
+            .await?;
+    if !price_errors.is_empty() {
+        return Err(ApiError::validation(event_type, price_errors));
+    }
+    if !cart_price_snapshot_matches(document, &current_price) {
+        return Err(ApiError::validation(
+            event_type,
+            vec!["Giá hoặc thuế của giỏ hàng đã thay đổi. Hãy cập nhật lại giỏ, kiểm tra tổng tiền mới rồi đặt đơn.".into()],
+        ));
+    }
     let mut data = Map::new();
     data.insert(
         "party".into(),
@@ -188,7 +205,9 @@ pub async fn handle_source_event(
     data.insert("warehouse".into(), json!(warehouse));
     data.insert(
         "lines".into(),
-        Value::Array(price_lines(tx, tenant, document, price_list, tax).await?),
+        current_price
+            .remove("lines")
+            .expect("prepared ecommerce price lines"),
     );
     if let Some(price_list) = price_list {
         data.insert("price_list".into(), json!(price_list));
@@ -224,6 +243,30 @@ pub async fn handle_source_event(
         )
         .await?;
     Ok(true)
+}
+
+fn cart_price_snapshot_matches(cart: &Value, current_price: &Map<String, Value>) -> bool {
+    let (Some(cart_lines), Some(current_lines)) = (
+        cart.get("lines").and_then(Value::as_array),
+        current_price.get("lines").and_then(Value::as_array),
+    ) else {
+        return false;
+    };
+    cart_lines.len() == current_lines.len()
+        && cart_lines
+            .iter()
+            .zip(current_lines)
+            .all(|(cart_line, current_line)| {
+                ["qty", "price", "discount_pct", "tax_rate", "line_total"]
+                    .into_iter()
+                    .all(|field| {
+                        cart_line.get(field).and_then(money::decimal)
+                            == current_line.get(field).and_then(money::decimal)
+                    })
+                    && ["product", "tax", "tax_name", "kind", "tracked"]
+                        .into_iter()
+                        .all(|field| cart_line.get(field) == current_line.get(field))
+            })
 }
 
 fn child_opts(event_id: Uuid, depth: u32) -> Opts {
