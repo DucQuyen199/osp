@@ -101,7 +101,7 @@ pub async fn prepare_document(
 }
 
 /// Sum quantities from completed, non-refunded POS orders linked to a prescription.
-async fn dispensed_quantities(
+pub(super) async fn dispensed_quantities(
     tx: &Tx<'_>,
     tenant: &Tenant,
     prescription_id: Uuid,

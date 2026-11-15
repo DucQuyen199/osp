@@ -1,5 +1,7 @@
 use crate::{db::Tx, error::R, kernel::Tenant};
+use rust_decimal::Decimal;
 use serde_json::Value;
+use std::collections::BTreeMap;
 use uuid::Uuid;
 
 pub async fn validate_persistence(
@@ -9,6 +11,159 @@ pub async fn validate_persistence(
     action: &str,
     doc: &Value,
 ) -> R<Vec<String>> {
+    if tenant.has_module("pharmacy") && entity == "pos_order" && action == "completed" {
+        let Some(prescription_id) = doc
+            .get("prescription")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .and_then(|value| Uuid::parse_str(value).ok())
+        else {
+            return if doc
+                .get("prescription")
+                .and_then(Value::as_str)
+                .is_some_and(|value| !value.trim().is_empty())
+            {
+                Ok(vec![
+                    "POS order requires a valid linked prescription".into(),
+                ])
+            } else {
+                Ok(Vec::new())
+            };
+        };
+        let Some(prescription) = tx
+            .query_opt(
+                "SELECT party, status, valid_until::text, items FROM pharmacy__prescription WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                &[&tenant.id, &prescription_id],
+            )
+            .await?
+        else {
+            return Ok(vec!["Linked prescription was not found for this tenant".into()]);
+        };
+        let prescription_party: Option<Uuid> = prescription.get(0);
+        let prescription_status: String = prescription.get(1);
+        let valid_until: String = prescription.get(2);
+        let items: Value = prescription.get(3);
+        let order_party = id(doc, "party");
+        let mut errors = Vec::new();
+        if !matches!(
+            prescription_status.as_str(),
+            "verified" | "partially_dispensed"
+        ) {
+            errors.push(
+                "Only a verified prescription with remaining quantity can be dispensed".into(),
+            );
+        }
+        if prescription_party.is_none() || prescription_party != order_party {
+            errors.push("POS customer must match the customer on the linked prescription".into());
+        }
+        if valid_until < tenant.business_today().to_string() {
+            errors.push("An expired prescription cannot be dispensed".into());
+        }
+        let mut prescribed = BTreeMap::<Uuid, Decimal>::new();
+        let Some(items) = items.as_array() else {
+            return Err(crate::error::ApiError::validation(
+                "pharmacy.prescription",
+                vec![
+                    "Prescription items are invalid; dispense quantities cannot be verified".into(),
+                ],
+            ));
+        };
+        for item in items {
+            let Some(product) = item
+                .get("product")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+            else {
+                return Err(crate::error::ApiError::validation(
+                    "pharmacy.prescription",
+                    vec!["Prescription item has an invalid product; dispense quantities cannot be verified".into()],
+                ));
+            };
+            let Some(quantity) = item
+                .get("base_qty")
+                .or_else(|| item.get("qty"))
+                .and_then(crate::money::decimal)
+                .filter(|quantity| *quantity > Decimal::ZERO)
+            else {
+                return Err(crate::error::ApiError::validation(
+                    "pharmacy.prescription",
+                    vec!["Prescription item has an invalid quantity; dispense quantities cannot be verified".into()],
+                ));
+            };
+            let current = prescribed.get(&product).copied().unwrap_or_default();
+            let Some(total) = current.checked_add(quantity) else {
+                return Err(crate::error::ApiError::validation(
+                    "pharmacy.prescription",
+                    vec!["Prescribed quantity exceeds the supported range".into()],
+                ));
+            };
+            prescribed.insert(product, total);
+        }
+        let dispensed =
+            super::application::dispensed_quantities(tx, tenant, prescription_id).await?;
+        let mut requested = BTreeMap::<Uuid, Decimal>::new();
+        let mut matching_product_found = false;
+        for line in doc
+            .get("lines")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            let Some(product) = line
+                .get("product")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+            else {
+                continue;
+            };
+            if !prescribed.contains_key(&product) {
+                continue;
+            }
+            let Some(quantity) = line
+                .get("base_qty")
+                .or_else(|| line.get("qty"))
+                .and_then(crate::money::decimal)
+                .filter(|quantity| *quantity > Decimal::ZERO)
+            else {
+                errors.push(format!(
+                    "Prescription product {product} has an invalid POS quantity"
+                ));
+                continue;
+            };
+            matching_product_found = true;
+            let current = requested.get(&product).copied().unwrap_or_default();
+            let Some(total) = current.checked_add(quantity) else {
+                return Err(crate::error::ApiError::validation(
+                    "pharmacy.prescription",
+                    vec!["POS dispense quantity exceeds the supported range".into()],
+                ));
+            };
+            requested.insert(product, total);
+        }
+        if !matching_product_found {
+            errors.push(
+                "A POS order linked to a prescription must include at least one prescribed product"
+                    .into(),
+            );
+        }
+        for (product, requested_quantity) in requested {
+            let remaining = prescribed
+                .get(&product)
+                .copied()
+                .unwrap_or_default()
+                .checked_sub(dispensed.get(&product).copied().unwrap_or_default())
+                .unwrap_or(Decimal::ZERO)
+                .max(Decimal::ZERO);
+            if requested_quantity > remaining {
+                errors.push(format!(
+                    "POS quantity for prescription product {product} exceeds the remaining prescribed quantity ({remaining})"
+                ));
+            }
+        }
+        if !errors.is_empty() {
+            return Ok(errors);
+        }
+    }
     if entity != "prescription" {
         return Ok(Vec::new());
     }
