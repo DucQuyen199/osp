@@ -81,6 +81,7 @@ const ApprovalWorkbenchPage = lazy(() => import('./ApprovalWorkbenchPage.jsx'));
 const ContractWorkbenchPage = lazy(() => import('./ContractWorkbenchPage.jsx'));
 const DocumentWorkbenchPage = lazy(() => import('./DocumentWorkbenchPage.jsx'));
 const IntegrationHubPage = lazy(() => import('./IntegrationHubPage.jsx'));
+const LoyaltyWorkbenchPage = lazy(() => import('./LoyaltyWorkbenchPage.jsx'));
 
 function parseRoute(hash = location.hash) {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
@@ -121,6 +122,7 @@ function parseRoute(hash = location.hash) {
   if (a === 'contracts') return { name: 'contract-workbench' };
   if (a === 'documents') return { name: 'document-workbench' };
   if (a === 'integrations') return { name: 'integration-hub-workbench' };
+  if (a === 'loyalty') return { name: 'loyalty-workbench' };
   if (a === 'expenses') return { name: 'expense-workbench' };
   if (a === 'returns') return { name: 'sales-returns-workbench' };
   if (a === 'bank-reconciliation') return { name: 'bank-reconciliation-workbench' };
@@ -209,6 +211,7 @@ function Sidebar({ meta, route, onNavigate, open }) {
     {meta.modules.some((module) => module.id === 'contract') && can('contract.contract.read') && link('#/contracts', 'Sổ hợp đồng', route.name === 'contract-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'document') && (can('document.document.read') || can('document.document.create') || can('document.folder.read')) && link('#/documents', 'Thư viện tài liệu', route.name === 'document-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'integration-hub') && (can('integration-hub.connector.read') || can('integration-hub.connector.create') || can('integration-hub.webhook.read') || can('integration-hub.webhook.create')) && link('#/integrations', 'Cổng tích hợp', route.name === 'integration-hub-workbench', 'list')}
+    {meta.modules.some((module) => module.id === 'loyalty') && (can('loyalty.member.read') || can('loyalty.member.create')) && link('#/loyalty', 'Khách hàng thân thiết', route.name === 'loyalty-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'accounting') && can('accounting.journal_entry.read') && link('#/reports/accounting', 'Báo cáo kế toán', route.name === 'accounting-reports', 'list')}
     {meta.modules.some((module) => module.id === 'manufacturing') && can('manufacturing.production_order.read') && link('#/reports/manufacturing/wip', 'WIP sản xuất', route.name === 'manufacturing-wip', 'list')}
     {meta.modules.some((module) => module.id === 'asset') && can('asset.asset.read') && link('#/reports/asset/depreciation-schedule', 'Lịch khấu hao tài sản', route.name === 'asset-depreciation-schedule', 'list')}
@@ -484,6 +487,7 @@ function App() {
         : route.name === 'contract-workbench' ? <ContractWorkbenchPage />
         : route.name === 'document-workbench' ? <DocumentWorkbenchPage />
         : route.name === 'integration-hub-workbench' ? <IntegrationHubPage />
+        : route.name === 'loyalty-workbench' ? <LoyaltyWorkbenchPage />
         : route.name === 'marketing-campaign-performance' ? <MarketingCampaignPerformancePage />
         : route.name === 'helpdesk-sla' ? <HelpdeskSlaPage />
         : route.name === 'bi-reports' ? <BiReportsPage route={route} />
