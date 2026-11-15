@@ -41,6 +41,19 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                 {
                     errors.push(format!("{label} cần mô tả"));
                 }
+                if item
+                    .get("unit")
+                    .and_then(Value::as_str)
+                    .is_none_or(|unit| unit.trim().is_empty())
+                {
+                    errors.push(format!("{label} cần đơn vị đo"));
+                } else if item
+                    .get("unit")
+                    .and_then(Value::as_str)
+                    .is_some_and(|unit| unit.trim().chars().count() > 32)
+                {
+                    errors.push(format!("{label} có đơn vị đo vượt quá 32 ký tự"));
+                }
                 if !item
                     .get("qty")
                     .and_then(money::decimal)

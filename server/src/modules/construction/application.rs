@@ -127,6 +127,17 @@ async fn prepare_boq(
             );
         }
     }
+    if let Some(items) = document.get_mut("items").and_then(Value::as_array_mut) {
+        for item in items {
+            if let Some(value) = item
+                .get("unit")
+                .and_then(Value::as_str)
+                .map(|unit| unit.trim().to_owned())
+            {
+                item["unit"] = Value::String(value);
+            }
+        }
+    }
     let Some(items) = document.get("items").and_then(Value::as_array) else {
         return Ok(Vec::new());
     };

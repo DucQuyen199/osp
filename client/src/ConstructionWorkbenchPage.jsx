@@ -23,7 +23,7 @@ export default function ConstructionWorkbenchPage() {
   const [siteForm, setSiteForm] = useState({ name: '', project: '', address: '' });
   const [diaryForm, setDiaryForm] = useState({ site: '', date: today(), weather: '', notes: '' });
   const [boqForm, setBoqForm] = useState({ project: '', supersedes: '', revision_reason: '' });
-  const [boqLines, setBoqLines] = useState([{ description: '', qty: '1', unit_price: '' }]);
+  const [boqLines, setBoqLines] = useState([{ description: '', unit: '', qty: '1', unit_price: '' }]);
   const [subcontractForm, setSubcontractForm] = useState({ project: '', vendor: '', value: '', scope: '' });
   const [claimForm, setClaimForm] = useState({ subcontract: '', period: today(), amount: '', notes: '' });
   const [busy, setBusy] = useState('');
@@ -93,11 +93,11 @@ export default function ConstructionWorkbenchPage() {
   async function createBoq(event) {
     event.preventDefault();
     await run('boq', async () => {
-      const payload = { ...boqForm, project: boqForm.project, supersedes: boqForm.supersedes || undefined, revision_reason: boqForm.revision_reason || undefined, items: boqLines.map((line) => ({ description: line.description.trim(), qty: Number(line.qty), unit_price: Number(line.unit_price) })) };
+      const payload = { ...boqForm, project: boqForm.project, supersedes: boqForm.supersedes || undefined, revision_reason: boqForm.revision_reason || undefined, items: boqLines.map((line) => ({ description: line.description.trim(), unit: line.unit.trim(), qty: Number(line.qty), unit_price: Number(line.unit_price) })) };
       delete payload.revision;
       await api(dataPath('construction.boq'), { method: 'POST', body: payload });
     }, 'Đã lập dự toán BOQ nháp; tổng giá trị được máy chủ tính từ khối lượng và đơn giá.');
-    setBoqLines([{ description: '', qty: '1', unit_price: '' }]);
+    setBoqLines([{ description: '', unit: '', qty: '1', unit_price: '' }]);
     setBoqForm((current) => ({ ...current, supersedes: '', revision_reason: '' }));
   }
 
@@ -119,7 +119,7 @@ export default function ConstructionWorkbenchPage() {
     await run(`${row.id}:${verb}`, () => runAction(entity, row, verb), success);
   }
 
-  const addBoqLine = () => setBoqLines((current) => [...current, { description: '', qty: '1', unit_price: '' }]);
+  const addBoqLine = () => setBoqLines((current) => [...current, { description: '', unit: '', qty: '1', unit_price: '' }]);
   const updateBoqLine = (index, field, value) => setBoqLines((current) => current.map((line, i) => i === index ? { ...line, [field]: value } : line));
 
   return <div className="page">
@@ -137,10 +137,10 @@ export default function ConstructionWorkbenchPage() {
               {revisionSource && <label className="field full"><span className="label">Lý do điều chỉnh *</span><input className="input" required value={boqForm.revision_reason} onChange={(e) => setBoqForm({ ...boqForm, revision_reason: e.target.value })}/></label>}
             </div>
             <div className="row wrap" style={{ marginTop: 12 }}><strong>Hạng mục</strong><span className="grow"/><button className="btn btn-secondary btn-sm" type="button" onClick={addBoqLine}>Thêm hạng mục</button></div>
-            {boqLines.map((line, index) => <div className="row wrap" key={index} style={{ marginTop: 8 }}><input className="input" aria-label="Mô tả hạng mục" placeholder="Mô tả công tác / vật tư" required value={line.description} onChange={(e) => updateBoqLine(index, 'description', e.target.value)}/><input className="input num" aria-label="Khối lượng" type="number" min="0.001" step="any" required value={line.qty} onChange={(e) => updateBoqLine(index, 'qty', e.target.value)} style={{ maxWidth: 110 }}/><input className="input num" aria-label="Đơn giá" type="number" min="0" step="any" required value={line.unit_price} onChange={(e) => updateBoqLine(index, 'unit_price', e.target.value)} style={{ maxWidth: 150 }}/><strong>{fmtMoney(lineValue(line))}</strong>{boqLines.length > 1 && <button className="btn btn-ghost btn-sm" type="button" aria-label="Xóa hạng mục" onClick={() => setBoqLines((current) => current.filter((_, i) => i !== index))}>Bỏ</button>}</div>)}
+            {boqLines.map((line, index) => <div className="row wrap" key={index} style={{ marginTop: 8 }}><input className="input" aria-label="Mô tả hạng mục" placeholder="Mô tả công tác / vật tư" required value={line.description} onChange={(e) => updateBoqLine(index, 'description', e.target.value)}/><input className="input" aria-label="Đơn vị tính" placeholder="m², m³, m, kg, ngày công" required maxLength={32} value={line.unit} onChange={(e) => updateBoqLine(index, 'unit', e.target.value)}/><input className="input num" aria-label="Khối lượng" type="number" min="0.001" step="any" required value={line.qty} onChange={(e) => updateBoqLine(index, 'qty', e.target.value)} style={{ maxWidth: 110 }}/><input className="input num" aria-label="Đơn giá" type="number" min="0" step="any" required value={line.unit_price} onChange={(e) => updateBoqLine(index, 'unit_price', e.target.value)} style={{ maxWidth: 150 }}/><strong>{fmtMoney(lineValue(line))}</strong>{boqLines.length > 1 && <button className="btn btn-ghost btn-sm" type="button" aria-label="Xóa hạng mục" onClick={() => setBoqLines((current) => current.filter((_, i) => i !== index))}>Bỏ</button>}</div>)}
             <div className="row" style={{ marginTop: 10 }}><span className="grow"/><strong>Ước tính: {fmtMoney(totalOf(boqLines))}</strong><button className="btn btn-primary" disabled={Boolean(busy) || !boqForm.project}>Lưu BOQ nháp</button></div>
           </form>}
-          <div className="table-wrap" style={{ marginTop: 16 }}><table className="table"><thead><tr><th>Mã BOQ</th><th>Phiên bản</th><th>Tổng dự toán</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{projectBoqs.map((row) => <tr key={row.id}><td><strong>{row.number}</strong>{Number(row.revision) > 1 && <div className="small muted">{row.revision_reason}</div>}</td><td>R{row.revision}</td><td>{fmtMoney(row.total || 0)}</td><td>{statusLabel(row.status)}</td><td>{row.status === 'draft' && can('construction.boq.approved') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => transition('construction.boq', row, 'approved', 'Đã duyệt BOQ và xác lập baseline dự toán cho công trình.')}>Duyệt baseline</button>}{row.status === 'approved' && can('construction.boq.create') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => { setBoqForm({ project: row.project, supersedes: row.id, revision_reason: '' }); setBoqLines((row.items || []).map((item) => ({ description: item.description || '', qty: String(item.qty || 1), unit_price: String(item.unit_price || 0) }))); }}>Lập phiên bản điều chỉnh</button>}</td></tr>)}</tbody></table></div>
+          <div className="table-wrap" style={{ marginTop: 16 }}><table className="table"><thead><tr><th>Mã BOQ</th><th>Phiên bản</th><th>Tổng dự toán</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{projectBoqs.map((row) => <tr key={row.id}><td><strong>{row.number}</strong>{Number(row.revision) > 1 && <div className="small muted">{row.revision_reason}</div>}{(row.items || []).map((item, index) => <div className="small muted" key={index}>{item.description} {'\u00b7'} {item.qty} {item.unit} {'\u00d7'} {fmtMoney(item.unit_price)}</div>)}</td><td>R{row.revision}</td><td>{fmtMoney(row.total || 0)}</td><td>{statusLabel(row.status)}</td><td>{row.status === 'draft' && can('construction.boq.approved') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => transition('construction.boq', row, 'approved', 'Đã duyệt BOQ và xác lập baseline dự toán cho công trình.')}>Duyệt baseline</button>}{row.status === 'approved' && can('construction.boq.create') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => { setBoqForm({ project: row.project, supersedes: row.id, revision_reason: '' }); setBoqLines((row.items || []).map((item) => ({ description: item.description || '', unit: item.unit || '', qty: String(item.qty || 1), unit_price: String(item.unit_price || 0) }))); }}>Lập phiên bản điều chỉnh</button>}</td></tr>)}</tbody></table></div>
         </section>
 
         <section className="card card-pad"><h2>Nhật ký công trường</h2>
