@@ -275,17 +275,22 @@ pub async fn validate_persistence(
                         {
                             errors.push("Post or remove the other declining-balance draft first".into());
                         }
-                        if let Some(period) = date(document, "period")
-                            && tx
-                                .query_opt(
-                                    "SELECT id FROM asset__depreciation WHERE tenant_id = $1 AND asset = $2 AND status = 'posted' AND period > $3 LIMIT 1",
-                                    &[&tenant.id, &id, &period],
-                                )
-                                .await?
-                                .is_some()
-                        {
-                            errors.push("Declining-balance depreciation must be posted in period order".into());
-                        }
+                    }
+                    if let (Some(depreciation_id), Some(period)) = (
+                        document
+                            .get("id")
+                            .and_then(Value::as_str)
+                            .and_then(|value| Uuid::parse_str(value).ok()),
+                        date(document, "period"),
+                    ) && tx
+                        .query_opt(
+                            "SELECT id FROM asset__depreciation WHERE tenant_id = $1 AND asset = $2 AND status = 'posted' AND period > $3 AND id <> $4 LIMIT 1",
+                            &[&tenant.id, &id, &period, &depreciation_id],
+                        )
+                        .await?
+                        .is_some()
+                    {
+                        errors.push("Asset depreciation must be posted in period order".into());
                     }
                     let maximum_accumulated = cost
                         .checked_sub(salvage)
