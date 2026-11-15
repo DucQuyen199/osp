@@ -1,3 +1,31 @@
+x-osp-environment: &osp-environment
+  DATABASE_URL: postgres://${OSP_DB_USER:-osp_app}:${OSP_DB_PASSWORD:?Set OSP_DB_PASSWORD in .env}@postgres:5432/${OSP_DB_NAME:-osp}
+  OSP_ENV: production
+  OSP_DEMO: ${OSP_DEMO:-0}
+  OSP_SIGNUP: ${OSP_SIGNUP:-0}
+  OSP_PUBLIC_URL: ${OSP_PUBLIC_URL:-}
+  OSP_TOTP_ENCRYPTION_KEY: ${OSP_TOTP_ENCRYPTION_KEY:-}
+  OSP_METRICS_TOKEN: ${OSP_METRICS_TOKEN:-}
+  OSP_JOBS_INTERVAL_SEC: ${OSP_JOBS_INTERVAL_SEC:-60}
+  OSP_OUTBOX_INTERVAL_SEC: ${OSP_OUTBOX_INTERVAL_SEC:-2}
+  OSP_COMM_INTERVAL_SEC: ${OSP_COMM_INTERVAL_SEC:-5}
+  OSP_EINVOICE_INTERVAL_SEC: ${OSP_EINVOICE_INTERVAL_SEC:-5}
+  OSP_EINVOICE_PROVIDER: ${OSP_EINVOICE_PROVIDER:-rest}
+  OSP_EINVOICE_ENDPOINT: ${OSP_EINVOICE_ENDPOINT:-}
+  OSP_EINVOICE_TOKEN: ${OSP_EINVOICE_TOKEN:-}
+  OSP_EINVOICE_TIMEOUT_SEC: ${OSP_EINVOICE_TIMEOUT_SEC:-30}
+  OSP_COMM_EMAIL_ENDPOINT: ${OSP_COMM_EMAIL_ENDPOINT:-}
+  OSP_COMM_EMAIL_TOKEN: ${OSP_COMM_EMAIL_TOKEN:-}
+  OSP_COMM_EMAIL_FROM: ${OSP_COMM_EMAIL_FROM:-}
+  OSP_COMM_SMTP_HOST: ${OSP_COMM_SMTP_HOST:-}
+  OSP_COMM_SMTP_PORT: ${OSP_COMM_SMTP_PORT:-}
+  OSP_COMM_SMTP_MODE: ${OSP_COMM_SMTP_MODE:-implicit_tls}
+  OSP_COMM_SMTP_USERNAME: ${OSP_COMM_SMTP_USERNAME:-}
+  OSP_COMM_SMTP_PASSWORD: ${OSP_COMM_SMTP_PASSWORD:-}
+  OSP_COMM_SMS_ENDPOINT: ${OSP_COMM_SMS_ENDPOINT:-}
+  OSP_COMM_SMS_TOKEN: ${OSP_COMM_SMS_TOKEN:-}
+  OSP_COMM_SMS_FROM: ${OSP_COMM_SMS_FROM:-}
+
 services:
   postgres:
     build:
@@ -23,37 +51,36 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgres://${OSP_DB_USER:-osp_app}:${OSP_DB_PASSWORD:?Set OSP_DB_PASSWORD in .env}@postgres:5432/${OSP_DB_NAME:-osp}
+      <<: *osp-environment
       OSP_PORT: 3000
-      OSP_ENV: production
-      OSP_DEMO: ${OSP_DEMO:-0}
-      OSP_SIGNUP: ${OSP_SIGNUP:-0}
-      OSP_PUBLIC_URL: ${OSP_PUBLIC_URL:-}
-      OSP_TOTP_ENCRYPTION_KEY: ${OSP_TOTP_ENCRYPTION_KEY:-}
-      OSP_METRICS_TOKEN: ${OSP_METRICS_TOKEN:-}
-      OSP_OUTBOX_INTERVAL_SEC: ${OSP_OUTBOX_INTERVAL_SEC:-2}
-      OSP_COMM_INTERVAL_SEC: ${OSP_COMM_INTERVAL_SEC:-5}
-      OSP_EINVOICE_INTERVAL_SEC: ${OSP_EINVOICE_INTERVAL_SEC:-5}
-      OSP_EINVOICE_PROVIDER: ${OSP_EINVOICE_PROVIDER:-rest}
-      OSP_EINVOICE_ENDPOINT: ${OSP_EINVOICE_ENDPOINT:-}
-      OSP_EINVOICE_TOKEN: ${OSP_EINVOICE_TOKEN:-}
-      OSP_EINVOICE_TIMEOUT_SEC: ${OSP_EINVOICE_TIMEOUT_SEC:-30}
-      OSP_COMM_EMAIL_ENDPOINT: ${OSP_COMM_EMAIL_ENDPOINT:-}
-      OSP_COMM_EMAIL_TOKEN: ${OSP_COMM_EMAIL_TOKEN:-}
-      OSP_COMM_EMAIL_FROM: ${OSP_COMM_EMAIL_FROM:-}
-      OSP_COMM_SMTP_HOST: ${OSP_COMM_SMTP_HOST:-}
-      OSP_COMM_SMTP_PORT: ${OSP_COMM_SMTP_PORT:-}
-      OSP_COMM_SMTP_MODE: ${OSP_COMM_SMTP_MODE:-implicit_tls}
-      OSP_COMM_SMTP_USERNAME: ${OSP_COMM_SMTP_USERNAME:-}
-      OSP_COMM_SMTP_PASSWORD: ${OSP_COMM_SMTP_PASSWORD:-}
-      OSP_COMM_SMS_ENDPOINT: ${OSP_COMM_SMS_ENDPOINT:-}
-      OSP_COMM_SMS_TOKEN: ${OSP_COMM_SMS_TOKEN:-}
-      OSP_COMM_SMS_FROM: ${OSP_COMM_SMS_FROM:-}
+      OSP_PROCESS_ROLE: api
     depends_on:
       postgres:
         condition: service_healthy
     ports:
       - "${OSP_BIND_ADDRESS:-127.0.0.1}:${OSP_PORT:-3000}:3000"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    restart: unless-stopped
+
+  osp-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      <<: *osp-environment
+      OSP_PROCESS_ROLE: worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      disable: true
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=64m

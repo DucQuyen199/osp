@@ -51,6 +51,11 @@ async fn run() {
         tracing_subscriber::fmt().with_env_filter(filter).init();
     }
 
+    let process_role = std::env::var("OSP_PROCESS_ROLE").unwrap_or_else(|_| "all".into());
+    if !matches!(process_role.as_str(), "api" | "worker" | "all") {
+        fatal("OSP_PROCESS_ROLE must be api, worker, or all");
+    }
+
     // Giữ tiến trình PostgreSQL nhúng sống suốt vòng đời máy chủ
     #[cfg(feature = "embedded-pg")]
     let mut embedded: Option<postgresql_embedded::PostgreSQL> = None;
@@ -94,6 +99,47 @@ async fn run() {
             .unwrap_or_else(|e| fatal(&e)),
     );
 
+    if process_role != "api" {
+        spawn_scheduler(
+            kernel.clone(),
+            std::env::var("OSP_JOBS_INTERVAL_SEC")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(60),
+        );
+        spawn_outbox_worker(
+            kernel.clone(),
+            std::env::var("OSP_OUTBOX_INTERVAL_SEC")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(2),
+        );
+        spawn_communication_worker(
+            kernel.clone(),
+            std::env::var("OSP_COMM_INTERVAL_SEC")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(5),
+        );
+        spawn_einvoice_worker(
+            kernel.clone(),
+            std::env::var("OSP_EINVOICE_INTERVAL_SEC")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(5),
+        );
+    }
+
+    if process_role == "worker" {
+        tracing::info!("OSP background worker process started");
+        shutdown_signal().await;
+        #[cfg(feature = "embedded-pg")]
+        if let Some(pg) = embedded {
+            let _ = pg.stop().await;
+        }
+        return;
+    }
+
     let port: u16 = std::env::var("OSP_PORT")
         .or_else(|_| std::env::var("PORT"))
         .ok()
@@ -110,34 +156,6 @@ async fn run() {
         public_dir: default_public_dir(),
     };
     let state = app_state(kernel.clone(), cfg);
-    spawn_scheduler(
-        kernel.clone(),
-        std::env::var("OSP_JOBS_INTERVAL_SEC")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(60),
-    );
-    spawn_outbox_worker(
-        kernel.clone(),
-        std::env::var("OSP_OUTBOX_INTERVAL_SEC")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(2),
-    );
-    spawn_communication_worker(
-        kernel.clone(),
-        std::env::var("OSP_COMM_INTERVAL_SEC")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(5),
-    );
-    spawn_einvoice_worker(
-        kernel.clone(),
-        std::env::var("OSP_EINVOICE_INTERVAL_SEC")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(5),
-    );
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = tokio::net::TcpListener::bind(addr)

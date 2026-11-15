@@ -24,7 +24,16 @@ docker compose ps
 curl --fail http://127.0.0.1:3000/api/health
 ```
 
-`osp` là máy chủ Rust; `postgres` là PostgreSQL 17. Migration lược đồ và Row-Level Security chạy tự động khi máy chủ khởi động. Ứng dụng chỉ bind vào loopback; reverse proxy phải chạy cùng máy chủ hoặc được cấu hình qua kênh private. Cổng PostgreSQL không publish ra host. `DATABASE_URL` dùng role `osp_app` không phải superuser. Demo tắt mặc định. Sau khi tạo tenant/quản trị viên đầu tiên qua SSH tunnel, sửa `.env` thành `OSP_SIGNUP=0` và chạy `docker compose up -d --force-recreate osp` trước khi mở reverse proxy cho người dùng.
+`osp` là API Rust; `osp-worker` chạy scheduler và các hàng đợi webhook, thông báo, hóa đơn điện tử; `postgres` là PostgreSQL 17. Cả hai tiến trình ứng dụng chạy migration có khóa PostgreSQL khi khởi động. API chỉ bind vào loopback; worker không mở cổng HTTP. Cổng PostgreSQL không publish ra host. `DATABASE_URL` dùng role `osp_app` không phải superuser. Demo tắt mặc định. Sau khi tạo tenant/quản trị viên đầu tiên qua SSH tunnel, sửa `.env` thành `OSP_SIGNUP=0` và chạy `docker compose up -d --force-recreate osp` trước khi mở reverse proxy cho người dùng.
+
+Có thể tăng riêng số worker mà không nhân bản cổng API:
+
+```bash
+docker compose up -d --scale osp-worker=3
+docker compose ps
+```
+
+Các worker claim hàng đợi bằng khóa PostgreSQL (`SKIP LOCKED`) và lease; có thể chạy nhiều bản sao cùng lúc. Scheduler cũng có thể chạy trên nhiều worker; các job được khóa và kiểm tra lại trước khi chuyển trạng thái. Thay đổi số worker theo tải và giới hạn kết nối PostgreSQL; tăng replica không thay thế việc đo tải trên hạ tầng production.
 
 ### Notification delivery (optional)
 
@@ -61,8 +70,10 @@ Doanh nghiệp tạo ra chỉ chọn được trong số module đã cài; modul
 | Biến / cờ | Mặc định | Ý nghĩa |
 |---|---|---|
 | `OSP_PORT` / `PORT` / `--port=` | `3000` | Cổng lắng nghe |
+| `OSP_PROCESS_ROLE` | `all` | `api` chỉ phục vụ HTTP, `worker` chỉ chạy tác vụ nền, `all` chạy cả hai; Compose đặt riêng role cho từng service |
 | `DATABASE_URL` | — | Chuỗi kết nối PostgreSQL bắt buộc khi chạy Rust production |
 | `OSP_MODULES` / `--modules=` | tất cả | Danh sách module cần cài |
+| `OSP_JOBS_INTERVAL_SEC` | `60` | Chu kỳ scheduler; đặt `0` để tắt |
 | `OSP_DEMO` | `1` (dev) · `0` (production) | Bật `POST /api/demo` và nút "Dùng thử" |
 | `OSP_SIGNUP` | `0` trong Compose; script khởi tạo đặt `1` | Tắt sau khi tạo tenant/quản trị viên đầu tiên |
 | `OSP_TOTP_ENCRYPTION_KEY` | rỗng | Khóa Base64 32 byte để mã hóa bí mật TOTP; bắt buộc trước khi bất kỳ người dùng nào bật MFA |

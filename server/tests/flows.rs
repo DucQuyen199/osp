@@ -1150,7 +1150,7 @@ async fn run(k: Arc<Kernel>, url: String, defs: PathBuf) {
         );
 
         let api = k
-            .issue_token(&t, &admin_id, "api", Some("CI"), None)
+            .issue_token(&t, &admin_id, "api", Some("CI"), None, None)
             .await
             .unwrap();
         let raw = api["token"].as_str().unwrap();
