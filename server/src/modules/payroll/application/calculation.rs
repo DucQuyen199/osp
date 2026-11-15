@@ -241,6 +241,26 @@ pub(super) async fn calculate_from_attendance(
             ],
         ));
     }
+    if tax_policy.is_none()
+        && rows
+            .iter()
+            .any(|row| row.get::<_, String>(8).as_str() != "exempt")
+    {
+        return Err(crate::error::ApiError::validation(
+            "payroll.tax_policy",
+            vec![format!(
+                "No approved income tax policy covers payroll period {period}; configure a policy or explicitly mark every included employee tax-exempt"
+            )],
+        ));
+    }
+    if contribution_policy.is_none() && rows.iter().any(|row| !row.get::<_, bool>(10)) {
+        return Err(crate::error::ApiError::validation(
+            "payroll.contribution_policy",
+            vec![format!(
+                "No approved contribution policy covers payroll period {period}; configure a policy or explicitly mark every included employee exempt"
+            )],
+        ));
+    }
 
     let entity = kernel.ent(tenant, "payroll.payslip")?;
     let mut created = 0usize;
