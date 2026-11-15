@@ -1832,6 +1832,10 @@
             ],
             "type": "string"
           },
+          "preharvest_interval_configured": {
+            "readOnly": true,
+            "type": "boolean"
+          },
           "preharvest_interval_days": {
             "readOnly": true,
             "type": "number"
@@ -1901,6 +1905,10 @@
               "seed"
             ],
             "type": "string"
+          },
+          "preharvest_interval_configured": {
+            "readOnly": true,
+            "type": "boolean"
           },
           "preharvest_interval_days": {
             "readOnly": true,

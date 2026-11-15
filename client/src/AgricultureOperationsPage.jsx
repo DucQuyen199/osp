@@ -74,16 +74,31 @@ export default function AgricultureOperationsPage() {
   const unitLabel = (item) => item.uom_name || units.get(item.uom)?.name || '';
   const cycleHarvests = useMemo(() => harvests.filter((item) => item.cycle === cycleId).sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))), [harvests, cycleId]);
   const cycleInputs = useMemo(() => applications.filter((item) => item.cycle === cycleId).sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))), [applications, cycleId]);
-  const harvestRestriction = useMemo(() => cycleInputs.reduce((latest, application) => {
-    if (application.kind !== 'pesticide') return latest;
-    const intervalDays = Number(application.preharvest_interval_days ?? products.get(application.product)?.preharvest_interval_days) || 0;
-    if (intervalDays <= 0 || !application.date) return latest;
-    const applicationDate = new Date(`${application.date}T00:00:00Z`);
-    if (!Number.isFinite(applicationDate.getTime())) return latest;
-    applicationDate.setUTCDate(applicationDate.getUTCDate() + intervalDays);
-    const allowedDate = applicationDate.toISOString().slice(0, 10);
-    return allowedDate > latest ? allowedDate : latest;
-  }, ''), [cycleInputs, products]);
+  const harvestSafety = useMemo(() => {
+    const unknownProducts = new Set();
+    const latestDate = cycleInputs.reduce((latest, application) => {
+      if (application.kind !== 'pesticide') return latest;
+      const product = products.get(application.product);
+      const configuredSnapshot = application.preharvest_interval_configured === true;
+      const intervalValue = configuredSnapshot
+        ? application.preharvest_interval_days
+        : product?.preharvest_interval_days;
+      const intervalDays = Number(intervalValue);
+      if (intervalValue == null || !Number.isInteger(intervalDays) || intervalDays < 0) {
+        unknownProducts.add(product?.name || 'thuốc bảo vệ thực vật');
+        return latest;
+      }
+      if (!application.date) return latest;
+      const applicationDate = new Date(`${application.date}T00:00:00Z`);
+      if (!Number.isFinite(applicationDate.getTime())) return latest;
+      applicationDate.setUTCDate(applicationDate.getUTCDate() + intervalDays);
+      const allowedDate = applicationDate.toISOString().slice(0, 10);
+      return allowedDate > latest ? allowedDate : latest;
+    }, '');
+    return { latestDate, unknownProducts: [...unknownProducts] };
+  }, [cycleInputs, products]);
+  const harvestRestriction = harvestSafety.latestDate;
+  const legacyPesticideApplications = cycleInputs.filter((application) => application.kind === 'pesticide' && application.preharvest_interval_configured !== true);
   const totalHarvest = cycleHarvests.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
   const yieldPerArea = selectedFarm?.area && Number(selectedFarm.area) > 0 ? totalHarvest / Number(selectedFarm.area) : null;
   const activeCycles = cycles.filter((item) => item.status === 'growing').length;
@@ -138,6 +153,10 @@ export default function AgricultureOperationsPage() {
 
   const inputKinds = [['fertilizer', 'Phân bón'], ['pesticide', 'Thuốc bảo vệ thực vật'], ['seed', 'Giống'], ['water', 'Nước tưới']];
   const requiresProduct = ['fertilizer', 'pesticide', 'seed'].includes(inputKind);
+  const pesticideIntervalMissing = inputKind === 'pesticide' && Boolean(inputProduct)
+    && (products.get(inputProduct)?.preharvest_interval_days == null
+      || !Number.isInteger(Number(products.get(inputProduct)?.preharvest_interval_days))
+      || Number(products.get(inputProduct)?.preharvest_interval_days) < 0);
 
   return <div className="page agriculture-page">
     <div className="page-head"><div><h1>Điều hành mùa vụ</h1><p className="sub">Quản lý trang trại, theo dõi vụ đang canh tác, ghi vật tư và nhập sản lượng thu hoạch vào kho.</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{loading ? 'Đang tải…' : 'Làm mới'}</button></div>
@@ -171,23 +190,26 @@ export default function AgricultureOperationsPage() {
         {selectedCycle.status === 'growing' && <div className="agriculture-work-forms">
           <form className="card agriculture-panel" onSubmit={createInput}><h3>Ghi vật tư canh tác</h3><p className="small muted">Vật tư có mã sản phẩm sẽ ghi xuất kho; nước tưới có thể ghi theo sản lượng vận hành mà không trừ tồn kho.</p><label className="field"><span className="label">Loại vật tư *</span><select className="select" value={inputKind} onChange={(event) => { setInputKind(event.target.value); setInputProduct(''); setInputUom(''); }} >{inputKinds.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             <label className="field"><span className="label">Sản phẩm {requiresProduct ? '*' : '(nếu trừ kho)'}</span><select className="select" required={requiresProduct} value={inputProduct} onChange={(event) => { setInputProduct(event.target.value); setInputUom(''); }}><option value="">{requiresProduct ? 'Chọn vật tư' : 'Không trừ kho'}</option>{[...products.values()].filter((product) => product.active !== false && product.kind !== 'service').map((product) => <option key={product.id} value={product.id}>{product.name}{product.sku ? ` · ${product.sku}` : ''}</option>)}</select></label>
+            {pesticideIntervalMissing && <div className="alert danger" role="alert">Hồ sơ sản phẩm chưa có số ngày cách ly. <a href={recordHref('master-data.product', inputProduct)}>Mở hồ sơ sản phẩm</a> và nhập đúng hướng dẫn trên nhãn trước khi ghi nhật ký.</div>}
             {unitsFor(inputProduct).length > 0 && <label className="field"><span className="label">&#272;&#417;n v&#7883; ghi nh&#7853;n</span><select className="select" value={inputUom || products.get(inputProduct)?.uom || ''} onChange={(event) => setInputUom(event.target.value)}>{unitsFor(inputProduct).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ' (' + unit.ratio + ' x base)' : ' (base)'}</option>)}</select></label>}
             {inputProduct && <label className="field"><span className="label">Kho xuất *</span><select className="select" required value={inputWarehouse} onChange={(event) => setInputWarehouse(event.target.value)}><option value="">Chọn kho</option>{[...warehouses.values()].map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{recordLabel('inventory.warehouse', warehouse)}</option>)}</select></label>}
             <div className="agriculture-form-row"><label className="field"><span className="label">Lượng sử dụng *</span><input className="input num" type="number" required min="0.001" step="any" value={inputQty} onChange={(event) => setInputQty(event.target.value)} /></label><label className="field"><span className="label">Ngày sử dụng *</span><input className="input" type="date" required min={selectedCycle.planted_on} max={today()} value={inputDate} onChange={(event) => setInputDate(event.target.value)} /></label></div>
-            <button className="btn btn-secondary" type="submit" disabled={Boolean(busy) || (inputProduct && !inputWarehouse) || !can('agriculture.input_application.create')}>{busy === 'input' ? 'Đang ghi…' : 'Ghi nhật ký vật tư'}</button>
+            <button className="btn btn-secondary" type="submit" disabled={Boolean(busy) || (inputProduct && !inputWarehouse) || pesticideIntervalMissing || !can('agriculture.input_application.create')}>{busy === 'input' ? 'Đang ghi…' : 'Ghi nhật ký vật tư'}</button>
           </form>
           <form className="card agriculture-panel" onSubmit={createHarvest}><h3>Nhập sản lượng thu hoạch</h3><p className="small muted">Ghi phiếu sẽ nhập hàng vào kho. Với sản phẩm quản lý lô, cần nhập mã lô để truy xuất nguồn gốc.</p>
+            {harvestSafety.unknownProducts.length > 0 && <div className="alert danger" role="alert">Chưa xác định được thời gian cách ly cho: {harvestSafety.unknownProducts.join(', ')}. Hãy cập nhật hồ sơ sản phẩm và đối chiếu nhãn thuốc trước khi thu hoạch.</div>}
+            {legacyPesticideApplications.length > 0 && harvestSafety.unknownProducts.length === 0 && <div className="alert warning" role="status">Một số nhật ký thuốc cũ chưa lưu snapshot thời gian cách ly. Hệ thống đang dùng thông tin hiện tại trên hồ sơ sản phẩm; hãy đối chiếu với nhãn thuốc đã dùng.</div>}
             {harvestRestriction && <div className={`alert ${harvestDate < harvestRestriction ? 'warning' : 'success'}`} role="status">{harvestDate < harvestRestriction ? `Thời gian cách ly sau lần phun gần nhất kết thúc ${fmtDate(harvestRestriction)}. Thu hoạch sớm nhất từ ngày này.` : `Đã qua thời gian cách ly. Có thể thu hoạch từ ${fmtDate(harvestRestriction)}.`}</div>}
             <label className="field"><span className="label">Nông sản *</span><select className="select" required value={harvestProduct} onChange={(event) => { setHarvestProduct(event.target.value); setHarvestUom(''); }}><option value="">Chọn nông sản</option>{[...products.values()].filter((product) => product.active !== false && product.kind !== 'service').map((product) => <option key={product.id} value={product.id}>{product.name}{product.sku ? ` · ${product.sku}` : ''}{product.lot_tracked ? ' · Quản lý lô' : ''}</option>)}</select></label>
             {unitsFor(harvestProduct).length > 0 && <label className="field"><span className="label">&#272;&#417;n v&#7883; ghi nh&#7853;n</span><select className="select" value={harvestUom || products.get(harvestProduct)?.uom || ''} onChange={(event) => setHarvestUom(event.target.value)}>{unitsFor(harvestProduct).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ' (' + unit.ratio + ' x base)' : ' (base)'}</option>)}</select></label>}
             <label className="field"><span className="label">Kho nhận *</span><select className="select" required value={harvestWarehouse} onChange={(event) => setHarvestWarehouse(event.target.value)}><option value="">Chọn kho</option>{[...warehouses.values()].map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{recordLabel('inventory.warehouse', warehouse)}</option>)}</select></label>
             <div className="agriculture-form-row"><label className="field"><span className="label">Sản lượng *</span><input className="input num" type="number" required min="0.001" step="any" value={harvestQty} onChange={(event) => setHarvestQty(event.target.value)} /></label><label className="field"><span className="label">Ngày thu hoạch *</span><input className="input" type="date" required min={selectedCycle.planted_on} max={today()} value={harvestDate} onChange={(event) => setHarvestDate(event.target.value)} /></label></div>
             <div className="agriculture-form-row"><label className="field"><span className="label">Phân hạng</span><input className="input" value={harvestGrade} onChange={(event) => setHarvestGrade(event.target.value)} placeholder="Ví dụ: Loại 1" /></label><label className="field"><span className="label">Mã lô</span><input className="input" required={Boolean(products.get(harvestProduct)?.lot_tracked)} value={harvestLotCode} onChange={(event) => setHarvestLotCode(event.target.value)} /></label></div>
-            <button className="btn btn-primary" type="submit" disabled={Boolean(busy) || Boolean(harvestRestriction && harvestDate < harvestRestriction) || !can('agriculture.harvest.create')}>{busy === 'harvest' ? 'Đang nhập kho…' : 'Ghi nhận thu hoạch'}</button>
+            <button className="btn btn-primary" type="submit" disabled={Boolean(busy) || harvestSafety.unknownProducts.length > 0 || Boolean(harvestRestriction && harvestDate < harvestRestriction) || !can('agriculture.harvest.create')}>{busy === 'harvest' ? 'Đang nhập kho…' : 'Ghi nhận thu hoạch'}</button>
           </form>
         </div>}
         <div className="agriculture-history-grid"><article className="card agriculture-panel"><h3>Lịch sử thu hoạch</h3>{cycleHarvests.length ? <div className="agriculture-history">{cycleHarvests.map((harvest) => { const lot = [...lots.values()].find((item) => item.product === harvest.product && item.code === harvest.lot_code); return <div className="agriculture-history-row" key={harvest.id}><div><strong>{products.get(harvest.product)?.name || 'Nông sản'} · {fmtNumber(harvest.qty)} {unitLabel(harvest)}{harvest.base_qty != null && harvest.uom_ratio > 1 ? ` (${fmtNumber(harvest.base_qty)} base)` : ""}</strong><div className="small muted">{fmtDate(harvest.date)}{harvest.grade ? ` · ${harvest.grade}` : ''}{harvest.lot_code ? ` · Lô ${harvest.lot_code}` : ''}</div></div>{lot && can('inventory.stock_move.read') && <a className="small" href={recordHref('inventory.lot', lot.id)}>Truy xuất lô</a>}</div>; })}</div> : <div className="empty">Chưa ghi nhận thu hoạch.</div>}</article>
-          <article className="card agriculture-panel"><h3>Nhật ký vật tư</h3>{cycleInputs.length ? <div className="agriculture-history">{cycleInputs.map((record) => <div className="agriculture-history-row" key={record.id}><div><strong>{inputKinds.find(([value]) => value === record.kind)?.[1] || record.kind}{record.product ? ` · ${products.get(record.product)?.name || 'Sản phẩm'}` : ''}</strong><div className="small muted">{fmtDate(record.date)} · {fmtNumber(record.qty)} {unitLabel(record)}{record.base_qty != null && record.uom_ratio > 1 ? ` (${fmtNumber(record.base_qty)} base)` : ""}{record.kind === 'pesticide' && record.preharvest_interval_days != null ? ` · Хүлээлгийн хугацаа ${fmtNumber(record.preharvest_interval_days)} хоног` : ''}{record.warehouse ? ` · ${warehouses.get(record.warehouse)?.name || 'Kho'}` : ''}</div></div></div>)}</div> : <div className="empty">Chưa ghi nhận vật tư.</div>}</article></div>
+          <article className="card agriculture-panel"><h3>Nhật ký vật tư</h3>{cycleInputs.length ? <div className="agriculture-history">{cycleInputs.map((record) => <div className="agriculture-history-row" key={record.id}><div><strong>{inputKinds.find(([value]) => value === record.kind)?.[1] || record.kind}{record.product ? ` · ${products.get(record.product)?.name || 'Sản phẩm'}` : ''}</strong><div className="small muted">{fmtDate(record.date)} · {fmtNumber(record.qty)} {unitLabel(record)}{record.base_qty != null && record.uom_ratio > 1 ? ` (${fmtNumber(record.base_qty)} base)` : ""}{record.kind === 'pesticide' && record.preharvest_interval_days != null ? ` · Cách ly trước thu hoạch ${fmtNumber(record.preharvest_interval_days)} ngày` : ''}{record.warehouse ? ` · ${warehouses.get(record.warehouse)?.name || 'Kho'}` : ''}</div></div></div>)}</div> : <div className="empty">Chưa ghi nhận vật tư.</div>}</article></div>
       </> : <div className="empty card-pad">Chọn vụ mùa để xem nhật ký, nhập vật tư và sản lượng.</div>}</section></div>
     </>}
   </div>;

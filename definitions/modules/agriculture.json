@@ -255,8 +255,15 @@
         },
         {
           "name": "preharvest_interval_days",
-          "label": "Хүлээлгийн хугацаа хэрэглэсэн үеийн (өдөр)",
+          "label": "Thời gian cách ly được áp dụng (ngày)",
           "type": "number",
+          "required": false,
+          "system": true
+        },
+        {
+          "name": "preharvest_interval_configured",
+          "label": "Đã xác nhận thời gian cách ly",
+          "type": "bool",
           "required": false,
           "system": true
         },

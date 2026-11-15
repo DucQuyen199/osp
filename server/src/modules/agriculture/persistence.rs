@@ -87,23 +87,28 @@ pub async fn prepare_input_application(
     };
     let Some(row) = tx
         .query_opt(
-            "SELECT COALESCE(preharvest_interval_days, 0)::text FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+            "SELECT preharvest_interval_days::text FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
             &[&tenant.id, &product],
         )
         .await?
     else {
         return Ok(Vec::new());
     };
-    let interval: String = row.get(0);
+    let Some(interval) = row.get::<_, Option<String>>(0) else {
+        return Ok(vec![
+            "Hãy khai báo thời gian cách ly trước thu hoạch trên hồ sơ sản phẩm thuốc bảo vệ thực vật trước khi ghi nhật ký".into(),
+        ]);
+    };
     let Some(snapshot) = serde_json::from_str::<Value>(&interval)
         .ok()
         .filter(|value| value.is_number())
     else {
         return Ok(vec![
-            "Бүтээгдэхүүний ургацын өмнөх хүлээлгийн хугацаа буруу байна".into(),
+            "Thời gian cách ly trước thu hoạch trên hồ sơ sản phẩm không hợp lệ".into(),
         ]);
     };
     document.insert("preharvest_interval_days".into(), snapshot);
+    document.insert("preharvest_interval_configured".into(), Value::Bool(true));
     Ok(Vec::new())
 }
 
@@ -260,16 +265,22 @@ async fn validate_harvest(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<V
     }
     if let Some(row) = tx
         .query_opt(
-            "SELECT ia.date + ceil(COALESCE(ia.preharvest_interval_days, p.preharvest_interval_days, 0))::int AS harvest_allowed_on, p.name FROM agriculture__input_application ia JOIN master_data__product p ON p.tenant_id = ia.tenant_id AND p.id = ia.product WHERE ia.tenant_id = $1 AND ia.cycle = $2 AND ia.kind = 'pesticide' AND ia.date + ceil(COALESCE(ia.preharvest_interval_days, p.preharvest_interval_days, 0))::int > $3::date ORDER BY harvest_allowed_on DESC LIMIT 1",
+            "SELECT CASE WHEN exposure.days IS NULL THEN NULL ELSE ia.date + ceil(exposure.days)::int END::text AS harvest_allowed_on, p.name FROM agriculture__input_application ia JOIN master_data__product p ON p.tenant_id = ia.tenant_id AND p.id = ia.product CROSS JOIN LATERAL (SELECT CASE WHEN ia.preharvest_interval_configured IS TRUE THEN ia.preharvest_interval_days ELSE p.preharvest_interval_days END AS days) exposure WHERE ia.tenant_id = $1 AND ia.cycle = $2 AND ia.kind = 'pesticide' AND (exposure.days IS NULL OR ia.date + ceil(exposure.days)::int > $3::date) ORDER BY harvest_allowed_on DESC NULLS FIRST LIMIT 1",
             &[&tenant.id, &cycle, &date],
         )
         .await?
     {
-        let allowed_on: String = row.get(0);
+        let allowed_on: Option<String> = row.get(0);
         let product_name: String = row.get(1);
-        errors.push(format!(
-            "Chưa thể thu hoạch: thời gian cách ly sau khi phun {product_name} kết thúc vào ngày {allowed_on}"
-        ));
+        if let Some(allowed_on) = allowed_on {
+            errors.push(format!(
+                "Chưa thể thu hoạch: thời gian cách ly sau khi phun {product_name} kết thúc vào ngày {allowed_on}"
+            ));
+        } else {
+            errors.push(format!(
+                "Chưa thể thu hoạch: chưa xác định được thời gian cách ly của {product_name}; hãy cập nhật hồ sơ sản phẩm và đối chiếu nhãn thuốc đã dùng"
+            ));
+        }
     }
     if tx
         .query_opt(
