@@ -205,8 +205,6 @@ fn validate_work_schedule_entry(document: &Value) -> Vec<String> {
 }
 
 fn validate_work_schedule_pattern(document: &Value) -> Vec<String> {
-    const MAX_ROTATION_DAYS: i64 = 731;
-    const MAX_GENERATED_SCHEDULE_ROWS: i64 = 40_000;
     let mut errors = Vec::new();
     let single_employee = document
         .get("employee")
@@ -256,10 +254,10 @@ fn validate_work_schedule_pattern(document: &Value) -> Vec<String> {
             .and_then(Value::as_array)
             .map_or(1, Vec::len)
             .max(1) as i64;
-        if days > MAX_ROTATION_DAYS {
-            errors.push("Một đợt áp dụng lịch luân phiên tối đa 2 năm".into());
+        if days > super::MAX_ROTATION_DAYS {
+            errors.push("Một đợt áp dụng lịch luân phiên tối đa 10 năm".into());
         }
-        if days.saturating_mul(employee_count) > MAX_GENERATED_SCHEDULE_ROWS {
+        if days.saturating_mul(employee_count) > super::MAX_GENERATED_SCHEDULE_ROWS {
             errors
                 .push("Một đợt không được sinh quá 40.000 dòng lịch cho toàn bộ nhân viên".into());
         }

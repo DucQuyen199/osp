@@ -145,10 +145,26 @@ async fn validate_pattern(
             "Shift rotation requires valid start_date and end_date".into(),
         ]);
     };
+    let days = (end - start).num_days() + 1;
+    if days <= 0 {
+        return Ok(vec![
+            "Shift rotation end_date must be on or after start_date".into(),
+        ]);
+    }
+    let rows = days.saturating_mul(employees.len() as i64);
+    let mut errors = Vec::new();
+    if days > super::super::MAX_ROTATION_DAYS {
+        errors.push("Một đợt áp dụng lịch luân phiên tối đa 10 năm".into());
+    }
+    if rows > super::super::MAX_GENERATED_SCHEDULE_ROWS {
+        errors.push("Một đợt không được sinh quá 40.000 dòng lịch cho toàn bộ nhân viên".into());
+    }
+    if !errors.is_empty() {
+        return Ok(errors);
+    }
     let Some(timezone) = document.get("timezone").and_then(Value::as_str) else {
         return Ok(vec!["Shift rotation requires an IANA time zone".into()]);
     };
-    let mut errors = Vec::new();
     if tx
         .query_opt(
             "SELECT 1 FROM pg_timezone_names WHERE name = $1 LIMIT 1",

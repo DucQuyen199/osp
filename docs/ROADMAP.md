@@ -85,4 +85,4 @@ Các module CRM/Marketing, bán hàng, mua hàng, loyalty, logistics, field serv
 
 - Mỗi phiếu lương lưu lại bộ ngày trong tuần và giờ chuẩn đã dùng để tính, giúp kiểm toán lịch áp dụng sau khi hồ sơ nhân sự thay đổi.
 
-- Lịch nhân sự hỗ trợ ngoại lệ theo ngày và mẫu ca luân phiên; mỗi đợt áp dụng có thể dài tối đa 2 năm, giới hạn tổng cộng 40.000 dòng lịch cho đội tối đa 50 nhân viên. Lịch được sinh theo ngày với múi giờ địa phương và khóa các kỳ payroll liên quan. Thư viện mẫu ca có tên hỗ trợ lưu và dùng lại chu kỳ cho nhiều đội; lịch cần vượt quá 2 năm trong một lần áp dụng vẫn cần phát triển.
+- Lịch nhân sự hỗ trợ ngoại lệ theo ngày và mẫu ca luân phiên; mỗi đợt hỗ trợ tối đa 10 năm và 40.000 dòng lịch cho đội tối đa 50 nhân viên. Số ngày tối đa được tính theo kích thước đội, cho phép đội nhỏ áp dụng lịch trên 2 năm mà vẫn giữ trần tài nguyên. Lịch được sinh theo ngày với múi giờ IANA và khóa các kỳ payroll liên quan. Thư viện mẫu ca có tên hỗ trợ lưu và dùng lại chu kỳ cho nhiều đội.

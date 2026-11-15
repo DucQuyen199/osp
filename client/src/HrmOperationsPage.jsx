@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtMoney, statusLabel } from './lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
@@ -8,7 +9,9 @@ const itemsOf = (response) => Array.isArray(response?.items) ? response.items : 
 const rotationEmployees = (row) => Array.isArray(row?.employees) ? row.employees : row?.employee ? [row.employee] : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
 const weekdayOptions = [[1, 'T2'], [2, 'T3'], [3, 'T4'], [4, 'T5'], [5, 'T6'], [6, 'T7'], [7, 'CN']];
-const localDate = () => { const date = new Date(); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; };
+const MAX_ROTATION_DAYS = 3653;
+const MAX_GENERATED_SCHEDULE_ROWS = 40_000;
+const rotationDayLimit = (employeeCount) => Math.min(MAX_ROTATION_DAYS, Math.floor(MAX_GENERATED_SCHEDULE_ROWS / Math.max(employeeCount, 1)));
 const nowIso = () => {
   const now = new Date();
   const offsetMinutes = -now.getTimezoneOffset();
@@ -75,6 +78,9 @@ export default function HrmOperationsPage() {
   const scheduleMonth = scheduleForm.work_date.slice(0, 7);
   const scheduleMonthStart = `${scheduleMonth}-01`;
   const scheduleMonthEnd = nextMonthStart(scheduleForm.work_date);
+  const maxPatternEndDate = patternForm.start_date
+    ? addLocalDays(patternForm.start_date, rotationDayLimit(patternForm.employees.length) - 1)
+    : undefined;
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
@@ -173,6 +179,31 @@ export default function HrmOperationsPage() {
     }, can('hrm.work_schedule_pattern.applied') ? 'Đã tạo lịch luân phiên và sinh các ca theo ngày; payroll và hạn mức phép sẽ dùng lịch mới.' : 'Đã lưu mẫu ca nháp để người có quyền áp dụng.');
   }
 
+  function updatePatternEmployees(employeeId, selected) {
+    setPatternForm((form) => {
+      const employees = selected
+        ? [...form.employees, employeeId]
+        : form.employees.filter((id) => id !== employeeId);
+      const maxEnd = addLocalDays(form.start_date, rotationDayLimit(employees.length) - 1);
+      return {
+        ...form,
+        employees,
+        end_date: form.end_date > maxEnd ? maxEnd : form.end_date,
+      };
+    });
+  }
+
+  function updatePatternStartDate(startDate) {
+    setPatternForm((form) => {
+      const maxEnd = addLocalDays(startDate, rotationDayLimit(form.employees.length) - 1);
+      return {
+        ...form,
+        start_date: startDate,
+        end_date: !form.end_date || form.end_date < startDate ? startDate : form.end_date > maxEnd ? maxEnd : form.end_date,
+      };
+    });
+  }
+
   function useScheduleTemplate(id) {
     setScheduleTemplateId(id);
     const template = scheduleTemplates.find((row) => row.id === id);
@@ -260,16 +291,16 @@ export default function HrmOperationsPage() {
 
     {(can('hrm.work_schedule_pattern.create') || can('hrm.work_schedule_pattern.read') || can('hrm.work_schedule_template.create') || can('hrm.work_schedule_template.read')) && <section className="card card-pad" style={{ marginTop: 16 }}>
       <h2>Lịch ca luân phiên</h2>
-      <p className="small muted">Khai báo chu kỳ ngày làm/nghỉ, ngày bắt đầu và múi giờ. Khi áp dụng, hệ thống sinh lịch theo ngày để chấm công, nghỉ phép và payroll cùng sử dụng. Mỗi lần áp dụng hỗ trợ tối đa 2 năm và 40.000 dòng lịch cho cả đội.</p>
+      <p className="small muted">Khai báo chu kỳ ngày làm/nghỉ, ngày bắt đầu và múi giờ. Khi áp dụng, hệ thống sinh lịch theo ngày để chấm công, nghỉ phép và payroll cùng sử dụng. Mỗi đợt tối đa 10 năm và 40.000 dòng; phạm vi ngày tối đa giảm theo số nhân viên trong đội.</p>
       {(can('hrm.work_schedule_template.read') || can('hrm.work_schedule_template.create')) && <div className="row wrap" style={{ marginBottom: 12 }}>
         {can('hrm.work_schedule_template.read') && <label className="field grow"><span className="label">Dùng mẫu ca trong thư viện</span><select className="select" value={scheduleTemplateId} onChange={(event) => useScheduleTemplate(event.target.value)}><option value="">Chọn mẫu đã lưu</option>{scheduleTemplates.map((row) => <option key={row.id} value={row.id}>{row.name} · {Array.isArray(row.cycle) ? row.cycle.length : 0} ngày</option>)}</select></label>}
         {can('hrm.work_schedule_template.create') && <><label className="field grow"><span className="label">Tên mẫu để lưu hoặc cập nhật</span><input className="input" maxLength="120" value={scheduleTemplateName} onChange={(event) => setScheduleTemplateName(event.target.value)} placeholder="Ví dụ: Ca xoay 2 ngày"/></label><button type="button" className="btn btn-secondary" disabled={Boolean(busy) || !scheduleTemplateName.trim()} onClick={saveScheduleTemplate}>{scheduleTemplateId ? 'Cập nhật mẫu' : 'Lưu thành mẫu'}</button></>}
       </div>}
       {can('hrm.work_schedule_template.read') && scheduleTemplates.length > 0 && <div className="row wrap small muted" style={{ marginBottom: 12 }}><span>Thư viện có {scheduleTemplates.length} mẫu.</span>{can('hrm.work_schedule_template.delete') && scheduleTemplateId && <button type="button" className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => { const row = scheduleTemplates.find((item) => item.id === scheduleTemplateId); if (row) removeScheduleTemplate(row); }}>Xóa mẫu đang chọn</button>}</div>}
       {can('hrm.work_schedule_pattern.create') && <form className="form-grid" onSubmit={createSchedulePattern}>
-        <fieldset className="field" style={{ border: 0, padding: 0, margin: 0 }}><legend className="label">Nhân viên trong đội * ({patternForm.employees.length}/50)</legend><input className="input" value={patternEmployeeFilter} onChange={(event) => setPatternEmployeeFilter(event.target.value)} placeholder="Tìm theo tên hoặc mã nhân viên"/><div className="row wrap" style={{ marginTop: 8, gap: 12 }}>{matchingPatternEmployees.map((row) => <label className="row small" key={row.id}><input type="checkbox" checked={patternForm.employees.includes(row.id)} disabled={!patternForm.employees.includes(row.id) && patternForm.employees.length >= 50} onChange={(event) => setPatternForm((form) => ({ ...form, employees: event.target.checked ? [...form.employees, row.id] : form.employees.filter((id) => id !== row.id) }))}/>{recordLabel('hrm.employee', row)}</label>)}</div>{!matchingPatternEmployees.length && <span className="small muted">Không tìm thấy nhân viên đang làm việc phù hợp.</span>}<span className="small muted">Chọn tối đa 50 nhân viên; lịch sẽ được áp dụng cho cả đội trong cùng giao dịch.</span></fieldset>
-        <label className="field"><span className="label">Ngày bắt đầu chu kỳ *</span><input className="input" required type="date" value={patternForm.start_date} onChange={(event) => setPatternForm({ ...patternForm, start_date: event.target.value })}/></label>
-        <label className="field"><span className="label">Sinh lịch đến ngày *</span><input className="input" required min={patternForm.start_date} max={addLocalDays(patternForm.start_date, 365)} type="date" value={patternForm.end_date} onChange={(event) => setPatternForm({ ...patternForm, end_date: event.target.value })}/></label>
+        <fieldset className="field" style={{ border: 0, padding: 0, margin: 0 }}><legend className="label">Nhân viên trong đội * ({patternForm.employees.length}/50)</legend><input className="input" value={patternEmployeeFilter} onChange={(event) => setPatternEmployeeFilter(event.target.value)} placeholder="Tìm theo tên hoặc mã nhân viên"/><div className="row wrap" style={{ marginTop: 8, gap: 12 }}>{matchingPatternEmployees.map((row) => <label className="row small" key={row.id}><input type="checkbox" checked={patternForm.employees.includes(row.id)} disabled={!patternForm.employees.includes(row.id) && patternForm.employees.length >= 50} onChange={(event) => updatePatternEmployees(row.id, event.target.checked)}/>{recordLabel('hrm.employee', row)}</label>)}</div>{!matchingPatternEmployees.length && <span className="small muted">Không tìm thấy nhân viên đang làm việc phù hợp.</span>}<span className="small muted">Chọn tối đa 50 nhân viên; phạm vi tối đa hiện tại là {rotationDayLimit(patternForm.employees.length)} ngày để không vượt giới hạn 40.000 dòng và trần 10 năm.</span></fieldset>
+        <label className="field"><span className="label">Ngày bắt đầu chu kỳ *</span><input className="input" required type="date" value={patternForm.start_date} onChange={(event) => updatePatternStartDate(event.target.value)}/></label>
+        <label className="field"><span className="label">Sinh lịch đến ngày *</span><input className="input" required min={patternForm.start_date} max={maxPatternEndDate} type="date" value={patternForm.end_date} onChange={(event) => setPatternForm({ ...patternForm, end_date: event.target.value })}/></label>
         <label className="field"><span className="label">Múi giờ IANA *</span><input className="input" required value={patternForm.timezone} onChange={(event) => setPatternForm({ ...patternForm, timezone: event.target.value })} placeholder="Asia/Ho_Chi_Minh"/></label>
         <div className="field" style={{ gridColumn: '1 / -1' }}><span className="label">Các ngày trong chu kỳ (lặp từ ngày bắt đầu)</span><div className="stack" style={{ marginTop: 8 }}>
           {patternForm.cycle.map((day, index) => <div className="row wrap card card-pad" key={index} style={{ gap: 12 }}>
