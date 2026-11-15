@@ -5637,6 +5637,11 @@
             "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)",
             "readOnly": true
           },
+          "retry_at": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
           "serial": {
             "readOnly": true,
             "type": "string"
@@ -5647,7 +5652,8 @@
               "cancellation_pending",
               "issued",
               "cancelled",
-              "failed"
+              "failed",
+              "withdrawn"
             ],
             "readOnly": true,
             "type": "string"
@@ -5729,6 +5735,11 @@
           "request_payload": {
             "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)",
             "readOnly": true
+          },
+          "retry_at": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
           },
           "serial": {
             "readOnly": true,
@@ -58684,7 +58695,11 @@
                 "cancelled",
                 "failed",
                 "issued",
-                "retry"
+                "retry",
+                "retry_cancellation",
+                "retry_cancellation_due",
+                "retry_due",
+                "withdrawn"
               ],
               "type": "string"
             }
@@ -59490,6 +59505,346 @@
           }
         ],
         "summary": "Hóa đơn điện tử: retry (failed → pending)",
+        "tags": [
+          "einvoice"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/einvoice/einvoice/{id}/retry_cancellation": {
+      "post": {
+        "description": "Phát sự kiện `einvoice.einvoice.retry_cancellation` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/einvoice_einvoice"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Hóa đơn điện tử: retry_cancellation (failed → cancellation_pending)",
+        "tags": [
+          "einvoice"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/einvoice/einvoice/{id}/retry_cancellation_due": {
+      "post": {
+        "description": "Phát sự kiện `einvoice.einvoice.retry_cancellation_due` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/einvoice_einvoice"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Hóa đơn điện tử: retry_cancellation_due (failed → cancellation_pending)",
+        "tags": [
+          "einvoice"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/einvoice/einvoice/{id}/retry_due": {
+      "post": {
+        "description": "Phát sự kiện `einvoice.einvoice.retry_due` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/einvoice_einvoice"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Hóa đơn điện tử: retry_due (failed → pending)",
+        "tags": [
+          "einvoice"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/einvoice/einvoice/{id}/withdrawn": {
+      "post": {
+        "description": "Phát sự kiện `einvoice.einvoice.withdrawn` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/einvoice_einvoice"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Hóa đơn điện tử: withdrawn (pending → withdrawn)",
         "tags": [
           "einvoice"
         ]

@@ -18,7 +18,7 @@ async function listAll(qname) {
 
 const timestamp = (row) => row.updatedAt || row.updated_at || row.createdAt || row.created_at || '';
 const formatDateTime = (value) => value ? fmtDateTime(value) : '—';
-const statusTone = (status) => status === 'issued' || status === 'cancelled' ? 'success' : status === 'failed' ? 'danger' : 'warning';
+const statusTone = (status) => status === 'issued' || status === 'cancelled' ? 'success' : status === 'failed' ? 'danger' : status === 'withdrawn' ? 'muted' : 'warning';
 
 export default function EInvoiceWorkbenchPage() {
   const [rows, setRows] = useState([]);
@@ -108,7 +108,7 @@ export default function EInvoiceWorkbenchPage() {
   const enabled = app.meta?.modules?.some((module) => module.id === 'einvoice');
   const filterOptions = [
     ['all', 'Tất cả'], ['pending', 'Chờ phát hành'], ['failed', 'Lỗi'],
-    ['issued', 'Đã phát hành'], ['cancellation_pending', 'Chờ hủy'], ['cancelled', 'Đã hủy'],
+    ['issued', 'Đã phát hành'], ['cancellation_pending', 'Chờ hủy'], ['cancelled', 'Đã hủy'], ['withdrawn', 'Đã rút'],
   ];
 
   return <div className="page">
@@ -131,6 +131,7 @@ export default function EInvoiceWorkbenchPage() {
           <td>{Number(row.attempts || 0)} lần<div className="small muted">{formatDateTime(timestamp(row))}</div></td>
           <td onClick={(event) => event.stopPropagation()}><div className="row wrap">
             {row.status === 'failed' && can(`einvoice.einvoice.${retryAction}`) && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => run(row, retryAction, 'Đã đưa yêu cầu vào hàng đợi thử lại.')}>Thử lại</button>}
+            {row.status === 'pending' && Number(row.attempts || 0) === 0 && can('einvoice.einvoice.withdrawn') && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => run(row, 'withdrawn', 'Đã rút yêu cầu phát hành chưa gửi đến nhà cung cấp.')}>Rút yêu cầu</button>}
             {row.status === 'issued' && can('einvoice.einvoice.cancel_requested') && can('einvoice.einvoice.update') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => { setSelectedId(row.id); setReason(row.cancellation_reason || ''); document.getElementById('einvoice-cancellation-reason')?.focus(); }}>Yêu cầu hủy</button>}
             <button className="btn btn-ghost btn-sm" type="button" onClick={() => setSelectedId(row.id)}>Chi tiết</button>
           </div></td>

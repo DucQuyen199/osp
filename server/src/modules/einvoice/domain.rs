@@ -157,6 +157,30 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
                 }
             }
         }
+        "withdrawn" => {
+            if document
+                .get("operation")
+                .and_then(Value::as_str)
+                .unwrap_or("issue")
+                != "issue"
+            {
+                errors.push("Only an issuance request can be withdrawn".into());
+            }
+            if document
+                .get("attempts")
+                .and_then(Value::as_i64)
+                .unwrap_or_default()
+                != 0
+                || document
+                    .get("lease_token")
+                    .is_some_and(|token| !token.is_null())
+            {
+                errors.push(
+                    "An issuance request can only be withdrawn before a provider attempt starts"
+                        .into(),
+                );
+            }
+        }
         _ => {}
     }
     errors
@@ -183,6 +207,7 @@ pub fn prepare_action(entity: &str, action: &str, document: &mut Map<String, Val
         || !matches!(
             action,
             "cancel_requested"
+                | "withdrawn"
                 | "failed"
                 | "retry"
                 | "retry_due"

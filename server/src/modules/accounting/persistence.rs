@@ -298,6 +298,26 @@ pub async fn validate_persistence(
                 {
                     errors.push("Không thể hủy hóa đơn đã có credit note".into());
                 }
+                if entity == "invoice" && tenant.has_module("einvoice") {
+                    if let Some(einvoice) = tx
+                        .query_opt(
+                            "SELECT status, COALESCE(operation, 'issue'), COALESCE(attempts, 0)::bigint FROM einvoice__einvoice WHERE tenant_id = $1 AND invoice = $2",
+                            &[&tenant.id, &id],
+                        )
+                        .await?
+                    {
+                        let status: String = einvoice.get(0);
+                        let operation: String = einvoice.get(1);
+                        let attempts: i64 = einvoice.get(2);
+                        let unresolved = matches!(
+                            status.as_str(),
+                            "pending" | "issued" | "cancellation_pending"
+                        ) || (status == "failed" && (operation == "cancel" || attempts > 0));
+                        if unresolved {
+                            errors.push("Cần xử lý yêu cầu hóa đơn điện tử trước khi hủy hóa đơn kế toán".into());
+                        }
+                    }
+                }
             }
         }
         ("journal_entry", "reversed") => {

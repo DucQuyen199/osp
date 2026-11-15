@@ -63,7 +63,7 @@ const STATUS = {
   sent: 'Đã gửi', accepted: 'Đã chấp nhận', rejected: 'Bị từ chối', confirmed: 'Đã xác nhận', partially_delivered: 'Đã giao một phần', delivered: 'Đã giao', cancelled: 'Đã hủy', completed: 'Hoàn tất',
   refunded: 'Đã hoàn', placed: 'Đã đặt', approved: 'Đã duyệt', sourced: 'Đã chọn nhà cung cấp', received: 'Đã nhận', posted: 'Đã ghi sổ', reversed: 'Đã đảo bút toán', paid: 'Đã thanh toán', void: 'Đã hủy bỏ',
   in_progress: 'Đang thực hiện', quote_declined: 'Khách từ chối báo giá', doing: 'Đang làm', done: 'Xong', closed: 'Đã đóng', resolved: 'Đã xử lý', launched: 'Đang chạy', paused: 'Tạm dừng',
-  dispatched: 'Đã xuất phát', failed: 'Thất bại', issued: 'Đã phát hành', signed: 'Đã ký', sold: 'Đã bán', leased: 'Đã cho thuê', terminated: 'Đã chấm dứt',
+  dispatched: 'Đã xuất phát', failed: 'Thất bại', issued: 'Đã phát hành', withdrawn: 'Đã rút', signed: 'Đã ký', sold: 'Đã bán', leased: 'Đã cho thuê', terminated: 'Đã chấm dứt',
   superseded: 'Đã thay thế',
   expired: 'Hết hạn', disposed: 'Đã thanh lý', on_hold: 'Tạm hoãn', succeeded: 'Thành công', hired: 'Đã tuyển', resulted: 'Có kết quả', partially_dispensed: 'Đã cấp một phần', dispensed: 'Đã phát thuốc',
   checked_in: 'Đã nhận phòng/Check-in', checked_out: 'Đã trả phòng', no_show: 'Vắng mặt', occupied: 'Có khách', cleaning: 'Đang dọn', served: 'Đã phục vụ',

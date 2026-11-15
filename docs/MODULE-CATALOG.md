@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **50 module**, **199 loại dữ liệu**, **898 sự kiện**.
+Tổng: **50 module**, **199 loại dữ liệu**, **902 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -278,7 +278,7 @@ Tổng: **50 module**, **199 loại dữ liệu**, **898 sự kiện**.
 
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
-| `einvoice` Hóa đơn điện tử | `pending` → **cancel_requested** (issued→cancellation_pending), **cancelled** (cancellation_pending→cancelled), **failed** (pending/cancellation_pending→failed), **issued** (pending→issued), **retry** (failed→pending) |
+| `einvoice` Hóa đơn điện tử | `pending` → **cancel_requested** (issued→cancellation_pending), **cancelled** (cancellation_pending→cancelled), **failed** (pending/cancellation_pending→failed), **issued** (pending→issued), **retry** (failed→pending), **retry_cancellation** (failed→cancellation_pending), **retry_cancellation_due** (failed→cancellation_pending), **retry_due** (failed→pending), **withdrawn** (pending→withdrawn) |
 
 ### expense
 **Chi phí nhân viên** — Đề nghị thanh toán/hoàn ứng chi phí, duyệt chi.

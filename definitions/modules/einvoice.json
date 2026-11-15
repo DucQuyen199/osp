@@ -128,7 +128,8 @@
       "cancellation_pending",
       "issued",
       "cancelled",
-      "failed"
+      "failed",
+      "withdrawn"
      ]
     }
    ],
@@ -147,6 +148,12 @@
        "issued"
       ],
       "to": "cancellation_pending"
+     },
+     "withdrawn": {
+      "from": [
+       "pending"
+      ],
+      "to": "withdrawn"
      },
      "cancelled": {
       "from": [
