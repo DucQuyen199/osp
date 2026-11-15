@@ -19,6 +19,7 @@ export default function RestaurantKitchenBoardPage() {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState('');
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [printingTicketId, setPrintingTicketId] = useState('');
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setError(''); setLoading(true); }
@@ -67,7 +68,14 @@ export default function RestaurantKitchenBoardPage() {
     }
   };
 
-  const renderTicket = (ticket) => <article className="card kitchen-ticket" key={ticket.id}>
+  const printTicket = (ticket) => {
+    setPrintingTicketId(ticket.id);
+    const finishPrint = () => setPrintingTicketId('');
+    window.addEventListener('afterprint', finishPrint, { once: true });
+    window.requestAnimationFrame(() => window.print());
+  };
+
+  const renderTicket = (ticket) => <article className={`card kitchen-ticket${printingTicketId === ticket.id ? ' is-printing' : ''}`} key={ticket.id}>
     <header className="card-head">
       <div>{can('restaurant.table_order.read') ? <a href={recordHref('restaurant.table_order', ticket.orderId)}><strong>{ticket.table || 'Mang đi'}</strong></a> : <strong>{ticket.table || 'Mang đi'}</strong>}<div className="small muted">{fmtAgo(ticket.createdAt)} · {ticket.station === 'bar' ? 'Quầy pha chế' : 'Bếp'}</div></div>
       <span className={`badge ${ticket.status === 'ready' ? 'success' : ticket.status === 'preparing' ? 'warning' : 'plain'}`}>{statusLabel(ticket.status)}</span>
@@ -81,6 +89,7 @@ export default function RestaurantKitchenBoardPage() {
       </li>;
     })}</ul>
     <footer className="row wrap kitchen-ticket-footer"><span className="small muted">{fmtDateTime(ticket.createdAt)}</span><span className="grow" />
+      <button className="btn btn-secondary btn-sm kitchen-ticket-print" type="button" onClick={() => printTicket(ticket)}>In phiếu bếp</button>
       {ticket.status === 'queued' && can('restaurant.kitchen_ticket.preparing') && <button className="btn btn-primary" type="button" disabled={Boolean(busy)} onClick={() => transition(ticket, 'preparing')}>{busy === `${ticket.id}:preparing` ? 'Đang cập nhật…' : 'Bắt đầu chế biến'}</button>}
       {ticket.status === 'preparing' && can('restaurant.kitchen_ticket.ready') && <button className="btn btn-primary" type="button" disabled={Boolean(busy)} onClick={() => transition(ticket, 'ready')}>{busy === `${ticket.id}:ready` ? 'Đang cập nhật…' : 'Báo món đã xong'}</button>}
     </footer>
