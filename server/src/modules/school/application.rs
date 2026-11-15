@@ -17,6 +17,7 @@ pub async fn prepare_document(
     match entity {
         "student" => Ok(trim(document, &["student_code", "guardian"])),
         "course_class" => Ok(trim(document, &["name", "subject", "teacher"])),
+        "class_session" => prepare_session_teacher(tx, tenant, document).await,
         "grade" => Ok(trim(document, &["term", "subject"])),
         "fee" => {
             trim(document, &["period", "note"]);
@@ -24,6 +25,40 @@ pub async fn prepare_document(
         }
         _ => Ok(Vec::new()),
     }
+}
+
+async fn prepare_session_teacher(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    document: &mut Map<String, Value>,
+) -> R<Vec<String>> {
+    let Some(class) = parse_id(document, "class") else {
+        return Ok(Vec::new());
+    };
+    let row = tx
+        .query_opt(
+            "SELECT course_class.teacher, course_class.teacher_employee, staff.name FROM school__course_class course_class LEFT JOIN hrm__employee staff ON staff.tenant_id = course_class.tenant_id AND staff.id = course_class.teacher_employee WHERE course_class.tenant_id = $1 AND course_class.id = $2 FOR SHARE OF course_class",
+            &[&tenant.id, &class],
+        )
+        .await?;
+    let Some(row) = row else {
+        return Ok(Vec::new());
+    };
+    let teacher: Option<String> = row.get(0);
+    let teacher_employee: Option<Uuid> = row.get(1);
+    let employee_name: Option<String> = row.get(2);
+    let teacher_name = employee_name
+        .or(teacher)
+        .filter(|name| !name.trim().is_empty());
+    document.insert(
+        "teacher_employee".into(),
+        teacher_employee.map_or(Value::Null, |id| Value::String(id.to_string())),
+    );
+    document.insert(
+        "teacher_name".into(),
+        teacher_name.map_or(Value::Null, Value::String),
+    );
+    Ok(Vec::new())
 }
 
 fn trim(document: &mut Map<String, Value>, fields: &[&str]) -> Vec<String> {

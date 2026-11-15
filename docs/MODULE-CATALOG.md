@@ -52,7 +52,7 @@ Tổng: **50 module**, **195 loại dữ liệu**, **876 sự kiện**.
 | [`real-estate`](#real-estate) — Bất động sản | Module chuyên ngành | `master-data`, `accounting`, `contract` |
 | [`recruitment`](#recruitment) — Tuyển dụng | Nhân sự | `hrm` |
 | [`restaurant`](#restaurant) — Nhà hàng / F&B | Module chuyên ngành | `master-data`, `inventory`, `accounting` |
-| [`school`](#school) — Trường học / Trung tâm đào tạo | Module chuyên ngành | `master-data`, `accounting` |
+| [`school`](#school) — Trường học / Trung tâm đào tạo | Module chuyên ngành | `master-data`, `accounting`, `hrm` |
 | [`subscription`](#subscription) — Gói thuê bao & thu phí định kỳ | Bán hàng & khách hàng | `master-data`, `accounting` |
 | [`utilities`](#utilities) — Điện nước / Viễn thông | Module chuyên ngành | `master-data`, `accounting` |
 | [`workflow-approval`](#workflow-approval) — Phê duyệt | Nền tảng dùng chung | — |

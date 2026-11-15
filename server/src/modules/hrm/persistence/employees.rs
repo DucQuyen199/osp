@@ -73,6 +73,17 @@ pub(super) async fn validate(
         {
             return Ok(vec!["Remove scheduled shifts after the termination date before terminating the employee".into()]);
         }
+        if tenant.has_module("school")
+            && tx
+                .query_opt(
+                    "SELECT scheduled_session.id FROM school__class_session scheduled_session JOIN school__course_class course_class ON course_class.tenant_id = scheduled_session.tenant_id AND course_class.id = scheduled_session.\"class\" WHERE scheduled_session.tenant_id = $1 AND COALESCE(scheduled_session.teacher_employee, course_class.teacher_employee) = $2 AND scheduled_session.status = 'scheduled' AND scheduled_session.starts_at::date >= $3 LIMIT 1",
+                    &[&tenant.id, &employee, &termination_date],
+                )
+                .await?
+                .is_some()
+        {
+            return Ok(vec!["Resolve scheduled school sessions on or after the employee's termination date before terminating the teacher".into()]);
+        }
         if tx
             .query_opt(
                 "SELECT 1 FROM hrm__leave_request WHERE tenant_id = $1 AND employee = $2 AND status IN ('submitted', 'approved') AND end_date > $3 LIMIT 1",

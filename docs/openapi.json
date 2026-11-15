@@ -16063,6 +16063,16 @@
             "readOnly": true,
             "type": "string"
           },
+          "teacher_employee": {
+            "description": "Tham chiếu tới hrm.employee",
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "teacher_name": {
+            "readOnly": true,
+            "type": "string"
+          },
           "topic": {
             "type": "string"
           },
@@ -16089,6 +16099,16 @@
           },
           "starts_at": {
             "format": "date-time",
+            "type": "string"
+          },
+          "teacher_employee": {
+            "description": "Tham chiếu tới hrm.employee",
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "teacher_name": {
+            "readOnly": true,
             "type": "string"
           },
           "topic": {
@@ -16132,6 +16152,11 @@
           "teacher": {
             "type": "string"
           },
+          "teacher_employee": {
+            "description": "Tham chiếu tới hrm.employee",
+            "format": "uuid",
+            "type": "string"
+          },
           "tuition": {
             "type": "number"
           },
@@ -16161,6 +16186,11 @@
             "type": "string"
           },
           "teacher": {
+            "type": "string"
+          },
+          "teacher_employee": {
+            "description": "Tham chiếu tới hrm.employee",
+            "format": "uuid",
             "type": "string"
           },
           "tuition": {

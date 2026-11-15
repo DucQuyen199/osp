@@ -6,7 +6,8 @@
   "version": "0.1.0",
   "depends": [
     "master-data",
-    "accounting"
+    "accounting",
+    "hrm"
   ],
   "core": false,
   "entities": [
@@ -58,6 +59,13 @@
           "name": "teacher",
           "type": "string",
           "required": false
+        },
+        {
+          "name": "teacher_employee",
+          "label": "Hồ sơ giáo viên",
+          "type": "ref",
+          "required": false,
+          "ref": "hrm.employee"
         },
         {
           "name": "start_date",
@@ -133,6 +141,8 @@
       "fields": [
         { "name": "class", "type": "ref", "required": true, "ref": "school.course_class" },
         { "name": "topic", "type": "string", "required": true },
+        { "name": "teacher_employee", "type": "ref", "required": false, "ref": "hrm.employee", "system": true },
+        { "name": "teacher_name", "type": "string", "required": false, "system": true },
         { "name": "starts_at", "type": "datetime", "required": true },
         { "name": "ends_at", "type": "datetime", "required": true },
         { "name": "status", "type": "enum", "required": false, "options": ["scheduled", "completed", "cancelled"] }

@@ -38,12 +38,14 @@ async fn validate_class_session(
         return Ok(vec!["Buổi học cần lớp hợp lệ".into()]);
     };
     let Some(row) = tx.query_opt(
-        "SELECT start_date::text FROM school__course_class WHERE tenant_id=$1 AND id=$2 FOR UPDATE",
+        "SELECT start_date::text, teacher, teacher_employee FROM school__course_class WHERE tenant_id=$1 AND id=$2 FOR UPDATE",
         &[&tenant.id, &class],
     ).await? else {
         return Ok(vec!["Lớp của buổi học không tồn tại trong doanh nghiệp".into()]);
     };
     let class_start: Option<String> = row.get(0);
+    let teacher: Option<String> = row.get(1);
+    let teacher_employee: Option<Uuid> = row.get(2);
     let starts_at = document
         .get("starts_at")
         .and_then(Value::as_str)
@@ -67,6 +69,74 @@ async fn validate_class_session(
         ).await?.is_some()
     {
         errors.push("Buổi học bị trùng giờ với buổi khác của cùng lớp".into());
+    }
+    if let Some(employee) = teacher_employee {
+        let employee_row = tx
+            .query_opt(
+                "SELECT name, status FROM hrm__employee WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                &[&tenant.id, &employee],
+            )
+            .await?;
+        let Some(employee_row) = employee_row else {
+            errors.push("Giáo viên được phân công không tồn tại trong doanh nghiệp".into());
+            return Ok(errors);
+        };
+        let employee_name: String = employee_row.get(0);
+        let employee_status: String = employee_row.get(1);
+        if employee_status != "active" {
+            errors.push("Không thể lên lịch cho giáo viên đã nghỉ việc".into());
+        }
+        let teacher_lock = format!(
+            "school-teacher:{}:{}",
+            tenant.id,
+            employee_name.trim().to_lowercase()
+        );
+        tx.query_opt(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            &[&teacher_lock],
+        )
+        .await?;
+        if matches!(action, "created" | "updated")
+            && tx
+                .query_opt(
+                    "SELECT scheduled_session.id FROM school__class_session scheduled_session LEFT JOIN school__course_class scheduled_class ON scheduled_class.tenant_id = scheduled_session.tenant_id AND scheduled_class.id = scheduled_session.\"class\" WHERE scheduled_session.tenant_id = $1 AND (COALESCE(scheduled_session.teacher_employee, scheduled_class.teacher_employee) = $2 OR (COALESCE(scheduled_session.teacher_employee, scheduled_class.teacher_employee) IS NULL AND lower(btrim(COALESCE(scheduled_session.teacher_name, scheduled_class.teacher))) = lower($6))) AND scheduled_session.status <> 'cancelled' AND scheduled_session.starts_at < $4::timestamptz AND scheduled_session.ends_at > $3::timestamptz AND ($5::uuid IS NULL OR scheduled_session.id <> $5) LIMIT 1",
+                    &[&tenant.id, &employee, &starts_at, &ends_at, &id, &employee_name],
+                )
+                .await?
+                .is_some()
+        {
+            errors.push(format!(
+                "Giáo viên {employee_name} đã có buổi học khác trong khung giờ này"
+            ));
+        }
+    } else if let Some(teacher_name) = teacher
+        .as_deref()
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+    {
+        let lock_key = format!(
+            "school-teacher:{}:{}",
+            tenant.id,
+            teacher_name.to_lowercase()
+        );
+        tx.query_opt(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            &[&lock_key],
+        )
+        .await?;
+        if matches!(action, "created" | "updated")
+            && tx
+                .query_opt(
+                    "SELECT scheduled_session.id FROM school__class_session scheduled_session LEFT JOIN school__course_class scheduled_class ON scheduled_class.tenant_id = scheduled_session.tenant_id AND scheduled_class.id = scheduled_session.\"class\" WHERE scheduled_session.tenant_id = $1 AND lower(btrim(COALESCE(scheduled_session.teacher_name, scheduled_class.teacher))) = lower($2) AND scheduled_session.status <> 'cancelled' AND scheduled_session.starts_at < $4::timestamptz AND scheduled_session.ends_at > $3::timestamptz AND ($5::uuid IS NULL OR scheduled_session.id <> $5) LIMIT 1",
+                    &[&tenant.id, &teacher_name, &starts_at, &ends_at, &id],
+                )
+                .await?
+                .is_some()
+        {
+            errors.push(format!(
+                "Giáo viên {teacher_name} đã có buổi học khác trong khung giờ này"
+            ));
+        }
     }
     if action == "completed" {
         let Some(session_id) = id else {
@@ -260,6 +330,35 @@ async fn validate_class(
         &[&tenant.id, &name, &id],
     ).await?.is_some() {
         errors.push("Tên lớp học đã tồn tại trong doanh nghiệp".into());
+    }
+    if action != "removed"
+        && let Some(teacher_employee) = parse_id(document, "teacher_employee")
+    {
+        let current_teacher = if action == "updated" {
+            if let Some(id) = id {
+                tx.query_opt(
+                    "SELECT teacher_employee FROM school__course_class WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                    &[&tenant.id, &id],
+                )
+                .await?
+                .and_then(|row| row.get::<_, Option<Uuid>>(0))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        if action != "updated" || current_teacher != Some(teacher_employee) {
+            let employee = tx
+                .query_opt(
+                    "SELECT status FROM hrm__employee WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                    &[&tenant.id, &teacher_employee],
+                )
+                .await?;
+            if !employee.is_some_and(|row| row.get::<_, String>(0) == "active") {
+                errors.push("Giáo viên phải là nhân viên đang làm việc thuộc doanh nghiệp".into());
+            }
+        }
     }
     if action == "updated" {
         if let (Some(id), Some(capacity)) = (id, document.get("capacity").and_then(Value::as_i64)) {
