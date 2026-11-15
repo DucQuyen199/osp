@@ -6,7 +6,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-fn receipt_quantities(lines: &[Value]) -> R<HashMap<(Uuid, Decimal), Decimal>> {
+fn receipt_quantities(lines: &[Value]) -> R<HashMap<(Uuid, Decimal, Option<Uuid>), Decimal>> {
     let mut quantities = HashMap::new();
     for line in lines {
         let (Some(product), Some(price), Some(qty)) = (
@@ -18,7 +18,13 @@ fn receipt_quantities(lines: &[Value]) -> R<HashMap<(Uuid, Decimal), Decimal>> {
         ) else {
             continue;
         };
-        let quantity = quantities.entry((product, price)).or_insert(Decimal::ZERO);
+        let unit = line
+            .get("uom")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok());
+        let quantity = quantities
+            .entry((product, price, unit))
+            .or_insert(Decimal::ZERO);
         *quantity = quantity
             .checked_add(qty)
             .ok_or_else(purchasing_quantity_error)?;
@@ -60,7 +66,7 @@ pub(super) async fn validate_receipt_progress(
             &[&tenant.id, &order_id],
         )
         .await?;
-    let mut received = HashMap::<(Uuid, Decimal), Decimal>::new();
+    let mut received = HashMap::<(Uuid, Decimal, Option<Uuid>), Decimal>::new();
     for row in receipts {
         let lines: Value = row.get(0);
         for (key, qty) in
@@ -177,7 +183,7 @@ pub(super) async fn validate_receipt_received(
             &[&tenant.id, &order_id, &receipt_id],
         )
         .await?;
-    let mut received = HashMap::<(Uuid, Decimal), Decimal>::new();
+    let mut received = HashMap::<(Uuid, Decimal, Option<Uuid>), Decimal>::new();
     for row in prior_receipts {
         let lines: Value = row.get(0);
         for (key, qty) in
@@ -206,11 +212,15 @@ pub(super) async fn validate_receipt_received(
         let (Some(product), Some(price), Some(qty)) = (product, price, qty) else {
             continue;
         };
-        let key = (product, price);
+        let unit = line
+            .get("uom")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok());
+        let key = (product, price, unit);
         let purchased_qty = ordered.get(&key).copied().unwrap_or(Decimal::ZERO);
         if purchased_qty <= Decimal::ZERO {
             errors.push(format!(
-                "Receipt line {} does not match a purchase order product and unit price",
+                "Receipt line {} does not match a purchase order product, unit, and price",
                 index + 1
             ));
             continue;
