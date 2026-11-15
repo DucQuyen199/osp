@@ -24,6 +24,8 @@ export default function EducationWorkbenchPage() {
   const [fees, setFees] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [selectedId, setSelectedId] = useState('');
+  const [enrollmentForm, setEnrollmentForm] = useState({ class: '', student: '' });
+  const [enrollmentClass, setEnrollmentClass] = useState('');
   const [gradeClass, setGradeClass] = useState('');
   const [gradeTerm, setGradeTerm] = useState('');
   const [gradeSubject, setGradeSubject] = useState('');
@@ -55,6 +57,8 @@ export default function EducationWorkbenchPage() {
       setGrades(gradeRes.items || []);
       setFees(feeRes.items || []); setInvoices(invoiceRes.items || []);
       setForm((current) => ({ ...current, class: current.class || classItems[0]?.id || '' }));
+      setEnrollmentForm((current) => ({ ...current, class: current.class || classItems[0]?.id || '', student: current.student || studentRes.items?.[0]?.id || '' }));
+      setEnrollmentClass((current) => current || classItems[0]?.id || '');
       setGradeClass((current) => current || classItems[0]?.id || '');
       setSelectedId((current) => current && sessionItems.some((x) => x.id === current) ? current : sessionItems[0]?.id || '');
       setFeeForm((current) => ({ ...current, student: current.student || studentRes.items?.[0]?.id || '' }));
@@ -80,6 +84,12 @@ export default function EducationWorkbenchPage() {
   const invoiceByFee = useMemo(() => new Map(invoices.filter((invoice) => invoice.source === 'school_fee').map((invoice) => [invoice.source_id, invoice])), [invoices]);
   const selectedFeeEnrollment = enrollmentById.get(feeForm.enrollment);
   const selectedFeeClass = classById.get(selectedFeeEnrollment?.class);
+  const selectedEnrollmentClass = classById.get(enrollmentForm.class);
+  const enrollmentRoster = useMemo(() => enrollments.filter((item) => item.class === enrollmentClass)
+    .map((enrollment) => ({ enrollment, student: students.get(enrollment.student) }))
+    .sort((a, b) => studentName(a.student, parties).localeCompare(studentName(b.student, parties), 'vi')), [enrollments, enrollmentClass, parties, students]);
+  const activeEnrollmentStudents = new Set(enrollments.filter((item) => item.class === enrollmentForm.class && item.status === 'active').map((item) => item.student));
+  const eligibleEnrollmentStudents = [...students.values()].filter((item) => !activeEnrollmentStudents.has(item.id));
 
   async function createFee(event) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
@@ -112,6 +122,25 @@ export default function EducationWorkbenchPage() {
       await api(dataPath('school.class_session'), { method: 'POST', body: { ...form, starts_at: new Date(form.starts_at).toISOString(), ends_at: new Date(form.ends_at).toISOString(), status: 'scheduled' } });
       setNotice('Đã lên lịch buổi học.'); setForm((current) => ({ ...current, topic: '' })); await load();
     } catch (reason) { setError(reason.message || 'Không thể lên lịch buổi học.'); }
+    finally { setBusy(false); }
+  }
+
+  async function createEnrollment(event) {
+    event.preventDefault(); setBusy(true); setError(''); setNotice('');
+    try {
+      await api(dataPath('school.class_enrollment'), { method: 'POST', body: { class: enrollmentForm.class, student: enrollmentForm.student, status: 'active' } });
+      setNotice('Student enrolled in the selected class.');
+      setEnrollmentForm((current) => ({ ...current, student: '' })); await load();
+    } catch (reason) { setError(reason.message || 'Could not enroll this student.'); }
+    finally { setBusy(false); }
+  }
+
+  async function changeEnrollment(enrollment, action) {
+    setBusy(enrollment.id); setError(''); setNotice('');
+    try {
+      await api(dataPath('school.class_enrollment', enrollment.id, action), { method: 'POST' });
+      setNotice(action === 'dropped' ? 'Enrollment withdrawn.' : 'Enrollment completed.'); await load();
+    } catch (reason) { setError(reason.message || 'Could not update this enrollment.'); }
     finally { setBusy(false); }
   }
 
@@ -162,6 +191,10 @@ export default function EducationWorkbenchPage() {
         <label className="field"><span className="label">Kết thúc *</span><input className="input" type="datetime-local" required min={form.starts_at} value={form.ends_at} onChange={(e) => setForm((x) => ({ ...x, ends_at: e.target.value }))} /></label>
         <div className="row full"><span className="grow" /><button className="btn btn-primary" disabled={busy || loading || !form.class || !can('school.class_session.create')}>Lên lịch</button></div>
       </form>
+    </section>}
+    {can('school.class_enrollment.read') && <section className="card card-pad" style={{ marginTop: 20 }}><div className="row wrap"><div><h2>Ghi danh lớp học</h2><p className="small muted">Quản lý sĩ số, rút ghi danh hoặc chốt hoàn thành khóa học.</p></div><span className="grow"/><select className="select" aria-label="Lớp cần quản lý ghi danh" value={enrollmentClass} onChange={(event) => setEnrollmentClass(event.target.value)}><option value="">Chọn lớp</option>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}{item.subject ? ` · ${item.subject}` : ''}</option>)}</select></div>
+      {can('school.class_enrollment.create') && can('school.course_class.read') && can('school.student.read') && <form className="form-grid" style={{ margin: '14px 0 20px' }} onSubmit={createEnrollment}><label className="field"><span className="label">Lớp *</span><select className="select" required value={enrollmentForm.class} onChange={(event) => setEnrollmentForm((current) => ({ ...current, class: event.target.value, student: '' }))}><option value="">Chọn lớp</option>{classes.map((item) => { const count = enrollments.filter((row) => row.class === item.id && row.status === 'active').length; return <option key={item.id} value={item.id}>{item.name}{item.capacity ? ` · ${count}/${item.capacity}` : ''}</option>; })}</select></label><label className="field"><span className="label">Học viên *</span><select className="select" required value={enrollmentForm.student} onChange={(event) => setEnrollmentForm((current) => ({ ...current, student: event.target.value }))}><option value="">Chọn học viên</option>{eligibleEnrollmentStudents.map((student) => <option key={student.id} value={student.id}>{parties.get(student.party) ? recordLabel('master-data.party', parties.get(student.party)) : student.student_code || 'Học viên'}{student.student_code ? ` · ${student.student_code}` : ''}</option>)}</select></label><div className="row full"><span className="grow small muted">{enrollmentForm.class && selectedEnrollmentClass?.capacity ? `Sĩ số hiện tại: ${enrollments.filter((row) => row.class === enrollmentForm.class && row.status === 'active').length}/${selectedEnrollmentClass.capacity}` : 'Hệ thống sẽ kiểm tra trùng ghi danh và sức chứa khi lưu.'}</span><button className="btn btn-primary" type="submit" disabled={busy || loading || !enrollmentForm.class || !enrollmentForm.student}>Ghi danh</button></div></form>}
+      {!enrollmentClass ? <div className="empty">Chọn lớp để xem danh sách ghi danh.</div> : !enrollmentRoster.length ? <div className="empty">Lớp chưa có ghi danh.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Mã học viên</th><th>Học viên</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{enrollmentRoster.map(({ enrollment, student }) => <tr key={enrollment.id}><td>{student?.student_code || '—'}</td><td>{student && parties.get(student.party) ? recordLabel('master-data.party', parties.get(student.party)) : 'Học viên'}</td><td>{statusLabel(enrollment.status)}</td><td><div className="row wrap">{enrollment.status === 'active' && can('school.class_enrollment.dropped') && <button className="btn btn-ghost btn-sm" type="button" disabled={busy} onClick={() => changeEnrollment(enrollment, 'dropped')}>Rút ghi danh</button>}{enrollment.status === 'active' && can('school.class_enrollment.completed') && <button className="btn btn-secondary btn-sm" type="button" disabled={busy} onClick={() => changeEnrollment(enrollment, 'completed')}>Hoàn thành khóa học</button>}</div></td></tr>)}</tbody></table></div>}
     </section>}
     <section className="card card-pad" style={{ marginTop: 20 }}><div className="row wrap"><h2>Danh sách buổi học</h2><span className="grow" /><select className="select" aria-label="Chọn buổi học" value={selectedId} onChange={(e) => setSelectedId(e.target.value)}><option value="">Chọn buổi học</option>{sessions.map((item) => <option key={item.id} value={item.id}>{classes.find((c) => c.id === item.class)?.name || 'Lớp'} · {fmtDateTime(item.starts_at)} · {item.topic}</option>)}</select></div>
       {loading ? <div className="skeleton" data-h="row" /> : !selected ? <div className="empty">Chưa có buổi học.</div> : <>
