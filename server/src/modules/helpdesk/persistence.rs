@@ -59,6 +59,68 @@ pub async fn validate_persistence(
             }
         }
         "ticket" => {
+            if matches!(action, "created" | "updated" | "responded") {
+                if let Some(employee) = document
+                    .get("assignee_employee")
+                    .and_then(Value::as_str)
+                    .and_then(|value| Uuid::parse_str(value).ok())
+                {
+                    let Some(employee_row) = tx
+                    .query_opt(
+                        "SELECT name, status FROM hrm__employee WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                        &[&tenant.id, &employee],
+                    )
+                    .await?
+                else {
+                    return Ok(vec!["Nhân viên phụ trách không tồn tại trong doanh nghiệp".into()]);
+                };
+                    let employee_name: String = employee_row.get(0);
+                    let employee_status: String = employee_row.get(1);
+                    let ticket_id = document
+                        .get("id")
+                        .and_then(Value::as_str)
+                        .and_then(|value| Uuid::parse_str(value).ok());
+                    let previous_assignment = if action == "updated" {
+                        if let Some(ticket_id) = ticket_id {
+                            tx.query_opt(
+                            "SELECT assignee_employee, assignee FROM helpdesk__ticket WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                            &[&tenant.id, &ticket_id],
+                        )
+                        .await?
+                        .map(|row| {
+                            (
+                                row.get::<_, Option<Uuid>>(0),
+                                row.get::<_, Option<String>>(1),
+                            )
+                        })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+                    let current_assignee = document
+                        .get("assignee")
+                        .and_then(Value::as_str)
+                        .map(str::trim);
+                    let assignment_changed = action == "created"
+                        || (action == "updated"
+                            && previous_assignment.as_ref().is_none_or(
+                                |(previous_employee, previous_name)| {
+                                    *previous_employee != Some(employee)
+                                        || previous_name.as_deref().map(str::trim)
+                                            != current_assignee
+                                },
+                            ));
+                    if (assignment_changed || action == "responded") && employee_status != "active"
+                    {
+                        errors.push("Chỉ có thể giao ticket cho nhân viên đang làm việc".into());
+                    }
+                    if assignment_changed && current_assignee != Some(employee_name.trim()) {
+                        errors.push("Tên người phụ trách phải khớp với hồ sơ nhân viên".into());
+                    }
+                }
+            }
             for (field, table, label) in [
                 ("party", "master_data__party", "Khách hàng"),
                 ("sla_policy", "helpdesk__sla_policy", "Chính sách SLA"),

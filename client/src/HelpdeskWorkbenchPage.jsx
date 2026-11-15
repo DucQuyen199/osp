@@ -3,17 +3,19 @@ import { api, dataPath } from './lib/api.js';
 import { fmtDateTime, statusLabel } from './lib/i18n.js';
 import { app, can, loadAllResponse, loadRefs, recordLabel } from './lib/state.js';
 
-const emptyTicket = { subject: '', party: '', priority: 'normal', channel: 'email', sla_policy: '', description: '', assignee: '' };
+const emptyTicket = { subject: '', party: '', priority: 'normal', channel: 'email', sla_policy: '', description: '', assignee: '', assignee_employee: '' };
 
 export default function HelpdeskWorkbenchPage() {
   const [tickets, setTickets] = useState([]);
   const [messages, setMessages] = useState([]);
   const [parties, setParties] = useState(new Map());
   const [policies, setPolicies] = useState(new Map());
+  const [employees, setEmployees] = useState(new Map());
   const [selectedId, setSelectedId] = useState('');
   const [ticketForm, setTicketForm] = useState(emptyTicket);
   const [messageForm, setMessageForm] = useState({ direction: 'outbound', author: app.user?.name || '', body: '' });
   const [assignment, setAssignment] = useState('');
+  const [assignmentEmployee, setAssignmentEmployee] = useState('');
   const [resolution, setResolution] = useState('');
   const [filter, setFilter] = useState('active');
   const [busy, setBusy] = useState('');
@@ -24,14 +26,15 @@ export default function HelpdeskWorkbenchPage() {
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
-      const [ticketRes, messageRes, partyMap, policyMap] = await Promise.all([
+      const [ticketRes, messageRes, partyMap, policyMap, employeeMap] = await Promise.all([
         can('helpdesk.ticket.read') ? loadAllResponse('helpdesk.ticket') : Promise.resolve({ items: [] }),
         can('helpdesk.message.read') ? loadAllResponse('helpdesk.message') : Promise.resolve({ items: [] }),
         can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
         can('helpdesk.sla_policy.read') ? loadRefs('helpdesk.sla_policy') : Promise.resolve(new Map()),
+        can('hrm.employee.read') ? loadRefs('hrm.employee') : Promise.resolve(new Map()),
       ]);
       const ticketRows = (ticketRes.items || []).sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')));
-      setTickets(ticketRows); setMessages(messageRes.items || []); setParties(partyMap); setPolicies(policyMap);
+      setTickets(ticketRows); setMessages(messageRes.items || []); setParties(partyMap); setPolicies(policyMap); setEmployees(employeeMap);
       setSelectedId((current) => ticketRows.some((ticket) => ticket.id === current) ? current : ticketRows[0]?.id || '');
       setTicketForm((current) => ({ ...current, party: current.party || [...partyMap.keys()][0] || '', sla_policy: current.sla_policy || [...policyMap.keys()][0] || '' }));
     } catch (reason) { setError(reason.message || 'Không thể tải hộp thư hỗ trợ.'); }
@@ -49,6 +52,7 @@ export default function HelpdeskWorkbenchPage() {
 
   useEffect(() => {
     setAssignment(selected?.assignee || '');
+    setAssignmentEmployee(selected?.assignee_employee || '');
     setResolution(selected?.resolution || '');
     setMessageForm((current) => ({ ...current, author: app.user?.name || current.author || '' }));
   }, [selectedId]);
@@ -69,6 +73,7 @@ export default function HelpdeskWorkbenchPage() {
         ...(ticketForm.sla_policy ? { sla_policy: ticketForm.sla_policy } : {}),
         ...(ticketForm.description.trim() ? { description: ticketForm.description.trim() } : {}),
         ...(ticketForm.assignee.trim() ? { assignee: ticketForm.assignee.trim() } : {}),
+        ...(ticketForm.assignee_employee ? { assignee_employee: ticketForm.assignee_employee } : {}),
       } });
       setTicketForm({ ...emptyTicket, party: ticketForm.party, sla_policy: ticketForm.sla_policy });
       return ticket;
@@ -78,7 +83,11 @@ export default function HelpdeskWorkbenchPage() {
 
   async function saveAssignment(event) {
     event.preventDefault(); if (!selected) return;
-    await run(`${selected.id}:assignment`, () => api(dataPath('helpdesk.ticket', selected.id), { method: 'PATCH', body: { assignee: assignment.trim() || null } }), 'Đã lưu người phụ trách.');
+    const employee = employees.get(assignmentEmployee);
+    await run(`${selected.id}:assignment`, () => api(dataPath('helpdesk.ticket', selected.id), { method: 'PATCH', body: {
+      assignee: employee?.name || assignment.trim() || null,
+      assignee_employee: assignmentEmployee || null,
+    } }), 'Đã lưu người phụ trách.');
   }
 
   async function addMessage(event) {
@@ -103,6 +112,7 @@ export default function HelpdeskWorkbenchPage() {
   }
 
   const partyName = (ticket) => ticket?.party ? recordLabel('master-data.party', parties.get(ticket.party) || { id: ticket.party }) : 'Khách chưa gắn hồ sơ';
+  const activeEmployees = [...employees.values()].filter((employee) => employee.status === 'active');
   const directionLabel = { inbound: 'Khách hàng', outbound: 'Phản hồi', internal: 'Ghi chú nội bộ' };
 
   return <div className="page">
@@ -114,7 +124,8 @@ export default function HelpdeskWorkbenchPage() {
       <label className="field"><span className="label">Mức ưu tiên</span><select className="select" value={ticketForm.priority} onChange={(event) => setTicketForm((current) => ({ ...current, priority: event.target.value }))}>{[['low','Thấp'],['normal','Bình thường'],['high','Cao'],['urgent','Khẩn cấp']].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
       <label className="field"><span className="label">Kênh tiếp nhận</span><select className="select" value={ticketForm.channel} onChange={(event) => setTicketForm((current) => ({ ...current, channel: event.target.value }))}>{[['email','Email'],['phone','Điện thoại'],['chat','Trò chuyện'],['field','Dịch vụ hiện trường'],['other','Khác']].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
       <label className="field"><span className="label">Chính sách SLA</span><select className="select" value={ticketForm.sla_policy} onChange={(event) => setTicketForm((current) => ({ ...current, sla_policy: event.target.value }))}><option value="">Chưa gắn SLA</option>{[...policies.values()].map((policy) => <option key={policy.id} value={policy.id}>{policy.name} · phản hồi {policy.response_hours}h / xử lý {policy.resolve_hours}h</option>)}</select></label>
-      <label className="field"><span className="label">Người phụ trách</span><input className="input" maxLength="160" value={ticketForm.assignee} onChange={(event) => setTicketForm((current) => ({ ...current, assignee: event.target.value }))} /></label>
+      {can('hrm.employee.read') && <label className="field"><span className="label">Nhân viên phụ trách</span><select className="select" value={ticketForm.assignee_employee} onChange={(event) => setTicketForm((current) => ({ ...current, assignee_employee: event.target.value, assignee: employees.get(event.target.value)?.name || '' }))}><option value="">Nhà thầu / người phụ trách ngoài</option>{activeEmployees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select></label>}
+      <label className="field"><span className="label">Người phụ trách ngoài</span><input className="input" maxLength="160" readOnly={Boolean(ticketForm.assignee_employee)} value={ticketForm.assignee} onChange={(event) => setTicketForm((current) => ({ ...current, assignee: event.target.value }))} /></label>
       <label className="field full"><span className="label">Mô tả yêu cầu</span><textarea className="textarea" rows="3" maxLength="10000" value={ticketForm.description} onChange={(event) => setTicketForm((current) => ({ ...current, description: event.target.value }))} /></label>
       <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || loading}>Tạo ticket</button></div>
     </form></section>}
@@ -126,7 +137,7 @@ export default function HelpdeskWorkbenchPage() {
       {selected && <section className="card card-pad"><div className="row wrap"><div><h2>{selected.subject}</h2><div className="small muted">{partyName(selected)} · {statusLabel(selected.channel)} · {fmtDateTime(selected.createdAt)}</div></div><span className="grow"/><span className="badge warning">{statusLabel(selected.status)}</span></div>
         <div className="row wrap small muted" style={{ marginTop: 8 }}><span>Ưu tiên: {statusLabel(selected.priority)}</span><span>· Phụ trách: {selected.assignee || 'Chưa phân công'}</span><span>· SLA: {policies.get(selected.sla_policy)?.name || 'Chưa gắn'}</span></div>
         {selected.description && <div className="card card-pad" style={{ marginTop: 12 }}><strong>Yêu cầu ban đầu</strong><p className="pre-wrap">{selected.description}</p></div>}
-        {can('helpdesk.ticket.update') && ['open','in_progress'].includes(selected.status) && <form className="row wrap" style={{ marginTop: 12 }} onSubmit={saveAssignment}><label className="field grow"><span className="label">Người phụ trách</span><input className="input" maxLength="160" value={assignment} onChange={(event) => setAssignment(event.target.value)} /></label><button className="btn btn-secondary btn-sm" disabled={Boolean(busy)}>Lưu phân công</button></form>}
+        {can('helpdesk.ticket.update') && ['open','in_progress'].includes(selected.status) && <form className="row wrap" style={{ marginTop: 12 }} onSubmit={saveAssignment}>{can('hrm.employee.read') && <label className="field"><span className="label">Nhân viên nội bộ</span><select className="select" value={assignmentEmployee} onChange={(event) => { const employee = employees.get(event.target.value); setAssignmentEmployee(event.target.value); setAssignment(employee?.name || ''); }}><option value="">Người phụ trách ngoài</option>{assignmentEmployee && !employees.has(assignmentEmployee) && <option value={assignmentEmployee}>Nhân viên {assignmentEmployee.slice(0, 8)} · không còn trong danh mục</option>}{activeEmployees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select></label>}<label className="field grow"><span className="label">Người phụ trách ngoài</span><input className="input" maxLength="160" readOnly={Boolean(assignmentEmployee)} value={assignment} onChange={(event) => setAssignment(event.target.value)} /></label><button className="btn btn-secondary btn-sm" disabled={Boolean(busy)}>Lưu phân công</button></form>}
         <div className="row wrap" style={{ marginTop: 14 }}><h3>Trao đổi</h3><span className="grow"/><span className="small muted">Phản hồi đầu tiên tự ghi nhận SLA và chuyển ticket sang đang xử lý.</span></div>
         {!can('helpdesk.message.read') ? <div className="small muted">Bạn chưa có quyền xem trao đổi ticket.</div> : !thread.length ? <div className="empty">Chưa có trao đổi. Gửi phản hồi hoặc ghi nhận tin nhắn đầu tiên.</div> : <div className="stack-sm" style={{ marginTop: 8 }}>{thread.map((message) => <article className="card card-pad" key={message.id}><div className="row wrap"><strong>{message.author}</strong><span className="badge plain">{directionLabel[message.direction] || message.direction}</span><span className="grow"/><span className="small muted">{fmtDateTime(message.createdAt)}</span></div><p className="pre-wrap" style={{ marginBottom: 0 }}>{message.body}</p></article>)}</div>}
         {can('helpdesk.message.create') && can('helpdesk.message.read') && <form className="card card-pad" style={{ marginTop: 12 }} onSubmit={addMessage}><div className="form-grid"><label className="field"><span className="label">Loại trao đổi</span><select className="select" value={messageForm.direction} onChange={(event) => setMessageForm((current) => ({ ...current, direction: event.target.value }))}>{[['outbound','Phản hồi khách hàng'],['inbound','Tin nhắn khách hàng'],['internal','Ghi chú nội bộ']].map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="field"><span className="label">Người gửi *</span><input className="input" required maxLength="160" value={messageForm.author} onChange={(event) => setMessageForm((current) => ({ ...current, author: event.target.value }))} /></label><label className="field full"><span className="label">Nội dung *</span><textarea className="textarea" rows="3" required minLength="1" maxLength="10000" value={messageForm.body} onChange={(event) => setMessageForm((current) => ({ ...current, body: event.target.value }))} /></label></div>{messageForm.direction === 'outbound' && selected.status === 'open' && !selected.assignee?.trim() && <p className="small muted">Phân công người phụ trách trước khi gửi phản hồi đầu tiên.</p>}{(selected.status === 'resolved' || selected.status === 'closed') && <p className="small muted">Tin nhắn khách hàng sẽ tự mở lại ticket; mở ticket trước khi gửi phản hồi mới.</p>}<div className="row"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || (messageForm.direction === 'outbound' && ['resolved','closed'].includes(selected.status)) || (messageForm.direction === 'internal' && selected.status === 'closed')}>Lưu trao đổi</button></div></form>}
