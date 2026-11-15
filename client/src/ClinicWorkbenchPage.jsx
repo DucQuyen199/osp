@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel } from './lib/i18n.js';
 import { app, can, loadAll, loadRefs, recordLabel } from './lib/state.js';
@@ -15,6 +16,7 @@ export default function ClinicWorkbenchPage() {
   const [selectedId, setSelectedId] = useState('');
   const [patientId, setPatientId] = useState('');
   const [patientRegistration, setPatientRegistration] = useState({ mode: can('master-data.party.create') ? 'new' : 'existing', party: '', name: '', phone: '', email: '', dob: '', gender: '', blood_type: '', allergies: '', insurance_no: '' });
+  const [patientRecordForm, setPatientRecordForm] = useState({ dob: '', gender: '', blood_type: '', allergies: '', insurance_no: '' });
   const [pendingPatientParty, setPendingPatientParty] = useState(null);
   const [doctor, setDoctor] = useState(app.user?.name || '');
   const [complaint, setComplaint] = useState('');
@@ -73,6 +75,10 @@ export default function ClinicWorkbenchPage() {
     setFee(selected.fee ?? '');
   }, [selectedId]);
 
+  useEffect(() => {
+    setPatientRecordForm({ dob: patient?.dob || '', gender: patient?.gender || '', blood_type: patient?.blood_type || '', allergies: patient?.allergies || '', insurance_no: patient?.insurance_no || '' });
+  }, [patient?.id, patient?.dob, patient?.gender, patient?.blood_type, patient?.allergies, patient?.insurance_no]);
+
   const createEncounter = async (event) => {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
@@ -106,6 +112,20 @@ export default function ClinicWorkbenchPage() {
     } catch (reason) {
       setError(reason.message || 'Không đăng ký được hồ sơ bệnh nhân. Nếu thông tin liên hệ đã tạo, hãy thử lại để hoàn tất hồ sơ.');
     } finally { setBusy(false); }
+  };
+
+  const updatePatientRecord = async (event) => {
+    event.preventDefault(); if (!patient) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      await api(dataPath('clinic.patient', patient.id), { method: 'PATCH', body: {
+        party: patient.party, dob: patientRecordForm.dob || null, gender: patientRecordForm.gender || null,
+        blood_type: patientRecordForm.blood_type.trim() || null, allergies: patientRecordForm.allergies.trim() || null,
+        insurance_no: patientRecordForm.insurance_no.trim() || null,
+      } });
+      await load(true); setNotice('Đã cập nhật thông tin y tế và bảo hiểm của bệnh nhân.');
+    } catch (reason) { setError(reason.message || 'Không thể cập nhật hồ sơ bệnh nhân.'); }
+    finally { setBusy(false); }
   };
 
   const completeEncounter = async (event) => {
@@ -180,8 +200,16 @@ export default function ClinicWorkbenchPage() {
         {encounters.length ? <div className="clinic-encounters">{encounters.map((item) => { const p = patients.find((patientRecord) => patientRecord.id === item.patient); const party = p && parties.get(p.party); return <button type="button" className={`card clinic-encounter${selectedId === item.id ? ' active' : ''}`} key={item.id} onClick={() => { setSelectedId(item.id); setDiagnosis(item.diagnosis || ''); setFee(item.fee ?? ''); }}><strong>{recordLabel('master-data.party', party)}</strong><span className="small muted">{item.doctor || 'Chưa phân bác sĩ'} · {fmtDateTime(item.created_at)}</span><span className={`badge ${item.status === 'completed' ? 'success' : 'warning'}`}>{statusLabel(item.status)}</span><span className="small">{item.complaint || item.diagnosis || 'Chưa ghi nhận nội dung'}</span></button>; })}</div> : <div className="empty">Chưa có lượt khám.</div>}
       </section>
       <section className="clinic-records">{selected ? <>
-        <article className="card clinic-record"><header className="clinic-section-head"><div><h2>{recordLabel('master-data.party', patientParty)}</h2><p className="small muted">{patient?.dob ? `Ngày sinh ${patient.dob}` : ''}{patient?.blood_type ? ` · Nhóm máu ${patient.blood_type}` : ''}</p></div><span className={`badge ${selected.status === 'completed' ? 'success' : 'warning'}`}>{statusLabel(selected.status)}</span></header>
+        <article className="card clinic-record"><header className="clinic-section-head"><div><h2>{recordLabel('master-data.party', patientParty)}</h2><p className="small muted">{patient?.dob ? `Ngày sinh ${patient.dob}` : ''}{patient?.gender ? ` · ${{ male: 'Nam', female: 'Nữ', other: 'Khác' }[patient.gender] || patient.gender}` : ''}{patient?.blood_type ? ` · Nhóm máu ${patient.blood_type}` : ''}{patient?.insurance_no ? ` · Bảo hiểm ${patient.insurance_no}` : ''}</p></div><span className={`badge ${selected.status === 'completed' ? 'success' : 'warning'}`}>{statusLabel(selected.status)}</span></header>
           {patient?.allergies && <div className="alert warning clinic-allergy"><strong>Dị ứng:</strong> {patient.allergies}</div>}
+          {patient && can('clinic.patient.update') && <details style={{ margin: '12px 0' }}><summary className="btn btn-ghost btn-sm" style={{ display: 'inline-flex', cursor: 'pointer' }}>Cập nhật hồ sơ y tế</summary><form className="form-grid" style={{ marginTop: 12 }} onSubmit={updatePatientRecord}>
+            <label className="field"><span className="label">Ngày sinh</span><input className="input" type="date" max={localDate()} value={patientRecordForm.dob} onChange={(event) => setPatientRecordForm((current) => ({ ...current, dob: event.target.value }))} /></label>
+            <label className="field"><span className="label">Giới tính</span><select className="select" value={patientRecordForm.gender} onChange={(event) => setPatientRecordForm((current) => ({ ...current, gender: event.target.value }))}><option value="">Chưa khai báo</option><option value="male">Nam</option><option value="female">Nữ</option><option value="other">Khác</option></select></label>
+            <label className="field"><span className="label">Nhóm máu</span><input className="input" maxLength="8" value={patientRecordForm.blood_type} onChange={(event) => setPatientRecordForm((current) => ({ ...current, blood_type: event.target.value }))} /></label>
+            <label className="field"><span className="label">Số bảo hiểm</span><input className="input" maxLength="80" value={patientRecordForm.insurance_no} onChange={(event) => setPatientRecordForm((current) => ({ ...current, insurance_no: event.target.value }))} /></label>
+            <label className="field full"><span className="label">Dị ứng cần lưu ý</span><textarea className="textarea" maxLength="2000" value={patientRecordForm.allergies} onChange={(event) => setPatientRecordForm((current) => ({ ...current, allergies: event.target.value }))} /></label>
+            <div className="row full"><span className="grow"/><button className="btn btn-secondary" type="submit" disabled={busy}>Lưu hồ sơ</button></div>
+          </form></details>}
           <dl className="clinic-summary"><div><dt>Lý do khám</dt><dd>{selected.complaint || 'Chưa ghi nhận'}</dd></div><div><dt>Chẩn đoán</dt><dd>{selected.diagnosis || 'Chưa ghi nhận'}</dd></div><div><dt>Bác sĩ</dt><dd>{selected.doctor || 'Chưa phân công'}</dd></div><div><dt>Phí khám</dt><dd>{selected.fee != null ? fmtMoney(selected.fee) : 'Chưa lập'}</dd></div></dl>
           {selected.status === 'open' && <form className="clinic-complete-form" onSubmit={completeEncounter}><h3>Chẩn đoán và hoàn tất</h3><label className="field"><span className="label">Bác sĩ phụ trách *</span><input className="input" required value={doctor} onChange={(event) => setDoctor(event.target.value)} /></label><label className="field"><span className="label">Chẩn đoán *</span><textarea className="textarea" required value={diagnosis} onChange={(event) => setDiagnosis(event.target.value)} /></label><label className="field"><span className="label">Phí khám *</span><input className="input num" required type="number" min="0.01" step="any" value={fee} onChange={(event) => setFee(event.target.value)} /></label><button className="btn btn-primary" type="submit" disabled={busy || !can('clinic.encounter.update') || !can('clinic.encounter.completed')}>Hoàn tất lượt khám</button></form>}
         </article>
