@@ -1829,6 +1829,21 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     }
                     return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
                 }
+                if q == "crm.deal" && *action == "lost" {
+                    let body = json_obj(&bytes)?;
+                    let reason = body
+                        .get("lost_reason")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::trim)
+                        .unwrap_or_default();
+                    if body.len() != 1 || !(5..=1000).contains(&reason.chars().count()) {
+                        return Err(ApiError::validation(
+                            "crm.deal.lost",
+                            vec!["Cần gửi duy nhất lost_reason có từ 5 đến 1000 ký tự".into()],
+                        ));
+                    }
+                    return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
+                }
                 if q == "accounting.bank_statement_line"
                     && *action == "matched"
                     && !bytes.is_empty()

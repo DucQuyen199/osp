@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { api, dataPath, tenantPath } from './lib/api.js';
-import { confirmDialog, toast } from './lib/feedback.js';
+import { confirmDialog, textDialog, toast } from './lib/feedback.js';
 import { descendants, eventTitle, fetchEvents, moduleName } from './lib/events.js';
 import {
   actionLabel, fmtAgo, fmtDate, fmtDateTime, fmtMoney, fmtNumber, fmtTime, statusLabel, tone,
@@ -120,6 +120,20 @@ export default function EntityDetailPage({ qname, id }) {
   };
 
   const runAction = async (action, targetStatus) => {
+    let body;
+    if (qname === 'crm.deal' && action === 'lost') {
+      const lostReason = await textDialog({
+        title: 'Ghi nhận cơ hội thua',
+        message: 'Ghi lý do để nhóm bán hàng phân tích và cải thiện quy trình chốt đơn.',
+        label: 'Lý do thua (5–1000 ký tự)',
+        minLength: 5,
+        maxLength: 1000,
+        confirmLabel: 'Tiếp tục',
+        danger: true,
+      });
+      if (!lostReason) return;
+      body = { lost_reason: lostReason };
+    }
     if (tone(targetStatus) === 'danger') {
       const confirmed = await confirmDialog({
         title: `${actionLabel(action)}?`,
@@ -131,7 +145,7 @@ export default function EntityDetailPage({ qname, id }) {
     }
     setWorking(action);
     try {
-      await api(dataPath(qname, id, action), { method: 'POST' });
+      await api(dataPath(qname, id, action), { method: 'POST', ...(body ? { body } : {}) });
       invalidateRefs(qname);
       entityChanged(qname);
       const all = await fetchEvents(1000).catch(() => []);
@@ -192,7 +206,7 @@ export default function EntityDetailPage({ qname, id }) {
   };
   const state = definition?.states && record?.[definition.states.field];
   const actions = definition?.states
-    ? Object.entries(definition.states.actions).filter(([action, transition]) => transition.from.includes(state) && can(`${qname}.${action}`))
+    ? Object.entries(definition.states.actions).filter(([action, transition]) => transition.from.includes(state) && can(`${qname}.${action}`) && (qname !== 'crm.deal' || action !== 'lost' || can(`${qname}.update`)))
     : [];
   const fields = definition?.fields.filter((field) => field.name !== definition.states?.field && !field.system) || [];
 

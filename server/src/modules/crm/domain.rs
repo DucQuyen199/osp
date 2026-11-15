@@ -130,6 +130,18 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
                 Vec::new()
             }
         }
+        ("deal", "lost") => {
+            let reason = document
+                .get("lost_reason")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .unwrap_or_default();
+            if !(5..=1000).contains(&reason.chars().count()) {
+                vec!["A lost deal requires a reason between 5 and 1000 characters".into()]
+            } else {
+                Vec::new()
+            }
+        }
         _ => Vec::new(),
     }
 }
@@ -159,6 +171,7 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
             "probability",
             "expected_close",
             "owner",
+            "lost_reason",
             "lead",
         ]
         .iter()

@@ -152,6 +152,12 @@
      "required": false
     },
     {
+     "name": "lost_reason",
+     "label": "Lý do thua cơ hội",
+     "type": "text",
+     "required": false
+    },
+    {
      "name": "lead",
      "type": "ref",
      "required": false,
