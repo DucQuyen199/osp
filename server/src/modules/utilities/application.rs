@@ -18,7 +18,7 @@ fn decimal_json(value: Decimal) -> R<Value> {
     money::json_number(value).ok_or_else(|| {
         crate::error::ApiError::validation(
             "utilities.meter_reading",
-            vec!["Utility amount exceeds the supported decimal range".into()],
+            vec!["Tổng tiền công tơ vượt phạm vi hỗ trợ".into()],
         )
     })
 }
@@ -59,7 +59,7 @@ async fn prepare_meter_reading(
         })?;
     let Some(meter_row) = tx
         .query_opt(
-            "SELECT rate::text, COALESCE(opening_reading, 0)::text FROM utilities__meter WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+            "SELECT rate::text, COALESCE(fixed_charge, 0)::text, COALESCE(tariff_tiers, '[]'::jsonb), COALESCE(opening_reading, 0)::text FROM utilities__meter WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
             &[&tenant.id, &meter],
         )
         .await?
@@ -67,7 +67,9 @@ async fn prepare_meter_reading(
         return Ok(vec!["Công tơ không tồn tại trong doanh nghiệp".into()]);
     };
     let rate = decimal_column(&meter_row, 0, "meter rate")?;
-    let opening_reading = decimal_column(&meter_row, 1, "opening reading")?;
+    let fixed_charge = decimal_column(&meter_row, 1, "fixed charge")?;
+    let tariff_tiers: Value = meter_row.get(2);
+    let opening_reading = decimal_column(&meter_row, 3, "opening reading")?;
     let previous = tx
         .query_opt(
             "SELECT reading::text FROM utilities__meter_reading WHERE tenant_id = $1 AND meter = $2 AND period < $3 ORDER BY period DESC, created_at DESC, id DESC LIMIT 1 FOR UPDATE",
@@ -88,12 +90,21 @@ async fn prepare_meter_reading(
             vec!["Meter consumption exceeds the supported decimal range".into()],
         )
     })?;
-    let Some(amount) = money::amount(consumption, rate) else {
-        return Ok(vec!["Không thể tính tiền từ đơn giá công tơ".into()]);
+    let Some((base_amount, tier_breakdown)) =
+        super::domain::calculate_charge(consumption, rate, &tariff_tiers)
+    else {
+        return Ok(vec!["Không thể tính tiền theo biểu giá công tơ".into()]);
+    };
+    let Some(amount) = base_amount.checked_add(fixed_charge) else {
+        return Ok(vec!["Tổng tiền công tơ vượt phạm vi hỗ trợ".into()]);
     };
     document.insert("previous_reading".into(), decimal_json(previous)?);
     document.insert("consumption".into(), decimal_json(consumption)?);
     document.insert("rate".into(), decimal_json(rate)?);
+    document.insert("base_amount".into(), decimal_json(base_amount)?);
+    document.insert("fixed_charge".into(), decimal_json(fixed_charge)?);
+    document.insert("tariff_tiers".into(), tariff_tiers);
+    document.insert("tier_breakdown".into(), tier_breakdown);
     document.insert("amount".into(), decimal_json(amount)?);
     Ok(Vec::new())
 }
@@ -108,7 +119,7 @@ async fn prepare_utility_bill(
     };
     let Some(row) = tx
         .query_opt(
-            "SELECT mr.period, mr.consumption::text, mr.rate::text, mr.amount::text, m.party FROM utilities__meter_reading mr JOIN utilities__meter m ON m.tenant_id = mr.tenant_id AND m.id = mr.meter WHERE mr.tenant_id = $1 AND mr.id = $2 FOR UPDATE OF mr, m",
+            "SELECT mr.period, mr.consumption::text, mr.rate::text, mr.amount::text, m.party, COALESCE(mr.base_amount, mr.amount)::text, COALESCE(mr.fixed_charge, 0)::text, COALESCE(mr.tier_breakdown, '[]'::jsonb) FROM utilities__meter_reading mr JOIN utilities__meter m ON m.tenant_id = mr.tenant_id AND m.id = mr.meter WHERE mr.tenant_id = $1 AND mr.id = $2 FOR UPDATE OF mr, m",
             &[&tenant.id, &reading_id],
         )
         .await?
@@ -120,9 +131,21 @@ async fn prepare_utility_bill(
     let rate = decimal_column(&row, 2, "rate")?;
     let amount = decimal_column(&row, 3, "amount")?;
     let party: Uuid = row.get(4);
+    let base_amount: String = row.get(5);
+    let fixed_charge: String = row.get(6);
+    let tier_breakdown: Value = row.get(7);
     document.insert("period".into(), Value::String(period));
     document.insert("consumption".into(), decimal_json(consumption)?);
     document.insert("unit_rate".into(), decimal_json(rate)?);
+    document.insert(
+        "base_amount".into(),
+        decimal_json(money::decimal_str(&base_amount).unwrap_or_default())?,
+    );
+    document.insert(
+        "fixed_charge".into(),
+        decimal_json(money::decimal_str(&fixed_charge).unwrap_or_default())?,
+    );
+    document.insert("tier_breakdown".into(), tier_breakdown);
     document.insert("amount".into(), decimal_json(amount)?);
     document.insert("party".into(), Value::String(party.to_string()));
     Ok(Vec::new())

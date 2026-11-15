@@ -130,7 +130,7 @@ async fn validate_reading(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<V
     let id = parse_id(document, "id");
     let Some(row) = tx
         .query_opt(
-        "SELECT rate::text, COALESCE(opening_reading, 0)::text FROM utilities__meter WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+            "SELECT rate::text, COALESCE(fixed_charge, 0)::text, COALESCE(tariff_tiers, '[]'::jsonb), COALESCE(opening_reading, 0)::text FROM utilities__meter WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
             &[&tenant.id, &meter],
         )
         .await?
@@ -138,7 +138,9 @@ async fn validate_reading(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<V
         return Ok(vec!["Công tơ không tồn tại trong doanh nghiệp".into()]);
     };
     let expected_rate = decimal_column(&row, 0, "meter rate")?;
-    let opening_reading = decimal_column(&row, 1, "opening reading")?;
+    let expected_fixed_charge = decimal_column(&row, 1, "fixed charge")?;
+    let expected_tiers: Value = row.get(2);
+    let opening_reading = decimal_column(&row, 3, "opening reading")?;
     let mut errors = Vec::new();
     if tx
         .query_opt(
@@ -182,6 +184,20 @@ async fn validate_reading(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<V
         .unwrap_or_default();
     if !money::within_tolerance(captured_rate, expected_rate, Decimal::new(1, 4)) {
         errors.push("Đơn giá chụp trên chỉ số không khớp đơn giá công tơ tại thời điểm ghi".into());
+    }
+    let captured_fixed_charge = document
+        .get("fixed_charge")
+        .and_then(money::decimal)
+        .unwrap_or_default();
+    if !money::within_tolerance(
+        captured_fixed_charge,
+        expected_fixed_charge,
+        Decimal::new(1, 4),
+    ) {
+        errors.push("Phí cố định chụp không khớp cấu hình công tơ".into());
+    }
+    if document.get("tariff_tiers") != Some(&expected_tiers) {
+        errors.push("Bậc giá chụp không khớp cấu hình công tơ".into());
     }
     Ok(errors)
 }

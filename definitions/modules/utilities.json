@@ -31,6 +31,16 @@
      "required": true
     },
     {
+     "name": "fixed_charge",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "tariff_tiers",
+     "type": "json",
+     "required": false
+    },
+    {
      "name": "opening_reading",
      "type": "number",
      "required": false
@@ -95,6 +105,30 @@
      "name": "amount",
      "type": "money",
      "required": false
+    },
+    {
+     "name": "base_amount",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "fixed_charge",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "tariff_tiers",
+     "type": "json",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "tier_breakdown",
+     "type": "json",
+     "required": false,
+     "system": true
     }
    ],
    "states": null,
@@ -136,6 +170,24 @@
      "name": "unit_rate",
      "type": "money",
      "required": false
+    },
+    {
+     "name": "base_amount",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "fixed_charge",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "tier_breakdown",
+     "type": "json",
+     "required": false,
+     "system": true
     },
     {
      "name": "status",
