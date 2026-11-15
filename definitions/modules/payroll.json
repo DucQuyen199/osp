@@ -3,7 +3,7 @@
  "name": "Tính lương",
  "description": "Bảng lương, phiếu lương. Phiếu lương được khóa theo bảng nháp; gửi bảng lương tạo yêu cầu duyệt, duyệt ghi bút toán và đánh dấu đã trả tạo payment.",
  "category": "people",
- "version": "0.8.0",
+ "version": "0.9.0",
  "depends": [
   "hrm",
   "accounting"
@@ -118,6 +118,9 @@
     { "name": "effective_to", "type": "date", "required": false },
     { "name": "personal_allowance", "type": "money", "required": true },
     { "name": "dependent_allowance", "type": "money", "required": true },
+    { "name": "annual_medical_deduction_cap", "type": "money", "required": false },
+    { "name": "annual_education_deduction_cap", "type": "money", "required": false },
+    { "name": "annual_deductions_require_resident", "type": "bool", "required": false },
     { "name": "resident_brackets", "type": "json", "required": true },
     { "name": "nonresident_rate", "type": "number", "required": true },
     { "name": "rounding_unit", "type": "money", "required": true },
@@ -152,6 +155,41 @@
     "field": "status",
     "initial": "draft",
     "actions": { "approved": { "from": ["draft"], "to": "approved" } }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "tax_deduction",
+   "label": "Hồ sơ giảm trừ thuế theo năm",
+   "fields": [
+    { "name": "employee", "type": "ref", "required": true, "ref": "hrm.employee" },
+    { "name": "tax_year", "type": "string", "required": true },
+    { "name": "category", "type": "enum", "required": true, "options": ["medical", "education"] },
+    { "name": "expense_date", "type": "date", "required": true },
+    { "name": "beneficiary_type", "type": "enum", "required": true, "options": ["self", "dependent"] },
+    { "name": "beneficiary_name", "type": "string", "required": true },
+    { "name": "provider_name", "type": "string", "required": true },
+    { "name": "provider_domestic", "type": "bool", "required": true },
+    { "name": "amount", "type": "money", "required": true },
+    { "name": "reimbursed_amount", "type": "money", "required": true },
+    { "name": "approved_amount", "type": "money", "required": false },
+    { "name": "receipt_number", "type": "string", "required": true },
+    { "name": "receipt_date", "type": "date", "required": true },
+    { "name": "medical_statement_available", "type": "bool", "required": true },
+    { "name": "eligible_expense", "type": "bool", "required": true },
+    { "name": "supporting_reference", "type": "text", "required": true },
+    { "name": "review_note", "type": "text", "required": false },
+    { "name": "status", "type": "enum", "required": false, "options": ["draft", "submitted", "approved", "rejected"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "submitted": { "from": ["draft", "rejected"], "to": "submitted" },
+     "approved": { "from": ["submitted"], "to": "approved" },
+     "rejected": { "from": ["submitted"], "to": "rejected" }
+    }
    },
    "computed": {},
    "constraints": []

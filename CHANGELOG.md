@@ -4,6 +4,7 @@
 
 ## [Unreleased]
 ### Added
+- Added annual medical and education tax deduction claims with receipt evidence fields, separate reviewer approval, duplicate receipt checks, configurable tax policy caps, and annual payroll summaries; this records employer evidence and does not calculate an individual's full annual tax settlement.
 - Added school tuition billing batches that generate missing student charges atomically per class and period, retain already-created charges, and preserve each draft amount as a billing snapshot until invoice issuance.
 - Added optional HRM teacher assignments for school classes, immutable teacher snapshots on lesson sessions, and tenant-serialized overlap checks across classes; teacher termination is blocked while future sessions remain scheduled.
 - Added automatic immutable LMS completion certificates with learner/course snapshots, certificate-number lookup, and print-ready issuance records.

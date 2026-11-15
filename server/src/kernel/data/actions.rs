@@ -515,6 +515,7 @@ fn segregation_reference(qname: &str, action: &str) -> Option<&'static str> {
         ("inventory.stock_count", "approved" | "rejected") => Some("create"),
         ("accounting.settlement_batch", "approved" | "rejected") => Some("create"),
         ("purchasing.rfq", "accepted") => Some("create"),
+        ("payroll.tax_deduction", "approved" | "rejected") => Some("submitted"),
         ("construction.boq", "approved") => Some("create"),
         ("lending.loan", "approved" | "rejected") => Some("create"),
         ("lending.loan", "disbursed") => Some("approved"),

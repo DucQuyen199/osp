@@ -36,6 +36,16 @@ pub(super) fn validate_tax_policy(document: &Value) -> Vec<String> {
             errors.push(format!("{field} must be non-negative"));
         }
     }
+    for field in [
+        "annual_medical_deduction_cap",
+        "annual_education_deduction_cap",
+    ] {
+        if document.get(field).is_some_and(|value| !value.is_null())
+            && !decimal_field(document, field).is_some_and(|amount| amount >= Decimal::ZERO)
+        {
+            errors.push(format!("{field} must be non-negative when configured"));
+        }
+    }
     if !decimal_field(document, "rounding_unit").is_some_and(|unit| unit > Decimal::ZERO) {
         errors.push("Tax rounding_unit must be greater than zero".into());
     }
@@ -88,6 +98,117 @@ pub(super) fn validate_tax_policy(document: &Value) -> Vec<String> {
     }
     errors
 }
+
+pub(super) fn validate_tax_deduction(
+    document: &Value,
+    review: bool,
+    approved: bool,
+) -> Vec<String> {
+    let mut errors = Vec::new();
+    let tax_year = document
+        .get("tax_year")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let year = tax_year
+        .parse::<i32>()
+        .ok()
+        .filter(|year| (1900..=9999).contains(year));
+    let expense_date = document
+        .get("expense_date")
+        .and_then(Value::as_str)
+        .and_then(|value| chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").ok());
+    let receipt_date = document
+        .get("receipt_date")
+        .and_then(Value::as_str)
+        .and_then(|value| chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").ok());
+    if tax_year.len() != 4 || year.is_none() {
+        errors.push("Tax deduction year must use YYYY format".into());
+    }
+    if expense_date.is_none_or(|date| Some(date.year()) != year) {
+        errors.push("Expense date must fall within the selected tax year".into());
+    }
+    if receipt_date.is_none() {
+        errors.push("Receipt date must be a valid date".into());
+    }
+    if document
+        .get("employee")
+        .and_then(Value::as_str)
+        .is_none_or(str::is_empty)
+    {
+        errors.push("Tax deduction claim requires an employee".into());
+    }
+    let category = document.get("category").and_then(Value::as_str);
+    if !matches!(category, Some("medical" | "education")) {
+        errors.push("Tax deduction category must be medical or education".into());
+    }
+    let amount = decimal_field(document, "amount");
+    let reimbursed = decimal_field(document, "reimbursed_amount");
+    if !amount.is_some_and(|value| value > Decimal::ZERO) {
+        errors.push("Expense amount must be greater than zero".into());
+    }
+    if !reimbursed.is_some_and(|value| value >= Decimal::ZERO) {
+        errors.push("Reimbursed amount must be non-negative".into());
+    }
+    if amount
+        .zip(reimbursed)
+        .is_some_and(|(amount, reimbursed)| reimbursed > amount)
+    {
+        errors.push("Reimbursed amount cannot exceed the expense amount".into());
+    }
+    if let Some(approved) = optional_decimal_field(document, "approved_amount") {
+        if approved < Decimal::ZERO
+            || amount
+                .zip(reimbursed)
+                .is_none_or(|(amount, reimbursed)| approved > amount - reimbursed)
+        {
+            errors.push("Approved deduction cannot exceed the unreimbursed expense amount".into());
+        }
+    } else {
+        errors.push("Approved deduction must be a valid amount".into());
+    }
+    if review {
+        for field in [
+            "beneficiary_name",
+            "provider_name",
+            "receipt_number",
+            "supporting_reference",
+        ] {
+            if document
+                .get(field)
+                .and_then(Value::as_str)
+                .is_none_or(|value| value.trim().is_empty())
+            {
+                errors.push(format!("{field} is required before submitting the claim"));
+            }
+        }
+        if document.get("provider_domestic").and_then(Value::as_bool) != Some(true) {
+            errors
+                .push("The provider must be confirmed as domestic for this deduction claim".into());
+        }
+        if document.get("eligible_expense").and_then(Value::as_bool) != Some(true) {
+            errors.push(
+                "The expense must be confirmed as eligible under the tenant tax policy".into(),
+            );
+        }
+        if category == Some("medical")
+            && document
+                .get("medical_statement_available")
+                .and_then(Value::as_bool)
+                != Some(true)
+        {
+            errors.push("Medical expense requires the healthcare cost statement reference".into());
+        }
+    }
+    if approved
+        && !decimal_field(document, "approved_amount").is_some_and(|value| value > Decimal::ZERO)
+    {
+        errors.push(
+            "Reviewer must record a positive approved deduction amount before approval".into(),
+        );
+    }
+    errors
+}
+
 pub(super) fn validate_contribution_policy(document: &Value) -> Vec<String> {
     let mut errors = Vec::new();
     let from = document

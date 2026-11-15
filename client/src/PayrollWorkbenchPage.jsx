@@ -17,6 +17,8 @@ const csvCell = (value) => {
 export default function PayrollWorkbenchPage() {
   const [runs, setRuns] = useState([]);
   const [payslips, setPayslips] = useState([]);
+  const [taxDeductions, setTaxDeductions] = useState([]);
+  const [taxPolicies, setTaxPolicies] = useState([]);
   const [employees, setEmployees] = useState(new Map());
   const [approvalRequests, setApprovalRequests] = useState([]);
   const [selectedId, setSelectedId] = useState('');
@@ -31,14 +33,17 @@ export default function PayrollWorkbenchPage() {
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
-      const [runRes, slipRes, employeeMap, requestRes] = await Promise.all([
+      const [runRes, slipRes, employeeMap, requestRes, taxDeductionRes, taxPolicyRes] = await Promise.all([
         can('payroll.payroll_run.read') ? loadAllResponse('payroll.payroll_run') : Promise.resolve({ items: [] }),
         can('payroll.payslip.read') ? loadAllResponse('payroll.payslip') : Promise.resolve({ items: [] }),
         can('hrm.employee.read') ? loadRefs('hrm.employee') : Promise.resolve(new Map()),
         workflowApproval && can('workflow-approval.approval_request.read') ? loadAllResponse('workflow-approval.approval_request') : Promise.resolve({ items: [] }),
+        can('payroll.tax_deduction.read') ? loadAllResponse('payroll.tax_deduction') : Promise.resolve({ items: [] }),
+        can('payroll.tax_policy.read') ? loadAllResponse('payroll.tax_policy') : Promise.resolve({ items: [] }),
       ]);
       const runRows = itemsOf(runRes).sort((a, b) => String(b.period || '').localeCompare(String(a.period || '')) || String(b.created_at || '').localeCompare(String(a.created_at || '')));
       setRuns(runRows); setPayslips(itemsOf(slipRes)); setEmployees(employeeMap); setApprovalRequests(itemsOf(requestRes));
+      setTaxDeductions(itemsOf(taxDeductionRes)); setTaxPolicies(itemsOf(taxPolicyRes));
       setSelectedId((id) => runRows.some((row) => row.id === id) ? id : runRows[0]?.id || '');
     } catch (reason) { setError(reason.message || 'Không tải được bảng lương.'); }
     finally { if (!quiet) setLoading(false); }
@@ -47,6 +52,18 @@ export default function PayrollWorkbenchPage() {
   useEffect(() => { document.title = 'Bảng lương · OSP Suite'; load(); }, [load]);
   const selected = runs.find((row) => row.id === selectedId);
   const runSlips = useMemo(() => payslips.filter((row) => row.run === selectedId).sort((a, b) => String(employees.get(a.employee)?.name || '').localeCompare(String(employees.get(b.employee)?.name || ''), 'vi')), [payslips, selectedId, employees]);
+  const annualDeductionCaps = useMemo(() => {
+    const start = `${reportYear}-01-01`;
+    const end = `${reportYear}-12-31`;
+    const policies = taxPolicies.filter((policy) => policy.status === 'approved' && String(policy.effective_from || '') <= end && String(policy.effective_to || '9999-12-31') >= start);
+    const getCap = (field) => {
+      if (!policies.length || policies.some((policy) => policy[field] === null || policy[field] === undefined || policy[field] === '')) return null;
+      const values = policies.map((policy) => policy[field]).filter((value) => value !== null && value !== undefined && value !== '').map(Number);
+      if (!values.length || values.some((value) => !Number.isFinite(value)) || values.some((value) => value !== values[0])) return null;
+      return values[0];
+    };
+    return { medical: getCap('annual_medical_deduction_cap'), education: getCap('annual_education_deduction_cap') };
+  }, [taxPolicies, reportYear]);
   const annualReport = useMemo(() => {
     const paidRuns = new Set(runs.filter((row) => row.status === 'paid' && String(row.payment_date || '').startsWith(`${reportYear}-`)).map((row) => row.id));
     const byEmployee = new Map();
@@ -57,6 +74,13 @@ export default function PayrollWorkbenchPage() {
       for (const field of ['gross', 'taxable_income', 'income_tax', 'employee_contribution', 'net']) current[field] += Number(slip[field]) || 0;
       byEmployee.set(slip.employee, current);
     }
+    for (const claim of taxDeductions) {
+      if (claim.status !== 'approved' || String(claim.tax_year) !== reportYear || !claim.employee) continue;
+      const current = byEmployee.get(claim.employee) || { employee: claim.employee, paidRuns: new Set(), gross: 0, taxable_income: 0, income_tax: 0, employee_contribution: 0, net: 0, medical_claims: 0, education_claims: 0 };
+      const field = claim.category === 'medical' ? 'medical_claims' : claim.category === 'education' ? 'education_claims' : null;
+      if (field) current[field] = (current[field] || 0) + (Number(claim.approved_amount) || 0);
+      byEmployee.set(claim.employee, current);
+    }
     return [...byEmployee.values()].map((row) => ({
       ...row,
       paidRuns: row.paidRuns.size,
@@ -65,12 +89,14 @@ export default function PayrollWorkbenchPage() {
       income_tax: Math.round((row.income_tax + Number.EPSILON) * 100) / 100,
       employee_contribution: Math.round((row.employee_contribution + Number.EPSILON) * 100) / 100,
       net: Math.round((row.net + Number.EPSILON) * 100) / 100,
+      medical_deduction: annualDeductionCaps.medical === null ? null : Math.min(Math.round(((row.medical_claims || 0) + Number.EPSILON) * 100) / 100, annualDeductionCaps.medical),
+      education_deduction: annualDeductionCaps.education === null ? null : Math.min(Math.round(((row.education_claims || 0) + Number.EPSILON) * 100) / 100, annualDeductionCaps.education),
     })).sort((a, b) => String(employees.get(a.employee)?.name || '').localeCompare(String(employees.get(b.employee)?.name || ''), 'vi'));
-  }, [runs, payslips, employees, reportYear]);
+  }, [runs, payslips, employees, taxDeductions, annualDeductionCaps, reportYear]);
   const reportYears = useMemo(() => {
-    const years = new Set([localMonth().slice(0, 4), ...runs.map((row) => String(row.period || '').slice(0, 4)).filter((year) => /^\d{4}$/.test(year))]);
+    const years = new Set([localMonth().slice(0, 4), ...runs.map((row) => String(row.period || '').slice(0, 4)), ...taxDeductions.map((row) => String(row.tax_year || ''))].filter((year) => /^\d{4}$/.test(year)));
     return [...years].sort((a, b) => b.localeCompare(a));
-  }, [runs]);
+  }, [runs, taxDeductions]);
   const requestByRun = approvalRequests.find((row) => row.entity === 'payroll.payroll_run' && row.record_id === selectedId);
   const totals = useMemo(() => ({
     draft: runs.filter((row) => ['draft', 'rejected'].includes(row.status)).length,
@@ -107,10 +133,10 @@ export default function PayrollWorkbenchPage() {
   }
 
   function exportAnnualReport() {
-    const columns = ['Mã nhân viên', 'Nhân viên', 'Số bảng lương đã chi', 'Lương gộp', 'Thu nhập tính thuế', 'Thuế TNCN đã khấu trừ', 'Khoản đóng góp của nhân viên', 'Thực nhận'];
+    const columns = ['Mã nhân viên', 'Nhân viên', 'Số bảng lương đã chi', 'Lương gộp', 'Thu nhập tính thuế', 'Thuế TNCN đã khấu trừ', 'Khoản đóng góp của nhân viên', 'Thực nhận', 'Giảm trừ y tế đã duyệt', 'Giảm trừ giáo dục đã duyệt'];
     const rows = annualReport.map((row) => {
       const employee = employees.get(row.employee);
-      return [employee?.code || '', employee?.name || 'Nhân viên', row.paidRuns, row.gross, row.taxable_income, row.income_tax, row.employee_contribution, row.net].map(csvCell).join(',');
+      return [employee?.code || '', employee?.name || 'Nhân viên', row.paidRuns, row.gross, row.taxable_income, row.income_tax, row.employee_contribution, row.net, row.medical_deduction ?? '', row.education_deduction ?? ''].map(csvCell).join(',');
     });
     const blob = new Blob([`\uFEFF${[columns.map(csvCell).join(','), ...rows].join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -125,6 +151,7 @@ export default function PayrollWorkbenchPage() {
     ['payroll.overtime_entry.read', 'payroll.overtime_entry', 'Tăng ca'],
     ['payroll.payroll_adjustment.read', 'payroll.payroll_adjustment', 'Điều chỉnh lương'],
     ['payroll.tax_policy.read', 'payroll.tax_policy', 'Chính sách thuế'],
+    ['payroll.tax_deduction.read', 'payroll.tax_deduction', 'Hồ sơ giảm trừ thuế năm'],
     ['payroll.contribution_policy.read', 'payroll.contribution_policy', 'Chính sách đóng góp'],
     ['payroll.contribution_remittance.read', 'payroll.contribution_remittance', 'Nộp khoản đóng góp'],
     ['hrm.attendance.read', 'hrm.attendance', 'Chấm công'],
@@ -140,8 +167,8 @@ export default function PayrollWorkbenchPage() {
 
     <section className="card card-pad" style={{ marginTop: 16 }}><div className="row wrap"><h2>Đầu vào và chính sách</h2><span className="grow"/><span className="small muted">Hoàn tất và duyệt dữ liệu nguồn trước khi tính kỳ lương.</span></div><div className="row wrap" style={{ marginTop: 8 }}>{inputLinks.map(([, entity, label]) => <a className="btn btn-secondary btn-sm" key={entity} href={listHref(entity)}>{label}</a>)}</div></section>
 
-    {can('payroll.payroll_run.read') && can('payroll.payslip.read') && <section className="card card-pad" style={{ marginTop: 16 }}><div className="row wrap"><div><h2>Tổng hợp lương và thuế theo năm</h2><p className="small muted">Cộng phiếu từ các bảng lương có ngày chi trong năm đã chọn. Số liệu chỉ phản ánh payroll tại doanh nghiệp này; chưa phải tờ khai quyết toán cá nhân vì không bao gồm thu nhập/khấu trừ từ nguồn khác.</p></div><span className="grow"/><label className="field"><span className="label">Năm</span><select className="select" value={reportYear} onChange={(event) => setReportYear(event.target.value)}>{reportYears.map((year) => <option key={year} value={year}>{year}</option>)}</select></label><button className="btn btn-secondary" type="button" disabled={!annualReport.length} onClick={exportAnnualReport}>Tải CSV</button></div>
-      {loading ? <div className="skeleton" data-h="row"/> : annualReport.length ? <div className="table-wrap"><table className="table"><thead><tr><th>Nhân viên</th><th>Số bảng lương đã chi</th><th>Lương gộp</th><th>Thu nhập tính thuế</th><th>Thuế TNCN đã khấu trừ</th><th>Đóng góp nhân viên</th><th>Thực nhận</th></tr></thead><tbody>{annualReport.map((row) => <tr key={row.employee}><td>{employees.get(row.employee) ? recordLabel('hrm.employee', employees.get(row.employee)) : 'Nhân viên'}</td><td>{row.paidRuns}</td><td>{fmtMoney(row.gross)}</td><td>{fmtMoney(row.taxable_income)}</td><td>{fmtMoney(row.income_tax)}</td><td>{fmtMoney(row.employee_contribution)}</td><td><strong>{fmtMoney(row.net)}</strong></td></tr>)}</tbody><tfoot><tr><th>Tổng</th><th>—</th>{['gross', 'taxable_income', 'income_tax', 'employee_contribution', 'net'].map((field) => <th key={field}>{fmtMoney(annualReport.reduce((sum, row) => sum + row[field], 0))}</th>)}</tr></tfoot></table></div> : <div className="empty">Chưa có payroll được chi trả trong năm {reportYear}.</div>}
+    {can('payroll.payroll_run.read') && can('payroll.payslip.read') && <section className="card card-pad" style={{ marginTop: 16 }}><div className="row wrap"><div><h2>Tổng hợp lương và thuế theo năm</h2><p className="small muted">Cộng phiếu từ bảng lương có ngày chi trong năm. Các khoản y tế/giáo dục là hồ sơ đã duyệt, giới hạn theo chính sách thuế năm. Nếu dùng các khoản giảm trừ này để quyết toán, cá nhân phải tự quyết toán; báo cáo không tính nghĩa vụ thuế cuối cùng.</p></div><span className="grow"/><label className="field"><span className="label">Năm</span><select className="select" value={reportYear} onChange={(event) => setReportYear(event.target.value)}>{reportYears.map((year) => <option key={year} value={year}>{year}</option>)}</select></label><button className="btn btn-secondary" type="button" disabled={!annualReport.length} onClick={exportAnnualReport}>Tải CSV</button></div>
+      {loading ? <div className="skeleton" data-h="row"/> : annualReport.length ? <div className="table-wrap"><table className="table"><thead><tr><th>Nhân viên</th><th>Số bảng lương đã chi</th><th>Lương gộp</th><th>Thu nhập tính thuế</th><th>Thuế đã khấu trừ</th><th>Đóng góp nhân viên</th><th>Thực nhận</th><th>Giảm trừ y tế</th><th>Giảm trừ giáo dục</th></tr></thead><tbody>{annualReport.map((row) => <tr key={row.employee}><td>{employees.get(row.employee) ? recordLabel('hrm.employee', employees.get(row.employee)) : 'Nhân viên'}</td><td>{row.paidRuns}</td><td>{fmtMoney(row.gross)}</td><td>{fmtMoney(row.taxable_income)}</td><td>{fmtMoney(row.income_tax)}</td><td>{fmtMoney(row.employee_contribution)}</td><td><strong>{fmtMoney(row.net)}</strong></td><td>{row.medical_deduction === null ? '—' : fmtMoney(row.medical_deduction)}</td><td>{row.education_deduction === null ? '—' : fmtMoney(row.education_deduction)}</td></tr>)}</tbody><tfoot><tr><th>Tổng</th><th>—</th>{['gross', 'taxable_income', 'income_tax', 'employee_contribution', 'net', 'medical_deduction', 'education_deduction'].map((field) => <th key={field}>{annualReport.some((row) => row[field] === null) ? '—' : fmtMoney(annualReport.reduce((sum, row) => sum + (Number(row[field]) || 0), 0))}</th>)}</tr></tfoot></table></div> : <div className="empty">Chưa có payroll hoặc hồ sơ giảm trừ đã duyệt trong năm {reportYear}.</div>}
     </section>}
 
     {loading ? <div className="skeleton" data-h="row"/> : !runs.length ? <div className="card card-pad empty" style={{ marginTop: 16 }}>Chưa có kỳ lương. Mở kỳ mới sau khi xác nhận kỳ chấm công và chính sách lương.</div> : <div className="layout-split" style={{ marginTop: 16 }}>

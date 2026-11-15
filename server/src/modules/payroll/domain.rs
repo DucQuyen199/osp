@@ -11,7 +11,8 @@ mod policies;
 pub use lifecycle::{validate_action, validate_remove, validate_update};
 use policies::{
     valid_period, validate_adjustment, validate_contribution_policy,
-    validate_contribution_remittance, validate_overtime_entry, validate_tax_policy,
+    validate_contribution_remittance, validate_overtime_entry, validate_tax_deduction,
+    validate_tax_policy,
 };
 
 fn decimal_field(document: &Value, field: &str) -> Option<Decimal> {
@@ -55,6 +56,9 @@ fn validate_run_weekdays(document: &Value, errors: &mut Vec<String>) {
 pub fn validate(entity: &str, document: &Value) -> Vec<String> {
     if entity == "tax_policy" {
         return validate_tax_policy(document);
+    }
+    if entity == "tax_deduction" {
+        return validate_tax_deduction(document, false, false);
     }
     if entity == "contribution_policy" {
         return validate_contribution_policy(document);

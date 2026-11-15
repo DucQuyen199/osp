@@ -2,6 +2,22 @@
 use super::*;
 pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<String> {
     match entity {
+        "tax_deduction"
+            if current.get("status").and_then(Value::as_str) == Some("approved")
+                && patch.as_object().is_none_or(|patch| !patch.is_empty()) =>
+        {
+            vec!["Approved tax deduction records are retained as annual tax evidence".into()]
+        }
+        "tax_deduction"
+            if current.get("status").and_then(Value::as_str) == Some("submitted")
+                && patch.as_object().is_some_and(|patch| {
+                    patch
+                        .keys()
+                        .any(|key| !matches!(key.as_str(), "approved_amount" | "review_note"))
+                }) =>
+        {
+            vec!["Submitted tax deduction details are locked; reviewer may only set approved amount and note".into()]
+        }
         "tax_policy"
             if current.get("status").and_then(Value::as_str) == Some("approved")
                 && [
@@ -10,6 +26,9 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
                     "effective_to",
                     "personal_allowance",
                     "dependent_allowance",
+                    "annual_medical_deduction_cap",
+                    "annual_education_deduction_cap",
+                    "annual_deductions_require_resident",
                     "resident_brackets",
                     "nonresident_rate",
                     "rounding_unit",
@@ -147,6 +166,16 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
 
 pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
     match entity {
+        "tax_deduction"
+            if matches!(
+                document.get("status").and_then(Value::as_str),
+                Some("submitted" | "approved")
+            ) =>
+        {
+            vec![
+                "Submitted or approved tax deduction records are retained as audit evidence".into(),
+            ]
+        }
         "tax_policy" if document.get("status").and_then(Value::as_str) == Some("approved") => {
             vec!["Approved payroll tax policies are retained as payroll audit history".into()]
         }
@@ -191,7 +220,20 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
-    if entity == "tax_policy" && action == "approved" {
+    if entity == "tax_deduction" && action == "submitted" {
+        return validate_tax_deduction(document, true, false);
+    } else if entity == "tax_deduction" && action == "approved" {
+        return validate_tax_deduction(document, true, true);
+    } else if entity == "tax_deduction" && action == "rejected" {
+        if document
+            .get("review_note")
+            .and_then(Value::as_str)
+            .is_none_or(|note| note.trim().is_empty())
+        {
+            return vec!["Reviewer must record a rejection note".into()];
+        }
+        return Vec::new();
+    } else if entity == "tax_policy" && action == "approved" {
         return validate_tax_policy(document);
     } else if entity == "contribution_policy" && action == "approved" {
         return validate_contribution_policy(document);

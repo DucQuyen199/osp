@@ -9,6 +9,23 @@ pub(super) async fn validate_policy_records(
     document: &Value,
 ) -> R<Option<Vec<String>>> {
     let mut errors = Vec::new();
+    if entity == "tax_deduction" && action == "created" {
+        if document
+            .get("status")
+            .and_then(Value::as_str)
+            .is_some_and(|status| status != "draft")
+        {
+            errors.push("Tax deduction claims must be created as drafts and submitted through the review workflow".into());
+        }
+        if document
+            .get("approved_amount")
+            .and_then(money::decimal)
+            .is_some_and(|amount| amount > Decimal::ZERO)
+        {
+            errors.push("Approved deduction amounts can only be entered by a separate reviewer after submission".into());
+        }
+        return Ok(Some(errors));
+    }
     if entity == "contribution_policy" && action == "approved" {
         let Some(policy_id) = document
             .get("id")
@@ -310,6 +327,151 @@ pub(super) async fn validate_policy_records(
         };
         if account_kind.as_deref() != Some("liability") {
             errors.push("Payroll tax account must be a tenant-owned liability account".into());
+        }
+        return Ok(Some(errors));
+    }
+
+    if entity == "tax_deduction" && action == "approved" {
+        let Some(claim_id) = document
+            .get("id")
+            .and_then(Value::as_str)
+            .and_then(|id| Uuid::parse_str(id).ok())
+        else {
+            return Ok(Some(vec![
+                "Tax deduction claim requires a valid record id".into(),
+            ]));
+        };
+        let Some(employee_id) = document
+            .get("employee")
+            .and_then(Value::as_str)
+            .and_then(|id| Uuid::parse_str(id).ok())
+        else {
+            return Ok(Some(vec![
+                "Tax deduction claim requires a valid employee".into(),
+            ]));
+        };
+        let Some(year) = document
+            .get("tax_year")
+            .and_then(Value::as_str)
+            .and_then(|year| year.parse::<i32>().ok())
+        else {
+            return Ok(Some(vec![
+                "Tax deduction claim requires a valid tax year".into(),
+            ]));
+        };
+        let category = document
+            .get("category")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let cap_field = match category {
+            "medical" => "annual_medical_deduction_cap",
+            "education" => "annual_education_deduction_cap",
+            _ => return Ok(Some(vec!["Tax deduction category is invalid".into()])),
+        };
+        let year_start = chrono::NaiveDate::from_ymd_opt(year, 1, 1);
+        let year_end = chrono::NaiveDate::from_ymd_opt(year, 12, 31);
+        let (Some(year_start), Some(year_end)) = (year_start, year_end) else {
+            return Ok(Some(vec![
+                "Tax deduction year is outside the supported range".into(),
+            ]));
+        };
+        tx.query_opt(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            &[&format!(
+                "payroll-tax-deduction:{}:{}:{}",
+                tenant.id, employee_id, year
+            )],
+        )
+        .await?;
+
+        let policy = tx
+            .query_opt(
+                &format!(
+                    "SELECT min({cap_field})::text, max({cap_field})::text, count(*), bool_and(COALESCE(annual_deductions_require_resident, false)), bool_or(COALESCE(annual_deductions_require_resident, false)) FROM payroll__tax_policy WHERE tenant_id = $1 AND status = 'approved' AND effective_from <= $3 AND COALESCE(effective_to, '9999-12-31'::date) >= $2"
+                ),
+                &[&tenant.id, &year_start, &year_end],
+            )
+            .await?;
+        let Some(policy) = policy else {
+            return Ok(Some(vec!["Approve an effective tax policy with an annual deduction cap before approving claims".into()]));
+        };
+        let min_cap: Option<String> = policy.get(0);
+        let max_cap: Option<String> = policy.get(1);
+        let policy_count: i64 = policy.get(2);
+        let require_resident_and = policy.get::<_, Option<bool>>(3).unwrap_or(false);
+        let require_resident_or = policy.get::<_, Option<bool>>(4).unwrap_or(false);
+        let Some(min_cap) = min_cap.and_then(|value| money::decimal_str(&value)) else {
+            return Ok(Some(vec![
+                "Tax deduction cap is not configured in an approved tax policy".into(),
+            ]));
+        };
+        let Some(max_cap) = max_cap.and_then(|value| money::decimal_str(&value)) else {
+            return Ok(Some(vec![
+                "Tax deduction cap is not configured in an approved tax policy".into(),
+            ]));
+        };
+        if policy_count == 0
+            || min_cap != max_cap
+            || min_cap <= Decimal::ZERO
+            || require_resident_and != require_resident_or
+        {
+            return Ok(Some(vec!["Approved tax policies for this year must configure one consistent positive annual cap for this deduction category".into()]));
+        }
+        if require_resident_and {
+            let residency = tx
+                .query_opt(
+                    "SELECT tax_residency FROM hrm__employee WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                    &[&tenant.id, &employee_id],
+                )
+                .await?
+                .map(|row| row.get::<_, Option<String>>(0))
+                .flatten();
+            if residency.as_deref().unwrap_or("resident") != "resident" {
+                errors.push("Annual medical and education deduction claims are restricted to resident taxpayers under the configured tax policy".into());
+            }
+        }
+
+        let receipt_number = document
+            .get("receipt_number")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .trim();
+        let provider_name = document
+            .get("provider_name")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .trim();
+        if tx
+            .query_opt(
+                "SELECT 1 FROM payroll__tax_deduction WHERE tenant_id = $1 AND id <> $2 AND employee = $3 AND tax_year = $4 AND lower(btrim(receipt_number)) = lower($5) AND lower(btrim(provider_name)) = lower($6) AND status = 'approved' LIMIT 1 FOR UPDATE",
+                &[&tenant.id, &claim_id, &employee_id, &year.to_string(), &receipt_number, &provider_name],
+            )
+            .await?
+            .is_some()
+        {
+            errors.push("This provider receipt has already been approved for the employee and tax year".into());
+        }
+
+        let approved_amount = document
+            .get("approved_amount")
+            .and_then(money::decimal)
+            .unwrap_or(Decimal::ZERO);
+        let current = tx
+            .query_opt(
+                "SELECT COALESCE(sum(approved_amount::numeric), 0)::text FROM payroll__tax_deduction WHERE tenant_id = $1 AND employee = $2 AND tax_year = $3 AND category = $4 AND status = 'approved' AND id <> $5",
+                &[&tenant.id, &employee_id, &year.to_string(), &category, &claim_id],
+            )
+            .await?;
+        let current_amount = current
+            .as_ref()
+            .and_then(|row| row.get::<_, Option<String>>(0))
+            .and_then(|value| money::decimal_str(&value))
+            .unwrap_or(Decimal::ZERO);
+        if current_amount
+            .checked_add(approved_amount)
+            .is_none_or(|sum| sum > min_cap)
+        {
+            errors.push("Approved deductions for this employee exceed the annual category cap; reduce this claim to the remaining eligible amount".into());
         }
         return Ok(Some(errors));
     }
