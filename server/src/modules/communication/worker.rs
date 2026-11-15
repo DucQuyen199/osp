@@ -1,13 +1,20 @@
 //! Tenant-scoped notification delivery worker.
 mod smtp;
 
-use crate::{db::Tx, error::R, kernel::Kernel};
+use crate::{
+    db::Tx,
+    error::{ApiError, R},
+    kernel::Kernel,
+};
+use futures::{StreamExt, stream};
 use serde_json::json;
 use std::{env, time::Duration};
 use uuid::Uuid;
 
 const BATCH_SIZE: i64 = 20;
 const MAX_ATTEMPTS: i64 = 8;
+const DEFAULT_DELIVERY_CONCURRENCY: usize = 4;
+const MAX_DELIVERY_CONCURRENCY: usize = 64;
 
 #[derive(Clone)]
 struct Provider {
@@ -35,6 +42,61 @@ struct Message {
 struct Failure {
     retryable: bool,
     message: &'static str,
+}
+
+#[derive(Clone, Copy)]
+enum DeliveryTarget<'a> {
+    Smtp(&'a smtp::SmtpSender),
+    Provider(&'a Provider),
+}
+
+fn delivery_concurrency() -> R<usize> {
+    let Ok(value) = env::var("OSP_COMM_CONCURRENCY") else {
+        return Ok(DEFAULT_DELIVERY_CONCURRENCY);
+    };
+    value
+        .parse::<usize>()
+        .ok()
+        .filter(|value| (1..=MAX_DELIVERY_CONCURRENCY).contains(value))
+        .ok_or_else(|| {
+            ApiError::new(
+                500,
+                "COMM_CONFIG",
+                format!("OSP_COMM_CONCURRENCY must be between 1 and {MAX_DELIVERY_CONCURRENCY}"),
+            )
+        })
+}
+
+async fn process_batch(
+    kernel: &Kernel,
+    messages: Vec<Message>,
+    target: DeliveryTarget<'_>,
+    authentication_mail: bool,
+    concurrency: usize,
+) -> u32 {
+    let count = messages.len() as u32;
+    stream::iter(messages)
+        .for_each_concurrent(concurrency, |message| async move {
+            let result = match target {
+                DeliveryTarget::Smtp(sender) => deliver_smtp(kernel, sender, &message).await,
+                DeliveryTarget::Provider(provider) => deliver(kernel, provider, &message).await,
+            };
+            let result = if authentication_mail {
+                process_auth_delivery(kernel, &message, result).await
+            } else {
+                process_delivery(kernel, &message, result).await
+            };
+            if let Err(error) = result {
+                tracing::error!(
+                    tenant_id = %message.tenant_id,
+                    message_id = %message.id,
+                    error = %error,
+                    "communication delivery state could not be saved"
+                );
+            }
+        })
+        .await;
+    count
 }
 
 fn providers() -> Vec<Provider> {
@@ -76,6 +138,7 @@ pub async fn run_once(kernel: &Kernel) -> R<u32> {
     if providers.is_empty() && smtp.is_none() {
         return Ok(0);
     }
+    let concurrency = delivery_concurrency()?;
     let tenant_ids: Vec<String> = {
         let conn = kernel.pool.get().await?;
         conn.query(
@@ -100,46 +163,54 @@ pub async fn run_once(kernel: &Kernel) -> R<u32> {
             continue;
         }
         if let Some(smtp) = &smtp {
-            for message in claim_auth_mail(kernel, &tenant_id).await? {
-                process_auth_delivery(kernel, &message, deliver_smtp(kernel, smtp, &message).await)
-                    .await?;
-                processed += 1;
-            }
+            processed += process_batch(
+                kernel,
+                claim_auth_mail(kernel, &tenant_id).await?,
+                DeliveryTarget::Smtp(smtp),
+                true,
+                concurrency,
+            )
+            .await;
         } else {
             for provider in providers
                 .iter()
                 .filter(|provider| provider.channel == "email")
             {
-                for message in claim_auth_mail(kernel, &tenant_id).await? {
-                    process_auth_delivery(
-                        kernel,
-                        &message,
-                        deliver(kernel, provider, &message).await,
-                    )
-                    .await?;
-                    processed += 1;
-                }
+                processed += process_batch(
+                    kernel,
+                    claim_auth_mail(kernel, &tenant_id).await?,
+                    DeliveryTarget::Provider(provider),
+                    true,
+                    concurrency,
+                )
+                .await;
             }
         }
         if !tenant.has_module("communication") {
             continue;
         }
         if let Some(smtp) = &smtp {
-            for message in claim(kernel, &tenant_id, "email").await? {
-                process_delivery(kernel, &message, deliver_smtp(kernel, smtp, &message).await)
-                    .await?;
-                processed += 1;
-            }
+            processed += process_batch(
+                kernel,
+                claim(kernel, &tenant_id, "email").await?,
+                DeliveryTarget::Smtp(smtp),
+                false,
+                concurrency,
+            )
+            .await;
         }
         for provider in providers
             .iter()
             .filter(|provider| !(smtp.is_some() && provider.channel == "email"))
         {
-            for message in claim(kernel, &tenant_id, provider.channel).await? {
-                process_delivery(kernel, &message, deliver(kernel, provider, &message).await)
-                    .await?;
-                processed += 1;
-            }
+            processed += process_batch(
+                kernel,
+                claim(kernel, &tenant_id, provider.channel).await?,
+                DeliveryTarget::Provider(provider),
+                false,
+                concurrency,
+            )
+            .await;
         }
     }
     Ok(processed)
