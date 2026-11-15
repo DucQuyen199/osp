@@ -98,7 +98,7 @@ impl Kernel {
         self.authorize(tenant, actor, "logistics.shipment.read")?;
         let mut conn = self.pool.get().await?;
         let tx = Tx::begin(&mut conn, &tenant.id, false).await?;
-        let items = tx
+        let mut items = tx
             .query_json(
                 "SELECT jsonb_build_object( \
                    'id', shipment.id, 'status', CASE WHEN shipment.status = 'delivered' AND NULLIF(btrim(shipment.short_delivery_reason), '') IS NOT NULL THEN 'partial' ELSE shipment.status END, 'source', shipment.source, \
@@ -131,6 +131,15 @@ impl Kernel {
                 &[&tenant.id],
             )
             .await?;
+        for item in &mut items {
+            if item["status"] == "partial"
+                && let Some(remaining) =
+                    super::domain::remaining_lines(&item["lines"], &item["deliveredLines"])
+                && let Some(fields) = item.as_object_mut()
+            {
+                fields.insert("remainingLines".into(), remaining);
+            }
+        }
         let created = items
             .iter()
             .filter(|item| item["status"] == "created")

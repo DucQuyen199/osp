@@ -146,6 +146,14 @@ export default function LogisticsDeliveryBoardPage() {
       <span className={`badge ${shipment.status === 'failed' ? 'danger' : shipment.status === 'dispatched' || shipment.status === 'partial' ? 'warning' : 'plain'}`}>{shipment.status === 'partial' ? 'Giao thiếu · cần giao bù' : statusLabel(shipment.status)}</span>
     </header>
     <div className="delivery-route"><span>{shipment.origin || 'Kho'}</span><span aria-hidden="true">→</span><strong>{shipment.destination || 'Chưa khai báo điểm giao'}</strong></div>
+    {shipment.status === 'partial' && <div className="alert warning delivery-alert">
+      <strong>Lý do giao thiếu:</strong> {shipment.shortDeliveryReason || 'Chưa ghi lý do'}
+      <div className="small" style={{ marginTop: 6 }}><strong>Đã nhận thực tế:</strong> {(shipment.deliveredLines || []).map((line, index) => {
+        const sourceLine = (shipment.lines || []).find((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && Math.abs(Number(item.price || 0) - Number(line.price || 0)) <= .005);
+        return <span key={`${line.product}-${index}`}> {sourceLine?.productName || line.name || line.product} {fmtNumber(Number(line.qty || 0), { maximumFractionDigits: 6 })} {line.uom_name || ''}{index < shipment.deliveredLines.length - 1 ? ' ·' : ''}</span>;
+      })}</div>
+      <div className="small"><strong>Còn giao bù:</strong> {(shipment.remainingLines || []).map((line, index) => <span key={`${line.product}-${index}`}> {(shipment.lines || []).find((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && Math.abs(Number(item.price || 0) - Number(line.price || 0)) <= .005)?.productName || line.name || line.product} {fmtNumber(Number(line.qty || 0), { maximumFractionDigits: 6 })} {line.uom_name || ''}{index < shipment.remainingLines.length - 1 ? ' ·' : ''}</span>)}</div>
+    </div>}
     <div className="delivery-meta small muted">
       <span>{shipment.driver || 'Chưa phân công tài xế'}</span>
       <span>{shipment.vehicle || 'Chưa phân công xe'}</span>
