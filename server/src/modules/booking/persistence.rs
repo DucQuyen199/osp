@@ -13,6 +13,27 @@ pub async fn validate_persistence(
     if entity != "booking" || !matches!(action, "created" | "updated") {
         return Ok(Vec::new());
     }
+    if tenant.has_module("clinic") {
+        let Some(party) = document
+            .get("party")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+        else {
+            return Ok(vec![
+                "A clinic appointment must be linked to a registered patient".into(),
+            ]);
+        };
+        if tx
+            .query_opt(
+                "SELECT id FROM clinic__patient WHERE tenant_id = $1 AND party = $2 LIMIT 1 FOR SHARE",
+                &[&tenant.id, &party],
+            )
+            .await?
+            .is_none()
+        {
+            return Ok(vec!["Clinic appointments require a patient record in this tenant".into()]);
+        }
+    }
     let Some(resource) = document
         .get("resource")
         .and_then(Value::as_str)
