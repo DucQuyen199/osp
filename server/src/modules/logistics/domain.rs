@@ -84,6 +84,41 @@ pub(super) fn normalize_delivered_lines(shipped: &Value, delivered: &Value) -> O
     Some(Value::Array(normalized))
 }
 
+pub(super) fn remaining_lines(shipped: &Value, delivered: &Value) -> Option<Value> {
+    let mut delivered = shipment_quantities(&normalize_delivered_lines(shipped, delivered)?)?;
+    let mut remaining = Vec::new();
+    for line in shipped.as_array()? {
+        if matches!(
+            line.get("kind").and_then(Value::as_str),
+            Some("service" | "digital")
+        ) {
+            continue;
+        }
+        let product = line.get("product").and_then(Value::as_str)?;
+        let price = number(line, "price")?.round_dp(2);
+        let shipped_qty = number(line, "qty")?;
+        let unit = line.get("uom").and_then(Value::as_str).map(str::to_owned);
+        let key = (product.to_owned(), price, unit);
+        let delivered_qty = delivered.entry(key).or_default();
+        let remaining_qty = shipped_qty.checked_sub((*delivered_qty).min(shipped_qty))?;
+        *delivered_qty -= (*delivered_qty).min(shipped_qty);
+        if remaining_qty <= Decimal::new(1, 6) {
+            continue;
+        }
+        let mut remaining_line = line.clone();
+        remaining_line["qty"] = money::json_number(remaining_qty)?;
+        if let Some(base_qty) = line.get("base_qty").and_then(money::decimal) {
+            remaining_line["base_qty"] = money::json_number(
+                base_qty
+                    .checked_mul(remaining_qty)?
+                    .checked_div(shipped_qty)?,
+            )?;
+        }
+        remaining.push(remaining_line);
+    }
+    (!remaining.is_empty()).then_some(Value::Array(remaining))
+}
+
 pub fn validate(entity: &str, document: &Value) -> Vec<String> {
     let mut errors = Vec::new();
     match entity {
@@ -282,6 +317,14 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
                         .is_none_or(|reason| !(5..=500).contains(&reason.trim().chars().count()))
                 {
                     errors.push("Giao thiếu cần lý do từ 5 đến 500 ký tự".into());
+                }
+                if !partial
+                    && document
+                        .get("short_delivery_reason")
+                        .and_then(Value::as_str)
+                        .is_some_and(|reason| !reason.trim().is_empty())
+                {
+                    errors.push("Không ghi lý do giao thiếu khi đã giao đủ số lượng".into());
                 }
             }
             _ => {

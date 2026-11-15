@@ -6,13 +6,14 @@ import { recordHref } from './lib/routes.js';
 
 const LANES = [
   ['failed', 'Giao thất bại · cần xử lý'],
+  ['partial', 'Giao thiếu · cần giao bù'],
   ['created', 'Chờ xuất phát'],
   ['dispatched', 'Đang giao'],
 ];
 
 export default function LogisticsDeliveryBoardPage() {
   const [items, setItems] = useState([]);
-  const [counts, setCounts] = useState({ created: 0, dispatched: 0, failed: 0 });
+  const [counts, setCounts] = useState({ created: 0, dispatched: 0, failed: 0, partial: 0 });
   const [truncated, setTruncated] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,7 +26,7 @@ export default function LogisticsDeliveryBoardPage() {
     try {
       const result = await api(tenantPath('/reports/logistics/delivery-board'));
       setItems(result.items || []);
-      setCounts(result.counts || { created: 0, dispatched: 0, failed: 0 });
+      setCounts(result.counts || { created: 0, dispatched: 0, failed: 0, partial: 0 });
       setTruncated(Boolean(result.truncated));
       setLastUpdated(new Date().toISOString());
     } catch (reason) {
@@ -142,7 +143,7 @@ export default function LogisticsDeliveryBoardPage() {
         {can('logistics.shipment.read') ? <a href={recordHref('logistics.shipment', shipment.id)}><strong>{shipment.carrier || 'Vận đơn'}{shipment.trackingNumber ? ` · ${shipment.trackingNumber}` : ''}</strong></a> : <strong>{shipment.carrier || 'Vận đơn'}{shipment.trackingNumber ? ` · ${shipment.trackingNumber}` : ''}</strong>}
         <div className="small muted">{shipment.party || 'Khách chưa xác định'} · {fmtAgo(shipment.createdAt)}</div>
       </div>
-      <span className={`badge ${shipment.status === 'failed' ? 'danger' : shipment.status === 'dispatched' ? 'warning' : 'plain'}`}>{statusLabel(shipment.status)}</span>
+      <span className={`badge ${shipment.status === 'failed' ? 'danger' : shipment.status === 'dispatched' || shipment.status === 'partial' ? 'warning' : 'plain'}`}>{shipment.status === 'partial' ? 'Giao thiếu · cần giao bù' : statusLabel(shipment.status)}</span>
     </header>
     <div className="delivery-route"><span>{shipment.origin || 'Kho'}</span><span aria-hidden="true">→</span><strong>{shipment.destination || 'Chưa khai báo điểm giao'}</strong></div>
     <div className="delivery-meta small muted">
@@ -170,14 +171,14 @@ export default function LogisticsDeliveryBoardPage() {
       <span className="grow" />
       {shipment.status === 'created' && can('logistics.shipment.dispatched') && <button className="btn btn-primary" type="button" disabled={Boolean(busy) || !shipment.vehicleId || !shipment.driverId} title={!shipment.vehicleId || !shipment.driverId ? 'Mở vận đơn để phân công xe và tài xế trước khi xuất phát' : ''} onClick={() => transition(shipment, 'dispatched')}>{busy === `${shipment.id}:dispatched` ? 'Đang cập nhật…' : 'Xác nhận xuất phát'}</button>}
       {shipment.status === 'dispatched' && can('logistics.shipment.delivered') && <button className="btn btn-primary" type="button" disabled={Boolean(busy) || !(deliveryProof[shipment.id]?.receivedBy?.trim() || deliveryProof[shipment.id]?.evidence?.trim())} onClick={() => confirmDelivered(shipment)}>{busy === `${shipment.id}:delivered` ? 'Đang cập nhật…' : 'Xác nhận đã giao'}</button>}
-      {shipment.status === 'failed' && can('logistics.shipment.create') && <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => redeliver(shipment)}>{busy === `${shipment.id}:redeliver` ? 'Đang tạo…' : 'Tạo vận đơn giao lại'}</button>}
+      {(shipment.status === 'failed' || shipment.status === 'partial') && can('logistics.shipment.create') && <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => redeliver(shipment)}>{busy === `${shipment.id}:redeliver` ? 'Đang tạo…' : shipment.status === 'partial' ? 'Tạo vận đơn giao bù' : 'Tạo vận đơn giao lại'}</button>}
       {shipment.status === 'failed' && can('logistics.shipment.read') && <a className="btn btn-secondary" href={recordHref('logistics.shipment', shipment.id)}>Xem lịch sử</a>}
     </footer>
   </article>;
 
   return <div className="page">
     <div className="page-head"><div><h1>Điều phối giao hàng</h1><p className="sub">Theo dõi vận đơn cần xử lý, chuyến đang giao và giao thất bại. Xác nhận giao thành công sẽ chạy luồng xuất kho và cập nhật tiến độ đơn bán.</p></div><button className="btn btn-secondary" type="button" disabled={loading} onClick={() => load()}>{loading ? 'Đang tải…' : 'Làm mới'}</button></div>
-    <div className="row wrap delivery-summary"><span className="badge plain">Chờ xuất phát: {counts.created}</span><span className="badge warning">Đang giao: {counts.dispatched}</span><span className="badge danger">Cần xử lý: {counts.failed}</span>{lastUpdated && <span className="small muted">Cập nhật lúc {fmtDateTime(lastUpdated)}</span>}</div>
+    <div className="row wrap delivery-summary"><span className="badge plain">Chờ xuất phát: {counts.created}</span><span className="badge warning">Đang giao: {counts.dispatched}</span><span className="badge danger">Giao thất bại: {counts.failed}</span><span className="badge warning">Giao thiếu: {counts.partial}</span>{lastUpdated && <span className="small muted">Cập nhật lúc {fmtDateTime(lastUpdated)}</span>}</div>
     {error && <div className="alert danger" role="alert">{error}</div>}
     {truncated && <div className="alert warning" role="status">Đang hiển thị tối đa 500 vận đơn đang mở. Xử lý vận đơn để xem các mục cũ hơn.</div>}
     {loading && !lastUpdated ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <div className="delivery-board">

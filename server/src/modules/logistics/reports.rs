@@ -101,7 +101,7 @@ impl Kernel {
         let items = tx
             .query_json(
                 "SELECT jsonb_build_object( \
-                   'id', shipment.id, 'status', shipment.status, 'source', shipment.source, \
+                   'id', shipment.id, 'status', CASE WHEN shipment.status = 'delivered' AND NULLIF(btrim(shipment.short_delivery_reason), '') IS NOT NULL THEN 'partial' ELSE shipment.status END, 'source', shipment.source, \
                    'sourceId', shipment.source_id, 'partyId', shipment.party, \
                    'party', party.name, 'warehouseId', shipment.warehouse, \
                    'lines', COALESCE((SELECT jsonb_agg(line.value || jsonb_build_object('productName', product.name)) \
@@ -125,8 +125,8 @@ impl Kernel {
                  LEFT JOIN LATERAL (SELECT status, occurred_at, location FROM logistics__tracking_event event \
                    WHERE event.tenant_id = shipment.tenant_id AND event.shipment = shipment.id \
                    ORDER BY event.occurred_at DESC, event.id DESC LIMIT 1) latest ON true \
-                 WHERE shipment.tenant_id = $1 AND shipment.status IN ('created', 'dispatched', 'failed') \
-                 ORDER BY CASE shipment.status WHEN 'failed' THEN 0 WHEN 'created' THEN 1 ELSE 2 END, shipment.created_at, shipment.id \
+                 WHERE shipment.tenant_id = $1 AND (shipment.status IN ('created', 'dispatched', 'failed') OR (shipment.status = 'delivered' AND NULLIF(btrim(shipment.short_delivery_reason), '') IS NOT NULL)) \
+                 ORDER BY CASE WHEN shipment.status = 'failed' THEN 0 WHEN shipment.status = 'delivered' THEN 1 WHEN shipment.status = 'created' THEN 2 ELSE 3 END, shipment.created_at, shipment.id \
                  LIMIT 500",
                 &[&tenant.id],
             )
@@ -143,11 +143,15 @@ impl Kernel {
             .iter()
             .filter(|item| item["status"] == "failed")
             .count();
+        let partial = items
+            .iter()
+            .filter(|item| item["status"] == "partial")
+            .count();
         let truncated = items.len() == 500;
         Ok(json!({
             "items": items,
-            "itemCount": created + dispatched + failed,
-            "counts": { "created": created, "dispatched": dispatched, "failed": failed },
+            "itemCount": created + dispatched + failed + partial,
+            "counts": { "created": created, "dispatched": dispatched, "failed": failed, "partial": partial },
             "truncated": truncated
         }))
     }
@@ -185,18 +189,30 @@ impl Kernel {
         .await?;
         let failed = tx
             .query_opt(
-                "SELECT source, source_id, party, warehouse, origin, destination, lines FROM logistics__shipment WHERE tenant_id = $1 AND id = $2 AND status = 'failed' FOR UPDATE",
+                "SELECT source, source_id, party, warehouse, origin, destination, lines, COALESCE(delivered_lines, lines), status, short_delivery_reason FROM logistics__shipment WHERE tenant_id = $1 AND id = $2 AND (status = 'failed' OR (status = 'delivered' AND NULLIF(btrim(short_delivery_reason), '') IS NOT NULL)) FOR UPDATE",
                 &[&tenant.id, &failed_id],
             )
             .await?
-            .ok_or_else(|| ApiError::validation("logistics.shipment", vec!["Only a failed shipment can be retried".into()]))?;
+            .ok_or_else(|| ApiError::validation("logistics.shipment", vec!["Only a failed or short delivered shipment can be retried".into()]))?;
         let source: Option<String> = failed.get(0);
         let source_id: Option<String> = failed.get(1);
         let party: Option<uuid::Uuid> = failed.get(2);
         let warehouse: Option<uuid::Uuid> = failed.get(3);
         let origin: Option<String> = failed.get(4);
         let destination: Option<String> = failed.get(5);
-        let lines: Value = failed.get(6);
+        let shipped_lines: Value = failed.get(6);
+        let delivered_lines: Value = failed.get(7);
+        let status: String = failed.get(8);
+        let lines = if status == "delivered" {
+            super::domain::remaining_lines(&shipped_lines, &delivered_lines).ok_or_else(|| {
+                ApiError::validation(
+                    "logistics.shipment",
+                    vec!["This shipment has no remaining item quantity to redeliver".into()],
+                )
+            })?
+        } else {
+            shipped_lines
+        };
         if lines.as_array().is_none_or(Vec::is_empty) {
             return Err(ApiError::validation(
                 "logistics.shipment",
@@ -235,7 +251,7 @@ impl Kernel {
         }
         if let Some(existing) = tx
             .query_opt(
-                "SELECT id FROM logistics__shipment WHERE tenant_id = $1 AND source IS NOT DISTINCT FROM $2 AND source_id IS NOT DISTINCT FROM $3 AND status = 'created' AND party IS NOT DISTINCT FROM $4 AND warehouse IS NOT DISTINCT FROM $5 AND origin IS NOT DISTINCT FROM $6 AND destination IS NOT DISTINCT FROM $7 AND lines = $8::jsonb ORDER BY created_at, id LIMIT 1 FOR UPDATE",
+                "SELECT id, status FROM logistics__shipment WHERE tenant_id = $1 AND source IS NOT DISTINCT FROM $2 AND source_id IS NOT DISTINCT FROM $3 AND status IN ('created', 'dispatched') AND party IS NOT DISTINCT FROM $4 AND warehouse IS NOT DISTINCT FROM $5 AND origin IS NOT DISTINCT FROM $6 AND destination IS NOT DISTINCT FROM $7 AND lines = $8::jsonb ORDER BY created_at, id LIMIT 1 FOR UPDATE",
                 &[
                     &tenant.id,
                     &source,
@@ -250,8 +266,9 @@ impl Kernel {
             .await?
         {
             let id: uuid::Uuid = existing.get(0);
+            let status: String = existing.get(1);
             tx.commit().await?;
-            return Ok(json!({"id": id, "status": "created", "existing": true}));
+            return Ok(json!({"id": id, "status": status, "existing": true}));
         }
         let mut data = serde_json::Map::new();
         data.insert("source".into(), json!(source));
