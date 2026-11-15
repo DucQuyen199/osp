@@ -16260,6 +16260,11 @@
             "readOnly": true,
             "type": "string"
           },
+          "invoice": {
+            "description": "Tham chiếu tới accounting.invoice",
+            "format": "uuid",
+            "type": "string"
+          },
           "lines": {
             "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
           },
@@ -16308,6 +16313,11 @@
         "additionalProperties": false,
         "description": "Phiếu trả hàng bán (dữ liệu gửi lên)",
         "properties": {
+          "invoice": {
+            "description": "Tham chiếu tới accounting.invoice",
+            "format": "uuid",
+            "type": "string"
+          },
           "lines": {
             "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
           },

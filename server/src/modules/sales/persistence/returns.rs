@@ -13,7 +13,17 @@ pub(super) async fn validate(
     action: &str,
     document: &Value,
 ) -> R<Vec<String>> {
-    if entity != "sales_return" || !matches!(action, "submitted" | "approved" | "received") {
+    if entity != "sales_return" {
+        return Ok(Vec::new());
+    }
+    let assigning_invoice = action == "updated"
+        && document
+            .get("invoice")
+            .is_some_and(|invoice| !invoice.is_null());
+    if action == "updated" && !assigning_invoice {
+        return Ok(Vec::new());
+    }
+    if !assigning_invoice && !matches!(action, "submitted" | "approved" | "received") {
         return Ok(Vec::new());
     }
     let Some(order_id) = document
@@ -44,6 +54,44 @@ pub(super) async fn validate(
         "confirmed" | "partially_delivered" | "delivered"
     ) {
         errors.push("Chỉ được trả hàng từ đơn bán đã xác nhận".into());
+    }
+    let selected_invoice = match document.get("invoice").filter(|invoice| !invoice.is_null()) {
+        Some(invoice) => match invoice.as_str().and_then(|id| Uuid::parse_str(id).ok()) {
+            Some(invoice_id) => Some(invoice_id),
+            None => {
+                errors.push("Mã hóa đơn gốc của phiếu trả không hợp lệ".into());
+                None
+            }
+        },
+        None => None,
+    };
+    if let Some(invoice_id) = selected_invoice {
+        if tx
+            .query_opt(
+                "SELECT id FROM accounting__invoice WHERE tenant_id = $1 AND id = $2 AND source = 'sales_order' AND source_id = $3 AND status IN ('posted', 'partially_paid', 'partially_settled', 'paid', 'settled') FOR SHARE",
+                &[&tenant.id, &invoice_id, &order_id.to_string()],
+            )
+            .await?
+            .is_none()
+        {
+            errors.push("Hóa đơn gốc phải đã ghi sổ và thuộc đúng đơn bán nguồn".into());
+        }
+    } else {
+        let source_invoices = tx
+            .query(
+                "SELECT id FROM accounting__invoice WHERE tenant_id = $1 AND source = 'sales_order' AND source_id = $2 AND status IN ('posted', 'partially_paid', 'partially_settled', 'paid', 'settled') ORDER BY created_at, id LIMIT 2 FOR SHARE",
+                &[&tenant.id, &order_id.to_string()],
+            )
+            .await?;
+        match source_invoices.len() {
+            0 => errors.push(
+                "Cần có hóa đơn kế toán đã ghi sổ cho đơn bán trước khi gửi duyệt phiếu trả".into(),
+            ),
+            1 => {}
+            _ => errors.push(
+                "Đơn bán có nhiều hóa đơn đã ghi sổ; hãy chọn hóa đơn gốc cho phiếu trả".into(),
+            ),
+        }
     }
     let requires_logistics_delivery = tenant.has_module("logistics")
         && shipping_address

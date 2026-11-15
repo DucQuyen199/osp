@@ -240,6 +240,12 @@
      "required": true,
      "ref": "sales.sales_order"
     },
+      {
+       "name": "invoice",
+       "type": "ref",
+       "required": false,
+       "ref": "accounting.invoice"
+      },
     {
      "name": "warehouse",
      "type": "ref",

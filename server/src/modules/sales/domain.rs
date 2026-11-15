@@ -112,6 +112,25 @@ fn validate_lines(value: Option<&Value>, field: &str) -> Vec<String> {
 }
 
 pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<String> {
+    if entity == "sales_return" {
+        if let Some(invoice) = current.get("invoice").filter(|value| !value.is_null()) {
+            if patch
+                .get("invoice")
+                .is_some_and(|replacement| replacement != invoice)
+            {
+                return vec!["Hóa đơn gốc của phiếu trả đã chọn không thể thay đổi".into()];
+            }
+        } else if patch
+            .get("invoice")
+            .is_some_and(|invoice| !invoice.is_null())
+            && !matches!(
+                current.get("status").and_then(Value::as_str),
+                Some("draft" | "rejected" | "submitted" | "approved")
+            )
+        {
+            return vec!["Chỉ có thể gắn hóa đơn gốc trước khi nhận hàng trả".into()];
+        }
+    }
     if entity == "sales_order"
         && current
             .get("source")

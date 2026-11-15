@@ -49,6 +49,24 @@ pub(super) async fn create_return_note(
         )
     };
     let source_key = source_id.to_string();
+    let requested_invoice = if !purchase {
+        match event.get("invoice").filter(|invoice| !invoice.is_null()) {
+            Some(invoice) => Some(
+                invoice
+                    .as_str()
+                    .and_then(|value| Uuid::parse_str(value).ok())
+                    .ok_or_else(|| {
+                        crate::error::ApiError::validation(
+                            "sales.sales_return.received",
+                            vec!["Sales return source invoice id is invalid".into()],
+                        )
+                    })?,
+            ),
+            None => None,
+        }
+    } else {
+        None
+    };
     let source_document = if purchase {
         if let Some(invoice_id) = event.get("supplier_invoice").and_then(Value::as_str) {
             tx.query_opt(
@@ -62,11 +80,19 @@ pub(super) async fn create_return_note(
             ).await?
         }
     } else {
-        let lookup_sql = format!(
-            "SELECT id FROM {table} WHERE tenant_id=$1 AND source='sales_order' AND source_id=$2 ORDER BY created_at,id LIMIT 1 FOR UPDATE"
-        );
-        tx.query_opt(&lookup_sql, &[&tenant.id, &source_key])
+        if let Some(invoice_id) = requested_invoice {
+            tx.query_opt(
+                "SELECT id FROM accounting__invoice WHERE tenant_id=$1 AND id=$2 AND source='sales_order' AND source_id=$3 AND status IN ('posted','partially_paid','partially_settled','paid','settled') FOR UPDATE",
+                &[&tenant.id, &invoice_id, &source_key],
+            )
             .await?
+        } else {
+            let lookup_sql = format!(
+                "SELECT id FROM {table} WHERE tenant_id=$1 AND source='sales_order' AND source_id=$2 AND status IN ('posted','partially_paid','partially_settled','paid','settled') ORDER BY created_at,id LIMIT 1 FOR UPDATE"
+            );
+            tx.query_opt(&lookup_sql, &[&tenant.id, &source_key])
+                .await?
+        }
     };
     let Some(source_document) = source_document else {
         return Err(crate::error::ApiError::validation(
