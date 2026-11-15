@@ -113,19 +113,40 @@ async fn dispensed_quantities(
     let mut quantities = BTreeMap::<Uuid, rust_decimal::Decimal>::new();
     for row in rows {
         let lines: Value = row.get(0);
-        for line in lines.as_array().into_iter().flatten() {
+        let Some(lines) = lines.as_array() else {
+            return Err(ApiError::validation(
+                "pharmacy.prescription",
+                vec!["Completed POS order has invalid lines; dispensed quantities cannot be verified".into()],
+            ));
+        };
+        for (index, line) in lines.iter().enumerate() {
             let Some(product) = line
                 .get("product")
                 .and_then(Value::as_str)
                 .and_then(|value| Uuid::parse_str(value).ok())
             else {
-                continue;
+                return Err(ApiError::validation(
+                    "pharmacy.prescription",
+                    vec![format!(
+                        "Completed POS order line {} has an invalid product",
+                        index + 1
+                    )],
+                ));
             };
             let qty = line
                 .get("base_qty")
                 .or_else(|| line.get("qty"))
                 .and_then(crate::money::decimal)
-                .unwrap_or_default();
+                .filter(|quantity| *quantity > rust_decimal::Decimal::ZERO)
+                .ok_or_else(|| {
+                    ApiError::validation(
+                        "pharmacy.prescription",
+                        vec![format!(
+                            "Completed POS order line {} has an invalid quantity",
+                            index + 1
+                        )],
+                    )
+                })?;
             let current = quantities.get(&product).copied().unwrap_or_default();
             let Some(total) = current.checked_add(qty) else {
                 return Err(ApiError::validation(
@@ -145,20 +166,47 @@ async fn is_fully_dispensed(
     prescription_id: Uuid,
     prescription_items: &Value,
 ) -> R<bool> {
+    let Some(prescription_items) = prescription_items.as_array() else {
+        return Err(ApiError::validation(
+            "pharmacy.prescription",
+            vec!["Prescription items are invalid; dispensed quantities cannot be verified".into()],
+        ));
+    };
+    if prescription_items.is_empty() {
+        return Err(ApiError::validation(
+            "pharmacy.prescription",
+            vec!["Prescription has no items; dispensed quantities cannot be verified".into()],
+        ));
+    }
     let mut prescribed = BTreeMap::<Uuid, rust_decimal::Decimal>::new();
-    for item in prescription_items.as_array().into_iter().flatten() {
+    for (index, item) in prescription_items.iter().enumerate() {
         let Some(product) = item
             .get("product")
             .and_then(Value::as_str)
             .and_then(|value| Uuid::parse_str(value).ok())
         else {
-            continue;
+            return Err(ApiError::validation(
+                "pharmacy.prescription",
+                vec![format!(
+                    "Prescription item {} has an invalid product",
+                    index + 1
+                )],
+            ));
         };
         let qty = item
             .get("base_qty")
             .or_else(|| item.get("qty"))
             .and_then(crate::money::decimal)
-            .unwrap_or_default();
+            .filter(|quantity| *quantity > rust_decimal::Decimal::ZERO)
+            .ok_or_else(|| {
+                ApiError::validation(
+                    "pharmacy.prescription",
+                    vec![format!(
+                        "Prescription item {} has an invalid quantity",
+                        index + 1
+                    )],
+                )
+            })?;
         let current = prescribed.get(&product).copied().unwrap_or_default();
         let Some(total) = current.checked_add(qty) else {
             return Err(ApiError::validation(
