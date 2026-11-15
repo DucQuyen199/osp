@@ -19,6 +19,7 @@ export default function ManufacturingWipPage() {
   const [loading, setLoading] = useState(false);
   const [boms, setBoms] = useState([]);
   const [productionOrders, setProductionOrders] = useState([]);
+  const [reworkOrders, setReworkOrders] = useState([]);
   const [inspections, setInspections] = useState([]);
   const [workCenters, setWorkCenters] = useState(new Map());
   const [products, setProducts] = useState(new Map());
@@ -33,6 +34,8 @@ export default function ManufacturingWipPage() {
   const [orderWarehouse, setOrderWarehouse] = useState('');
   const [orderCenter, setOrderCenter] = useState('');
   const [orderDate, setOrderDate] = useState(today());
+  const [reworkInspection, setReworkInspection] = useState('');
+  const [reworkReason, setReworkReason] = useState('');
   const [outputLot, setOutputLot] = useState('');
   const [outputExpiry, setOutputExpiry] = useState('');
   const [scrapMethod, setScrapMethod] = useState('absorb');
@@ -47,10 +50,11 @@ export default function ManufacturingWipPage() {
     try {
       const params = new URLSearchParams();
       if (asOf) params.set('asOf', asOf);
-      const [reportData, bomResponse, orderResponse, inspectionResponse, centerMap, productMap, warehouseMap, unitMap, accountMap] = await Promise.all([
+      const [reportData, bomResponse, orderResponse, reworkResponse, inspectionResponse, centerMap, productMap, warehouseMap, unitMap, accountMap] = await Promise.all([
         api(`${tenantPath('/reports/manufacturing/wip')}?${params}`),
         can('manufacturing.bom.read') ? loadAllResponse('manufacturing.bom') : Promise.resolve({ items: [] }),
         can('manufacturing.production_order.read') ? loadAllResponse('manufacturing.production_order') : Promise.resolve({ items: [] }),
+        can('manufacturing.rework_order.read') ? loadAllResponse('manufacturing.rework_order') : Promise.resolve({ items: [] }),
         can('quality.inspection.read') ? loadAllResponse('quality.inspection') : Promise.resolve({ items: [] }),
         can('manufacturing.work_center.read') ? loadRefs('manufacturing.work_center') : Promise.resolve(new Map()),
         can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
@@ -61,6 +65,7 @@ export default function ManufacturingWipPage() {
       setReport(reportData);
       setBoms(Array.isArray(bomResponse.items) ? bomResponse.items : []);
       setProductionOrders(Array.isArray(orderResponse.items) ? orderResponse.items : []);
+      setReworkOrders(Array.isArray(reworkResponse.items) ? reworkResponse.items : []);
       setInspections(Array.isArray(inspectionResponse.items) ? inspectionResponse.items : []);
       setWorkCenters(centerMap); setProducts(productMap); setWarehouses(warehouseMap); setUnits(unitMap); setAccounts(accountMap);
     } catch (reason) {
@@ -139,6 +144,30 @@ export default function ManufacturingWipPage() {
     finally { setBusy(''); }
   };
 
+  const createReworkOrder = async (event) => {
+    event.preventDefault();
+    const inspection = inspections.find((row) => row.id === reworkInspection);
+    if (!inspection) return;
+    setBusy('rework'); setError('');
+    try {
+      await api(dataPath('manufacturing.rework_order'), { method: 'POST', body: {
+        production_order: inspection.source_id, inspection: inspection.id,
+        qty: Number(inspection.qty), reason: reworkReason.trim(),
+      } });
+      setReworkInspection(''); setReworkReason(''); await load();
+    } catch (reason) { setError(reason.message || 'KhÃ´ng táº¡o Ä‘Æ°á»£c lá»‡nh sá»­a.'); }
+    finally { setBusy(''); }
+  };
+
+  const operateRework = async (order, action) => {
+    setBusy(`${order.id}:${action}`); setError('');
+    try {
+      await api(dataPath('manufacturing.rework_order', order.id, action), { method: 'POST' });
+      await load();
+    } catch (reason) { setError(reason.message || 'KhÃ´ng cáº­p nháº­t Ä‘Æ°á»£c lá»‡nh sá»­a.'); }
+    finally { setBusy(''); }
+  };
+
   useEffect(() => { document.title = 'WIP sản xuất · OSP Suite'; load(); }, [load]);
 
   const createDraft = async () => {
@@ -191,6 +220,7 @@ export default function ManufacturingWipPage() {
       <div className="manufacturing-orders"><h3>Lệnh sản xuất</h3>{productionOrders.map((order) => { const draft = outputs[order.id] || {}; return <article className="manufacturing-order-card" key={order.id}><div className="manufacturing-order-summary"><strong>{products.get(order.product)?.name || order.product}</strong><span className="badge">{statusLabel(order.status)}</span><span className="small muted">Kế hoạch {qty(order.qty)} · {order.planned_start || 'Chưa xếp lịch'} · {workCenters.get(order.work_center)?.name || 'Không gán trung tâm'}</span></div>{order.status === 'in_progress' && <div className="manufacturing-output"><label className="field"><span>Đạt</span><input className="input num" type="number" min="0" step="any" value={draft.good_qty ?? order.good_qty ?? order.qty} onChange={(event) => setOutputs((rows) => ({ ...rows, [order.id]: { ...rows[order.id], good_qty: event.target.value } }))} /></label><label className="field"><span>Phế phẩm</span><input className="input num" type="number" min="0" step="any" value={draft.scrap_qty ?? order.scrap_qty ?? ''} onChange={(event) => setOutputs((rows) => ({ ...rows, [order.id]: { ...rows[order.id], scrap_qty: event.target.value } }))} /></label><label className="field"><span>Lý do phế phẩm</span><input className="input" value={draft.scrap_reason ?? order.scrap_reason ?? ''} onChange={(event) => setOutputs((rows) => ({ ...rows, [order.id]: { ...rows[order.id], scrap_reason: event.target.value } }))} /></label></div>}{order.status === 'planned' && can('manufacturing.production_order.started') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateOrder(order, 'started')}>Bắt đầu, xuất vật tư</button>}{order.status === 'in_progress' && can('manufacturing.production_order.done') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateOrder(order, 'done')}>Hoàn tất, gửi QC</button>}{['planned', 'in_progress'].includes(order.status) && can('manufacturing.production_order.cancelled') && <button className="btn btn-ghost btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateOrder(order, 'cancelled')}>Hủy lệnh</button>}</article>; })}{!productionOrders.length && <p className="small muted">Chưa có lệnh sản xuất.</p>}</div>
       {can('quality.inspection.read') && <div className="manufacturing-orders"><h3>Kiểm tra thành phẩm</h3>{inspections.filter((inspection) => inspection.source === 'production_order' && inspection.status === 'pending').map((inspection) => <article className="manufacturing-order-card" key={inspection.id}><div className="manufacturing-order-summary"><strong>{products.get(inspection.product)?.name || inspection.product}</strong><span className="small muted">Lệnh {String(inspection.source_id).slice(0, 8)} · Số lượng {qty(inspection.qty)} {baseUnitName(inspection.product)}{inspection.lot ? ` · Lô ${inspection.lot}` : ''}</span></div>{can('quality.inspection.failed') && can('quality.inspection.update') && <label className="field"><span>Mô tả lỗi nếu không đạt</span><input className="input" minLength="5" maxLength="500" value={qcNotes[inspection.id] || ''} onChange={(event) => setQcNotes((rows) => ({ ...rows, [inspection.id]: event.target.value }))} /></label>}{can('quality.inspection.passed') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => decideInspection(inspection, 'passed')}>Đạt, nhập kho</button>}{can('quality.inspection.failed') && can('quality.inspection.update') && <button className="btn btn-ghost btn-sm" type="button" disabled={Boolean(busy) || (qcNotes[inspection.id] || '').trim().length < 5} onClick={() => decideInspection(inspection, 'failed')}>Không đạt, lập NCR</button>}</article>)}{!inspections.some((inspection) => inspection.source === 'production_order' && inspection.status === 'pending') && <p className="small muted">Không có lô thành phẩm chờ kiểm tra.</p>}</div>}
     </section>
+      {can('manufacturing.rework_order.read') && <div className="manufacturing-orders"><h3>Sửa hàng không đạt</h3>{can('manufacturing.rework_order.create') && <form className="manufacturing-form" onSubmit={createReworkOrder}><label className="field"><span>Phiếu QC trượt *</span><select className="select" required value={reworkInspection} onChange={(event) => setReworkInspection(event.target.value)}><option value="">Chọn phiếu QC</option>{inspections.filter((inspection) => inspection.source === 'production_order' && inspection.status === 'failed' && !reworkOrders.some((order) => order.inspection === inspection.id && ['planned', 'in_progress'].includes(order.status))).map((inspection) => <option key={inspection.id} value={inspection.id}>{products.get(inspection.product)?.name || inspection.product} · {qty(inspection.qty)} {baseUnitName(inspection.product)} · lệnh {String(inspection.source_id).slice(0, 8)}</option>)}</select></label>{reworkInspection && <p className="small muted">Sửa toàn bộ số lượng trên phiếu QC; sau khi hoàn tất, lô sẽ quay lại chờ kiểm tra.</p>}<label className="field"><span>Lý do sửa *</span><input className="input" minLength={5} maxLength={500} required value={reworkReason} onChange={(event) => setReworkReason(event.target.value)} /></label><button className="btn btn-primary btn-sm" type="submit" disabled={busy === 'rework' || !reworkInspection || reworkReason.trim().length < 5}>{busy === 'rework' ? 'Đang tạo…' : 'Tạo lệnh sửa'}</button></form>}{reworkOrders.map((order) => { const inspection = inspections.find((row) => row.id === order.inspection); return <article className="manufacturing-order-card" key={order.id}><div className="manufacturing-order-summary"><strong>{products.get(inspection?.product)?.name || 'Lô sửa hàng'}</strong><span className="badge">{statusLabel(order.status)}</span><span className="small muted">Lệnh {String(order.production_order).slice(0, 8)} · Số lượng {qty(order.qty)} · {order.reason}</span></div>{order.status === 'planned' && can('manufacturing.rework_order.started') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateRework(order, 'started')}>Bắt đầu, xuất vật tư</button>}{order.status === 'in_progress' && can('manufacturing.rework_order.done') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateRework(order, 'done')}>Hoàn tất, gửi QC kiểm tra lại</button>}{order.status === 'planned' && can('manufacturing.rework_order.cancelled') && <button className="btn btn-ghost btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateRework(order, 'cancelled')}>Hủy lệnh sửa</button>}</article>; })}{!reworkOrders.length && <p className="small muted">Chưa có lệnh sửa hàng.</p>}</div>}
     <section className="card">
       <form className="toolbar" onSubmit={(event) => { event.preventDefault(); load(); }}>
         <label className="field"><span className="label">Chốt phát sinh đến ngày</span><input className="input" type="date" value={asOf} onChange={(event) => setAsOf(event.target.value)} /></label>
