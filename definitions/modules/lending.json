@@ -36,6 +36,11 @@
      "required": true
     },
     {
+     "name": "first_due_date",
+     "type": "date",
+     "required": false
+    },
+    {
      "name": "method",
      "type": "enum",
      "required": false,

@@ -81,7 +81,14 @@ pub async fn handle_source_event(
         ));
     }
 
-    let dates = domain::due_dates(Utc::now().date_naive(), months)
+    let dates = document
+        .get("first_due_date")
+        .and_then(Value::as_str)
+        .and_then(|value| chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").ok())
+        .and_then(|first_due_date| domain::due_dates_from_first(first_due_date, months))
+        // Older loan records predate contractual first due dates. Keep those
+        // disbursements working with the former one-month-from-disbursement rule.
+        .or_else(|| domain::due_dates(Utc::now().date_naive(), months))
         .ok_or_else(|| ApiError::internal("Could not calculate monthly due dates"))?;
     let entity = kernel.ent(tenant, "lending.repayment")?;
     for (index, ((amount, principal_component, interest_component), due_date)) in

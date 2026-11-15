@@ -6,7 +6,9 @@ use serde_json::Value;
 
 #[path = "domain/installments.rs"]
 mod installments;
-pub use installments::{due_dates, installment_amounts, installment_components};
+pub use installments::{
+    due_dates, due_dates_from_first, installment_amounts, installment_components,
+};
 
 fn decimal(document: &Value, field: &str) -> Option<Decimal> {
     document.get(field).and_then(money::decimal)
@@ -29,6 +31,16 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                     && value.fract() == Decimal::ZERO
             }) {
                 errors.push("Kỳ hạn phải là số tháng nguyên từ 1 đến 600".into());
+            }
+            if document.get("id").is_none() || document.get("first_due_date").is_some() {
+                if document
+                    .get("first_due_date")
+                    .and_then(Value::as_str)
+                    .and_then(|date| NaiveDate::parse_from_str(date, "%Y-%m-%d").ok())
+                    .is_none()
+                {
+                    errors.push("Khoản vay cần ngày đến hạn kỳ đầu hợp lệ theo hợp đồng".into());
+                }
             }
             if document.get("method").is_some_and(|value| {
                 !value.is_null() && !matches!(value.as_str(), Some("cash" | "bank"))

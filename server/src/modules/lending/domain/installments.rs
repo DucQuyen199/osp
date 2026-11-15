@@ -77,3 +77,11 @@ pub fn due_dates(start: NaiveDate, months: u32) -> Option<Vec<NaiveDate>> {
         .map(|month| start.checked_add_months(Months::new(month)))
         .collect()
 }
+
+/// Generate all contractual due dates, starting with the specified first
+/// installment date and preserving its day-of-month when possible.
+pub fn due_dates_from_first(first_due_date: NaiveDate, months: u32) -> Option<Vec<NaiveDate>> {
+    (0..months)
+        .map(|month| first_due_date.checked_add_months(Months::new(month)))
+        .collect()
+}
