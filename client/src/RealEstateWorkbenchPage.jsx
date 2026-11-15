@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { localDate } from './lib/dates.js';
+import { localDate, localDateTimeToIso } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel } from './lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
@@ -77,7 +77,9 @@ export default function RealEstateWorkbenchPage() {
 
   async function createViewing(event) {
     event.preventDefault();
-    await run('viewing', () => api(dataPath('real-estate.viewing'), { method: 'POST', body: { ...viewingForm, property: selectedProperty, party: viewingForm.party || undefined, at: viewingForm.at ? new Date(viewingForm.at).toISOString() : undefined } }), 'Đã xếp lịch xem bất động sản.');
+    const at = localDateTimeToIso(viewingForm.at);
+    if (!at) { setError('Giờ xem không hợp lệ trong múi giờ kinh doanh.'); return; }
+    await run('viewing', () => api(dataPath('real-estate.viewing'), { method: 'POST', body: { ...viewingForm, property: selectedProperty, party: viewingForm.party || undefined, at } }), 'Đã xếp lịch xem bất động sản.');
     setViewingForm((current) => ({ ...current, at: '', note: '' }));
   }
 

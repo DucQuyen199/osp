@@ -1,3 +1,5 @@
+import { businessTimezone } from './dates.js';
+
 // Từ điển tiếng Việt cho nhãn trường, trạng thái, hành động + định dạng số/ngày.
 // Quy ước nội dung: câu ngắn, động từ ở đầu nút ("Tạo mới", "Xác nhận"), không viết hoa tràn lan, dùng "bạn".
 
@@ -163,11 +165,11 @@ export function fmtDate(s) {
 export function fmtDateTime(s) {
   if (!s) return '';
   const d = new Date(s);
-  return Number.isNaN(d.getTime()) ? s : d.toLocaleString(formatLocale, { dateStyle: 'short', timeStyle: 'short' });
+  return Number.isNaN(d.getTime()) ? s : d.toLocaleString(formatLocale, { dateStyle: 'short', timeStyle: 'short', timeZone: businessTimezone });
 }
 export function fmtTime(s) {
   const d = new Date(s);
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString(formatLocale, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString(formatLocale, { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: businessTimezone });
 }
 export function fmtAgo(s) {
   const sec = Math.round((Date.now() - new Date(s).getTime()) / 1000);

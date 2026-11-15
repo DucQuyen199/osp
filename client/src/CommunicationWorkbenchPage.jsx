@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { localDateTime, localDateTimeToIso } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDateTime, statusLabel } from './lib/i18n.js';
 import { can, loadAllResponse, loadRefs, recordLabel } from './lib/state.js';
@@ -50,9 +51,9 @@ export default function CommunicationWorkbenchPage() {
   async function create(event) {
     event.preventDefault();
     if (!form.party || !form.send_at || !form.body.trim()) return;
-    const sendAt = new Date(form.send_at);
-    if (Number.isNaN(sendAt.getTime())) { setError('Thời điểm gửi không hợp lệ.'); return; }
-    const payload = { party: form.party, channel: form.channel, body: form.body.trim(), send_at: sendAt.toISOString() };
+    const sendAt = localDateTimeToIso(form.send_at);
+    if (!sendAt) { setError('Thời điểm gửi không hợp lệ trong múi giờ kinh doanh.'); return; }
+    const payload = { party: form.party, channel: form.channel, body: form.body.trim(), send_at: sendAt };
     if (form.subject.trim()) payload.subject = form.subject.trim();
     await run('create', async () => {
       await api(dataPath('communication.reminder'), { method: 'POST', body: payload });
@@ -70,7 +71,7 @@ export default function CommunicationWorkbenchPage() {
     {can('communication.reminder.create') && <section className="card card-pad"><h2>Lên lịch nhắc</h2><form className="form-grid" onSubmit={create}>
       <label className="field"><span className="label">Người nhận *</span><select className="select" required value={form.party} onChange={(event) => setForm({ ...form, party: event.target.value })}><option value="">Chọn liên hệ</option>{[...parties.values()].map((party) => <option key={party.id} value={party.id}>{recordLabel('master-data.party', party)}{party.email ? ` · ${party.email}` : party.phone ? ` · ${party.phone}` : ''}</option>)}</select></label>
       <label className="field"><span className="label">Kênh</span><select className="select" value={form.channel} onChange={(event) => setForm({ ...form, channel: event.target.value })}><option value="email">Email</option><option value="sms">SMS</option></select></label>
-      <label className="field"><span className="label">Thời điểm gửi *</span><input className="input" required type="datetime-local" min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)} value={form.send_at} onChange={(event) => setForm({ ...form, send_at: event.target.value })}/></label>
+      <label className="field"><span className="label">Thời điểm gửi *</span><input className="input" required type="datetime-local" min={localDateTime()} value={form.send_at} onChange={(event) => setForm({ ...form, send_at: event.target.value })}/></label>
       <label className="field"><span className="label">Tiêu đề</span><input className="input" maxLength="240" value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })}/></label>
       <label className="field full"><span className="label">Nội dung *</span><textarea className="input" required rows="4" maxLength="10000" value={form.body} onChange={(event) => setForm({ ...form, body: event.target.value })}/></label>
       <div className="row full"><span className="grow small muted">Kênh gửi phải được cấu hình ở máy chủ. Lịch nhắc chưa đến giờ có thể hủy.</span><button className="btn btn-primary" disabled={Boolean(busy) || !form.party}>Lên lịch</button></div>

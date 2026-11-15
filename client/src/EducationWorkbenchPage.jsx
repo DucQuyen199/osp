@@ -1,17 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { localDate as formatLocalDate } from './lib/dates.js';
+import { localDate as formatLocalDate, localDateTime as businessDateTime, localDateTimeToIso } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel } from './lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
-const localDateTime = (value) => {
-  if (!value) return '';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '' : new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-};
 const localDate = formatLocalDate;
 const attendanceLabels = { present: 'Có mặt', absent: 'Vắng', late: 'Đi muộn', excused: 'Có phép' };
-const sessionDate = () => localDateTime(new Date(Date.now() + 60 * 60 * 1000).toISOString());
+const sessionDate = () => businessDateTime(new Date(Date.now() + 60 * 60 * 1000));
 
 export default function EducationWorkbenchPage() {
   const [classes, setClasses] = useState([]);
@@ -36,7 +31,7 @@ export default function EducationWorkbenchPage() {
   const [classForm, setClassForm] = useState({ name: '', subject: '', teacher: '', teacher_employee: '', start_date: '', capacity: '', tuition: '' });
   const [studentForm, setStudentForm] = useState({ name: '', student_code: '', dob: '', guardian: '', phone: '', email: '' });
   const [pendingStudentParty, setPendingStudentParty] = useState(null);
-  const [form, setForm] = useState({ class: '', topic: '', starts_at: sessionDate(), ends_at: localDateTime(new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()) });
+  const [form, setForm] = useState({ class: '', topic: '', starts_at: sessionDate(), ends_at: businessDateTime(new Date(Date.now() + 2 * 60 * 60 * 1000)) });
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -190,7 +185,10 @@ export default function EducationWorkbenchPage() {
   async function createSession(event) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
-      await api(dataPath('school.class_session'), { method: 'POST', body: { ...form, starts_at: new Date(form.starts_at).toISOString(), ends_at: new Date(form.ends_at).toISOString(), status: 'scheduled' } });
+      const startsAt = localDateTimeToIso(form.starts_at);
+      const endsAt = localDateTimeToIso(form.ends_at);
+      if (!startsAt || !endsAt) throw new Error('Giờ học không hợp lệ trong múi giờ kinh doanh.');
+      await api(dataPath('school.class_session'), { method: 'POST', body: { ...form, starts_at: startsAt, ends_at: endsAt, status: 'scheduled' } });
       setNotice('Đã lên lịch buổi học.'); setForm((current) => ({ ...current, topic: '' })); await load();
     } catch (reason) { setError(reason.message || 'Không thể lên lịch buổi học.'); }
     finally { setBusy(false); }

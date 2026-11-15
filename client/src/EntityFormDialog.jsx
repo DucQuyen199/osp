@@ -1,4 +1,5 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { localDateTime as businessDateTime, localDateTimeToIso } from './lib/dates.js';
 import { ApiError, api, dataPath, tenantPath } from './lib/api.js';
 import { toast } from './lib/feedback.js';
 import { fmtMoney, statusLabel } from './lib/i18n.js';
@@ -17,8 +18,7 @@ function toLocalInput(value) {
   if (!value) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  const pad = (part) => String(part).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return businessDateTime(date);
 }
 
 function FieldLines({ qname, value, onChange, priceList, salesOrder, purchaseOrder, inspection }) {
@@ -270,7 +270,12 @@ export default function EntityFormDialog({ qname, record, onClose, onSaved }) {
   const readField = (field) => {
     const value = values[field.name];
     if (field.type === 'number' || field.type === 'money') return value === '' || value == null ? undefined : Number(value);
-    if (field.type === 'datetime') return value ? new Date(value).toISOString() : undefined;
+    if (field.type === 'datetime') {
+      if (!value) return undefined;
+      const instant = localDateTimeToIso(value);
+      if (!instant) throw new Error(`${fieldLabelOf(qname, field.name)}: giờ không hợp lệ trong múi giờ kinh doanh`);
+      return instant;
+    }
     if (field.type === 'json') {
       if (field.name === 'lines') {
         const rows = Array.isArray(value) ? value : [];

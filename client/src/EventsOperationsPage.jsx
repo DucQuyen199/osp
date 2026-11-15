@@ -1,14 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { localDateTime, localDateTimeToIso } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDateTime, statusLabel, fmtNumber } from './lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
-const localDateTime = (value) => {
-  if (!value) return '';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '' : new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-};
-const inMinutes = (minutes) => localDateTime(new Date(Date.now() + minutes * 60000).toISOString());
+const inMinutes = (minutes) => localDateTime(new Date(Date.now() + minutes * 60000));
 const paymentMethods = [['cash', 'Tiền mặt'], ['card', 'Thẻ'], ['transfer', 'Chuyển khoản'], ['ewallet', 'Ví điện tử'], ['bank', 'Ngân hàng']];
 const price = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 2 });
 
@@ -60,7 +56,9 @@ export default function EventsOperationsPage() {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
       const { ticket_tax, ...fields } = eventForm;
-      await api(dataPath('events.event'), { method: 'POST', body: { ...fields, ...(ticket_tax ? { ticket_tax } : {}), starts_at: new Date(eventForm.starts_at).toISOString(), capacity: Number(eventForm.capacity), reservation_minutes: Number(eventForm.reservation_minutes), ticket_price: Number(eventForm.ticket_price), status: 'draft' } });
+      const startsAt = localDateTimeToIso(eventForm.starts_at);
+      if (!startsAt) throw new Error('Giờ bắt đầu không hợp lệ trong múi giờ kinh doanh.');
+      await api(dataPath('events.event'), { method: 'POST', body: { ...fields, ...(ticket_tax ? { ticket_tax } : {}), starts_at: startsAt, capacity: Number(eventForm.capacity), reservation_minutes: Number(eventForm.reservation_minutes), ticket_price: Number(eventForm.ticket_price), status: 'draft' } });
       setEventForm((current) => ({ ...current, name: '', venue: '', ticket_price: '' })); setNotice('Đã tạo sự kiện nháp. Kiểm tra thông tin rồi công bố để mở bán vé.'); await load();
     } catch (reason) { setError(reason.message || 'Không thể tạo sự kiện.'); }
     finally { setBusy(false); }

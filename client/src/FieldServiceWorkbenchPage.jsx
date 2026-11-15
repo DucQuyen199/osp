@@ -1,14 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { localDateTime as businessDateTime, localDateTimeToIso } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel } from './lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
-const localDateTime = (value) => {
-  if (!value) return '';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '' : new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-};
-const futureSlot = (hours) => localDateTime(new Date(Date.now() + hours * 3600000).toISOString());
+const localDateTime = (value) => value ? businessDateTime(new Date(value)) : '';
+const futureSlot = (hours) => businessDateTime(new Date(Date.now() + hours * 3600000));
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const lineTotal = (line, products, units) => (Number(line.qty) || 0) * (Number(products.get(line.product)?.price) || Number(line.price) || 0) * (units.get(line.uom || products.get(line.product)?.uom)?.ratio ?? line.uom_ratio ?? 1);
 
@@ -91,12 +88,15 @@ export default function FieldServiceWorkbenchPage() {
   async function createOrder(event) {
     event.preventDefault(); setBusy('create'); setError(''); setNotice('');
     try {
+      const scheduledAt = form.scheduled_at ? localDateTimeToIso(form.scheduled_at) : undefined;
+      const scheduledEnd = form.scheduled_end ? localDateTimeToIso(form.scheduled_end) : undefined;
+      if ((form.scheduled_at && !scheduledAt) || (form.scheduled_end && !scheduledEnd)) throw new Error('Giờ hẹn không hợp lệ trong múi giờ kinh doanh.');
       const created = await api(dataPath('field-service.work_order'), { method: 'POST', body: {
         party: form.party, title: form.title.trim(), address: form.address.trim() || undefined,
         technician: form.technician_employee ? undefined : form.technician.trim() || undefined,
         technician_employee: form.technician_employee || undefined,
-        scheduled_at: form.scheduled_at ? new Date(form.scheduled_at).toISOString() : undefined,
-        scheduled_end: form.scheduled_end ? new Date(form.scheduled_end).toISOString() : undefined,
+        scheduled_at: scheduledAt,
+        scheduled_end: scheduledEnd,
         warehouse: form.warehouse || undefined,
         lines: newLines.map((line) => ({ product: line.product, qty: Number(line.qty), ...(line.uom ? { uom: line.uom } : {}) })),
       } });
@@ -109,12 +109,15 @@ export default function FieldServiceWorkbenchPage() {
   async function saveOpenOrder(order) {
     setBusy(`${order.id}:save`); setError(''); setNotice('');
     try {
+      const scheduledAt = editForm.scheduled_at ? localDateTimeToIso(editForm.scheduled_at) : null;
+      const scheduledEnd = editForm.scheduled_end ? localDateTimeToIso(editForm.scheduled_end) : null;
+      if ((editForm.scheduled_at && !scheduledAt) || (editForm.scheduled_end && !scheduledEnd)) throw new Error('Giờ hẹn không hợp lệ trong múi giờ kinh doanh.');
       const body = {
         title: editForm.title.trim(), address: editForm.address.trim() || null,
         technician: editForm.technician_employee ? null : editForm.technician.trim() || null,
         technician_employee: editForm.technician_employee || null,
-        scheduled_at: editForm.scheduled_at ? new Date(editForm.scheduled_at).toISOString() : null,
-        scheduled_end: editForm.scheduled_end ? new Date(editForm.scheduled_end).toISOString() : null,
+        scheduled_at: scheduledAt,
+        scheduled_end: scheduledEnd,
         warehouse: editForm.warehouse || null,
         lines: editLines.map((line) => ({ product: line.product, qty: Number(line.qty), ...(line.uom ? { uom: line.uom } : {}) })),
       };

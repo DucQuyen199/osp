@@ -1,15 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { localDate as businessDate } from './lib/dates.js';
+import { localDate as businessDate, localDateTime as businessDateTime, localDateTimeToIso } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel } from './lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
-const localDateTime = (value) => {
-  if (!value) return '';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '' : new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-};
 const localDate = (value) => {
   if (!value) return '';
   const date = new Date(value);
@@ -24,7 +19,7 @@ export default function WellnessBookingPage({ healthcare = false }) {
   const [parties, setParties] = useState(new Map());
   const [invoices, setInvoices] = useState([]);
   const [selectedId, setSelectedId] = useState('');
-  const [form, setForm] = useState({ party: '', resource: '', service: '', starts_at: localDateTime(new Date(Date.now() + 3600000).toISOString()), ends_at: '', price: '', note: '' });
+  const [form, setForm] = useState({ party: '', resource: '', service: '', starts_at: businessDateTime(new Date(Date.now() + 3600000)), ends_at: '', price: '', note: '' });
   const [resourceForm, setResourceForm] = useState({ name: '', kind: 'staff' });
   const [serviceForm, setServiceForm] = useState({ name: '', duration_min: '', price: '' });
   const [busy, setBusy] = useState('');
@@ -73,8 +68,11 @@ export default function WellnessBookingPage({ healthcare = false }) {
   async function createBooking(event) {
     event.preventDefault();
     await run('booking', async () => {
-      const body = { resource: form.resource, service: form.service || undefined, party: form.party || undefined, starts_at: new Date(form.starts_at).toISOString(), note: form.note.trim() || undefined };
-      if (form.ends_at) body.ends_at = new Date(form.ends_at).toISOString();
+      const startsAt = localDateTimeToIso(form.starts_at);
+      const endsAt = form.ends_at ? localDateTimeToIso(form.ends_at) : undefined;
+      if (!startsAt || (form.ends_at && !endsAt)) throw new Error('Giờ hẹn không hợp lệ trong múi giờ kinh doanh.');
+      const body = { resource: form.resource, service: form.service || undefined, party: form.party || undefined, starts_at: startsAt, note: form.note.trim() || undefined };
+      if (endsAt) body.ends_at = endsAt;
       if (form.price !== '') body.price = Number(form.price);
       await api(dataPath('booking.booking'), { method: 'POST', body });
     }, 'Đã tiếp nhận lịch hẹn. Tài nguyên và khung giờ sẽ được kiểm tra trùng lịch ở máy chủ.');
