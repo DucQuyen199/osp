@@ -4,7 +4,7 @@ use deadpool_postgres::{Config, ManagerConfig, Pool, RecyclingMethod, Runtime};
 use serde_json::Value;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tokio_postgres::types::ToSql;
-use tokio_postgres::{NoTls, Row};
+use tokio_postgres::{IsolationLevel, NoTls, Row};
 
 pub type Params<'a> = &'a [&'a (dyn ToSql + Sync)];
 
@@ -55,6 +55,26 @@ impl<'a> Tx<'a> {
         } else {
             inner.batch_execute("SET TRANSACTION READ ONLY").await?;
         }
+        Ok(Tx {
+            inner,
+            sp: AtomicU32::new(0),
+        })
+    }
+
+    /// Begin a read-only transaction with one stable snapshot across all pages.
+    pub async fn begin_snapshot(
+        conn: &'a mut deadpool_postgres::Object,
+        tenant: &str,
+    ) -> R<Tx<'a>> {
+        let inner = conn
+            .build_transaction()
+            .isolation_level(IsolationLevel::RepeatableRead)
+            .read_only(true)
+            .start()
+            .await?;
+        inner
+            .execute("SELECT set_config('app.tenant_id', $1, true)", &[&tenant])
+            .await?;
         Ok(Tx {
             inner,
             sp: AtomicU32::new(0),

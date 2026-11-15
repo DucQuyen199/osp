@@ -13,6 +13,26 @@ impl Kernel {
         spec: &crate::modules::bi::AggregateSpec,
         page: &ListQuery,
     ) -> R<Value> {
+        let mut conn = self.pool.get().await?;
+        let tx = Tx::begin(&mut conn, &t.id, false).await?;
+        let result = self
+            .aggregate_bi_report_in_tx(&tx, actor, t, qname, filters, search, spec, page)
+            .await?;
+        tx.commit().await?;
+        Ok(result)
+    }
+
+    pub(crate) async fn aggregate_bi_report_in_tx(
+        &self,
+        tx: &Tx<'_>,
+        actor: &Actor,
+        t: &Tenant,
+        qname: &str,
+        filters: &[(String, String)],
+        search: Option<&str>,
+        spec: &crate::modules::bi::AggregateSpec,
+        page: &ListQuery,
+    ) -> R<Value> {
         let ent = self.ent(t, qname)?;
         self.authorize(t, actor, &format!("{qname}.read"))?;
         let error = |message: String| ApiError::validation("bi.report", vec![message]);
@@ -121,8 +141,6 @@ impl Kernel {
                 None,
             )
         };
-        let mut conn = self.pool.get().await?;
-        let tx = Tx::begin(&mut conn, &t.id, false).await?;
         let total = if let Some(count_sql) = count_sql {
             tx.query_one_row(&count_sql, &as_refs(&row_params[..row_params.len() - 2]))
                 .await?
