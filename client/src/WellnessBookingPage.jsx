@@ -21,6 +21,8 @@ export default function WellnessBookingPage({ healthcare = false }) {
   const [invoices, setInvoices] = useState([]);
   const [selectedId, setSelectedId] = useState('');
   const [form, setForm] = useState({ party: '', resource: '', service: '', starts_at: businessDateTime(new Date(Date.now() + 3600000)), ends_at: '', price: '', note: '' });
+  const [editingBooking, setEditingBooking] = useState(false);
+  const [editForm, setEditForm] = useState({ resource: '', service: '', starts_at: '', ends_at: '', price: '', note: '' });
   const [resourceForm, setResourceForm] = useState({ name: '', kind: 'staff' });
   const [serviceForm, setServiceForm] = useState({ name: '', duration_min: '', price: '' });
   const [busy, setBusy] = useState('');
@@ -105,6 +107,43 @@ export default function WellnessBookingPage({ healthcare = false }) {
     await run(`${row.id}:${verb}`, () => action(row, verb), messages[verb]);
   }
 
+  function startEditBooking(row) {
+    setEditForm({
+      resource: row.resource || '',
+      service: row.service || '',
+      starts_at: row.starts_at ? businessDateTime(new Date(row.starts_at)) : '',
+      ends_at: row.ends_at ? businessDateTime(new Date(row.ends_at)) : '',
+      price: row.price ?? '',
+      note: row.note || '',
+    });
+    setEditingBooking(true);
+  }
+
+  async function saveBooking(event) {
+    event.preventDefault();
+    if (!selected) return;
+    await run(`${selected.id}:update`, async () => {
+      const startsAt = localDateTimeToIso(editForm.starts_at);
+      const endsAt = localDateTimeToIso(editForm.ends_at);
+      if (!startsAt || !endsAt || new Date(endsAt).getTime() <= new Date(startsAt).getTime()) {
+        throw new Error('Giờ bắt đầu và kết thúc không hợp lệ.');
+      }
+      const body = {
+        resource: editForm.resource,
+        service: editForm.service || null,
+        starts_at: startsAt,
+        note: editForm.note.trim(),
+      };
+      const originalEnd = selected.ends_at ? businessDateTime(new Date(selected.ends_at)) : '';
+      const editService = services.find((row) => row.id === editForm.service);
+      const serviceHasDuration = Number(editService?.duration_min) > 0;
+      if (editForm.ends_at !== originalEnd || !serviceHasDuration) body.ends_at = endsAt;
+      if (editForm.price !== '') body.price = Number(editForm.price);
+      await api(dataPath('booking.booking', selected.id), { method: 'PATCH', body });
+    }, 'Đã cập nhật lịch chờ; máy chủ đã tính lại thời lượng dịch vụ và kiểm tra xung đột tài nguyên.');
+    setEditingBooking(false);
+  }
+
   const canNoShow = (row) => row.status === 'confirmed' && row.ends_at && new Date(row.ends_at).getTime() <= Date.now();
   const kindLabel = (kind) => (healthcare
     ? ({ staff: 'Bác sĩ', room: 'Phòng khám', equipment: 'Thiết bị y tế' }[kind] || 'Tài nguyên')
@@ -129,10 +168,11 @@ export default function WellnessBookingPage({ healthcare = false }) {
       {can('booking.service.create') && <form className="form-grid" onSubmit={createService}><h3 className="full">Dịch vụ</h3><label className="field"><span className="label">Tên dịch vụ *</span><input className="input" required value={serviceForm.name} onChange={(e) => setServiceForm({ ...serviceForm, name: e.target.value })}/></label><label className="field"><span className="label">Thời lượng (phút) *</span><input className="input" type="number" min="1" step="1" required value={serviceForm.duration_min} onChange={(e) => setServiceForm({ ...serviceForm, duration_min: e.target.value })}/></label><label className="field"><span className="label">Giá niêm yết *</span><input className="input" type="number" min="0" step="any" required value={serviceForm.price} onChange={(e) => setServiceForm({ ...serviceForm, price: e.target.value })}/></label><div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy)}>Thêm dịch vụ</button></div></form>}</div></section>}
 
     {loading ? <div className="skeleton" data-h="row"/> : <div className="layout-split" style={{ marginTop: 16 }}>
-      <section className="card card-pad"><h2>Lịch hẹn</h2>{!bookings.length ? <p className="empty">Chưa có lịch hẹn.</p> : <div className="table-wrap"><table className="table"><thead><tr><th>Giờ / khách</th><th>Dịch vụ / tài nguyên</th><th>Trạng thái</th></tr></thead><tbody>{bookings.map((row) => <tr key={row.id} className={selectedId === row.id ? 'selected' : ''} onClick={() => setSelectedId(row.id)} style={{ cursor: 'pointer' }}><td><strong>{fmtDateTime(row.starts_at)}</strong><div className="small muted">{parties.has(row.party) ? recordLabel('master-data.party', parties.get(row.party)) : row.party ? `Khách ${row.party.slice(0, 8)}` : 'Khách vãng lai'}</div></td><td>{serviceById.get(row.service)?.name || 'Dịch vụ'}<div className="small muted">{resourceById.get(row.resource)?.name || 'Tài nguyên'}</div></td><td>{statusLabel(row.status)}</td></tr>)}</tbody></table></div>}</section>
+      <section className="card card-pad"><h2>Lịch hẹn</h2>{!bookings.length ? <p className="empty">Chưa có lịch hẹn.</p> : <div className="table-wrap"><table className="table"><thead><tr><th>Giờ / khách</th><th>Dịch vụ / tài nguyên</th><th>Trạng thái</th></tr></thead><tbody>{bookings.map((row) => <tr key={row.id} className={selectedId === row.id ? 'selected' : ''} onClick={() => { setSelectedId(row.id); setEditingBooking(false); }} style={{ cursor: 'pointer' }}><td><strong>{fmtDateTime(row.starts_at)}</strong><div className="small muted">{parties.has(row.party) ? recordLabel('master-data.party', parties.get(row.party)) : row.party ? `Khách ${row.party.slice(0, 8)}` : 'Khách vãng lai'}</div></td><td>{serviceById.get(row.service)?.name || 'Dịch vụ'}<div className="small muted">{resourceById.get(row.resource)?.name || 'Tài nguyên'}</div></td><td>{statusLabel(row.status)}</td></tr>)}</tbody></table></div>}</section>
       {selected && <section className="card card-pad"><div className="row wrap"><div><h2>{serviceById.get(selected.service)?.name || 'Lịch dịch vụ'}</h2><div className="small muted">{parties.has(selected.party) ? recordLabel('master-data.party', parties.get(selected.party)) : selected.party ? `Khách ${selected.party.slice(0,8)}` : 'Khách vãng lai'} · {resourceById.get(selected.resource)?.name || 'Tài nguyên'}</div></div><span className="grow"/><span className="badge warning">{statusLabel(selected.status)}</span></div>
         <dl className="dl" style={{ marginTop: 14 }}><dt>Bắt đầu</dt><dd>{fmtDateTime(selected.starts_at)}</dd><dt>Kết thúc</dt><dd>{fmtDateTime(selected.ends_at)}</dd><dt>Giá dịch vụ</dt><dd>{fmtMoney(selected.price || 0)}</dd><dt>Ghi chú</dt><dd>{selected.note || '—'}</dd></dl>
-        <div className="row wrap" style={{ marginTop: 14 }}>{selected.status === 'requested' && can('booking.booking.confirmed') && <button className="btn btn-primary" disabled={Boolean(busy) || new Date(selected.starts_at).getTime() <= Date.now()} onClick={() => change(selected, 'confirmed')}>Xác nhận lịch</button>}{selected.status === 'confirmed' && can('booking.booking.checked_in') && <button className="btn btn-primary" disabled={Boolean(busy) || Date.now() < new Date(selected.starts_at).getTime() || Date.now() >= new Date(selected.ends_at).getTime()} onClick={() => change(selected, 'checked_in')}>Check-in</button>}{selected.status === 'checked_in' && !healthcare && can('booking.booking.completed') && <button className="btn btn-primary" disabled={Boolean(busy)} onClick={() => change(selected, 'completed')}>Hoàn tất dịch vụ</button>}{selected.status === 'checked_in' && healthcare && <span className="small muted">Hoàn tất dịch vụ trong hồ sơ lượt khám.</span>}{['requested','confirmed'].includes(selected.status) && can('booking.booking.cancelled') && <button className="btn btn-ghost" disabled={Boolean(busy) || new Date(selected.starts_at).getTime() <= Date.now()} onClick={() => change(selected, 'cancelled')}>Hủy lịch</button>}{canNoShow(selected) && can('booking.booking.no_show') && <button className="btn btn-ghost" disabled={Boolean(busy)} onClick={() => change(selected, 'no_show')}>Ghi nhận vắng mặt</button>}</div>
+        <div className="row wrap" style={{ marginTop: 14 }}>{selected.status === 'requested' && can('booking.booking.update') && <button className="btn btn-secondary" disabled={Boolean(busy)} onClick={() => editingBooking ? setEditingBooking(false) : startEditBooking(selected)}>{editingBooking ? 'Đóng chỉnh sửa' : 'Sửa lịch chờ'}</button>}{selected.status === 'requested' && can('booking.booking.confirmed') && <button className="btn btn-primary" disabled={Boolean(busy) || new Date(selected.starts_at).getTime() <= Date.now()} onClick={() => change(selected, 'confirmed')}>Xác nhận lịch</button>}{selected.status === 'confirmed' && can('booking.booking.checked_in') && <button className="btn btn-primary" disabled={Boolean(busy) || Date.now() < new Date(selected.starts_at).getTime() || Date.now() >= new Date(selected.ends_at).getTime()} onClick={() => change(selected, 'checked_in')}>Check-in</button>}{selected.status === 'checked_in' && !healthcare && can('booking.booking.completed') && <button className="btn btn-primary" disabled={Boolean(busy)} onClick={() => change(selected, 'completed')}>Hoàn tất dịch vụ</button>}{selected.status === 'checked_in' && healthcare && <span className="small muted">Hoàn tất dịch vụ trong hồ sơ lượt khám.</span>}{['requested','confirmed'].includes(selected.status) && can('booking.booking.cancelled') && <button className="btn btn-ghost" disabled={Boolean(busy) || new Date(selected.starts_at).getTime() <= Date.now()} onClick={() => change(selected, 'cancelled')}>Hủy lịch</button>}{canNoShow(selected) && can('booking.booking.no_show') && <button className="btn btn-ghost" disabled={Boolean(busy)} onClick={() => change(selected, 'no_show')}>Ghi nhận vắng mặt</button>}</div>
+        {editingBooking && selected.status === 'requested' && <form className="card card-pad" style={{ marginTop: 12 }} onSubmit={saveBooking}><h3>Chỉnh lịch chờ</h3><div className="form-grid"><label className="field"><span className="label">Tài nguyên *</span><select className="select" required value={editForm.resource} onChange={(event) => setEditForm({ ...editForm, resource: event.target.value })}>{resources.map((row) => <option key={row.id} value={row.id}>{row.name} · {kindLabel(row.kind)}</option>)}</select></label><label className="field"><span className="label">Dịch vụ</span><select className="select" value={editForm.service} onChange={(event) => setEditForm({ ...editForm, service: event.target.value, price: '' })}><option value="">Không gắn dịch vụ</option>{services.map((row) => <option key={row.id} value={row.id}>{row.name} · {row.duration_min || '—'} phút</option>)}</select></label><label className="field"><span className="label">Bắt đầu *</span><input className="input" required type="datetime-local" value={editForm.starts_at} onChange={(event) => setEditForm({ ...editForm, starts_at: event.target.value })}/></label><label className="field"><span className="label">Kết thúc *</span><input className="input" required type="datetime-local" min={editForm.starts_at} value={editForm.ends_at} onChange={(event) => setEditForm({ ...editForm, ends_at: event.target.value })}/></label><label className="field"><span className="label">Giá thỏa thuận</span><input className="input" type="number" min="0" step="any" value={editForm.price} onChange={(event) => setEditForm({ ...editForm, price: event.target.value })}/></label><label className="field"><span className="label">Ghi chú</span><input className="input" maxLength="2000" value={editForm.note} onChange={(event) => setEditForm({ ...editForm, note: event.target.value })}/></label></div><div className="row" style={{ marginTop: 10 }}><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy)}>Lưu thay đổi</button></div></form>}
         {healthcare && selected.status === 'checked_in' && <p style={{ marginTop: 12 }}><a className="btn btn-secondary btn-sm" href="#/clinic">Mở hồ sơ phòng khám</a></p>}
         {invoiceByBooking.has(selected.id) && <p style={{ marginTop: 12 }}><a className="btn btn-secondary btn-sm" href={`#/e/accounting/invoice/${invoiceByBooking.get(selected.id).id}`}>Mở hóa đơn {statusLabel(invoiceByBooking.get(selected.id).status)}</a></p>}
       </section>}
