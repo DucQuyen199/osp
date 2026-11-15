@@ -32,6 +32,11 @@ pub async fn prepare_document(
             errors.push(format!("{prefix} không hợp lệ"));
             continue;
         };
+        if reprice {
+            for field in ["base_qty", "uom_name", "uom_ratio", "base_uom"] {
+                line.remove(field);
+            }
+        }
         if !line
             .get("qty")
             .and_then(money::decimal)
@@ -76,10 +81,66 @@ pub async fn prepare_document(
                 errors.push(format!("{prefix}: sản phẩm chưa có đơn giá hợp lệ"));
                 continue;
             };
-            line.insert(
-                "price".into(),
-                money::json_number(price).unwrap_or(Value::Null),
-            );
+            let selected_unit = match line.get("uom") {
+                Some(Value::String(value)) => match Uuid::parse_str(value) {
+                    Ok(unit) => Some(unit),
+                    Err(_) => {
+                        errors.push(format!("{prefix}: selected unit is invalid"));
+                        continue;
+                    }
+                },
+                Some(value) if !value.is_null() => {
+                    errors.push(format!("{prefix}: selected unit is invalid"));
+                    continue;
+                }
+                _ => None,
+            };
+            let unit = match crate::modules::master_data::unit_conversion::resolve(
+                tx,
+                tenant,
+                product,
+                selected_unit,
+            )
+            .await?
+            {
+                Ok(unit) => unit,
+                Err(message) => {
+                    errors.push(format!("{prefix}: {message}"));
+                    continue;
+                }
+            };
+            let Some(base_qty) = line
+                .get("qty")
+                .and_then(money::decimal)
+                .and_then(|qty| unit.base_quantity(qty))
+                .and_then(money::json_number)
+            else {
+                errors.push(format!("{prefix}: converted quantity is invalid"));
+                continue;
+            };
+            let Some(unit_ratio) = money::json_number(unit.ratio) else {
+                errors.push(format!("{prefix}: unit ratio exceeds the supported range"));
+                continue;
+            };
+            let Some(unit_price) = price.checked_mul(unit.ratio).and_then(money::json_number)
+            else {
+                errors.push(format!(
+                    "{prefix}: converted price exceeds the supported range"
+                ));
+                continue;
+            };
+            line.insert("base_qty".into(), base_qty);
+            line.insert("uom_ratio".into(), unit_ratio);
+            if let Some(unit_id) = unit.unit_id {
+                line.insert("uom".into(), Value::String(unit_id.to_string()));
+            }
+            if let Some(name) = unit.unit_name {
+                line.insert("uom_name".into(), Value::String(name));
+            }
+            if let Some(base_unit) = unit.base_unit_id {
+                line.insert("base_uom".into(), Value::String(base_unit.to_string()));
+            }
+            line.insert("price".into(), unit_price);
             line.insert(
                 "kind".into(),
                 Value::String(kind.clone().unwrap_or_else(|| "goods".into())),

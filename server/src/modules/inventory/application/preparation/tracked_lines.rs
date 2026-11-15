@@ -25,6 +25,11 @@ pub async fn prepare_tracked_lines(
             errors.push(format!("{key}[{}] phải là một dòng hàng", index + 1));
             continue;
         };
+        if key == "parts" && editable {
+            for field in ["base_qty", "uom_name", "uom_ratio", "base_uom"] {
+                line.remove(field);
+            }
+        }
         let Some(product_id) = line
             .get("product")
             .and_then(Value::as_str)
@@ -63,6 +68,66 @@ pub async fn prepare_tracked_lines(
         let kind = kind.unwrap_or_else(|| "goods".into());
         line.insert("tracked".into(), json!(tracked.unwrap_or(kind == "goods")));
         line.insert("kind".into(), json!(kind));
+        if key == "parts" && editable {
+            let selected_unit = match line.get("uom") {
+                Some(Value::String(value)) => match Uuid::parse_str(value) {
+                    Ok(unit) => Some(unit),
+                    Err(_) => {
+                        errors.push(format!("{key}[{}] has an invalid unit", index + 1));
+                        continue;
+                    }
+                },
+                Some(value) if !value.is_null() => {
+                    errors.push(format!("{key}[{}] has an invalid unit", index + 1));
+                    continue;
+                }
+                _ => None,
+            };
+            let unit = match crate::modules::master_data::unit_conversion::resolve(
+                tx,
+                tenant,
+                product_id,
+                selected_unit,
+            )
+            .await?
+            {
+                Ok(unit) => unit,
+                Err(message) => {
+                    errors.push(format!("{key}[{}]: {message}", index + 1));
+                    continue;
+                }
+            };
+            if let Some(quantity) = line.get("qty").and_then(crate::money::decimal) {
+                let Some(base_qty) = unit
+                    .base_quantity(quantity)
+                    .and_then(crate::money::json_number)
+                else {
+                    errors.push(format!(
+                        "{key}[{}] converted quantity is invalid",
+                        index + 1
+                    ));
+                    continue;
+                };
+                line.insert("base_qty".into(), base_qty);
+            }
+            let Some(ratio) = crate::money::json_number(unit.ratio) else {
+                errors.push(format!(
+                    "{key}[{}] unit ratio exceeds the supported range",
+                    index + 1
+                ));
+                continue;
+            };
+            line.insert("uom_ratio".into(), ratio);
+            if let Some(unit_id) = unit.unit_id {
+                line.insert("uom".into(), json!(unit_id));
+            }
+            if let Some(name) = unit.unit_name {
+                line.insert("uom_name".into(), json!(name));
+            }
+            if let Some(base_unit) = unit.base_unit_id {
+                line.insert("base_uom".into(), json!(base_unit));
+            }
+        }
     }
     Ok(errors)
 }

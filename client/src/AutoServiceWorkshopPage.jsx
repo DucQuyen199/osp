@@ -11,6 +11,7 @@ export default function AutoServiceWorkshopPage() {
   const [orders, setOrders] = useState([]);
   const [parties, setParties] = useState(new Map());
   const [products, setProducts] = useState(new Map());
+  const [units, setUnits] = useState(new Map());
   const [warehouses, setWarehouses] = useState(new Map());
   const [invoices, setInvoices] = useState([]);
   const [selectedId, setSelectedId] = useState('');
@@ -34,14 +35,14 @@ export default function AutoServiceWorkshopPage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const showInvoices = app.meta?.modules?.some((module) => module.id === 'accounting') && can('accounting.invoice.read');
-      const [vehicleResponse, orderResponse, partyMap, productMap, warehouseMap, invoiceResponse] = await Promise.all([
+      const [vehicleResponse, orderResponse, partyMap, productMap, unitMap, warehouseMap, invoiceResponse] = await Promise.all([
         api(`${dataPath('auto-service.vehicle')}?limit=1000`), api(`${dataPath('auto-service.repair_order')}?limit=1000`),
-        loadRefs('master-data.party'), loadRefs('master-data.product'), loadRefs('inventory.warehouse'),
+        loadRefs('master-data.party'), loadRefs('master-data.product'), can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()), loadRefs('inventory.warehouse'),
         showInvoices ? api(`${dataPath('accounting.invoice')}?limit=1000`) : Promise.resolve({ items: [] }),
       ]);
       const nextVehicles = itemsOf(vehicleResponse).sort((a, b) => String(a.plate || '').localeCompare(String(b.plate || '')));
       const nextOrders = itemsOf(orderResponse).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
-      setVehicles(nextVehicles); setOrders(nextOrders); setParties(partyMap); setProducts(productMap); setWarehouses(warehouseMap);
+      setVehicles(nextVehicles); setOrders(nextOrders); setParties(partyMap); setProducts(productMap); setUnits(unitMap); setWarehouses(warehouseMap);
       setInvoices(itemsOf(invoiceResponse));
       setSelectedId((current) => nextOrders.some((item) => item.id === current) ? current : nextOrders[0]?.id || '');
       setVehicleId((current) => nextVehicles.some((item) => item.id === current) ? current : nextVehicles[0]?.id || '');
@@ -57,6 +58,11 @@ export default function AutoServiceWorkshopPage() {
   const vehicleById = useMemo(() => new Map(vehicles.map((item) => [item.id, item])), [vehicles]);
   const openOrders = orders.filter((item) => !['completed', 'delivered', 'quote_declined'].includes(item.status));
   const productChoices = [...products.values()].filter((item) => item.active !== false && ['goods', 'service', undefined].includes(item.kind)).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
+  const unitsFor = (productId) => {
+    const baseUnit = products.get(productId)?.uom;
+    return baseUnit ? [...units.values()].filter((unit) => unit.id === baseUnit || unit.base_uom === baseUnit) : [];
+  };
+  const unitRatio = (line) => units.get(line.uom || products.get(line.product)?.uom)?.ratio || 1;
   const needsWarehouse = draftLines.some((line) => {
     const product = products.get(line.product);
     return product && (product.tracked ?? (product.kind === 'goods'));
@@ -77,8 +83,8 @@ export default function AutoServiceWorkshopPage() {
     finally { setBusy(''); }
   };
 
-  const addLine = () => setDraftLines((current) => [...current, { product: productChoices[0]?.id || '', qty: '1' }]);
-  const updateLine = (index, key, value) => setDraftLines((current) => current.map((line, i) => i === index ? { ...line, [key]: value } : line));
+  const addLine = () => setDraftLines((current) => [...current, { product: productChoices[0]?.id || '', qty: '1', uom: '' }]);
+  const updateLine = (index, key, value) => setDraftLines((current) => current.map((line, i) => i === index ? { ...line, [key]: value, ...(key === 'product' ? { uom: '' } : {}) } : line));
   const createOrder = async (event) => {
     event.preventDefault(); if (!vehicleId || !draftLines.length) return;
     const vehicle = vehicleById.get(vehicleId);
@@ -86,7 +92,7 @@ export default function AutoServiceWorkshopPage() {
     try {
       const created = await api(dataPath('auto-service.repair_order'), { method: 'POST', body: {
         vehicle: vehicleId, party: vehicle.party, warehouse: warehouseId || undefined, complaint: complaint.trim() || undefined,
-        lines: draftLines.map((line) => ({ product: line.product, qty: Number(line.qty) })),
+        lines: draftLines.map((line) => ({ product: line.product, qty: Number(line.qty), ...(line.uom ? { uom: line.uom } : {}) })),
       } });
       setDraftLines([]); setComplaint(''); await load(true); setSelectedId(created.id);
       setNotice(`Đã lập lệnh ${String(created.id).slice(0, 8)}. Đơn giá và tổng tiền do server lấy theo danh mục sản phẩm.`);
@@ -137,9 +143,9 @@ export default function AutoServiceWorkshopPage() {
       </div>
       <div className="workshop-lines"><div className="workshop-section-head"><h3>Phụ tùng và công việc</h3><button type="button" className="button" onClick={addLine} disabled={!productChoices.length}>Thêm dòng</button></div>
         {draftLines.map((line, index) => { const product = products.get(line.product); return <div className="workshop-line" key={index}>
-          <select className="select" required value={line.product} onChange={(event) => updateLine(index, 'product', event.target.value)}><option value="">Chọn phụ tùng / dịch vụ</option>{productChoices.map((item) => <option key={item.id} value={item.id}>{item.name} · {fmtMoney(item.price || 0)}</option>)}</select>
+          <select className="select" required value={line.product} onChange={(event) => updateLine(index, 'product', event.target.value)}><option value="">Chọn phụ tùng / dịch vụ</option>{productChoices.map((item) => <option key={item.id} value={item.id}>{item.name} · {fmtMoney(item.price || 0)}</option>)}</select>{unitsFor(line.product).length > 0 && <select className="select" aria-label="Unit" value={line.uom || products.get(line.product)?.uom || ''} onChange={(event) => updateLine(index, 'uom', event.target.value)}>{unitsFor(line.product).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ' (' + unit.ratio + ' x base)' : ' (base)'}</option>)}</select>}
           <input className="input" type="number" min="0.001" step="any" required aria-label="Số lượng" value={line.qty} onChange={(event) => updateLine(index, 'qty', event.target.value)} />
-          <strong className="num">{fmtMoney((Number(product?.price) || 0) * (Number(line.qty) || 0))}</strong>
+          <strong className="num">{fmtMoney((Number(product?.price) || 0) * unitRatio(line) * (Number(line.qty) || 0))}</strong>
           <button type="button" className="button danger" aria-label="Xóa dòng" onClick={() => setDraftLines((current) => current.filter((_, i) => i !== index))}>×</button>
         </div>; })}
       </div>
@@ -160,7 +166,7 @@ export default function AutoServiceWorkshopPage() {
         <dl className="workshop-summary"><div><dt>Xe</dt><dd>{[orderVehicle?.make, orderVehicle?.model].filter(Boolean).join(' ') || 'Chưa khai báo'} · {orderVehicle?.odometer || '—'} km</dd></div><div><dt>VIN</dt><dd>{orderVehicle?.vin || '—'}</dd></div><div><dt>Ngày nhận</dt><dd>{fmtDateTime(selected.created_at)}</dd></div></dl>
         {selected.complaint && <p className="workshop-complaint"><strong>Yêu cầu:</strong> {selected.complaint}</p>}
         {selected.status === 'quote_declined' && selected.declined_reason && <div className="alert">Khách từ chối báo giá: {selected.declined_reason}</div>}
-        <h3>Báo giá</h3><ul className="workshop-estimate">{(selected.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{line.product_name || products.get(line.product)?.name || 'Sản phẩm'} × {line.qty}</span><strong className="num">{fmtMoney((Number(line.qty) || 0) * (Number(line.price) || 0))}</strong></li>)}</ul>
+        <h3>Báo giá</h3><ul className="workshop-estimate">{(selected.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{line.product_name || products.get(line.product)?.name || 'Sản phẩm'} × {line.qty} {line.uom_name || units.get(line.uom)?.name || ''}</span><strong className="num">{fmtMoney((Number(line.qty) || 0) * (Number(line.price) || 0))}</strong></li>)}</ul>
         <div className="workshop-total"><span>Tổng cộng</span><strong className="num">{fmtMoney(selected.total || 0)}</strong></div>
         {selectedInvoice && <a className="button" href={recordHref('accounting.invoice', selectedInvoice.id)}>Mở hóa đơn {String(selectedInvoice.id).slice(0, 8)}</a>}
         <div className="workshop-actions">

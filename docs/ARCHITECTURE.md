@@ -273,3 +273,5 @@ Automatic inventory replenishment locks the tenant/warehouse handoff before reca
 Payroll now supports approved, period-specific additions and deductions. Each payslip snapshots the approved amounts, and Rust validates them against source adjustments. Accrual accounting debits gross wages, credits net employee payables, and credits withholding to configured tenant-owned asset or liability accounts. Payroll run creation is serialized and unique per non-cancelled month.
 
 Payroll payslip creation now rechecks the captured paid-day count against locked attendance, approved paid leave, and paid holidays for the run month. This prevents manual API writes from bypassing the payroll calculation's attendance snapshot.
+
+Automotive repair quotes, field-service estimates, and maintenance material reservations now snapshot each selected product unit. Service prices are scaled from the product base price by the selected unit ratio, while completion issues stock in the validated base quantity.
