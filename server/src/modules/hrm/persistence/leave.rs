@@ -262,7 +262,7 @@ pub(super) async fn validate(
                 == "full"
             && tx
                 .query_opt(
-                    "SELECT 1 FROM hrm__attendance WHERE tenant_id = $1 AND employee = $2 AND date BETWEEN $3 AND $4 LIMIT 1",
+                    "SELECT 1 FROM hrm__attendance WHERE tenant_id = $1 AND employee = $2 AND date BETWEEN $3 AND $4 AND (check_in IS NOT NULL OR check_out IS NOT NULL) LIMIT 1",
                     &[&tenant.id, &employee, &start, &end],
                 )
                 .await?
