@@ -86,6 +86,7 @@ const LmsWorkbenchPage = lazy(() => import('./LmsWorkbenchPage.jsx'));
 const QualityWorkbenchPage = lazy(() => import('./QualityWorkbenchPage.jsx'));
 const CommunicationWorkbenchPage = lazy(() => import('./CommunicationWorkbenchPage.jsx'));
 const PaymentsWorkbenchPage = lazy(() => import('./PaymentsWorkbenchPage.jsx'));
+const AssetWorkbenchPage = lazy(() => import('./AssetWorkbenchPage.jsx'));
 
 function parseRoute(hash = location.hash) {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
@@ -106,6 +107,7 @@ function parseRoute(hash = location.hash) {
   if (a === 'quality') return { name: 'quality-workbench' };
   if (a === 'communications') return { name: 'communication-workbench' };
   if (a === 'payments') return { name: 'payments-workbench' };
+  if (a === 'assets') return { name: 'asset-workbench' };
   if (a === 'utilities') return { name: 'utilities-workbench' };
   if (a === 'finance') return { name: 'finance-operations' };
   if (a === 'event-ops') return { name: 'events-operations' };
@@ -222,6 +224,7 @@ function Sidebar({ meta, route, onNavigate, open }) {
     {meta.modules.some((module) => module.id === 'loyalty') && (can('loyalty.member.read') || can('loyalty.member.create') || can('loyalty.voucher.read') || can('loyalty.voucher.create')) && link('#/loyalty', 'Khách hàng thân thiết', route.name === 'loyalty-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'accounting') && can('accounting.journal_entry.read') && link('#/reports/accounting', 'Báo cáo kế toán', route.name === 'accounting-reports', 'list')}
     {meta.modules.some((module) => module.id === 'manufacturing') && can('manufacturing.production_order.read') && link('#/reports/manufacturing/wip', 'WIP sản xuất', route.name === 'manufacturing-wip', 'list')}
+    {meta.modules.some((module) => module.id === 'asset') && (can('asset.asset.read') || can('asset.asset.create')) && link('#/assets', 'Sổ tài sản cố định', route.name === 'asset-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'asset') && can('asset.asset.read') && link('#/reports/asset/depreciation-schedule', 'Lịch khấu hao tài sản', route.name === 'asset-depreciation-schedule', 'list')}
     {meta.modules.some((module) => module.id === 'inventory') && can('inventory.reorder_rule.read') && link('#/reports/inventory/replenishment', 'Bổ sung tồn kho', route.name === 'inventory-replenishment', 'list')}
     {meta.modules.some((module) => module.id === 'inventory') && can('inventory.stock_move.read') && link('#/reports/inventory/location-stock', 'Tồn theo vị trí', route.name === 'inventory-location-stock', 'list')}
@@ -465,6 +468,7 @@ function App() {
         : route.name === 'quality-workbench' ? <QualityWorkbenchPage />
         : route.name === 'communication-workbench' ? <CommunicationWorkbenchPage />
         : route.name === 'payments-workbench' ? <PaymentsWorkbenchPage />
+        : route.name === 'asset-workbench' ? <AssetWorkbenchPage />
         : route.name === 'utilities-workbench' ? <UtilitiesWorkbenchPage />
         : route.name === 'finance-operations' ? <FinanceOperationsPage />
         : route.name === 'events-operations' ? <EventsOperationsPage />
