@@ -6,22 +6,84 @@ use serde_json::Value;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-fn receipt_quantities(lines: &[Value]) -> R<HashMap<(Uuid, Decimal, Option<Uuid>), Decimal>> {
+fn receipt_quantities(lines: &Value) -> R<HashMap<(Uuid, Decimal, Option<Uuid>), Decimal>> {
+    let Some(lines) = lines.as_array() else {
+        return Err(crate::error::ApiError::validation(
+            "purchasing.purchase_receipt",
+            vec![
+                "Purchase receipt lines are invalid; received quantities cannot be verified".into(),
+            ],
+        ));
+    };
+    if lines.is_empty() {
+        return Err(crate::error::ApiError::validation(
+            "purchasing.purchase_receipt",
+            vec!["Purchase receipt has no lines; received quantities cannot be verified".into()],
+        ));
+    }
     let mut quantities = HashMap::new();
-    for line in lines {
-        let (Some(product), Some(price), Some(qty)) = (
-            line.get("product")
-                .and_then(Value::as_str)
-                .and_then(|value| Uuid::parse_str(value).ok()),
-            line.get("price").and_then(money::decimal),
-            line.get("qty").and_then(money::decimal),
-        ) else {
-            continue;
-        };
-        let unit = line
-            .get("uom")
+    for (index, line) in lines.iter().enumerate() {
+        let Some(product) = line
+            .get("product")
             .and_then(Value::as_str)
-            .and_then(|value| Uuid::parse_str(value).ok());
+            .and_then(|value| Uuid::parse_str(value).ok())
+        else {
+            return Err(crate::error::ApiError::validation(
+                "purchasing.purchase_receipt",
+                vec![format!(
+                    "Purchase receipt line {} has an invalid product",
+                    index + 1
+                )],
+            ));
+        };
+        let Some(price) = line.get("price").and_then(money::decimal) else {
+            return Err(crate::error::ApiError::validation(
+                "purchasing.purchase_receipt",
+                vec![format!(
+                    "Purchase receipt line {} has an invalid price",
+                    index + 1
+                )],
+            ));
+        };
+        let Some(qty) = line.get("qty").and_then(money::decimal) else {
+            return Err(crate::error::ApiError::validation(
+                "purchasing.purchase_receipt",
+                vec![format!(
+                    "Purchase receipt line {} has an invalid quantity",
+                    index + 1
+                )],
+            ));
+        };
+        if price < Decimal::ZERO || qty <= Decimal::ZERO {
+            return Err(crate::error::ApiError::validation(
+                "purchasing.purchase_receipt",
+                vec![format!(
+                    "Purchase receipt line {} has a negative price or nonpositive quantity",
+                    index + 1
+                )],
+            ));
+        }
+        let unit = match line.get("uom") {
+            Some(Value::String(value)) => Some(Uuid::parse_str(value).map_err(|_| {
+                crate::error::ApiError::validation(
+                    "purchasing.purchase_receipt",
+                    vec![format!(
+                        "Purchase receipt line {} has an invalid unit",
+                        index + 1
+                    )],
+                )
+            })?),
+            Some(value) if !value.is_null() => {
+                return Err(crate::error::ApiError::validation(
+                    "purchasing.purchase_receipt",
+                    vec![format!(
+                        "Purchase receipt line {} has an invalid unit",
+                        index + 1
+                    )],
+                ));
+            }
+            _ => None,
+        };
         let quantity = quantities
             .entry((product, price, unit))
             .or_insert(Decimal::ZERO);
@@ -54,12 +116,7 @@ pub(super) async fn validate_receipt_progress(
         return Ok(vec!["Purchase order was not found for this tenant".into()]);
     };
     let ordered_lines: Value = order.get(0);
-    let ordered = receipt_quantities(
-        ordered_lines
-            .as_array()
-            .map(Vec::as_slice)
-            .unwrap_or_default(),
-    )?;
+    let ordered = receipt_quantities(&ordered_lines)?;
     let receipts = tx
         .query(
             "SELECT lines FROM purchasing__purchase_receipt WHERE tenant_id = $1 AND purchase_order = $2 AND status = 'received'",
@@ -69,9 +126,7 @@ pub(super) async fn validate_receipt_progress(
     let mut received = HashMap::<(Uuid, Decimal, Option<Uuid>), Decimal>::new();
     for row in receipts {
         let lines: Value = row.get(0);
-        for (key, qty) in
-            receipt_quantities(lines.as_array().map(Vec::as_slice).unwrap_or_default())?
-        {
+        for (key, qty) in receipt_quantities(&lines)? {
             let received_qty = received.entry(key).or_insert(Decimal::ZERO);
             *received_qty = received_qty
                 .checked_add(qty)
@@ -171,12 +226,7 @@ pub(super) async fn validate_receipt_received(
     if receipt_warehouse != order_warehouse {
         errors.push("Receipt warehouse must match the purchase order warehouse".into());
     }
-    let ordered = receipt_quantities(
-        order_lines
-            .as_array()
-            .map(Vec::as_slice)
-            .unwrap_or_default(),
-    )?;
+    let ordered = receipt_quantities(&order_lines)?;
     let prior_receipts = tx
         .query(
             "SELECT lines FROM purchasing__purchase_receipt WHERE tenant_id = $1 AND purchase_order = $2 AND id <> $3 AND status = 'received'",
@@ -186,21 +236,16 @@ pub(super) async fn validate_receipt_received(
     let mut received = HashMap::<(Uuid, Decimal, Option<Uuid>), Decimal>::new();
     for row in prior_receipts {
         let lines: Value = row.get(0);
-        for (key, qty) in
-            receipt_quantities(lines.as_array().map(Vec::as_slice).unwrap_or_default())?
-        {
+        for (key, qty) in receipt_quantities(&lines)? {
             let received_qty = received.entry(key).or_insert(Decimal::ZERO);
             *received_qty = received_qty
                 .checked_add(qty)
                 .ok_or_else(purchasing_quantity_error)?;
         }
     }
-    let receipt_lines = document
-        .get("lines")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-    let requested = receipt_quantities(&receipt_lines)?;
+    let receipt_lines_value = document.get("lines").cloned().unwrap_or(Value::Null);
+    let requested = receipt_quantities(&receipt_lines_value)?;
+    let receipt_lines = receipt_lines_value.as_array().cloned().unwrap_or_default();
     let tolerance = Decimal::new(1, 6);
     for (index, line) in receipt_lines.iter().enumerate() {
         let product = line
