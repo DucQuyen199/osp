@@ -87,6 +87,13 @@
      "required": false
     },
     {
+     "name": "document_version",
+     "label": "Phiên bản tài liệu được yêu cầu ký",
+     "type": "number",
+     "required": true,
+     "system": true
+    },
+    {
      "name": "status",
      "type": "enum",
      "required": false,

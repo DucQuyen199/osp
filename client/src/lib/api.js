@@ -49,8 +49,14 @@ export async function api(path, { method = 'GET', body, token, raw = false, head
   if (tok) h.authorization = `Bearer ${tok}`;
   let payload = body;
   if (body !== undefined && typeof body !== 'string') {
-    h['content-type'] = 'application/json';
-    payload = JSON.stringify(body);
+    const isRawBody = (typeof Blob !== 'undefined' && body instanceof Blob)
+      || (typeof ArrayBuffer !== 'undefined' && body instanceof ArrayBuffer)
+      || (typeof ArrayBuffer !== 'undefined' && ArrayBuffer.isView(body));
+    if (isRawBody) payload = body;
+    else {
+      h['content-type'] = 'application/json';
+      payload = JSON.stringify(body);
+    }
   }
   let res;
   try {

@@ -54,6 +54,13 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
             if !valid_email {
                 errors.push("A valid signer email is required".into());
             }
+            if !document
+                .get("document_version")
+                .and_then(money::decimal)
+                .is_some_and(|version| version >= Decimal::ONE && version.fract().is_zero())
+            {
+                errors.push("A signature request must identify a positive document version".into());
+            }
         }
         _ => {}
     }
@@ -95,6 +102,11 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
                 && patch.as_object().is_some_and(|patch| !patch.is_empty()) =>
         {
             return vec!["Signed or declined signature requests are immutable".into()];
+        }
+        "signature_request" if patch.get("document_version").is_some() => {
+            return vec![
+                "A signature request cannot change the document version it refers to".into(),
+            ];
         }
         "signature_request" if patch.get("status").is_some() => {
             return vec!["Signature status can change only through its lifecycle action".into()];

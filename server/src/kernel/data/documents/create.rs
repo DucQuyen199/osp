@@ -199,6 +199,13 @@ impl Kernel {
                 return Err(ApiError::validation(&qname, errors));
             }
         }
+        if qname == "document.signature_request" {
+            let errors =
+                crate::modules::document::prepare_signature_request(tx, t, &mut clean).await?;
+            if !errors.is_empty() {
+                return Err(ApiError::validation(&qname, errors));
+            }
+        }
         if qname.starts_with("bi.") {
             let errors = crate::modules::bi::prepare_document(ent.def.name.as_str(), &mut clean);
             if !errors.is_empty() {

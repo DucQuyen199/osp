@@ -140,7 +140,7 @@ async fn validate_signature_request(
     };
     let Some(row) = tx
         .query_opt(
-            "SELECT file_url FROM document__document WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+            "SELECT file_url, COALESCE(version, 1)::text FROM document__document WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
             &[&tenant.id, &document_id],
         )
         .await?
@@ -153,6 +153,14 @@ async fn validate_signature_request(
     if file_url.as_deref().is_none_or(str::is_empty) {
         return Ok(vec![
             "A document must have a file URL before requesting a signature".into(),
+        ]);
+    }
+    let current_version = row.get::<_, String>(1).parse::<i64>().unwrap_or(1);
+    if action == "created"
+        && document.get("document_version").and_then(Value::as_i64) != Some(current_version)
+    {
+        return Ok(vec![
+            "Signature request version must match the current document version".into(),
         ]);
     }
     if action == "created" {

@@ -79,6 +79,7 @@ const HelpdeskWorkbenchPage = lazy(() => import('./HelpdeskWorkbenchPage.jsx'));
 const PerformanceWorkbenchPage = lazy(() => import('./PerformanceWorkbenchPage.jsx'));
 const ApprovalWorkbenchPage = lazy(() => import('./ApprovalWorkbenchPage.jsx'));
 const ContractWorkbenchPage = lazy(() => import('./ContractWorkbenchPage.jsx'));
+const DocumentWorkbenchPage = lazy(() => import('./DocumentWorkbenchPage.jsx'));
 
 function parseRoute(hash = location.hash) {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
@@ -117,6 +118,7 @@ function parseRoute(hash = location.hash) {
   if (a === 'performance') return { name: 'performance-workbench' };
   if (a === 'approvals') return { name: 'approval-workbench' };
   if (a === 'contracts') return { name: 'contract-workbench' };
+  if (a === 'documents') return { name: 'document-workbench' };
   if (a === 'expenses') return { name: 'expense-workbench' };
   if (a === 'returns') return { name: 'sales-returns-workbench' };
   if (a === 'bank-reconciliation') return { name: 'bank-reconciliation-workbench' };
@@ -203,6 +205,7 @@ function Sidebar({ meta, route, onNavigate, open }) {
     {meta.modules.some((module) => module.id === 'bi') && (can('bi.report.read') || can('bi.dashboard.read')) && link('#/reports/bi', 'Báo cáo & phân tích', route.name === 'bi-reports', 'list')}
     {meta.modules.some((module) => module.id === 'workflow-approval') && (can('workflow-approval.approval_request.read') || can('workflow-approval.approval_request.approved') || can('workflow-approval.approval_request.rejected') || can('workflow-approval.approval_rule.read') || can('workflow-approval.approval_rule.create') || can('workflow-approval.approval_rule.update')) && link('#/approvals', 'Phê duyệt', route.name === 'approval-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'contract') && can('contract.contract.read') && link('#/contracts', 'Sổ hợp đồng', route.name === 'contract-workbench', 'list')}
+    {meta.modules.some((module) => module.id === 'document') && (can('document.document.read') || can('document.document.create') || can('document.folder.read')) && link('#/documents', 'Thư viện tài liệu', route.name === 'document-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'accounting') && can('accounting.journal_entry.read') && link('#/reports/accounting', 'Báo cáo kế toán', route.name === 'accounting-reports', 'list')}
     {meta.modules.some((module) => module.id === 'manufacturing') && can('manufacturing.production_order.read') && link('#/reports/manufacturing/wip', 'WIP sản xuất', route.name === 'manufacturing-wip', 'list')}
     {meta.modules.some((module) => module.id === 'asset') && can('asset.asset.read') && link('#/reports/asset/depreciation-schedule', 'Lịch khấu hao tài sản', route.name === 'asset-depreciation-schedule', 'list')}
@@ -476,6 +479,7 @@ function App() {
         : route.name === 'performance-workbench' ? <PerformanceWorkbenchPage />
         : route.name === 'approval-workbench' ? <ApprovalWorkbenchPage />
         : route.name === 'contract-workbench' ? <ContractWorkbenchPage />
+        : route.name === 'document-workbench' ? <DocumentWorkbenchPage />
         : route.name === 'marketing-campaign-performance' ? <MarketingCampaignPerformancePage />
         : route.name === 'helpdesk-sla' ? <HelpdeskSlaPage />
         : route.name === 'bi-reports' ? <BiReportsPage route={route} />

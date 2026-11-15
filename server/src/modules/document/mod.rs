@@ -5,7 +5,7 @@ mod persistence;
 
 pub use application::{
     AttachmentDownload, AttachmentMetadata, download_attachment, list_attachments,
-    prepare_document, upload_attachment,
+    prepare_document, prepare_signature_request, upload_attachment,
 };
 pub use domain::{validate, validate_action, validate_remove, validate_update};
 pub use persistence::validate_persistence;
