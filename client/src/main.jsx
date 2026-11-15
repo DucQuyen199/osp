@@ -83,6 +83,7 @@ const DocumentWorkbenchPage = lazy(() => import('./DocumentWorkbenchPage.jsx'));
 const IntegrationHubPage = lazy(() => import('./IntegrationHubPage.jsx'));
 const LoyaltyWorkbenchPage = lazy(() => import('./LoyaltyWorkbenchPage.jsx'));
 const LmsWorkbenchPage = lazy(() => import('./LmsWorkbenchPage.jsx'));
+const QualityWorkbenchPage = lazy(() => import('./QualityWorkbenchPage.jsx'));
 
 function parseRoute(hash = location.hash) {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
@@ -100,6 +101,7 @@ function parseRoute(hash = location.hash) {
   if (a === 'pharmacy') return { name: 'pharmacy-workbench' };
   if (a === 'education') return { name: 'education-workbench' };
   if (a === 'lms') return { name: 'lms-workbench' };
+  if (a === 'quality') return { name: 'quality-workbench' };
   if (a === 'utilities') return { name: 'utilities-workbench' };
   if (a === 'finance') return { name: 'finance-operations' };
   if (a === 'event-ops') return { name: 'events-operations' };
@@ -229,6 +231,7 @@ function Sidebar({ meta, route, onNavigate, open }) {
     {meta.modules.some((module) => module.id === 'pharmacy') && can('pharmacy.prescription.read') && link('#/pharmacy', 'Đơn thuốc nhà thuốc', route.name === 'pharmacy-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'school') && (can('school.class_session.read') || can('school.fee.read')) && link('#/education', 'Lịch lớp và học phí', route.name === 'education-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'lms') && (can('lms.course.read') || can('lms.course.create') || can('lms.enrollment.read')) && link('#/lms', 'Đào tạo trực tuyến', route.name === 'lms-workbench', 'list')}
+    {meta.modules.some((module) => module.id === 'quality') && (can('quality.nonconformance.read') || can('quality.nonconformance.create')) && link('#/quality', 'Sổ sự không phù hợp', route.name === 'quality-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'utilities') && can('utilities.meter_reading.read') && link('#/utilities', 'Công tơ và hóa đơn tiện ích', route.name === 'utilities-workbench', 'list')}
     {meta.modules.some((module) => ['lending', 'insurance'].includes(module.id)) && (can('lending.loan.read') || can('insurance.policy.read')) && link('#/finance', 'Cho vay và bảo hiểm', route.name === 'finance-operations', 'list')}
     {meta.modules.some((module) => module.id === 'events') && can('events.ticket.read') && can('events.event.read') && link('#/event-ops', 'Sự kiện và quầy vé', route.name === 'events-operations', 'list')}
@@ -453,6 +456,7 @@ function App() {
         : route.name === 'pharmacy-workbench' ? <PharmacyWorkbenchPage />
         : route.name === 'education-workbench' ? <EducationWorkbenchPage />
         : route.name === 'lms-workbench' ? <LmsWorkbenchPage />
+        : route.name === 'quality-workbench' ? <QualityWorkbenchPage />
         : route.name === 'utilities-workbench' ? <UtilitiesWorkbenchPage />
         : route.name === 'finance-operations' ? <FinanceOperationsPage />
         : route.name === 'events-operations' ? <EventsOperationsPage />
