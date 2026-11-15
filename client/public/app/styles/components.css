@@ -270,3 +270,29 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .quality-hold-actions { display: grid; gap: .4rem; min-width: 12rem; }
 .quality-partial-release { display: grid; gap: .35rem; padding-top: .35rem; border-top: 1px solid var(--border, #ddd); }
 .quality-hold-actions .input { min-width: 10rem; }
+
+.pos-receipt { display: none; }
+.pos-receipt header, .pos-receipt footer { display: grid; gap: .2rem; text-align: center; }
+.pos-receipt header strong { font-size: 1.15rem; }
+.pos-receipt hr { border: 0; border-top: 1px dashed #555; margin: .5rem 0; }
+.pos-receipt-line { display: grid; gap: .15rem; margin: .45rem 0; }
+.pos-receipt-line > div, .pos-receipt-total { display: flex; justify-content: space-between; gap: .4rem; }
+.pos-receipt-grand { font-size: 1.1rem; }
+@media print {
+  body:has(.pos-receipt.is-printing) * { visibility: hidden !important; }
+  body:has(.pos-receipt.is-printing) .pos-receipt.is-printing,
+  body:has(.pos-receipt.is-printing) .pos-receipt.is-printing * { visibility: visible !important; }
+  .pos-receipt.is-printing {
+    display: block !important;
+    position: fixed;
+    inset: 0 auto auto 0;
+    width: 72mm;
+    margin: 0;
+    padding: 3mm;
+    color: #000;
+    background: #fff;
+    font: 10pt/1.3 system-ui, sans-serif;
+    overflow-wrap: anywhere;
+    break-inside: avoid;
+  }
+}

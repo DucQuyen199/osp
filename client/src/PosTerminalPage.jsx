@@ -39,6 +39,18 @@ export default function PosTerminalPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
+  const [printingOrderId, setPrintingOrderId] = useState('');
+
+  useEffect(() => {
+    if (!printingOrderId) return undefined;
+    const finish = () => setPrintingOrderId('');
+    window.addEventListener('afterprint', finish);
+    const timer = window.setTimeout(() => window.print(), 80);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('afterprint', finish);
+    };
+  }, [printingOrderId]);
 
   const load = useCallback(async (keepNotice = false) => {
     setLoading(true);
@@ -187,6 +199,8 @@ export default function PosTerminalPage() {
     finally { setBusy(false); }
   };
 
+  const printingOrder = orders.find((order) => order.id === printingOrderId);
+
   const createCashMovement = async (event) => {
     event.preventDefault();
     if (!activeSession) return;
@@ -261,7 +275,7 @@ export default function PosTerminalPage() {
           <div className="pos-total"><span>Tạm tính</span><span>Tiền hàng <strong className="num">{fmtMoney(subtotal)}</strong></span><span>Thuế ước tính <strong className="num">{fmtMoney(estimatedTax)}</strong></span><strong className="num">{fmtMoney(total)}</strong><small>Thuế và số tiền chính thức do máy chủ tính theo danh mục khi tạo đơn.</small></div>
           <button className="btn btn-primary pos-checkout" type="button" disabled={busy || !cart.length || !can('pos.pos_order.create')} onClick={checkout}>{busy ? 'Đang xử lý…' : `Tạo đơn & thanh toán · ${fmtMoney(total)}`}</button>
           {sessionOrders.length > 0 && <section className="pos-pending"><h3>Đơn chờ xử lý ({sessionOrders.length})</h3>{sessionOrders.map((order) => <div className="pos-pending-item" key={order.id}><div><strong>{fmtMoney(order.total || 0)}</strong><div className="small muted">{fmtDateTime(order.created_at)} · {statusLabel(order.status)}</div></div><button className="btn btn-primary btn-sm" type="button" disabled={busy || !can('pos.pos_order.completed')} onClick={() => completeOrder(order)}>Hoàn tất</button><button className="btn btn-ghost btn-sm" type="button" disabled={busy || !can('pos.pos_order.delete')} onClick={() => removeOrder(order)}>Hủy</button></div>)}</section>}
-          <section className="pos-pending"><h3>Giao dịch gần đây</h3>{recentTransactions.length ? recentTransactions.map((order) => <div className="pos-pending-item" key={order.id}><div className="grow"><strong>{fmtMoney(order.total || 0)} · {parties.get(order.party)?.name || 'Khách lẻ'}</strong><div className="small muted">{fmtDateTime(order.created_at)} · {order.method === 'cash' ? 'Tiền mặt' : order.method === 'card' ? 'Thẻ' : order.method === 'transfer' ? 'Chuyển khoản' : order.method === 'ewallet' ? 'Ví điện tử' : '—'} · {statusLabel(order.status)}</div><div className="small muted">{(order.lines || []).map((line, index) => `${line.product_name || products.get(line.product)?.name || 'Mặt hàng'} × ${line.qty}${line.uom_name ? ` ${line.uom_name}` : ''}`).join(' · ')}</div>{order.refund_reason && <div className="small muted">Lý do hoàn: {order.refund_reason}</div>}</div>{order.status === 'completed' && can('pos.pos_order.refunded') && can('pos.pos_order.update') && <button className="btn btn-ghost btn-sm" type="button" disabled={busy} onClick={() => refundOrder(order)}>Hoàn toàn bộ</button>}</div>) : <div className="empty">Chưa có giao dịch hoàn tất trong danh sách gần đây.</div>}</section>
+          <section className="pos-pending"><h3>Giao dịch gần đây</h3>{recentTransactions.length ? recentTransactions.map((order) => <div className="pos-pending-item" key={order.id}><div className="grow"><strong>{fmtMoney(order.total || 0)} · {parties.get(order.party)?.name || 'Khách lẻ'}</strong><div className="small muted">{fmtDateTime(order.created_at)} · {order.method === 'cash' ? 'Tiền mặt' : order.method === 'card' ? 'Thẻ' : order.method === 'transfer' ? 'Chuyển khoản' : order.method === 'ewallet' ? 'Ví điện tử' : '—'} · {statusLabel(order.status)}</div><div className="small muted">{(order.lines || []).map((line, index) => `${line.product_name || products.get(line.product)?.name || 'Mặt hàng'} × ${line.qty}${line.uom_name ? ` ${line.uom_name}` : ''}`).join(' · ')}</div>{order.refund_reason && <div className="small muted">Lý do hoàn: {order.refund_reason}</div>}</div><button className="btn btn-ghost btn-sm" type="button" onClick={() => setPrintingOrderId(order.id)}>In biên nhận</button>{order.status === 'completed' && can('pos.pos_order.refunded') && can('pos.pos_order.update') && <button className="btn btn-ghost btn-sm" type="button" disabled={busy} onClick={() => refundOrder(order)}>Hoàn toàn bộ</button>}</div>) : <div className="empty">Chưa có giao dịch hoàn tất trong danh sách gần đây.</div>}</section>
           <details className="pos-cash-panel"><summary>Thu / chi quỹ tiền mặt</summary><form className="pos-cash-form" onSubmit={createCashMovement}>
             <label className="field"><span className="label">Loại giao dịch</span><select className="select" value={cashDirection} onChange={(event) => setCashDirection(event.target.value)}><option value="cash_out">Chi tiền</option><option value="cash_in">Nộp tiền vào quỹ</option></select></label>
             <label className="field"><span className="label">Số tiền</span><input className="input num" required type="number" min="0.01" step="any" value={cashAmount} onChange={(event) => setCashAmount(event.target.value)} /></label>
@@ -275,5 +289,29 @@ export default function PosTerminalPage() {
         </aside>
       </div>}
     </>}
+    {printingOrder && <article className="pos-receipt is-printing" aria-hidden="true">
+      <header><strong>{app.meta?.name || 'Cửa hàng'}</strong><div>BIÊN NHẬN BÁN HÀNG</div></header>
+      <hr />
+      <div>Mã đơn: {String(printingOrder.id).slice(0, 8)}</div>
+      <div>Thời gian: {fmtDateTime(printingOrder.created_at)}</div>
+      <div>Khách hàng: {parties.get(printingOrder.party)?.name || 'Khách lẻ'}</div>
+      {printingOrder.status === 'refunded' && <strong>ĐÃ HOÀN TIỀN</strong>}
+      <hr />
+      {(printingOrder.lines || []).map((line, index) => {
+        const qty = Number(line.qty) || 0;
+        const unitPrice = Number(line.price ?? line.unit_price) || 0;
+        return <div className="pos-receipt-line" key={`${line.product || 'line'}-${index}`}>
+          <strong>{line.product_name || products.get(line.product)?.name || 'Mặt hàng'}</strong>
+          <div>{qty}{line.uom_name ? ` ${line.uom_name}` : ''} × {fmtMoney(unitPrice)} <span>{fmtMoney(qty * unitPrice)}</span></div>
+        </div>;
+      })}
+      <hr />
+      {Number(printingOrder.voucher_discount) > 0 && <div className="pos-receipt-total"><span>Chiết khấu</span><span>−{fmtMoney(printingOrder.voucher_discount)}</span></div>}
+      <div className="pos-receipt-total"><span>Thuế</span><span>{fmtMoney(printingOrder.tax_total || 0)}</span></div>
+      <div className="pos-receipt-total pos-receipt-grand"><strong>Tổng cộng</strong><strong>{fmtMoney(printingOrder.total || 0)}</strong></div>
+      <div>Thanh toán: {printingOrder.method === 'cash' ? 'Tiền mặt' : printingOrder.method === 'card' ? 'Thẻ' : printingOrder.method === 'transfer' ? 'Chuyển khoản' : printingOrder.method === 'ewallet' ? 'Ví điện tử' : '—'}</div>
+      {printingOrder.refund_reason && <div>Lý do hoàn: {printingOrder.refund_reason}</div>}
+      <footer>Cảm ơn quý khách!</footer>
+    </article>}
   </div>;
 }
