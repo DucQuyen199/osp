@@ -166,6 +166,7 @@ impl Kernel {
                     "verify_email",
                     Some("email verification"),
                     Some(std::time::Duration::from_secs(24 * 60 * 60)),
+                    None,
                 )
                 .await?;
             let recipient = user.email.as_deref().unwrap_or_default();
@@ -190,10 +191,11 @@ impl Kernel {
                 "session",
                 Some("bootstrap"),
                 Some(self.cfg.session_ttl),
+                None,
             )
             .await?
         } else {
-            self.insert_token(&tx, &id, &user.id, "api", Some("bootstrap"), None)
+            self.insert_token(&tx, &id, &user.id, "api", Some("bootstrap"), None, None)
                 .await?
         };
 

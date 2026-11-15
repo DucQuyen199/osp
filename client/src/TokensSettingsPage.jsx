@@ -12,6 +12,7 @@ export default function TokensSettingsPage() {
   const [busy, setBusy] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [revealed, setRevealed] = useState(null);
+  const [tokenMode, setTokenMode] = useState('scoped');
 
   const reload = async () => {
     setError('');
@@ -27,12 +28,17 @@ export default function TokensSettingsPage() {
   const create = async (event) => {
     event.preventDefault();
     const values = new FormData(event.currentTarget);
+    const scopes = tokenMode === 'scoped'
+      ? String(values.get('scopes') || '').split(/[\n,;]/).map((scope) => scope.trim()).filter(Boolean)
+      : null;
+    if (tokenMode === 'scoped' && !scopes.length) { setError('Nhập ít nhất một quyền cho token giới hạn.'); return; }
     setBusy('create');
     setError('');
     try {
       const result = await api(tenantPath('/tokens'), { method: 'POST', body: {
         userId: values.get('userId'), label: String(values.get('label') || '').trim() || undefined,
         ttlDays: values.get('ttlDays') || undefined,
+        ...(scopes ? { scopes } : {}),
       } });
       setRevealed({ token: result.token, expiresAt: result.expiresAt });
       setShowCreate(false);
@@ -78,9 +84,11 @@ export default function TokensSettingsPage() {
       {showCreate && <form className="card stack" onSubmit={create}>
         <div className="card-head"><h2>Tạo API token</h2></div>
         {users.length === 0 ? <div className="alert danger">Cần có người dùng trước khi cấp token.</div> : <div className="form-grid">
-          <div className="field"><label htmlFor="token-user">Cấp cho</label><select className="select" id="token-user" name="userId" required>{users.filter((user) => !user.disabled).map((user) => <option key={user.id} value={user.id}>{user.name}{user.email ? ` · ${user.email}` : ''}</option>)}</select><p className="hint">Token kế thừa quyền của người dùng được chọn.</p></div>
+          <div className="field"><label htmlFor="token-mode">Phạm vi token</label><select className="select" id="token-mode" value={tokenMode} onChange={(event) => setTokenMode(event.target.value)}><option value="scoped">Giới hạn theo quyền</option><option value="api">Toàn bộ quyền của người dùng</option></select><p className="hint">Token giới hạn chỉ thực hiện được các quyền khai báo bên dưới. Không thể cấp quyền thuộc tenant.</p></div>
+          <div className="field"><label htmlFor="token-user">Cấp cho</label><select className="select" id="token-user" name="userId" required>{users.filter((user) => !user.disabled).map((user) => <option key={user.id} value={user.id}>{user.name}{user.email ? ` · ${user.email}` : ''}</option>)}</select><p className="hint">Chọn người phụ trách để lưu dấu vết và thu hồi token.</p></div>
           <div className="field"><label htmlFor="token-label">Ghi chú</label><input className="input" id="token-label" name="label" placeholder="Ví dụ: Kết nối kế toán" /></div>
           <div className="field"><label htmlFor="token-ttl">Hết hạn sau (ngày)</label><input className="input" id="token-ttl" name="ttlDays" type="number" min="1" step="1" /><p className="hint">Để trống nếu cần token không hết hạn.</p></div>
+          {tokenMode === 'scoped' && <div className="field full"><label htmlFor="token-scopes">Quyền được phép, mỗi dòng một quyền *</label><textarea className="input mono" id="token-scopes" name="scopes" rows="5" required placeholder={'sales.sales_order.read\nsales.sales_order.create\ninventory.stock_move.read'} /><p className="hint">Dạng module.entity.action. Có thể dùng wildcard cụ thể như sales.sales_order.*; mọi quyền thuộc tenant bị từ chối.</p></div>}
         </div>}
         <div className="row"><button className="btn btn-primary" type="submit" disabled={Boolean(busy) || users.every((user) => user.disabled)}>{busy === 'create' ? 'Đang tạo…' : 'Tạo token'}</button><button className="btn" type="button" onClick={() => setShowCreate(false)}>Hủy</button></div>
       </form>}
@@ -88,7 +96,7 @@ export default function TokensSettingsPage() {
         <div className="card-head"><h2>API token và phiên đăng nhập</h2><button className="btn btn-primary btn-sm" type="button" onClick={() => setShowCreate((value) => !value)}>{showCreate ? 'Đóng biểu mẫu' : 'Tạo API token'}</button></div>
         {tokens.length === 0 ? <div className="card-pad muted">Không có token hoặc phiên còn hiệu lực.</div> : <div className="table-wrap"><table className="table">
           <thead><tr><th>Loại</th><th>Người dùng</th><th>Ghi chú</th><th>Tạo lúc</th><th>Hết hạn</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
-          <tbody>{tokens.map((token) => <tr key={token.id}><td><span className="badge plain">{token.kind === 'api' ? 'API' : 'Phiên'}</span></td><td>{users.find((user) => user.id === token.userId)?.name || token.userId}</td><td>{token.label || '—'}</td><td className="nowrap">{fmtDateTime(token.createdAt)}</td><td>{token.expiresAt ? fmtDateTime(token.expiresAt) : 'Không'}</td><td className="right"><button className="btn btn-sm" type="button" disabled={Boolean(busy)} onClick={() => revoke(token)}>Thu hồi</button></td></tr>)}</tbody>
+          <tbody>{tokens.map((token) => <tr key={token.id}><td><span className="badge plain">{token.kind === 'api' ? 'API đầy đủ' : token.kind === 'scoped_api' ? 'API giới hạn' : 'Phiên'}</span></td><td>{users.find((user) => user.id === token.userId)?.name || token.userId}</td><td>{token.label || '—'}{token.kind === 'scoped_api' && <div className="small muted">{Array.isArray(token.scopes) ? token.scopes.join(' · ') : 'Không có quyền'}</div>}</td><td className="nowrap">{fmtDateTime(token.createdAt)}</td><td>{token.expiresAt ? fmtDateTime(token.expiresAt) : 'Không'}</td><td className="right"><button className="btn btn-sm" type="button" disabled={Boolean(busy)} onClick={() => revoke(token)}>Thu hồi</button></td></tr>)}</tbody>
         </table></div>}
       </section>
     </section>

@@ -50,7 +50,11 @@ impl Tenant {
 #[derive(Debug, Clone)]
 pub enum Actor {
     System,
-    User { id: String, roles: Vec<String> },
+    User {
+        id: String,
+        roles: Vec<String>,
+        scopes: Option<Vec<String>>,
+    },
 }
 
 impl Actor {
@@ -335,6 +339,13 @@ impl Kernel {
     pub fn can(&self, t: &Tenant, actor: &Actor, permission: &str) -> bool {
         match actor {
             Actor::System => true,
+            Actor::User {
+                roles: _,
+                scopes: Some(scopes),
+                ..
+            } => scopes
+                .iter()
+                .any(|scope| permission_matches(scope, permission)),
             Actor::User { roles, .. } => roles.iter().any(|r| {
                 t.roles.get(r).is_some_and(|role| {
                     role.permissions

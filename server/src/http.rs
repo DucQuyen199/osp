@@ -1556,14 +1556,43 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
             } else {
                 None
             };
+            let scopes = match b.get("scopes") {
+                Some(value) => Some(
+                    value
+                        .as_array()
+                        .ok_or_else(|| {
+                            ApiError::validation(
+                                "tenant.token",
+                                vec!["scopes must be a list".into()],
+                            )
+                        })?
+                        .iter()
+                        .map(|scope| {
+                            scope.as_str().map(str::to_string).ok_or_else(|| {
+                                ApiError::validation(
+                                    "tenant.token",
+                                    vec!["Each scope must be a string".into()],
+                                )
+                            })
+                        })
+                        .collect::<R<Vec<_>>>()?,
+                ),
+                None => None,
+            };
+            let kind = if scopes.is_some() {
+                "scoped_api"
+            } else {
+                "api"
+            };
             return Ok(Reply::Json(
                 201,
                 k.issue_token(
                     &t,
                     &uid,
-                    "api",
+                    kind,
                     b.get("label").and_then(|v| v.as_str()),
                     ttl,
+                    scopes,
                 )
                 .await?,
             ));

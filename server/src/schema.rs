@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS osp_sessions (
 );
 CREATE INDEX IF NOT EXISTS osp_sessions_user ON osp_sessions (tenant_id, user_id);
 ALTER TABLE osp_sessions ADD COLUMN IF NOT EXISTS attempts integer NOT NULL DEFAULT 0;
+ALTER TABLE osp_sessions ADD COLUMN IF NOT EXISTS scopes text[];
 
 CREATE TABLE IF NOT EXISTS osp_user_recovery_codes (
   tenant_id text NOT NULL REFERENCES osp_tenants(id) ON DELETE CASCADE,

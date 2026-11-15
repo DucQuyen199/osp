@@ -17,6 +17,24 @@ pub(crate) mod mfa;
 const LOGIN_MAX_FAILS: u32 = 5;
 const LOGIN_WINDOW: Duration = Duration::from_secs(15 * 60);
 
+fn valid_api_scope(scope: &str) -> bool {
+    if scope.len() > 160 {
+        return false;
+    }
+    let parts: Vec<&str> = scope.split('.').collect();
+    parts.len() == 3
+        && parts[0] != "tenant"
+        && parts.iter().all(|part| {
+            *part == "*"
+                || (!part.is_empty()
+                    && part.bytes().all(|byte| {
+                        byte.is_ascii_lowercase()
+                            || byte.is_ascii_digit()
+                            || matches!(byte, b'_' | b'-')
+                    }))
+        })
+}
+
 pub fn hash_token(token: &str) -> String {
     hex::encode(Sha256::digest(token.as_bytes()))
 }
@@ -190,6 +208,7 @@ impl Kernel {
         kind: &str,
         label: Option<&str>,
         ttl: Option<Duration>,
+        scopes: Option<&[String]>,
     ) -> R<(String, String, Option<String>)> {
         let token = new_token();
         let hash = hash_token(&token);
@@ -205,10 +224,10 @@ impl Kernel {
             .transpose()?;
         let row = tx
             .query_one_row(
-                "INSERT INTO osp_sessions (hash, tenant_id, user_id, kind, label, expires_at) \
-                 VALUES ($1, $2, $3, $4, $5, CASE WHEN $6::bigint IS NULL THEN NULL ELSE now() + (($6::bigint)::text || ' seconds')::interval END) \
+                "INSERT INTO osp_sessions (hash, tenant_id, user_id, kind, label, expires_at, scopes) \
+                 VALUES ($1, $2, $3, $4, $5, CASE WHEN $6::bigint IS NULL THEN NULL ELSE now() + (($6::bigint)::text || ' seconds')::interval END, $7) \
                  RETURNING to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')",
-                &[&hash, &tenant, &user, &kind, &label, &secs],
+                &[&hash, &tenant, &user, &kind, &label, &secs, &scopes],
             )
             .await?;
         Ok((token, hash[..12].to_string(), row.get(0)))
@@ -229,7 +248,7 @@ impl Kernel {
             .await?;
         let token = if password.is_none() {
             Some(
-                self.insert_token(&tx, &t.id, &u.id, "api", Some("mặc định"), None)
+                self.insert_token(&tx, &t.id, &u.id, "api", Some("mặc định"), None, None)
                     .await?
                     .0,
             )
@@ -386,7 +405,26 @@ impl Kernel {
         kind: &str,
         label: Option<&str>,
         ttl: Option<Duration>,
+        scopes: Option<Vec<String>>,
     ) -> R<Value> {
+        if kind == "scoped_api" {
+            let valid = scopes.as_ref().is_some_and(|items| {
+                !items.is_empty()
+                    && items.len() <= 200
+                    && items.iter().all(|scope| valid_api_scope(scope))
+            });
+            if !valid {
+                return Err(ApiError::validation(
+                    "tenant.token",
+                    vec!["Scoped API tokens require 1 to 200 valid, non-administrative permission scopes".into()],
+                ));
+            }
+        } else if scopes.is_some() {
+            return Err(ApiError::validation(
+                "tenant.token",
+                vec!["Permission scopes are only supported for scoped_api tokens".into()],
+            ));
+        }
         let mut conn = self.pool.get().await?;
         let tx = Tx::begin(&mut conn, &t.id, true).await?;
         if tx
@@ -404,7 +442,7 @@ impl Kernel {
             ));
         }
         let (token, id, exp) = self
-            .insert_token(&tx, &t.id, user_id, kind, label, ttl)
+            .insert_token(&tx, &t.id, user_id, kind, label, ttl, scopes.as_deref())
             .await?;
         tx.commit().await?;
         Ok(json!({ "token": token, "id": id, "expiresAt": exp }))
@@ -414,7 +452,7 @@ impl Kernel {
         let conn = self.pool.get().await?;
         let rows = conn
             .query(
-                "SELECT jsonb_build_object('id', substr(hash, 1, 12), 'userId', user_id, 'kind', kind, 'label', label, 'createdAt', created_at, 'expiresAt', expires_at) \
+                "SELECT jsonb_build_object('id', substr(hash, 1, 12), 'userId', user_id, 'kind', kind, 'label', label, 'createdAt', created_at, 'expiresAt', expires_at, 'scopes', scopes) \
                  FROM osp_sessions WHERE tenant_id = $1 AND (expires_at IS NULL OR expires_at > now()) ORDER BY created_at DESC",
                 &[&t.id],
             )
@@ -590,6 +628,7 @@ impl Kernel {
                 "session",
                 Some("đăng nhập"),
                 Some(self.cfg.session_ttl),
+                None,
             )
             .await?;
         self.audit_raw(&tx, &t.id, &uid, "login", None, None)
@@ -676,6 +715,7 @@ impl Kernel {
                 "reset",
                 Some("password reset"),
                 Some(Duration::from_secs(30 * 60)),
+                None,
             )
             .await?;
         let reset_url = format!("{origin}/#/reset-password/{token}");
@@ -746,6 +786,7 @@ impl Kernel {
                 "verify_email",
                 Some("email verification"),
                 Some(Duration::from_secs(24 * 60 * 60)),
+                None,
             )
             .await?;
         let verify_url = format!("{origin}/#/verify-email/{token}");
@@ -894,7 +935,7 @@ impl Kernel {
         let conn = self.pool.get().await.ok()?;
         let row = conn
             .query_opt(
-                "SELECT s.tenant_id, u.id, u.name, u.email, u.roles, u.disabled, u.password_hash IS NOT NULL, u.totp_enabled, to_char(u.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') \
+                "SELECT s.tenant_id, u.id, u.name, u.email, u.roles, u.disabled, u.password_hash IS NOT NULL, u.totp_enabled, to_char(u.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'), s.kind, s.scopes \
                  FROM osp_sessions s JOIN osp_users u ON u.tenant_id = s.tenant_id AND u.id = s.user_id \
                  WHERE s.hash = $1 AND s.kind NOT IN ('reset', 'verify_email', 'mfa') AND u.email_verified = true AND (s.expires_at IS NULL OR s.expires_at > now())",
                 &[&hash_token(token)],
@@ -905,11 +946,18 @@ impl Kernel {
             return None;
         }
         let tenant = self.tenant(row.get::<_, String>(0).as_str()).await.ok()?;
+        let scoped = row.get::<_, String>(9) == "scoped_api";
+        let roles = if scoped { Vec::new() } else { row.get(4) };
+        let scopes: Option<Vec<String>> = if scoped {
+            Some(row.get::<_, Option<Vec<String>>>(10).unwrap_or_default())
+        } else {
+            None
+        };
         let user = PublicUser {
             id: row.get(1),
             name: row.get(2),
             email: row.get(3),
-            roles: row.get(4),
+            roles: roles.clone(),
             disabled: false,
             has_password: row.get(6),
             mfa_enabled: row.get(7),
@@ -917,7 +965,8 @@ impl Kernel {
         };
         let actor = Actor::User {
             id: user.id.clone(),
-            roles: user.roles.clone(),
+            roles,
+            scopes,
         };
         Some((tenant, actor, user))
     }

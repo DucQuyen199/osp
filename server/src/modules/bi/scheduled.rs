@@ -297,6 +297,7 @@ pub async fn handle_source_event(
                     .unwrap_or_default()
                     .to_owned(),
                 roles: owner.get(0),
+                scopes: None,
             };
             let actor_roles = match &actor {
                 Actor::User { roles, .. } => roles,

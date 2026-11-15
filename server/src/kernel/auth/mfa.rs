@@ -235,6 +235,7 @@ pub async fn create_login_challenge(
             "mfa",
             Some("MFA login challenge"),
             Some(std::time::Duration::from_secs(5 * 60)),
+            None,
         )
         .await?;
     kernel
@@ -360,6 +361,7 @@ pub async fn complete_login(kernel: &Kernel, token: &str, code: &str) -> R<Value
             "session",
             Some("MFA login"),
             Some(kernel.cfg.session_ttl),
+            None,
         )
         .await?;
     kernel

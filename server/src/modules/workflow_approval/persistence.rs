@@ -49,7 +49,7 @@ pub async fn authorize_decision(
     if !matches!(action, "approved" | "rejected") {
         return Ok(());
     }
-    let Actor::User { id, roles } = actor else {
+    let Actor::User { id, roles, .. } = actor else {
         return Ok(());
     };
     if request.get("requested_by_user").and_then(Value::as_str) == Some(id.as_str()) {
