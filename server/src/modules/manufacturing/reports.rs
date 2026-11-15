@@ -39,9 +39,9 @@ async fn wip_subledger_balance(tx: &Tx<'_>, tenant: &Tenant, as_of: NaiveDate) -
                  COALESCE(sum(sm.total_cost) FILTER (WHERE sm.source = 'production_order_bom' AND sm.direction = 'out' AND sm.source_id = po.id::text), 0)::numeric AS base_material_cost, \
                  COALESCE(sum(sm.total_cost) FILTER (WHERE sm.source = 'production_order_bom' AND sm.direction = 'out' AND sm.source_id <> po.id::text), 0)::numeric AS rework_material_cost, \
                  COALESCE(sum(sm.total_cost) FILTER (WHERE sm.source IN ('production_order', 'production_rework', 'production_concession') AND sm.direction = 'in'), 0)::numeric AS finished_cost, \
-                 COALESCE((SELECT SUM((line->>'credit')::numeric - (line->>'debit')::numeric) FROM accounting__journal_entry entry JOIN manufacturing__production_disposition pd ON pd.tenant_id = entry.tenant_id AND pd.id::text = entry.source_id JOIN quality__inspection qi ON qi.tenant_id = pd.tenant_id AND qi.id = pd.inspection CROSS JOIN LATERAL jsonb_array_elements(COALESCE(entry.lines, '[]'::jsonb)) line JOIN accounting__account account ON account.tenant_id = entry.tenant_id AND account.id::text = line->>'account' WHERE entry.tenant_id = po.tenant_id AND entry.source = 'production_qc_scrap' AND qi.source_id = po.id::text AND qi.source IN ('production_order', 'production_rework') AND entry.status = 'posted' AND account.code = '154' AND COALESCE(entry.posting_date, (entry.created_at AT TIME ZONE 'UTC')::date) <= $2::date), 0)::numeric AS qc_scrap_cost \
+               COALESCE((SELECT SUM((line->>'credit')::numeric - (line->>'debit')::numeric) FROM accounting__journal_entry entry JOIN manufacturing__production_disposition pd ON pd.tenant_id = entry.tenant_id AND pd.id::text = entry.source_id JOIN quality__inspection qi ON qi.tenant_id = pd.tenant_id AND qi.id = pd.inspection CROSS JOIN LATERAL jsonb_array_elements(COALESCE(entry.lines, '[]'::jsonb)) line JOIN accounting__account account ON account.tenant_id = entry.tenant_id AND account.id::text = line->>'account' WHERE entry.tenant_id = po.tenant_id AND entry.source = 'production_qc_scrap' AND qi.source_id = po.id::text AND qi.source IN ('production_order', 'production_rework') AND entry.status = 'posted' AND account.code = '154' AND COALESCE(entry.posting_date, (entry.created_at AT TIME ZONE $3)::date) <= $2::date), 0)::numeric AS qc_scrap_cost \
                FROM manufacturing__production_order po \
-               LEFT JOIN inventory__stock_move sm ON sm.tenant_id = po.tenant_id AND (sm.created_at AT TIME ZONE 'UTC')::date <= $2::date AND ( \
+               LEFT JOIN inventory__stock_move sm ON sm.tenant_id = po.tenant_id AND (sm.created_at AT TIME ZONE $3)::date <= $2::date AND ( \
                  (sm.source = 'production_order_bom' AND (sm.source_id = po.id::text OR EXISTS (SELECT 1 FROM manufacturing__rework_order ro WHERE ro.tenant_id = po.tenant_id AND ro.id::text = sm.source_id AND ro.production_order = po.id))) OR \
                  (sm.source IN ('production_order', 'production_concession') AND sm.source_id = po.id::text) OR \
                  (sm.source = 'production_rework' AND EXISTS (SELECT 1 FROM manufacturing__rework_order ro WHERE ro.tenant_id = po.tenant_id AND ro.id::text = sm.source_id AND ro.production_order = po.id)) \
@@ -50,7 +50,7 @@ async fn wip_subledger_balance(tx: &Tx<'_>, tenant: &Tenant, as_of: NaiveDate) -
                FROM manufacturing__production_order po \
                JOIN production_costs cost ON cost.source_id = po.id::text \
                WHERE po.tenant_id = $1 AND po.status IN ('in_progress', 'done')",
-            &[&tenant.id, &as_of],
+            &[&tenant.id, &as_of, &tenant.business_timezone().to_string()],
         )
         .await?;
     decimal_column(&row, 0, "WIP subledger balance")
@@ -64,8 +64,8 @@ async fn ledger_wip_balance(tx: &Tx<'_>, tenant: &Tenant, as_of: NaiveDate) -> R
              CROSS JOIN LATERAL jsonb_array_elements(COALESCE(entry.lines, '[]'::jsonb)) line \
              JOIN accounting__account account ON account.tenant_id = entry.tenant_id AND account.id::text = line->>'account' \
              WHERE entry.tenant_id = $1 AND account.code = '154' AND entry.status IN ('posted', 'reversed') \
-               AND COALESCE(entry.posting_date, (entry.created_at AT TIME ZONE 'UTC')::date) <= $2::date",
-            &[&tenant.id, &as_of],
+               AND COALESCE(entry.posting_date, (entry.created_at AT TIME ZONE $3)::date) <= $2::date",
+            &[&tenant.id, &as_of, &tenant.business_timezone().to_string()],
         )
         .await?;
     decimal_column(&row, 0, "ledger WIP balance")
@@ -105,9 +105,9 @@ impl Kernel {
                  COALESCE(sum(sm.total_cost) FILTER (WHERE sm.source = 'production_order_bom' AND sm.direction = 'out' AND sm.source_id = po.id::text), 0)::numeric AS base_material_cost, \
                  COALESCE(sum(sm.total_cost) FILTER (WHERE sm.source = 'production_order_bom' AND sm.direction = 'out' AND sm.source_id <> po.id::text), 0)::numeric AS rework_material_cost, \
                  COALESCE(sum(sm.total_cost) FILTER (WHERE sm.source IN ('production_order', 'production_rework', 'production_concession') AND sm.direction = 'in'), 0)::numeric AS finished_cost, \
-                 COALESCE((SELECT SUM((line->>'credit')::numeric - (line->>'debit')::numeric) FROM accounting__journal_entry entry JOIN manufacturing__production_disposition pd ON pd.tenant_id = entry.tenant_id AND pd.id::text = entry.source_id JOIN quality__inspection qi ON qi.tenant_id = pd.tenant_id AND qi.id = pd.inspection CROSS JOIN LATERAL jsonb_array_elements(COALESCE(entry.lines, '[]'::jsonb)) line JOIN accounting__account account ON account.tenant_id = entry.tenant_id AND account.id::text = line->>'account' WHERE entry.tenant_id = po.tenant_id AND entry.source = 'production_qc_scrap' AND qi.source_id = po.id::text AND qi.source IN ('production_order', 'production_rework') AND entry.status = 'posted' AND account.code = '154' AND COALESCE(entry.posting_date, (entry.created_at AT TIME ZONE 'UTC')::date) <= $2::date), 0)::numeric AS qc_scrap_cost \
+                 COALESCE((SELECT SUM((line->>'credit')::numeric - (line->>'debit')::numeric) FROM accounting__journal_entry entry JOIN manufacturing__production_disposition pd ON pd.tenant_id = entry.tenant_id AND pd.id::text = entry.source_id JOIN quality__inspection qi ON qi.tenant_id = pd.tenant_id AND qi.id = pd.inspection CROSS JOIN LATERAL jsonb_array_elements(COALESCE(entry.lines, '[]'::jsonb)) line JOIN accounting__account account ON account.tenant_id = entry.tenant_id AND account.id::text = line->>'account' WHERE entry.tenant_id = po.tenant_id AND entry.source = 'production_qc_scrap' AND qi.source_id = po.id::text AND qi.source IN ('production_order', 'production_rework') AND entry.status = 'posted' AND account.code = '154' AND COALESCE(entry.posting_date, (entry.created_at AT TIME ZONE $3)::date) <= $2::date), 0)::numeric AS qc_scrap_cost \
                FROM manufacturing__production_order po \
-               LEFT JOIN inventory__stock_move sm ON sm.tenant_id = po.tenant_id AND (sm.created_at AT TIME ZONE 'UTC')::date <= $2::date AND ( \
+               LEFT JOIN inventory__stock_move sm ON sm.tenant_id = po.tenant_id AND (sm.created_at AT TIME ZONE $3)::date <= $2::date AND ( \
                  (sm.source = 'production_order_bom' AND (sm.source_id = po.id::text OR EXISTS (SELECT 1 FROM manufacturing__rework_order ro WHERE ro.tenant_id = po.tenant_id AND ro.id::text = sm.source_id AND ro.production_order = po.id))) OR \
                  (sm.source IN ('production_order', 'production_concession') AND sm.source_id = po.id::text) OR \
                  (sm.source = 'production_rework' AND EXISTS (SELECT 1 FROM manufacturing__rework_order ro WHERE ro.tenant_id = po.tenant_id AND ro.id::text = sm.source_id AND ro.production_order = po.id)) \
@@ -133,7 +133,7 @@ impl Kernel {
                  WHERE po.tenant_id = $1 AND po.status IN ('in_progress', 'done') \
                    AND abs(COALESCE(cost.base_material_cost, 0) + COALESCE(cost.rework_material_cost, 0) - COALESCE(cost.finished_cost, 0) - COALESCE(cost.qc_scrap_cost, 0) - CASE WHEN po.status = 'done' AND po.scrap_cost_method = 'expense' THEN COALESCE(cost.base_material_cost, 0) * COALESCE(po.scrap_qty, 0)::numeric / NULLIF(po.qty, 0)::numeric ELSE 0 END) > 0.005 \
                  ORDER BY po.updated_at, po.id",
-                &[&tenant.id, &as_of],
+                &[&tenant.id, &as_of, &tenant.business_timezone().to_string()],
             )
             .await?;
         let total_wip = wip_subledger_balance(&tx, tenant, as_of).await?;

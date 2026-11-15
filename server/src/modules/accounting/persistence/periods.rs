@@ -37,8 +37,8 @@ pub async fn validate_persistence(
                     if start != old_start || end != old_end {
                         let has_journals = tx
                             .query_opt(
-                                "SELECT 1 FROM accounting__journal_entry WHERE tenant_id = $1 AND COALESCE(posting_date, (created_at AT TIME ZONE 'UTC')::date) BETWEEN $2 AND $3 LIMIT 1",
-                                &[&tenant.id, &old_start, &old_end],
+                                "SELECT 1 FROM accounting__journal_entry WHERE tenant_id = $1 AND COALESCE(posting_date, (created_at AT TIME ZONE $4)::date) BETWEEN $2 AND $3 LIMIT 1",
+                                &[&tenant.id, &old_start, &old_end, &tenant.business_timezone().to_string()],
                             )
                             .await?
                             .is_some();
@@ -83,8 +83,8 @@ pub async fn validate_persistence(
                 }
                 if tx
                     .query_opt(
-                        "SELECT id FROM accounting__journal_entry WHERE tenant_id = $1 AND status = 'draft' AND COALESCE(posting_date, (created_at AT TIME ZONE 'UTC')::date) BETWEEN $2 AND $3 LIMIT 1",
-                        &[&tenant.id, &start, &end],
+                        "SELECT id FROM accounting__journal_entry WHERE tenant_id = $1 AND status = 'draft' AND COALESCE(posting_date, (created_at AT TIME ZONE $4)::date) BETWEEN $2 AND $3 LIMIT 1",
+                        &[&tenant.id, &start, &end, &tenant.business_timezone().to_string()],
                     )
                     .await?
                     .is_some()
@@ -111,8 +111,8 @@ pub async fn validate_persistence(
                 }
                 if tx
                     .query_opt(
-                        "SELECT id FROM accounting__journal_entry WHERE tenant_id = $1 AND COALESCE(posting_date, (created_at AT TIME ZONE 'UTC')::date) BETWEEN $2 AND $3 LIMIT 1",
-                        &[&tenant.id, &start, &end],
+                        "SELECT id FROM accounting__journal_entry WHERE tenant_id = $1 AND COALESCE(posting_date, (created_at AT TIME ZONE $4)::date) BETWEEN $2 AND $3 LIMIT 1",
+                        &[&tenant.id, &start, &end, &tenant.business_timezone().to_string()],
                     )
                     .await?
                     .is_some()

@@ -586,8 +586,8 @@ pub async fn migrate(client: &mut Client, reg: &Registry) -> Result<(), String> 
                 principal_component = COALESCE(r.principal_component, r.amount), \
                 interest_component = COALESCE(r.interest_component, 0), \
                 legacy_schedule = COALESCE(r.legacy_schedule, true), \
-                due_date = COALESCE(r.due_date, r.created_at::date) \
-            FROM ranked WHERE ranked.tenant_id = r.tenant_id AND ranked.id = r.id AND (\
+                due_date = COALESCE(r.due_date, (r.created_at AT TIME ZONE COALESCE(t.settings->>'businessTimezone', 'UTC'))::date) \
+            FROM ranked, osp_tenants t WHERE ranked.tenant_id = r.tenant_id AND ranked.id = r.id AND t.id = r.tenant_id AND (\
                 r.installment_no IS NULL OR r.principal_component IS NULL OR \
                 r.interest_component IS NULL OR r.legacy_schedule IS NULL OR r.due_date IS NULL\
             )",
