@@ -119,6 +119,42 @@
           "required": true
         },
         {
+          "name": "uom",
+          "label": "Đơn vị ghi nhận",
+          "type": "ref",
+          "required": false,
+          "ref": "master-data.uom"
+        },
+        {
+          "name": "base_qty",
+          "label": "Số lượng theo đơn vị kho",
+          "type": "number",
+          "required": false,
+          "system": true
+        },
+        {
+          "name": "uom_name",
+          "label": "Tên đơn vị tại thời điểm ghi nhận",
+          "type": "string",
+          "required": false,
+          "system": true
+        },
+        {
+          "name": "base_uom",
+          "label": "Đơn vị kho",
+          "type": "ref",
+          "required": false,
+          "ref": "master-data.uom",
+          "system": true
+        },
+        {
+          "name": "uom_ratio",
+          "label": "Tỷ lệ quy đổi đã lưu",
+          "type": "number",
+          "required": false,
+          "system": true
+        },
+        {
           "name": "grade",
           "type": "string",
           "required": false
@@ -175,6 +211,42 @@
           "name": "qty",
           "type": "number",
           "required": true
+        },
+        {
+          "name": "uom",
+          "label": "Đơn vị ghi nhận",
+          "type": "ref",
+          "required": false,
+          "ref": "master-data.uom"
+        },
+        {
+          "name": "base_qty",
+          "label": "Số lượng theo đơn vị kho",
+          "type": "number",
+          "required": false,
+          "system": true
+        },
+        {
+          "name": "uom_name",
+          "label": "Tên đơn vị tại thời điểm ghi nhận",
+          "type": "string",
+          "required": false,
+          "system": true
+        },
+        {
+          "name": "base_uom",
+          "label": "Đơn vị kho",
+          "type": "ref",
+          "required": false,
+          "ref": "master-data.uom",
+          "system": true
+        },
+        {
+          "name": "uom_ratio",
+          "label": "Tỷ lệ quy đổi đã lưu",
+          "type": "number",
+          "required": false,
+          "system": true
         },
         {
           "name": "date",

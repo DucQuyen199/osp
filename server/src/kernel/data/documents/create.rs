@@ -65,8 +65,30 @@ impl Kernel {
             }
         }
         if qname == "agriculture.input_application" {
+            let errors = crate::modules::agriculture::prepare_stock_quantity(
+                tx,
+                t,
+                ent.def.name.as_str(),
+                &mut clean,
+            )
+            .await?;
+            if !errors.is_empty() {
+                return Err(ApiError::validation(&qname, errors));
+            }
             let errors =
                 crate::modules::agriculture::prepare_input_application(tx, t, &mut clean).await?;
+            if !errors.is_empty() {
+                return Err(ApiError::validation(&qname, errors));
+            }
+        }
+        if qname == "agriculture.harvest" {
+            let errors = crate::modules::agriculture::prepare_stock_quantity(
+                tx,
+                t,
+                ent.def.name.as_str(),
+                &mut clean,
+            )
+            .await?;
             if !errors.is_empty() {
                 return Err(ApiError::validation(&qname, errors));
             }

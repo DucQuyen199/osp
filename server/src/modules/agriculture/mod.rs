@@ -5,4 +5,4 @@ mod persistence;
 
 pub use application::prepare_document;
 pub use domain::{validate, validate_action, validate_remove, validate_update};
-pub use persistence::{prepare_input_application, validate_persistence};
+pub use persistence::{prepare_input_application, prepare_stock_quantity, validate_persistence};

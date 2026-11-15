@@ -3,6 +3,77 @@ use crate::{db::Tx, error::R, kernel::Tenant};
 use serde_json::{Map, Value};
 use uuid::Uuid;
 
+/// Snapshot the selected product unit and convert operational quantities to
+/// the product's base inventory unit before source-stock events are emitted.
+pub async fn prepare_stock_quantity(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    entity: &str,
+    document: &mut Map<String, Value>,
+) -> R<Vec<String>> {
+    if !matches!(entity, "harvest" | "input_application") {
+        return Ok(Vec::new());
+    }
+    for field in ["base_qty", "uom_name", "uom_ratio", "base_uom"] {
+        document.remove(field);
+    }
+    let Some(product_id) = document
+        .get("product")
+        .and_then(Value::as_str)
+        .and_then(|value| Uuid::parse_str(value).ok())
+    else {
+        return Ok(Vec::new());
+    };
+    let selected_unit = match document.get("uom") {
+        Some(Value::String(value)) => match Uuid::parse_str(value) {
+            Ok(unit) => Some(unit),
+            Err(_) => return Ok(vec!["Selected agricultural unit is invalid".into()]),
+        },
+        Some(value) if !value.is_null() => {
+            return Ok(vec!["Selected agricultural unit is invalid".into()]);
+        }
+        _ => None,
+    };
+    let unit = match crate::modules::master_data::unit_conversion::resolve(
+        tx,
+        tenant,
+        product_id,
+        selected_unit,
+    )
+    .await?
+    {
+        Ok(unit) => unit,
+        Err(message) => return Ok(vec![format!("Agricultural unit: {message}")]),
+    };
+    if let Some(quantity) = document.get("qty").and_then(crate::money::decimal) {
+        let Some(base_quantity) = unit
+            .base_quantity(quantity)
+            .and_then(crate::money::json_number)
+        else {
+            return Ok(vec![
+                "Agricultural quantity exceeds the supported range".into(),
+            ]);
+        };
+        document.insert("base_qty".into(), base_quantity);
+    }
+    if let Some(unit_id) = unit.unit_id {
+        document.insert("uom".into(), serde_json::json!(unit_id));
+    }
+    if let Some(name) = unit.unit_name {
+        document.insert("uom_name".into(), serde_json::json!(name));
+    }
+    if let Some(base_unit) = unit.base_unit_id {
+        document.insert("base_uom".into(), serde_json::json!(base_unit));
+    }
+    let Some(ratio) = crate::money::json_number(unit.ratio) else {
+        return Ok(vec![
+            "Agricultural unit ratio exceeds the supported range".into(),
+        ]);
+    };
+    document.insert("uom_ratio".into(), ratio);
+    Ok(Vec::new())
+}
+
 pub async fn prepare_input_application(
     tx: &Tx<'_>,
     tenant: &Tenant,
