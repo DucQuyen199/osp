@@ -376,6 +376,19 @@ impl Kernel {
 
     /// Mô tả đầy đủ cho UI: module đã bật, entity (kèm trường mở rộng), thuật ngữ, vai trò.
     pub fn meta(&self, t: &Tenant) -> R<Value> {
+        let mut events: Vec<String> = self
+            .reg
+            .events
+            .iter()
+            .filter(|event_type| {
+                event_type
+                    .split('.')
+                    .next()
+                    .is_some_and(|module| t.has_module(module))
+            })
+            .cloned()
+            .collect();
+        events.sort();
         let modules: Vec<Value> = t
             .modules
             .iter()
@@ -407,7 +420,7 @@ impl Kernel {
         Ok(json!({
             "id": t.id, "name": t.name, "vertical": t.vertical, "verticalName": vertical.map(|v| v.name.clone()),
             "terminology": t.terminology, "roles": t.roles, "extensions": t.extensions, "settings": t.settings,
-            "kpis": vertical.map(|v| v.kpis.clone()).unwrap_or_default(),
+            "kpis": vertical.map(|v| v.kpis.clone()).unwrap_or_default(), "events": events,
             "allModules": all, "modules": modules,
         }))
     }

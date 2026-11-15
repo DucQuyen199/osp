@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, dataPath } from './lib/api.js';
 import { fmtDateTime } from './lib/i18n.js';
-import { can, loadAllResponse } from './lib/state.js';
+import { app, can, loadAllResponse } from './lib/state.js';
 
 const items = (value) => Array.isArray(value?.items) ? value.items : [];
 const eventExamples = ['sales.sales_order.confirmed', 'inventory.stock_move.created'];
@@ -11,6 +11,7 @@ export default function IntegrationHubPage() {
   const [webhooks, setWebhooks] = useState([]);
   const [connectorForm, setConnectorForm] = useState({ name: '', kind: '', config: '{\n  \n}' });
   const [webhookForm, setWebhookForm] = useState({ url: '', events: '', secret: '' });
+  const [eventSearch, setEventSearch] = useState('');
   const [busy, setBusy] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -30,6 +31,8 @@ export default function IntegrationHubPage() {
   }, []);
 
   useEffect(() => { document.title = 'Cổng tích hợp · OSP Suite'; load(); }, [load]);
+
+  const availableEvents = app.meta?.events || [];
 
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
@@ -63,6 +66,15 @@ export default function IntegrationHubPage() {
     }, 'Đã tạo webhook. Bí mật ký chỉ được nhập lúc tạo và không hiển thị trong danh sách.');
   }
 
+  function addCatalogEvent() {
+    const eventType = eventSearch.trim();
+    if (!eventType || !availableEvents.includes(eventType)) return;
+    const selected = webhookForm.events.split(/[\n,;]/).map((value) => value.trim()).filter(Boolean);
+    if (!selected.includes(eventType)) selected.push(eventType);
+    setWebhookForm((current) => ({ ...current, events: selected.join('\n') }));
+    setEventSearch('');
+  }
+
   async function toggle(entity, row, field) {
     const next = !(row[field] === true);
     await run(`${row.id}:${field}`, () => api(dataPath(entity, row.id), { method: 'PATCH', body: { [field]: next } }), next ? 'Đã bật cấu hình.' : 'Đã tạm ngưng cấu hình.');
@@ -80,7 +92,8 @@ export default function IntegrationHubPage() {
       </form></section>}
       {can('integration-hub.webhook.create') && <section className="card card-pad"><h2>Đăng ký webhook</h2><p className="small muted">OSP sẽ gửi payload sự kiện đã đăng ký qua HTTPS và ký payload bằng HMAC SHA-256 nếu có bí mật.</p><form className="form-grid" onSubmit={createWebhook}>
         <label className="field full"><span className="label">URL HTTPS *</span><input className="input" required type="url" placeholder="https://example.com/osp/events" value={webhookForm.url} onChange={(event) => setWebhookForm({ ...webhookForm, url: event.target.value })}/></label>
-        <label className="field full"><span className="label">Sự kiện nhận *</span><textarea className="input" rows="3" required placeholder={eventExamples.join('\n')} value={webhookForm.events} onChange={(event) => setWebhookForm({ ...webhookForm, events: event.target.value })}/><span className="small muted">Phân cách bằng dấu phẩy hoặc xuống dòng; hỗ trợ wildcard như sales.*</span></label>
+        <label className="field full"><span className="label">Chọn sự kiện từ danh mục</span><div className="row"><input className="input grow" list="integration-event-catalog" placeholder="Tìm tên sự kiện, ví dụ sales.sales_order.confirmed" value={eventSearch} onChange={(event) => setEventSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addCatalogEvent(); } }}/><button className="btn btn-secondary" type="button" disabled={!availableEvents.includes(eventSearch.trim())} onClick={addCatalogEvent}>Thêm sự kiện</button><datalist id="integration-event-catalog">{availableEvents.map((eventType) => <option key={eventType} value={eventType}/>)}</datalist></div><span className="small muted">Danh mục chỉ gồm sự kiện của module đang bật trong doanh nghiệp này.</span></label>
+        <label className="field full"><span className="label">Sự kiện nhận *</span><textarea className="input" rows="4" required placeholder={eventExamples.join('\n')} value={webhookForm.events} onChange={(event) => setWebhookForm({ ...webhookForm, events: event.target.value })}/><span className="small muted">Phân cách bằng dấu phẩy hoặc xuống dòng; hỗ trợ wildcard như sales.*</span></label>
         <label className="field full"><span className="label">Bí mật ký (tùy chọn)</span><input className="input" type="password" autoComplete="new-password" minLength="16" maxLength="256" value={webhookForm.secret} onChange={(event) => setWebhookForm({ ...webhookForm, secret: event.target.value })}/></label>
         <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy)}>Tạo webhook</button></div>
       </form></section>}
