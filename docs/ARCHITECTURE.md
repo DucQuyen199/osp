@@ -29,7 +29,7 @@ Dependency direction flows inward: domain policy does not depend on HTTP or SQL 
 
 Computed fields, numeric rule increments, schema minimums, CSV imports, KPI formulas, and financial preview/reconciliation paths use Decimal. JSON amount values pass through the shared serializer so arbitrary-precision decimal values remain numeric in API responses.
 
-Scheduled job actions run in tenant-scoped PostgreSQL transactions under row locks. Failed retries update one open failure record per tenant/job/entity instead of creating a row every scheduler tick; a successful retry resolves that record in the same transaction as the action.
+Scheduled job actions run in tenant-scoped PostgreSQL transactions under row locks. Failed retries update one open failure record per tenant/job/entity instead of creating a row every scheduler tick. The scheduler delays retries with capped exponential backoff (one minute to six hours) and skips records whose failure is still cooling down, so permanently invalid early records cannot occupy the first 500 due slots on every tick; a successful retry resolves the failure in the same transaction as the action.
 
 New domain contexts use:
 

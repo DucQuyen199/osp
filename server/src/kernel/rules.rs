@@ -563,8 +563,8 @@ impl Kernel {
                 );
                 let mut params: Vec<Box<dyn ToSql + Sync + Send>> = vec![Box::new(t.id.clone())];
                 let mut wh = vec![
-                    "tenant_id = $1".to_string(),
-                    format!("{} {op} {now_expr}", quote(&job.due.field)),
+                    "e.tenant_id = $1".to_string(),
+                    format!("e.{} {op} {now_expr}", quote(&job.due.field)),
                 ];
                 if let Some(Value::Object(w)) = &job.where_ {
                     for (k, v) in w {
@@ -573,11 +573,18 @@ impl Kernel {
                                 .map(String::from)
                                 .unwrap_or_else(|| v.to_string()),
                         ));
-                        wh.push(format!("{}::text = ${}", quote(k), params.len()));
+                        wh.push(format!("e.{}::text = ${}", quote(k), params.len()));
                     }
                 }
+                params.push(Box::new(job.id.clone()));
+                let job_param = params.len();
+                params.push(Box::new(id.clone()));
+                let module_param = params.len();
+                wh.push(format!(
+                    "NOT EXISTS (SELECT 1 FROM osp_failures f WHERE f.tenant_id = $1 AND f.module = ${module_param} AND f.event_type = 'job:' || ${job_param} AND f.rule_index = -1 AND f.status = 'open' AND f.event->>'job' = ${job_param} AND f.event->>'recordId' = e.id::text AND f.updated_at > now() - make_interval(secs => LEAST(21600, (60 * power(2, LEAST(GREATEST(f.attempts - 1, 0), 9)))::integer)))"
+                ));
                 let sql = format!(
-                    "SELECT id::text FROM {} WHERE {} ORDER BY created_at LIMIT 500",
+                    "SELECT e.id::text FROM {} AS e WHERE {} ORDER BY e.created_at LIMIT 500",
                     quote(&ent.def.table()),
                     wh.join(" AND ")
                 );

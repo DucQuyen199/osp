@@ -189,6 +189,7 @@ CREATE TABLE IF NOT EXISTS osp_failures (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS osp_failures_tenant ON osp_failures (tenant_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS osp_failures_scheduled_retry ON osp_failures (tenant_id, module, event_type, updated_at DESC) WHERE rule_index = -1 AND status = 'open';
 
 CREATE TABLE IF NOT EXISTS osp_outbox (
   id uuid PRIMARY KEY,
