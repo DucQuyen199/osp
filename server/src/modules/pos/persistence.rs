@@ -308,7 +308,11 @@ pub async fn validate_persistence(
                                 .and_then(|v| Uuid::parse_str(v).ok())
                                 == Some(*pid)
                         })
-                        .filter_map(|item| item.get("qty").and_then(money::decimal))
+                        .filter_map(|item| {
+                            item.get("base_qty")
+                                .or_else(|| item.get("qty"))
+                                .and_then(money::decimal)
+                        })
                         .try_fold(Decimal::ZERO, |sum, value| sum.checked_add(value))
                         .unwrap_or(Decimal::ZERO);
                     let already_dispensed = previously_dispensed

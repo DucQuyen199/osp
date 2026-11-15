@@ -280,6 +280,17 @@ impl Kernel {
         if errors.is_empty() && qname == "pos.pos_order" {
             errors.extend(crate::modules::pos::prepare_document(tx, t, &mut clean).await?);
         }
+        if errors.is_empty() && qname.starts_with("pharmacy.") {
+            errors.extend(
+                crate::modules::pharmacy::prepare_document(
+                    tx,
+                    t,
+                    ent.def.name.as_str(),
+                    &mut clean,
+                )
+                .await?,
+            );
+        }
         if errors.is_empty() && qname.starts_with("payments.") {
             errors.extend(
                 crate::modules::payments::prepare_document(

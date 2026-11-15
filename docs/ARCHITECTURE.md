@@ -152,6 +152,8 @@ Purchasing application use cases are grouped by workflow under `modules/purchasi
 
 Purchasing quantities, source prices, receipt progress, supplier-return limits and QC disposition checks use Decimal; PostgreSQL numeric fields and quantity aggregates are read as text before validation. Application and persistence code no longer uses binary floating point for purchasing values.
 
+Pharmacy prescriptions store each selected dispensing unit with a server-resolved base-quantity snapshot. POS prescription limits, partial-dispense status, and the pharmacy workbench compare base quantities, then present fulfillment in the prescribed unit.
+
 Quality inspection dispositions and source-document traceability use Decimal for inspected, released, returned, and held-stock quantities. Purchase-order and receipt line matching uses the same tolerance policy in Rust, while numeric aggregates are parsed from PostgreSQL text to avoid float conversions.
 
 Lending policy keeps loan and repayment invariants in `domain.rs` and annuity/date calculations in `domain/installments.rs`. Principal, annual rates, monthly interest, principal portions, and repayment totals use Decimal with cent rounding; persistence reads PostgreSQL numeric terms as decimal text and validates each generated installment against the approved loan schedule.

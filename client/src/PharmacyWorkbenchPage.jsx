@@ -5,10 +5,11 @@ import { fmtDateTime, statusLabel } from './lib/i18n.js';
 import { can, loadRefs, recordLabel } from './lib/state.js';
 
 const today = localDate;
-const newLine = () => ({ product: '', qty: '1', dosage: '' });
+const newLine = () => ({ product: '', uom: '', qty: '1', dosage: '' });
 
 export default function PharmacyWorkbenchPage() {
   const [products, setProducts] = useState([]);
+  const [units, setUnits] = useState(new Map());
   const [parties, setParties] = useState(new Map());
   const [prescriptions, setPrescriptions] = useState([]);
   const [dispensedByPrescription, setDispensedByPrescription] = useState(new Map());
@@ -22,11 +23,12 @@ export default function PharmacyWorkbenchPage() {
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const [productMap, partyMap, rxResponse, orderResponse] = await Promise.all([
-        loadRefs('master-data.product'), loadRefs('master-data.party'), api(`${dataPath('pharmacy.prescription')}?limit=1000`),
+      const [productMap, partyMap, unitMap, rxResponse, orderResponse] = await Promise.all([
+        loadRefs('master-data.product'), loadRefs('master-data.party'), can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()), api(`${dataPath('pharmacy.prescription')}?limit=1000`),
         can('pos.pos_order.read') ? api(`${dataPath('pos.pos_order')}?limit=1000`) : Promise.resolve({ items: [] }),
       ]);
       setProducts([...productMap.values()].filter((p) => p.active !== false && p.requires_prescription === true).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi')));
+      setUnits(unitMap);
       setParties(partyMap);
       setPrescriptions((rxResponse.items || []).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))));
       const dispensed = new Map();
@@ -35,7 +37,7 @@ export default function PharmacyWorkbenchPage() {
         const quantities = dispensed.get(order.prescription) || new Map();
         for (const line of Array.isArray(order.lines) ? order.lines : []) {
           if (!line.product) continue;
-          quantities.set(line.product, (quantities.get(line.product) || 0) + Number(line.qty || 0));
+          quantities.set(line.product, (quantities.get(line.product) || 0) + Number(line.base_qty ?? line.qty ?? 0));
         }
         dispensed.set(order.prescription, quantities);
       }
@@ -47,12 +49,16 @@ export default function PharmacyWorkbenchPage() {
   useEffect(() => { document.title = 'Quản lý đơn thuốc · OSP Suite'; load(); }, [load]);
   const activeLines = useMemo(() => lines.filter((line) => line.product), [lines]);
   const updateForm = (field, value) => setForm((current) => ({ ...current, [field]: value }));
-  const updateLine = (index, field, value) => setLines((current) => current.map((line, i) => i === index ? { ...line, [field]: value } : line));
+  const updateLine = (index, field, value) => setLines((current) => current.map((line, i) => i === index ? { ...line, [field]: value, ...(field === 'product' ? { uom: products.find((product) => product.id === value)?.uom || '' } : {}) } : line));
+  const unitsFor = (productId) => {
+    const baseUnit = products.find((product) => product.id === productId)?.uom;
+    return baseUnit ? [...units.values()].filter((unit) => unit.active !== false && (unit.id === baseUnit || unit.base_uom === baseUnit)) : [];
+  };
 
   const createPrescription = async (event) => {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
-      const items = activeLines.map((line) => ({ product: line.product, qty: Number(line.qty), dosage: line.dosage.trim() }));
+      const items = activeLines.map((line) => ({ product: line.product, qty: Number(line.qty), ...(line.uom ? { uom: line.uom } : {}), dosage: line.dosage.trim() }));
       await api(dataPath('pharmacy.prescription'), { method: 'POST', body: { ...form, items, status: 'draft' } });
       setForm({ prescription_no: '', party: '', prescriber: '', prescriber_license: '', issued_at: today(), valid_until: today(), notes: '' });
       setLines([newLine()]); setNotice('Đã lưu đơn thuốc ở trạng thái nháp. Hãy đối chiếu bản gốc rồi xác minh.'); await load();
@@ -85,7 +91,7 @@ export default function PharmacyWorkbenchPage() {
         <label className="field"><span className="label">Có hiệu lực đến *</span><input className="input" type="date" min={form.issued_at} required value={form.valid_until} onChange={(e) => updateForm('valid_until', e.target.value)} /></label>
         <div className="field full"><span className="label">Thuốc kê trong đơn *</span>
           {lines.map((line, index) => <div className="row wrap" key={index} style={{ marginBottom: 8 }}>
-            <select className="select" required value={line.product} onChange={(e) => updateLine(index, 'product', e.target.value)}><option value="">Chọn thuốc</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name}{product.sku ? ` · ${product.sku}` : ''}</option>)}</select>
+            <select className="select" required value={line.product} onChange={(e) => updateLine(index, 'product', e.target.value)}><option value="">Chọn thuốc</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name}{product.sku ? ` · ${product.sku}` : ''}</option>)}</select>{unitsFor(line.product).length > 0 && <select className="select" aria-label="Đơn vị thuốc" value={line.uom || products.find((product) => product.id === line.product)?.uom || ''} onChange={(event) => updateLine(index, 'uom', event.target.value)}>{unitsFor(line.product).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` (${unit.ratio} × đơn vị gốc)` : ' (đơn vị gốc)'}</option>)}</select>}
             <input className="input num" aria-label="Số lượng" required type="number" min="0.001" step="any" value={line.qty} onChange={(e) => updateLine(index, 'qty', e.target.value)} style={{ maxWidth: 120 }} />
             <input className="input" aria-label="Hướng dẫn sử dụng" required placeholder="Liều dùng / cách dùng" value={line.dosage} onChange={(e) => updateLine(index, 'dosage', e.target.value)} />
             <button className="btn btn-ghost btn-sm" type="button" disabled={lines.length === 1} onClick={() => setLines((current) => current.filter((_, i) => i !== index))}>Bỏ</button>
@@ -102,7 +108,7 @@ export default function PharmacyWorkbenchPage() {
       {loading ? <div className="skeleton" data-h="row" /> : prescriptions.length === 0 ? <div className="empty">Chưa có đơn thuốc.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Số đơn</th><th>Khách hàng</th><th>Ngày kê</th><th>Hiệu lực đến</th><th>Thuốc</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{prescriptions.map((rx) => <tr key={rx.id}>
         <td><strong>{rx.prescription_no}</strong><div className="small muted">{rx.prescriber}{rx.prescriber_license ? ` · ${rx.prescriber_license}` : ''}</div></td>
         <td>{parties.get(rx.party)?.name || 'Khách hàng'}</td><td>{rx.issued_at}</td><td>{rx.valid_until}</td>
-        <td>{(Array.isArray(rx.items) ? rx.items : []).map((item) => { const dispensed = dispensedByPrescription.get(rx.id)?.get(item.product) || 0; const remaining = Math.max(0, Number(item.qty || 0) - dispensed); return <div key={`${item.product}-${item.dosage}`}>{productName(item.product)} · kê {item.qty}{dispensed > 0 && <span className="small muted"> · đã cấp {dispensed} · còn {remaining}</span>}<div className="small muted">{item.dosage}</div></div>; })}</td>
+        <td>{(Array.isArray(rx.items) ? rx.items : []).map((item) => { const dispensed = dispensedByPrescription.get(rx.id)?.get(item.product) || 0; const ratio = Number(item.uom_ratio || 1); const prescribed = Number(item.base_qty ?? item.qty ?? 0); const remaining = Math.max(0, prescribed - dispensed); const unitDispensed = dispensed / ratio; const unitRemaining = remaining / ratio; const unitName = item.uom_name || units.get(item.uom)?.name || ''; return <div key={`${item.product}-${item.dosage}`}>{productName(item.product)} · kê {item.qty} {unitName}{dispensed > 0 && <span className="small muted"> · đã cấp {unitDispensed.toLocaleString()} · còn {unitRemaining.toLocaleString()}</span>}<div className="small muted">{item.dosage}</div></div>; })}</td>
         <td>{statusLabel(rx.status)}{rx.dispensed_at && <div className="small muted">{fmtDateTime(rx.dispensed_at)}</div>}</td>
         <td className="row wrap">{rx.status === 'draft' && <button className="btn btn-primary btn-sm" type="button" disabled={busy || !can('pharmacy.prescription.verified')} onClick={() => transition(rx, 'verified')}>Xác minh</button>}{['draft', 'verified'].includes(rx.status) && <button className="btn btn-ghost btn-sm" type="button" disabled={busy || !can('pharmacy.prescription.cancelled')} onClick={() => transition(rx, 'cancelled')}>Hủy</button>}</td>
       </tr>)}</tbody></table></div>}

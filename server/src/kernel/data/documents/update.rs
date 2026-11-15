@@ -298,6 +298,16 @@ impl Kernel {
                 return Err(ApiError::validation(&qname, errors));
             }
         }
+        if qname == "pharmacy.prescription"
+            && cur.get("status").and_then(Value::as_str) == Some("draft")
+        {
+            let errors =
+                crate::modules::pharmacy::prepare_document(tx, t, ent.def.name.as_str(), &mut cur)
+                    .await?;
+            if !errors.is_empty() {
+                return Err(ApiError::validation(&qname, errors));
+            }
+        }
         if qname == "booking.booking"
             && cur.get("status").and_then(Value::as_str) == Some("requested")
         {
