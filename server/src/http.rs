@@ -1403,6 +1403,11 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
             );
         }
         (&Method::GET, ["events"]) => return json_ok(k.event_log(&t, qnum("limit", 100)).await?),
+        (&Method::POST, ["webhooks", id, "test"]) => {
+            return json_ok(
+                crate::modules::integration_hub::test_webhook(k, &actor, &t, id).await?,
+            );
+        }
         (&Method::GET, ["audit"]) => {
             return json_ok(k.audit_log(&actor, &t, qnum("limit", 200)).await?);
         }

@@ -7,7 +7,7 @@ use crate::{
 use futures::{StreamExt, stream};
 use hmac::{Hmac, KeyInit, Mac};
 use reqwest::redirect::Policy;
-use serde_json::Value;
+use serde_json::{Value, json};
 use sha2::Sha256;
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
@@ -49,6 +49,57 @@ pub async fn run_once(kernel: &Kernel) -> R<usize> {
         })
         .await;
     Ok(count)
+}
+
+/// Send a one-off signed test event to a configured webhook without creating
+/// an operational event or an outbox item.
+pub async fn test_webhook(
+    kernel: &Kernel,
+    actor: &Actor,
+    tenant: &Tenant,
+    webhook_id: &str,
+) -> R<Value> {
+    kernel.authorize(tenant, actor, "tenant.admin")?;
+    let webhook_id = Uuid::parse_str(webhook_id)
+        .map_err(|_| ApiError::not_found("Webhook configuration not found"))?;
+    let mut conn = kernel.pool.get().await?;
+    let tx = Tx::begin(&mut conn, &tenant.id, false).await?;
+    let row = tx
+        .query_opt(
+            "SELECT url, secret FROM integration_hub__webhook WHERE tenant_id = $1 AND id = $2",
+            &[&tenant.id, &webhook_id],
+        )
+        .await?;
+    tx.commit().await?;
+    let row = row.ok_or_else(|| ApiError::not_found("Webhook configuration not found"))?;
+    let destination = Destination {
+        url: row.get(0),
+        secret: row.get(1),
+        events: None,
+    };
+    let event_id = Uuid::new_v4();
+    let event_type = "osp.webhook.test";
+    let delivery = Delivery {
+        id: Uuid::new_v4(),
+        tenant_id: tenant.id.clone(),
+        webhook_id,
+        event_type: event_type.into(),
+        payload: json!({
+            "id": event_id,
+            "type": event_type,
+            "at": chrono::Utc::now().to_rfc3339(),
+            "tenantId": tenant.id,
+            "depth": 0,
+            "recordId": null,
+            "causationId": null,
+            "data": { "test": true, "message": "OSP webhook connectivity test" },
+        }),
+        attempts: 1,
+    };
+    let status = send(&destination, &delivery)
+        .await
+        .map_err(|failure| ApiError::new(502, "WEBHOOK_TEST_FAILED", failure.message))?;
+    Ok(json!({ "ok": true, "status": status, "eventType": event_type, "eventId": event_id }))
 }
 
 pub async fn list_deliveries(
@@ -163,7 +214,7 @@ async fn process(kernel: &Kernel, delivery: &Delivery) -> R<()> {
         return Ok(());
     }
     match send(&destination, delivery).await {
-        Ok(()) => finish_delivered(kernel, delivery.id).await,
+        Ok(_) => finish_delivered(kernel, delivery.id).await,
         Err(failure) => finish_failed(kernel, delivery, failure).await,
     }
 }
@@ -189,7 +240,7 @@ async fn load_destination(kernel: &Kernel, delivery: &Delivery) -> R<Option<Dest
     }))
 }
 
-async fn send(destination: &Destination, delivery: &Delivery) -> Result<(), Failure> {
+async fn send(destination: &Destination, delivery: &Delivery) -> Result<u16, Failure> {
     let url =
         Url::parse(&destination.url).map_err(|_| Failure::permanent("invalid webhook URL"))?;
     if url.scheme() != "https" || !url.username().is_empty() || url.password().is_some() {
@@ -262,7 +313,7 @@ async fn send(destination: &Destination, delivery: &Delivery) -> Result<(), Fail
     })?;
     let status = response.status();
     if status.is_success() {
-        Ok(())
+        Ok(status.as_u16())
     } else if status.is_client_error() && status.as_u16() != 408 && status.as_u16() != 429 {
         Err(Failure::permanent(format!(
             "webhook returned HTTP {}",
