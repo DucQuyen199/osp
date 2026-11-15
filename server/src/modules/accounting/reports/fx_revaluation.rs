@@ -131,7 +131,7 @@ impl Kernel {
         as_of: Option<&str>,
     ) -> R<Value> {
         self.ensure_accounting_read(tenant, actor)?;
-        let as_of = parse_date(as_of, "asOf")?.unwrap_or_else(|| chrono::Utc::now().date_naive());
+        let as_of = parse_date(as_of, "asOf")?.unwrap_or_else(|| tenant.business_today());
         let base_code = tenant
             .setting_str("baseCurrency")
             .unwrap_or("VND")

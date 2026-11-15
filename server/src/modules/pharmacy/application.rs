@@ -288,7 +288,7 @@ pub async fn validate_dispense(
         .get("valid_until")
         .and_then(Value::as_str)
         .and_then(|date| chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").ok())
-        .is_none_or(|date| date < chrono::Utc::now().date_naive())
+        .is_none_or(|date| date < tenant.business_today())
     {
         return Ok(vec!["Không thể cấp phát đơn thuốc đã hết hạn".into()]);
     }

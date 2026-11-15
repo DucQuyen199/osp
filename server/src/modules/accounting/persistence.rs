@@ -144,7 +144,7 @@ pub async fn validate_persistence(
         ("journal_entry", "posted") => {
             lock_period_calendar(tx, tenant).await?;
             let posting_date =
-                date(document, "posting_date").unwrap_or_else(|| chrono::Utc::now().date_naive());
+                date(document, "posting_date").unwrap_or_else(|| tenant.business_today());
             if tx
                 .query_opt(
                     "SELECT id FROM accounting__period WHERE tenant_id = $1 AND status = 'period_closed' AND start_date <= $2 AND end_date >= $2 LIMIT 1",
@@ -161,7 +161,7 @@ pub async fn validate_persistence(
         ("journal_entry", "created" | "updated") => {
             lock_period_calendar(tx, tenant).await?;
             let posting_date =
-                date(document, "posting_date").unwrap_or_else(|| chrono::Utc::now().date_naive());
+                date(document, "posting_date").unwrap_or_else(|| tenant.business_today());
             if tx
                 .query_opt(
                     "SELECT id FROM accounting__period WHERE tenant_id = $1 AND status = 'period_closed' AND start_date <= $2 AND end_date >= $2 LIMIT 1",

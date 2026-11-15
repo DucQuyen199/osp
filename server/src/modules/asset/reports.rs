@@ -5,7 +5,7 @@ use crate::{
     kernel::{Actor, Kernel, Tenant},
     money,
 };
-use chrono::{Datelike, Months, NaiveDate, Utc};
+use chrono::{Datelike, Months, NaiveDate};
 use rust_decimal::Decimal;
 use serde_json::{Value, json};
 
@@ -54,7 +54,7 @@ impl Kernel {
                     )
                 })?,
         };
-        let as_of = Utc::now().date_naive();
+        let as_of = tenant.business_today();
         let current_month = NaiveDate::from_ymd_opt(as_of.year(), as_of.month(), 1)
             .ok_or_else(|| ApiError::internal("Invalid current month"))?;
         let first_period = current_month

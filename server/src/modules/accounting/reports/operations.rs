@@ -46,7 +46,7 @@ impl Kernel {
         as_of: Option<&str>,
     ) -> R<Value> {
         self.ensure_accounting_read(tenant, actor)?;
-        let as_of = parse_date(as_of, "asOf")?.unwrap_or_else(|| chrono::Utc::now().date_naive());
+        let as_of = parse_date(as_of, "asOf")?.unwrap_or_else(|| tenant.business_today());
         let (document_table, party_field, note_table, note_field, note_source, kind_label) =
             match kind {
                 "receivables" => (
@@ -138,7 +138,7 @@ impl Kernel {
         to: Option<&str>,
     ) -> R<Value> {
         self.ensure_accounting_read(tenant, actor)?;
-        let as_of = chrono::Utc::now().date_naive();
+        let as_of = tenant.business_today();
         let from = parse_date(from, "from")?.unwrap_or(as_of);
         let to = parse_date(to, "to")?.unwrap_or(from + chrono::Days::new(90));
         if from > to {

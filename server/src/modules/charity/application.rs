@@ -65,10 +65,7 @@ pub async fn handle_source_event(
     data.insert("amount".into(), amount_value);
     data.insert("method".into(), json!(method));
     data.insert("expense_account".into(), json!(expense_account));
-    data.insert(
-        "payment_date".into(),
-        json!(chrono::Utc::now().date_naive()),
-    );
+    data.insert("payment_date".into(), json!(tenant.business_today()));
     data.insert("source".into(), json!("charity_disbursement"));
     data.insert("source_id".into(), json!(disbursement_id));
     let payment = kernel.ent(tenant, "accounting.payment")?;

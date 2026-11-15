@@ -5,7 +5,6 @@ use crate::{
     kernel::{Actor, Kernel, Opts, Tenant},
     money,
 };
-use chrono::Utc;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use serde_json::{Map, Value, json};
@@ -88,7 +87,7 @@ pub async fn handle_source_event(
         .and_then(|first_due_date| domain::due_dates_from_first(first_due_date, months))
         // Older loan records predate contractual first due dates. Keep those
         // disbursements working with the former one-month-from-disbursement rule.
-        .or_else(|| domain::due_dates(Utc::now().date_naive(), months))
+        .or_else(|| domain::due_dates(tenant.business_today(), months))
         .ok_or_else(|| ApiError::internal("Could not calculate monthly due dates"))?;
     let entity = kernel.ent(tenant, "lending.repayment")?;
     for (index, ((amount, principal_component, interest_component), due_date)) in

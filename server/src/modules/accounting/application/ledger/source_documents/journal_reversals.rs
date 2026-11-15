@@ -95,7 +95,7 @@ pub(super) async fn handle(
     );
     data.insert(
         "posting_date".into(),
-        Value::String(chrono::Utc::now().date_naive().to_string()),
+        Value::String(tenant.business_today().to_string()),
     );
     data.insert("lines".into(), Value::Array(reversal_lines));
     data.insert("source".into(), Value::String("reversal".into()));

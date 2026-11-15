@@ -118,7 +118,7 @@ pub(super) async fn create_posted_journal_at_value(
         Value::String(
             posting_date
                 .map(str::to_owned)
-                .unwrap_or_else(|| chrono::Utc::now().date_naive().to_string()),
+                .unwrap_or_else(|| tenant.business_today().to_string()),
         ),
     );
     data.insert("source".into(), Value::String(source.into()));

@@ -8,12 +8,12 @@ use uuid::Uuid;
 
 type BudgetKey = (Uuid, Option<Uuid>);
 
-fn posting_date(document: &Value) -> NaiveDate {
+fn posting_date(document: &Value, tenant: &Tenant) -> NaiveDate {
     document
         .get("posting_date")
         .and_then(Value::as_str)
         .and_then(|value| NaiveDate::parse_from_str(value, "%Y-%m-%d").ok())
-        .unwrap_or_else(|| chrono::Utc::now().date_naive())
+        .unwrap_or_else(|| tenant.business_today())
 }
 
 fn period_keys(date: NaiveDate) -> Vec<String> {
@@ -54,7 +54,7 @@ pub(super) async fn validate_journal_posting(
     let Some(lines) = document.get("lines").and_then(Value::as_array) else {
         return Ok(Vec::new());
     };
-    let date = posting_date(document);
+    let date = posting_date(document, tenant);
     let periods = period_keys(date);
     lock_periods(tx, tenant, &periods).await?;
 

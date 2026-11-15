@@ -56,7 +56,7 @@ pub(super) async fn validate(
             let Ok(valid_until) = chrono::NaiveDate::parse_from_str(valid_until, "%Y-%m-%d") else {
                 return Ok(vec!["Quote validity date is invalid".into()]);
             };
-            if valid_until < chrono::Utc::now().date_naive() {
+            if valid_until < tenant.business_today() {
                 errors.push("Expired supplier quotes cannot be submitted or awarded".into());
             }
         }

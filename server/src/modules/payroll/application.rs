@@ -171,7 +171,7 @@ async fn handle_hrm_source_change(
                 .and_then(|date| {
                     NaiveDate::parse_from_str(date.get(..10).unwrap_or(""), "%Y-%m-%d").ok()
                 })
-                .unwrap_or_else(|| chrono::Utc::now().date_naive())
+                .unwrap_or_else(|| tenant.business_today())
                 .format("%Y-%m")
                 .to_string();
             tx.query_opt(

@@ -6,7 +6,6 @@ use crate::{
     kernel::Tenant,
     money,
 };
-use chrono::Utc;
 use rust_decimal::Decimal;
 use serde_json::Value;
 use uuid::Uuid;
@@ -169,7 +168,7 @@ pub async fn validate_persistence(
                 .get("period")
                 .and_then(Value::as_str)
                 .and_then(period_end);
-            if !end.is_some_and(|end| end < Utc::now().date_naive()) {
+            if !end.is_some_and(|end| end < tenant.business_today()) {
                 errors.push("A budget can only close after its period has ended".into());
             }
         }

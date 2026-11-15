@@ -56,7 +56,7 @@ async fn apply_lease_amendment(
             vec!["Ngày hiệu lực phụ lục không hợp lệ".into()],
         ));
     };
-    let today = chrono::Utc::now().date_naive();
+    let today = tenant.business_today();
     let old_end = domain::date(&lease, "end_date");
     let new_end = match changes.get("end_date") {
         Some(Value::Null) => {
@@ -543,7 +543,7 @@ async fn bill_due_rent(
             vec!["Rent billing requires an amount".into()],
         )
     })?;
-    let today = chrono::Utc::now().date_naive();
+    let today = tenant.business_today();
     let anchor = start.day();
     let months = domain::interval_months(document);
     let rent_cycle = kernel.ent(tenant, "real-estate.rent_cycle")?;

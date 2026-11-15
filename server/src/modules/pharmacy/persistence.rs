@@ -78,7 +78,7 @@ pub async fn validate_persistence(
         if doc
             .get("valid_until")
             .and_then(Value::as_str)
-            .is_some_and(|date| date < chrono::Utc::now().date_naive().to_string().as_str())
+            .is_some_and(|date| date < tenant.business_today().to_string().as_str())
         {
             errors.push("Không thể xác minh đơn thuốc đã hết hạn".into());
         }

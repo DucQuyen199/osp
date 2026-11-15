@@ -1,7 +1,7 @@
 //! Tenant-scoped fixed-asset and depreciation persistence invariants.
 use super::domain::{date, number};
 use crate::{db::Tx, error::R, kernel::Tenant, money};
-use chrono::{Datelike, NaiveDate, Utc};
+use chrono::{Datelike, NaiveDate};
 use rust_decimal::Decimal;
 use serde_json::Value;
 use uuid::Uuid;
@@ -302,7 +302,7 @@ pub async fn validate_persistence(
                 }
             }
             if let Some(period) = date(document, "period") {
-                let current = Utc::now().date_naive();
+                let current = tenant.business_today();
                 if (period.year(), period.month()) > (current.year(), current.month()) {
                     errors.push("Không thể ghi sổ khấu hao cho tháng trong tương lai".into());
                 }

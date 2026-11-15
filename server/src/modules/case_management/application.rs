@@ -1,6 +1,5 @@
 //! Normalize case commands and derive client/fee snapshots from source records.
 use crate::{db::Tx, error::R, kernel::Tenant, money};
-use chrono::Utc;
 use rust_decimal::{Decimal, RoundingStrategy};
 use serde_json::{Map, Value};
 use uuid::Uuid;
@@ -21,7 +20,7 @@ pub async fn prepare_document(
             if !document.contains_key("opened_on") && !document.contains_key("id") {
                 document.insert(
                     "opened_on".into(),
-                    Value::String(Utc::now().date_naive().to_string()),
+                    Value::String(tenant.business_today().to_string()),
                 );
             }
         }
@@ -31,7 +30,7 @@ pub async fn prepare_document(
             if !document.contains_key("date") && !document.contains_key("id") {
                 document.insert(
                     "date".into(),
-                    Value::String(Utc::now().date_naive().to_string()),
+                    Value::String(tenant.business_today().to_string()),
                 );
             }
             let Some(case_id) = document

@@ -127,7 +127,7 @@ pub async fn prepare_currency_posting(
         };
         let rate_date = rate_date
             .or(issue_date)
-            .unwrap_or_else(|| chrono::Utc::now().date_naive());
+            .unwrap_or_else(|| tenant.business_today());
         (currency_id, exchange_rate, rate_date)
     } else {
         let currency_id = match document
@@ -175,7 +175,7 @@ pub async fn prepare_currency_posting(
         {
             Some(date) => date,
             None => {
-                let today = chrono::Utc::now().date_naive();
+                let today = tenant.business_today();
                 document.insert("issue_date".into(), Value::String(today.to_string()));
                 today
             }
@@ -356,7 +356,7 @@ pub async fn prepare_payment_currency(
         },
         Some(_) => return Ok(vec!["Payment date must use YYYY-MM-DD".into()]),
         None => {
-            let today = chrono::Utc::now().date_naive();
+            let today = tenant.business_today();
             document.insert("payment_date".into(), Value::String(today.to_string()));
             today
         }

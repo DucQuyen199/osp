@@ -276,7 +276,7 @@ pub async fn validate_persistence(
                 if !matches!(status.as_str(), "verified" | "partially_dispensed") {
                     errors.push("Chỉ dùng đơn thuốc đã xác minh hoặc đang cấp một phần".into());
                 }
-                if valid_until.is_none_or(|date| date < chrono::Utc::now().date_naive()) {
+                if valid_until.is_none_or(|date| date < tenant.business_today()) {
                     errors.push("Đơn thuốc đã hết hạn".into());
                 }
                 let order_party = document

@@ -4,7 +4,6 @@ use crate::{
     kernel::{Actor, Kernel, Opts, Tenant},
     money,
 };
-use chrono::Utc;
 use rust_decimal::Decimal;
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
@@ -61,7 +60,7 @@ pub async fn apply_to_order(
         return Ok(vec!["Voucher này đã được sử dụng".into()]);
     }
     let valid_until: Option<chrono::NaiveDate> = row.get(3);
-    if valid_until.is_some_and(|date| date < Utc::now().date_naive()) {
+    if valid_until.is_some_and(|date| date < tenant.business_today()) {
         return Ok(vec!["Voucher đã hết hạn".into()]);
     }
     let party = document

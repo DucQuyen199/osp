@@ -234,7 +234,7 @@ impl Kernel {
     ) -> R<Value> {
         let as_of = as_of
             .map(str::to_owned)
-            .unwrap_or_else(|| chrono::Utc::now().date_naive().to_string());
+            .unwrap_or_else(|| tenant.business_today().to_string());
         let trial_balance = self
             .accounting_trial_balance(actor, tenant, None, Some(&as_of))
             .await?;

@@ -94,7 +94,7 @@ impl Kernel {
                     .map_err(|_| ApiError::new(422, "INVALID_DATE", "asOf must use YYYY-MM-DD"))
             })
             .transpose()?
-            .unwrap_or_else(|| chrono::Utc::now().date_naive());
+            .unwrap_or_else(|| tenant.business_today());
 
         let mut conn = self.pool.get().await?;
         let tx = Tx::begin(&mut conn, &tenant.id, false).await?;

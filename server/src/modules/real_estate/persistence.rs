@@ -151,16 +151,13 @@ async fn validate_reservation(
     }
     if action == "expired" {
         let expires_on = document.get("expires_on").and_then(Value::as_str);
-        if expires_on
-            .is_none_or(|date| date >= chrono::Utc::now().date_naive().to_string().as_str())
-        {
+        if expires_on.is_none_or(|date| date >= tenant.business_today().to_string().as_str()) {
             errors.push("A reservation expires only after its expiry date has passed".into());
         }
     }
     if action == "converted" {
         let expires_on = document.get("expires_on").and_then(Value::as_str);
-        if expires_on.is_none_or(|date| date < chrono::Utc::now().date_naive().to_string().as_str())
-        {
+        if expires_on.is_none_or(|date| date < tenant.business_today().to_string().as_str()) {
             errors.push("An expired reservation cannot be converted to a sale".into());
         }
     }
@@ -215,7 +212,7 @@ async fn validate_rent_due(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<
     let status: String = row.get(0);
     let next: Option<chrono::NaiveDate> = row.get(1);
     let end: Option<chrono::NaiveDate> = row.get(2);
-    let today = chrono::Utc::now().date_naive();
+    let today = tenant.business_today();
     if status != "active"
         || next.is_none_or(|date| date > today || end.is_some_and(|end| date > end))
     {
