@@ -7,6 +7,7 @@ import { recordHref } from './lib/routes.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const today = localDate;
+const activeStay = (reservation) => ['booked', 'checked_in'].includes(reservation.status);
 const nextDay = (value) => {
   if (!value) return '';
   const date = new Date(`${value}T00:00:00Z`);
@@ -62,14 +63,20 @@ export default function HotelFrontDeskPage() {
   const selectedCharges = useMemo(() => charges.filter((item) => item.reservation === selectedId), [charges, selectedId]);
   const selectedInvoice = invoices.find((item) => item.source === 'reservation' && item.source_id === selectedId);
   const visible = reservations.filter((item) => filter === 'all' || item.status === filter || (filter === 'arrivals' && item.check_in === today() && item.status === 'booked') || (filter === 'departures' && item.check_out === today() && item.status === 'checked_in'));
-  const availableRooms = [...rooms.values()].filter((room) => {
-    if (room.room_type !== (selected?.room_type || roomType) || room.status !== 'vacant') return false;
-    if (!selected?.check_in || !selected?.check_out) return true;
-    return !reservations.some((reservation) => reservation.id !== selected.id
-      && reservation.room === room.id
-      && ['booked', 'checked_in'].includes(reservation.status)
+  const assignmentRoomType = selected?.room_type || roomType;
+  const typeRooms = [...rooms.values()].filter((room) => room.room_type === assignmentRoomType);
+  const overlappingStays = selected?.check_in && selected?.check_out
+    ? reservations.filter((reservation) => reservation.id !== selected.id
+      && activeStay(reservation)
+      && (rooms.get(reservation.room)?.room_type || reservation.room_type) === assignmentRoomType
       && reservation.check_in < selected.check_out
-      && reservation.check_out > selected.check_in);
+      && reservation.check_out > selected.check_in)
+    : [];
+  const roomTypeHasCapacity = overlappingStays.length < typeRooms.length;
+  const availableRooms = typeRooms.filter((room) => {
+    if (!selected?.check_in || !selected?.check_out) return true;
+    if (!roomTypeHasCapacity) return false;
+    return !overlappingStays.some((reservation) => reservation.room === room.id);
   });
   const arrivalsToday = reservations.filter((item) => item.status === 'booked' && item.check_in === today()).length;
   const departuresToday = reservations.filter((item) => item.status === 'checked_in' && item.check_out === today()).length;
@@ -157,7 +164,7 @@ export default function HotelFrontDeskPage() {
         <article className="card hotel-detail-card"><header className="hotel-detail-head"><div><h2>{recordLabel('master-data.party', parties.get(selected.party))}</h2><p className="small muted">{roomTypes.get(selected.room_type)?.name || 'Loại phòng'} · {selected.guest_count || 1} khách · {selected.nights || '—'} đêm · {fmtDate(selected.check_in)} đến {fmtDate(selected.check_out)}</p></div><span className={`badge ${reservationStatus(selected.status)}`}>{statusLabel(selected.status)}</span></header>
           <div className="hotel-folio-total"><span>Phòng {selected.room ? rooms.get(selected.room)?.number || '' : 'chưa phân'} · {fmtMoney(selected.nightly_rate || 0)} / đêm</span><strong>{fmtMoney(selected.total || 0)}</strong></div>
           {selected.status === 'no_show' && selected.no_show_reason && <div className="alert warning" role="status">Lý do khách vắng mặt: {selected.no_show_reason}</div>}
-          {selected.status === 'booked' && <div className="hotel-checkin-tools"><label className="field"><span className="label">Phân phòng</span><select className="select" value={assignment} onChange={(event) => setAssignment(event.target.value)}><option value="">Chọn phòng trống</option>{availableRooms.map((room) => <option key={room.id} value={room.id}>{room.number}{room.floor ? ` · Tầng ${room.floor}` : ''}</option>)}</select></label><button className="btn btn-secondary" type="button" disabled={Boolean(busy) || !assignment || assignment === selected.room || !can('hotel.reservation.update')} onClick={() => assignRoom(selected)}>Lưu phòng</button></div>}
+          {selected.status === 'booked' && <div className="hotel-checkin-tools"><label className="field"><span className="label">Phân phòng</span><select className="select" value={assignment} onChange={(event) => setAssignment(event.target.value)}><option value="">{availableRooms.length ? 'Chọn phòng không trùng lịch' : 'Không còn phòng theo lịch ngày này'}</option>{availableRooms.map((room) => <option key={room.id} value={room.id}>{room.number}{room.floor ? ` · Tầng ${room.floor}` : ''}{room.status !== 'vacant' ? ` · ${statusLabel(room.status)} hiện tại` : ''}</option>)}</select></label><button className="btn btn-secondary" type="button" disabled={Boolean(busy) || !assignment || assignment === selected.room || !can('hotel.reservation.update')} onClick={() => assignRoom(selected)}>Lưu phòng</button></div>}
           {selected.status === 'booked' && selected.check_in < today() && can('hotel.reservation.no_show') && can('hotel.reservation.update') && <div className="hotel-no-show-tools">{selectedCharges.length > 0 && <div className="alert warning" role="status">Đặt phòng còn phí folio; cần xử lý folio trước khi ghi nhận khách vắng mặt.</div>}<label className="field"><span className="label">Lý do khách vắng mặt *</span><textarea className="textarea" rows="2" maxLength="500" required value={noShowReason} onChange={(event) => setNoShowReasons((current) => ({ ...current, [selected.id]: event.target.value }))} placeholder="Ví dụ: khách không đến, không liên lạc được" /></label>{selectedCharges.length === 0 && <button className="btn btn-secondary" type="button" disabled={Boolean(busy) || !noShowReason.trim()} onClick={() => transition(selected, 'no_show')}>Ghi nhận khách vắng mặt</button>}</div>}
           <footer className="row wrap hotel-detail-actions">{selected.status === 'booked' && can('hotel.reservation.checked_in') && <button className="btn btn-primary" type="button" disabled={Boolean(busy) || !selected.room} title={!selected.room ? 'Phân phòng trước khi nhận khách' : ''} onClick={() => transition(selected, 'checked_in')}>Nhận phòng</button>}{selected.status === 'checked_in' && can('hotel.reservation.checked_out') && <button className="btn btn-primary" type="button" disabled={Boolean(busy)} onClick={() => transition(selected, 'checked_out')}>Trả phòng · chốt folio</button>}{selected.status === 'booked' && can('hotel.reservation.cancelled') && <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => transition(selected, 'cancelled')}>Hủy đặt phòng</button>}{selectedInvoice && can('accounting.invoice.read') && <a className="btn btn-secondary" href={recordHref('accounting.invoice', selectedInvoice.id)}>Mở hóa đơn · {statusLabel(selectedInvoice.status)}</a>}</footer>
         </article>
