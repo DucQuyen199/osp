@@ -566,10 +566,35 @@ pub async fn validate_persistence(
     if action == "retest" && matches!(source, Some("purchase_order" | "purchase_receipt")) {
         if let Some(inspection_id) = id(document, "id") {
             if tx.query_opt(
-                "SELECT id FROM purchasing__purchase_return WHERE tenant_id = $1 AND inspection = $2 AND status IN ('submitted', 'approved', 'dispatched') LIMIT 1",
+                "SELECT id FROM purchasing__purchase_return WHERE tenant_id = $1 AND inspection = $2 AND status IN ('submitted', 'approved') LIMIT 1",
                 &[&tenant.id, &inspection_id],
             ).await?.is_some() {
-                errors.push("Không gửi kiểm tra lại khi hàng đã có phiếu trả nhà cung cấp".into());
+                errors.push("Không thể kiểm định lại khi phiếu trả nhà cung cấp còn chờ xử lý hoặc duyệt".into());
+            }
+            let returned = tx.query_opt(
+                "SELECT COALESCE(SUM(qty::numeric), 0)::text FROM inventory__stock_move WHERE tenant_id = $1 AND source = 'quality_return' AND source_id = $2 AND direction = 'out'",
+                &[&tenant.id, &inspection_id.to_string()],
+            ).await?;
+            let returned = returned
+                .map(|row| decimal_column(&row, 0, "returned quantity"))
+                .transpose()?
+                .unwrap_or(Decimal::ZERO);
+            let released = tx.query_opt(
+                "SELECT COALESCE(SUM(qty::numeric), 0)::text FROM quality__inspection_disposition WHERE tenant_id = $1 AND inspection = $2 AND status = 'posted'",
+                &[&tenant.id, &inspection_id],
+            ).await?;
+            let released = released
+                .map(|row| decimal_column(&row, 0, "released quantity"))
+                .transpose()?
+                .unwrap_or(Decimal::ZERO);
+            let inspected_qty = number(document, "qty").unwrap_or(Decimal::ZERO);
+            let accounted = returned.checked_add(released);
+            if inspected_qty
+                .checked_sub(Decimal::new(1, 6))
+                .zip(accounted)
+                .is_none_or(|(minimum_remaining, used)| used >= minimum_remaining)
+            {
+                errors.push("Không còn số lượng hàng mua đang giữ để kiểm định lại".into());
             }
         }
     }
