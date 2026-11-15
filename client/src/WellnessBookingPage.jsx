@@ -16,6 +16,7 @@ export default function WellnessBookingPage({ healthcare = false }) {
   const [bookings, setBookings] = useState([]);
   const [resources, setResources] = useState([]);
   const [services, setServices] = useState([]);
+  const [clinicPatients, setClinicPatients] = useState([]);
   const [parties, setParties] = useState(new Map());
   const [invoices, setInvoices] = useState([]);
   const [selectedId, setSelectedId] = useState('');
@@ -30,18 +31,22 @@ export default function WellnessBookingPage({ healthcare = false }) {
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
-      const [bookingRes, resourceRes, serviceRes, partyMap, invoiceRes] = await Promise.all([
+      const [bookingRes, resourceRes, serviceRes, partyMap, invoiceRes, clinicPatientRes] = await Promise.all([
         can('booking.booking.read') ? loadAllResponse('booking.booking') : Promise.resolve({ items: [] }),
         can('booking.resource.read') ? loadAllResponse('booking.resource') : Promise.resolve({ items: [] }),
         can('booking.service.read') ? loadAllResponse('booking.service') : Promise.resolve({ items: [] }),
         can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
         can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
+        healthcare && can('clinic.patient.read') ? loadAllResponse('clinic.patient') : Promise.resolve({ items: [] }),
       ]);
       const rows = itemsOf(bookingRes).sort((a, b) => String(a.starts_at || '').localeCompare(String(b.starts_at || '')));
       const resourceRows = itemsOf(resourceRes); const serviceRows = itemsOf(serviceRes);
       setBookings(rows); setResources(resourceRows); setServices(serviceRows); setParties(partyMap); setInvoices(itemsOf(invoiceRes));
+      setClinicPatients(itemsOf(clinicPatientRes));
       setSelectedId((current) => rows.some((row) => row.id === current) ? current : rows[0]?.id || '');
-      setForm((current) => ({ ...current, party: current.party || [...partyMap.keys()][0] || '', resource: current.resource || resourceRows[0]?.id || '', service: current.service || serviceRows[0]?.id || '' }));
+      const patientPartyIds = new Set(itemsOf(clinicPatientRes).map((patient) => patient.party).filter(Boolean));
+      const availableParties = healthcare ? [...patientPartyIds].filter((id) => partyMap.has(id)) : [...partyMap.keys()];
+      setForm((current) => ({ ...current, party: availableParties.includes(current.party) ? current.party : availableParties[0] || '', resource: current.resource || resourceRows[0]?.id || '', service: current.service || serviceRows[0]?.id || '' }));
     } catch (reason) { setError(reason.message || 'Không tải được lịch hẹn.'); }
     finally { if (!quiet) setLoading(false); }
   }, []);
@@ -51,6 +56,9 @@ export default function WellnessBookingPage({ healthcare = false }) {
   const serviceById = useMemo(() => new Map(services.map((row) => [row.id, row])), [services]);
   const invoiceByBooking = useMemo(() => new Map(invoices.filter((row) => row.source === 'booking').map((row) => [row.source_id, row])), [invoices]);
   const selected = bookings.find((row) => row.id === selectedId);
+  const bookableParties = healthcare
+    ? [...new Set(clinicPatients.map((patient) => patient.party).filter(Boolean))].map((id) => parties.get(id)).filter(Boolean)
+    : [...parties.values()];
   const today = localDate(new Date());
   const todays = bookings.filter((row) => localDate(row.starts_at) === today);
   const confirmed = todays.filter((row) => row.status === 'confirmed').length;
@@ -68,6 +76,7 @@ export default function WellnessBookingPage({ healthcare = false }) {
   async function createBooking(event) {
     event.preventDefault();
     await run('booking', async () => {
+      if (healthcare && !bookableParties.some((party) => party.id === form.party)) throw new Error('Chọn hồ sơ bệnh nhân đã đăng ký trước khi đặt lịch khám.');
       const startsAt = localDateTimeToIso(form.starts_at);
       const endsAt = form.ends_at ? localDateTimeToIso(form.ends_at) : undefined;
       if (!startsAt || (form.ends_at && !endsAt)) throw new Error('Giờ hẹn không hợp lệ trong múi giờ kinh doanh.');
@@ -106,7 +115,7 @@ export default function WellnessBookingPage({ healthcare = false }) {
     {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
     <div className="stats" style={{ marginBottom: 16 }}><div className="card stat"><span className="stat-label">Lịch hôm nay</span><strong className="stat-value">{todays.length}</strong></div><div className="card stat"><span className="stat-label">Đã xác nhận</span><strong className="stat-value">{confirmed}</strong></div><div className="card stat"><span className="stat-label">Đang phục vụ</span><strong className="stat-value">{inProgress}</strong></div><div className="card stat"><span className="stat-label">Đã hoàn tất</span><strong className="stat-value">{completed}</strong></div></div>
     {can('booking.booking.create') && resources.length > 0 && <section className="card card-pad"><h2>{healthcare ? 'Đặt lịch khám' : 'Đặt lịch dịch vụ'}</h2><form className="form-grid" onSubmit={createBooking}>
-      <label className="field"><span className="label">Khách hàng</span><select className="select" value={form.party} onChange={(e) => setForm({ ...form, party: e.target.value })}><option value="">Khách chưa đăng ký</option>{[...parties.values()].map((party) => <option key={party.id} value={party.id}>{recordLabel('master-data.party', party)}</option>)}</select></label>
+      <label className="field"><span className="label">{healthcare ? 'Bệnh nhân' : 'Khách hàng'}</span><select className="select" required={healthcare} value={form.party} onChange={(e) => setForm({ ...form, party: e.target.value })}><option value="">{healthcare ? 'Chọn hồ sơ bệnh nhân' : 'Khách chưa đăng ký'}</option>{bookableParties.map((party) => <option key={party.id} value={party.id}>{recordLabel('master-data.party', party)}</option>)}</select>{healthcare && !bookableParties.length && <span className="small muted">Đăng ký hồ sơ bệnh nhân trước khi đặt lịch khám.</span>}</label>
       <label className="field"><span className="label">{healthcare ? 'Bác sĩ / phòng khám *' : 'Kỹ thuật viên / phòng *'}</span><select className="select" required value={form.resource} onChange={(e) => setForm({ ...form, resource: e.target.value })}><option value="">Chọn tài nguyên</option>{resources.map((row) => <option key={row.id} value={row.id}>{row.name} · {kindLabel(row.kind)}</option>)}</select></label>
       {services.length > 0 && <label className="field"><span className="label">{healthcare ? 'Dịch vụ khám' : 'Dịch vụ'}</span><select className="select" value={form.service} onChange={(e) => setForm({ ...form, service: e.target.value, ends_at: '' })}><option value="">Lịch không gắn dịch vụ</option>{services.map((row) => <option key={row.id} value={row.id}>{row.name} · {row.duration_min || '—'} phút · {fmtMoney(row.price || 0)}</option>)}</select></label>}
       <label className="field"><span className="label">Bắt đầu *</span><input className="input" required type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })}/></label>
