@@ -280,7 +280,8 @@
       "inventory.warehouse.read",
       "inventory.warehouse_location.read",
       "inventory.lot.read",
-      "master-data.product.read"
+      "master-data.product.read",
+      "master-data.uom.read"
     ]
   },  "inventory_count_approver": {
     "name": "Quản lý duyệt kiểm kê",
@@ -291,7 +292,8 @@
       "inventory.warehouse.read",
       "inventory.warehouse_location.read",
       "inventory.lot.read",
-      "master-data.product.read"
+      "master-data.product.read",
+      "master-data.uom.read"
     ]
   },  "accounting_settlement_operator": {
     "name": "Nhân viên thu chi điều chỉnh",

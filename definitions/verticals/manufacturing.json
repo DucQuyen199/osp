@@ -402,6 +402,7 @@
       "inventory.warehouse_location.read",
       "inventory.lot.read",
       "master-data.product.read",
+      "master-data.uom.read",
       "workflow-approval.approval_request.read",
       "workflow-approval.approval_request.approved",
       "workflow-approval.approval_request.rejected"
@@ -416,6 +417,7 @@
       "inventory.warehouse_location.read",
       "inventory.lot.read",
       "master-data.product.read",
+      "master-data.uom.read",
       "workflow-approval.approval_request.read",
       "workflow-approval.approval_request.approved",
       "workflow-approval.approval_request.rejected"
