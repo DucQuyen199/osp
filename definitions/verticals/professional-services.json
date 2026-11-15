@@ -67,7 +67,7 @@
     ]
   },
   "recruiter": {
-    "name": "Chuy?n vi?n tuy?n d?ng",
+    "name": "Chuyên viên tuyển dụng",
     "permissions": [
       "recruitment.job_opening.read",
       "recruitment.job_opening.create",
@@ -86,7 +86,7 @@
     ]
   },
   "hiring_manager": {
-    "name": "Qu?n l? tuy?n d?ng",
+    "name": "Quản lý tuyển dụng",
     "permissions": [
       "recruitment.job_opening.read",
       "recruitment.job_opening.create",
@@ -106,7 +106,7 @@
     ]
   },
   "payroll_clerk": {
-    "name": "Chuy?n vi?n ti?n l??ng",
+    "name": "Chuyên viên tiền lương",
     "permissions": [
       "payroll.payroll_run.read",
       "payroll.payroll_run.create",
@@ -134,7 +134,7 @@
     ]
   },
   "payroll_approver": {
-    "name": "Qu?n l? ph? duy?t v? chi l??ng",
+    "name": "Quản lý phê duyệt và chi lương",
     "permissions": [
       "payroll.payroll_run.read",
       "payroll.payroll_run.approved",
@@ -158,7 +158,7 @@
     ]
   },
   "payroll_policy_manager": {
-    "name": "Qu?n l? ch?nh s?ch l??ng v? kho?n n?p",
+    "name": "Quản lý chính sách lương và khoản nộp",
     "permissions": [
       "payroll.tax_policy.read",
       "payroll.tax_policy.create",
@@ -180,7 +180,7 @@
     ]
   },
   "hr_staff": {
-    "name": "Chuy?n vi?n nh?n s?",
+    "name": "Chuyên viên nhân sự",
     "permissions": [
       "hrm.employee.read",
       "hrm.employee.create",
@@ -203,7 +203,7 @@
     ]
   },
   "hr_manager": {
-    "name": "Qu?n l? nh?n s?",
+    "name": "Quản lý nhân sự",
     "permissions": [
       "hrm.employee.read",
       "hrm.employee.create",
@@ -235,7 +235,7 @@
     ]
   },
   "expense_clerk": {
-    "name": "Chuy?n vi?n ?? ngh? chi",
+    "name": "Chuyên viên đề nghị chi",
     "permissions": [
       "expense.expense_claim.read",
       "expense.expense_claim.create",
@@ -246,7 +246,7 @@
     ]
   },
   "expense_approver": {
-    "name": "Qu?n l? duy?t v? chi ph?",
+    "name": "Quản lý duyệt và chi trả chi phí",
     "permissions": [
       "expense.expense_claim.read",
       "expense.expense_claim.approved",
@@ -258,7 +258,7 @@
     ]
   },
   "bank_reconciliation_clerk": {
-    "name": "Nh?n vi?n ??i so?t ng?n h?ng",
+    "name": "Nhân viên đối soát ngân hàng",
     "permissions": [
       "accounting.bank_statement.read",
       "accounting.bank_statement.create",
@@ -313,7 +313,7 @@
     ]
   },
   "accounting_period_manager": {
-    "name": "Qu?n l? kh?a s? k? to?n",
+    "name": "Quản lý khóa sổ kế toán",
     "permissions": [
       "accounting.period.read",
       "accounting.period.create",
