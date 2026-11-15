@@ -21,8 +21,25 @@ fn sales_amount_error() -> crate::error::ApiError {
 }
 
 fn shipment_quantities(lines: &Value) -> R<HashMap<(String, PriceBucket), Decimal>> {
+    let Some(lines) = lines.as_array() else {
+        return Err(crate::error::ApiError::validation(
+            "sales.amount",
+            vec![
+                "Shipment source lines are invalid; delivered quantities cannot be verified".into(),
+            ],
+        ));
+    };
     let mut quantities = HashMap::new();
-    for line in lines.as_array().into_iter().flatten() {
+    for (index, line) in lines.iter().enumerate() {
+        if !line.is_object() {
+            return Err(crate::error::ApiError::validation(
+                "sales.amount",
+                vec![format!(
+                    "Shipment line {} is invalid; delivered quantities cannot be verified",
+                    index + 1
+                )],
+            ));
+        }
         if matches!(
             line.get("kind").and_then(Value::as_str),
             Some("service" | "digital")
@@ -34,8 +51,23 @@ fn shipment_quantities(lines: &Value) -> R<HashMap<(String, PriceBucket), Decima
             line.get("price").and_then(money::decimal),
             line.get("qty").and_then(money::decimal),
         ) else {
-            continue;
+            return Err(crate::error::ApiError::validation(
+                "sales.amount",
+                vec![format!(
+                    "Shipment line {} is incomplete; delivered quantities cannot be verified",
+                    index + 1
+                )],
+            ));
         };
+        if Uuid::parse_str(product).is_err() || price < Decimal::ZERO || qty <= Decimal::ZERO {
+            return Err(crate::error::ApiError::validation(
+                "sales.amount",
+                vec![format!(
+                    "Shipment line {} has an invalid product, price, or quantity",
+                    index + 1
+                )],
+            ));
+        }
         let price_bucket = PriceBucket(
             price.round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero),
             line.get("uom").and_then(Value::as_str).map(str::to_owned),
