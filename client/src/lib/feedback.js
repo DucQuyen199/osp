@@ -1,13 +1,7 @@
-let toastHost;
-
 export function toast(message, kind = '') {
-  if (!toastHost) {
-    toastHost = document.createElement('div');
-    toastHost.className = 'toasts';
-    toastHost.setAttribute('role', 'status');
-    toastHost.setAttribute('aria-live', 'polite');
-    document.body.append(toastHost);
-  }
+  const urgent = kind === 'danger' || kind === 'error';
+  const toastHost = document.getElementById(urgent ? 'osp-toast-alert' : 'osp-toast-status');
+  if (!toastHost) return;
   const item = document.createElement('div');
   item.className = `toast ${kind}`;
   item.textContent = message;
