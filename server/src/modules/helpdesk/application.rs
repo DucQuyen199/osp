@@ -66,7 +66,7 @@ pub async fn handle_source_event(
         .unwrap_or_default();
     let direction = document.get("direction").and_then(Value::as_str);
     let action = match (direction, status) {
-        (Some("outbound"), "open") => Some("responded"),
+        (Some("outbound"), "open" | "in_progress") => Some("responded"),
         (Some("inbound"), "resolved" | "closed") => Some("reopened"),
         _ => None,
     };

@@ -118,7 +118,7 @@ Tổng: **50 module**, **199 loại dữ liệu**, **902 sự kiện**.
 
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
-| `ticket` Ticket | `open` → **closed** (resolved→closed), **reopened** (resolved/closed→open), **resolved** (open/in_progress→resolved), **responded** (open→in_progress) |
+| `ticket` Ticket | `open` → **closed** (resolved→closed), **reopened** (resolved/closed→open), **resolved** (open/in_progress→resolved), **responded** (open/in_progress→in_progress) |
 | `sla_policy` Chính sách SLA | — |
 | `message` Trao đổi ticket | — |
 | `kb_article` Bài viết tri thức | — |

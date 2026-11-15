@@ -67194,7 +67194,7 @@
             "bearer": []
           }
         ],
-        "summary": "Ticket: responded (open → in_progress)",
+        "summary": "Ticket: responded (open|in_progress → in_progress)",
         "tags": [
           "helpdesk"
         ]

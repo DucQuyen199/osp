@@ -87,7 +87,8 @@
     "actions": {
      "responded": {
       "from": [
-       "open"
+       "open",
+       "in_progress"
       ],
       "to": "in_progress"
      },
