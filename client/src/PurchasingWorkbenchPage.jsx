@@ -324,7 +324,7 @@ export default function PurchasingWorkbenchPage() {
     if (!sourceLine) { setError('Không đối chiếu được dòng QC với dòng đơn mua tương ứng.'); return; }
     const qty = Number(returnForm.qty);
     if (!Number.isFinite(qty) || qty <= 0 || qty > returnAvailableQuantity + 0.000001) {
-      setError('Sá»‘ lÆ°á»£ng tráº£ khÃ´ng Ä‘Æ°á»£c vÆ°á»£t sá»‘ lÆ°á»£ng QC cÃ²n láº¡i.'); return;
+      setError('Return quantity must not exceed the remaining failed inspection quantity.'); return;
     }
     const payload = {
       purchase_order: selected.id, inspection: returnInspection.id,
@@ -333,13 +333,13 @@ export default function PurchasingWorkbenchPage() {
       lines: [{ product: returnInspection.product, uom: sourceLine?.uom || undefined, qty, price: Number(sourceLine?.price ?? returnInspection.unit_cost ?? 0), lot: returnInspection.lot || undefined }],
       ...(returnForm.supplier_invoice ? { supplier_invoice: returnForm.supplier_invoice } : {}),
     };
-    await run('return:create', () => api(dataPath('purchasing.purchase_return'), { method: 'POST', body: payload }), 'ÄÃ£ táº¡o phiáº¿u tráº£ hÃ ng nhÃ  cung cáº¥p tá»« phiáº¿u QC.');
+    await run('return:create', () => api(dataPath('purchasing.purchase_return'), { method: 'POST', body: payload }), 'Created supplier return from the failed quality inspection.');
     setReturnForm({ inspection: '', qty: '', reason: '', supplier_invoice: '' });
   }
 
   async function purchaseReturnAction(row, verb) {
-    const messages = { submitted: 'ÄÃ£ gá»­i phiáº¿u tráº£ Ä‘i duyá»‡t.', approved: 'ÄÃ£ duyá»‡t phiáº¿u tráº£.', rejected: 'Phiáº¿u tráº£ Ä‘Ã£ bá»‹ tá»« chá»‘i.', dispatched: 'ÄÃ£ xuáº¥t tráº£ hÃ ng cho nhÃ  cung cáº¥p.', cancelled: 'ÄÃ£ há»§y phiáº¿u tráº£ nhÃ¡p.' };
-    await run(`${row.id}:${verb}`, () => action('purchasing.purchase_return', row, verb), messages[verb] || 'ÄÃ£ cáº­p nháº­t phiáº¿u tráº£.');
+    const messages = { submitted: 'Submitted return for approval.', approved: 'Approved supplier return.', rejected: 'Return was rejected.', dispatched: 'Dispatched goods back to the supplier.', cancelled: 'Cancelled return draft.' };
+    await run(`${row.id}:${verb}`, () => action('purchasing.purchase_return', row, verb), messages[verb] || 'Updated supplier return.');
   }
 
   const addLine = () => { const product = [...products.values()].find((row) => row.active !== false); setLines((current) => [...current, { product: product?.id || '', uom: product?.uom || '', qty: '1', price: '', tax: '' }]); };
