@@ -107,7 +107,7 @@ export default function PosTerminalPage() {
   const subtotal = cart.reduce((sum, row) => sum + priceFor(row.product, row.uom) * row.qty, 0);
   const estimatedTax = cart.reduce((sum, row) => sum + priceFor(row.product, row.uom) * row.qty * ((Number(taxes.get(row.product.tax)?.rate) || 0) / 100), 0);
   const total = Math.round((subtotal + estimatedTax + Number.EPSILON) * 100) / 100;
-  const filteredProducts = [...products.values()].filter((product) => product.active !== false && (!query || `${product.name} ${product.sku || ''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()))).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
+  const filteredProducts = [...products.values()].filter((product) => product.active !== false && (!query || `${product.name} ${product.sku || ''} ${product.barcode || ''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()))).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
 
   const startSession = async (event) => {
     event.preventDefault();
@@ -131,6 +131,24 @@ export default function PosTerminalPage() {
     if (qty === 0) delete next[productId]; else next[productId] = qty;
     return next;
   });
+
+  const scanProduct = (event) => {
+    if (event.key !== 'Enter') return;
+    const scanned = event.currentTarget.value.trim().toLocaleUpperCase();
+    if (!scanned) return;
+    const availableProducts = [...products.values()].filter((product) => product.active !== false);
+    const matches = availableProducts.filter((product) => String(product.barcode || '').trim().toLocaleUpperCase() === scanned);
+    const exactMatches = matches.length ? matches : availableProducts.filter((product) => String(product.sku || '').trim().toLocaleUpperCase() === scanned);
+    if (exactMatches.length === 1) {
+      event.preventDefault();
+      const product = exactMatches[0];
+      setQty(product.id, (Number(quantities[product.id]) || 0) + 1);
+      setQuery(''); setError(''); setNotice(`Đã thêm ${product.name} vào giỏ.`);
+    } else if (exactMatches.length > 1) {
+      event.preventDefault();
+      setError(`Mã “${scanned}” khớp với nhiều sản phẩm. Hãy kiểm tra lại barcode và SKU trong danh mục.`);
+    }
+  };
 
   const checkout = async (event) => {
     event.preventDefault();
@@ -263,7 +281,7 @@ export default function PosTerminalPage() {
         </form></details>
       </section>
       {!activeSession ? <div className="empty card-pad">Chọn một ca đang mở hoặc mở ca mới để sử dụng quầy.</div> : !activeSession.warehouse ? <div className="alert warning">Ca này được tạo trước khi bắt buộc chọn kho. Hãy chốt ca cũ và mở ca mới để tiếp tục bán.<form className="pos-close-form" onSubmit={closeSession}><label className="field"><span className="label">Tiền mặt thực đếm để chốt ca</span><input className="input num" type="number" min="0" step="any" required value={closingCash} onChange={(event) => setClosingCash(event.target.value)} /></label><button className="btn btn-secondary" type="submit" disabled={busy || !can('pos.pos_session.update') || !can('pos.pos_session.closed')}>Chốt ca cũ</button></form></div> : <div className="pos-layout">
-        <section className="pos-products-panel"><div className="row wrap"><h2>Sản phẩm</h2><span className="grow" /><input className="input pos-search" type="search" placeholder="Tìm tên hoặc mã hàng" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
+        <section className="pos-products-panel"><div className="row wrap"><h2>Sản phẩm</h2><span className="grow" /><input className="input pos-search" type="search" placeholder="Quét/nhập tên, SKU hoặc mã vạch" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={scanProduct} aria-label="Quét barcode hoặc tìm sản phẩm" /></div><p className="small muted">Đặt con trỏ trong ô tìm kiếm rồi quét mã; máy quét gửi Enter để thêm đúng một sản phẩm vào giỏ.</p>
           <div className="pos-products">{filteredProducts.map((product) => { const uom = selectedUnits[product.id] || product.uom || ''; return <button className={`card pos-product${quantities[product.id] ? ' selected' : ''}`} key={product.id} type="button" disabled={!can('pos.pos_order.create')} onClick={() => setQty(product.id, (Number(quantities[product.id]) || 0) + 1)}><strong>{product.name}</strong><span className="small muted">{product.sku || 'Không mã'}</span><span className="num">{fmtMoney(priceFor(product, uom))}{units.get(uom)?.name ? ` / ${units.get(uom).name}` : ''}</span>{product.tracked !== false && <span className="small faint">Quản lý tồn kho</span>}</button>; })}</div>
           {!filteredProducts.length && <div className="empty">Không có sản phẩm phù hợp.</div>}
         </section>

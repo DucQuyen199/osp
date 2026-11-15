@@ -127,6 +127,12 @@
      "required": true
     },
     {
+     "name": "barcode",
+     "label": "Mã vạch",
+     "type": "string",
+     "required": false
+    },
+    {
      "name": "name",
      "type": "string",
      "required": true

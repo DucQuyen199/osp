@@ -8,7 +8,10 @@ pub fn prepare_document(entity: &str, document: &mut Map<String, Value>) -> Vec<
             &["name"],
         ),
         "contact" => (&["name", "title", "phone", "email"], &["name"]),
-        "product" => (&["sku", "name", "uom", "category"], &["sku", "name"]),
+        "product" => (
+            &["sku", "barcode", "name", "uom", "category"],
+            &["sku", "name"],
+        ),
         "product_category" => (&["name"], &["name"]),
         "uom" => (&["name"], &["name"]),
         "branch" => (&["name", "code", "address"], &["name"]),
@@ -25,7 +28,7 @@ pub fn prepare_document(entity: &str, document: &mut Map<String, Value>) -> Vec<
         {
             let normalized = match *field {
                 "email" => value.to_ascii_lowercase(),
-                "sku" | "code" | "tax_code" => value.to_ascii_uppercase(),
+                "sku" | "barcode" | "code" | "tax_code" => value.to_ascii_uppercase(),
                 _ => value,
             };
             if required.contains(field) && normalized.is_empty() {

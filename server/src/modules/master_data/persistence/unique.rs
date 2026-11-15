@@ -43,6 +43,7 @@ fn unique_column(entity: &str, field: &str) -> Option<(&'static str, &'static st
     match (entity, field) {
         ("party", "tax_code") => Some(("master_data__party", "tax_code", "Tax code")),
         ("product", "sku") => Some(("master_data__product", "sku", "SKU")),
+        ("product", "barcode") => Some(("master_data__product", "barcode", "Barcode")),
         ("branch", "code") => Some(("master_data__branch", "code", "Branch code")),
         ("currency", "code") => Some(("master_data__currency", "code", "Currency code")),
         ("uom", "name") => Some(("master_data__uom", "name", "Unit name")),

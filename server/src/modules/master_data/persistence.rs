@@ -50,6 +50,18 @@ pub async fn validate_persistence(
                     )
                     .await?;
                 }
+                if let Some(barcode) = non_empty(document, "barcode") {
+                    unique::validate_unique(
+                        tx,
+                        tenant,
+                        "product",
+                        "barcode",
+                        barcode,
+                        document,
+                        &mut errors,
+                    )
+                    .await?;
+                }
             }
             if matches!(action, "created" | "updated") && tenant.has_module("inventory") {
                 product::validate_expiry_policy(tx, tenant, action, document, &mut errors).await?;
