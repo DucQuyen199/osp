@@ -9,20 +9,25 @@ pub(super) async fn handle_void(
     event_id: Uuid,
     depth: u32,
 ) -> R<Option<bool>> {
-    let invoice_id = event
+    let (source_kind, document_label) = match event_type {
+        "accounting.invoice.void" => ("invoice", "Hóa đơn bán"),
+        "accounting.bill.void" => ("bill", "Hóa đơn mua"),
+        _ => return Ok(None),
+    };
+    let document_id = event
         .get("id")
         .and_then(Value::as_str)
         .and_then(|value| Uuid::parse_str(value).ok())
         .ok_or_else(|| {
             crate::error::ApiError::validation(
                 event_type,
-                vec!["Hóa đơn bị hủy cần mã hợp lệ".into()],
+                vec![format!("{document_label} bị hủy cần mã hợp lệ")],
             )
         })?;
     let journals = tx
         .query(
-            "SELECT id FROM accounting__journal_entry WHERE tenant_id = $1 AND source = 'invoice' AND source_id = $2 AND status = 'posted' ORDER BY created_at, id FOR UPDATE",
-            &[&tenant.id, &invoice_id.to_string()],
+            "SELECT id FROM accounting__journal_entry WHERE tenant_id = $1 AND source = $2 AND source_id = $3 AND status = 'posted' ORDER BY created_at, id FOR UPDATE",
+            &[&tenant.id, &source_kind, &document_id.to_string()],
         )
         .await?;
     let entity = kernel.ent(tenant, "accounting.journal_entry")?;
