@@ -79,4 +79,4 @@ Các module CRM/Marketing, bán hàng, mua hàng, loyalty, logistics, field serv
 
 - Mỗi phiếu lương lưu lại bộ ngày trong tuần và giờ chuẩn đã dùng để tính, giúp kiểm toán lịch áp dụng sau khi hồ sơ nhân sự thay đổi.
 
-- Lịch nhân sự hỗ trợ ngoại lệ theo ngày và mẫu ca luân phiên theo chu kỳ tối đa 366 ngày, áp dụng nguyên tử cho tối đa 50 nhân viên; lịch được sinh theo ngày với múi giờ địa phương và chịu cùng khóa payroll. Thư viện mẫu có tên để tái sử dụng, phân đội và lịch lặp dài hơn một năm vẫn cần phát triển.
+- Lịch nhân sự hỗ trợ ngoại lệ theo ngày và mẫu ca luân phiên theo chu kỳ tối đa 366 ngày, áp dụng nguyên tử cho tối đa 50 nhân viên; lịch được sinh theo ngày với múi giờ địa phương và chịu cùng khóa payroll. Thư viện mẫu ca có tên hỗ trợ lưu và dùng lại chu kỳ cho nhiều đội; lịch lặp dài hơn một năm vẫn cần phát triển.

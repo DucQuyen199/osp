@@ -366,6 +366,18 @@
    "constraints": []
   },
   {
+   "name": "work_schedule_template",
+   "label": "Thư viện mẫu ca",
+   "fields": [
+    { "name": "name", "type": "string", "required": true },
+    { "name": "timezone", "type": "string", "required": true },
+    { "name": "cycle", "type": "json", "required": true }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
    "name": "work_schedule_pattern",
    "label": "Mẫu ca luân phiên",
    "fields": [

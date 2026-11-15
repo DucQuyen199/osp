@@ -53,6 +53,7 @@ export default function HrmOperationsPage() {
   const [attendance, setAttendance] = useState([]);
   const [scheduleEntries, setScheduleEntries] = useState([]);
   const [schedulePatterns, setSchedulePatterns] = useState([]);
+  const [scheduleTemplates, setScheduleTemplates] = useState([]);
   const [salaryRevisions, setSalaryRevisions] = useState([]);
   const [allocations, setAllocations] = useState([]);
   const [approvalRequests, setApprovalRequests] = useState([]);
@@ -63,6 +64,8 @@ export default function HrmOperationsPage() {
   const [revisionForm, setRevisionForm] = useState({ employee: '', effective_from: '', base_salary: '', reason: '' });
   const [scheduleForm, setScheduleForm] = useState({ employee: '', work_date: localDate(), is_working: true, start_time: '09:00', end_time: '17:00', break_minutes: '60' });
   const [patternForm, setPatternForm] = useState({ employees: [], start_date: localDate(), end_date: addLocalDays(localDate(), 27), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', cycle: [{ is_working: true, start_time: '09:00', end_time: '17:00', break_minutes: 60 }, { is_working: false, start_time: '', end_time: '', break_minutes: 0 }] });
+  const [scheduleTemplateName, setScheduleTemplateName] = useState('');
+  const [scheduleTemplateId, setScheduleTemplateId] = useState('');
   const [patternEmployeeFilter, setPatternEmployeeFilter] = useState('');
   const [busy, setBusy] = useState('');
   const [loading, setLoading] = useState(true);
@@ -76,7 +79,7 @@ export default function HrmOperationsPage() {
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
-      const [employeeRes, leaveRes, attendanceRes, revisionRes, allocationRes, scheduleRes, patternRes, departmentMap, positionMap, requestRes] = await Promise.all([
+      const [employeeRes, leaveRes, attendanceRes, revisionRes, allocationRes, scheduleRes, patternRes, templateRes, departmentMap, positionMap, requestRes] = await Promise.all([
         can('hrm.employee.read') ? api(`${dataPath('hrm.employee')}?limit=2000`) : Promise.resolve({ items: [] }),
         can('hrm.leave_request.read') ? api(`${dataPath('hrm.leave_request')}?limit=2000`) : Promise.resolve({ items: [] }),
         can('hrm.attendance.read') ? api(`${dataPath('hrm.attendance')}?limit=3000`) : Promise.resolve({ items: [] }),
@@ -84,6 +87,7 @@ export default function HrmOperationsPage() {
         can('hrm.leave_allocation.read') ? api(`${dataPath('hrm.leave_allocation')}?limit=2000`) : Promise.resolve({ items: [] }),
         can('hrm.work_schedule_entry.read') ? listAllRows('hrm.work_schedule_entry', { work_date__gte: scheduleMonthStart, work_date__lt: scheduleMonthEnd, sort: 'work_date' }) : Promise.resolve({ items: [] }),
         can('hrm.work_schedule_pattern.read') ? loadAllResponse('hrm.work_schedule_pattern') : Promise.resolve({ items: [] }),
+        can('hrm.work_schedule_template.read') ? loadAllResponse('hrm.work_schedule_template') : Promise.resolve({ items: [] }),
         can('hrm.department.read') ? loadRefs('hrm.department') : Promise.resolve(new Map()),
         can('hrm.position.read') ? loadRefs('hrm.position') : Promise.resolve(new Map()),
         workflowApproval && can('workflow-approval.approval_request.read') ? loadAllResponse('workflow-approval.approval_request') : Promise.resolve({ items: [] }),
@@ -96,6 +100,7 @@ export default function HrmOperationsPage() {
       setAllocations(itemsOf(allocationRes)); setDepartments(departmentMap); setPositions(positionMap); setApprovalRequests(itemsOf(requestRes));
       setScheduleEntries(itemsOf(scheduleRes).sort((a, b) => String(a.work_date || '').localeCompare(String(b.work_date || ''))));
       setSchedulePatterns(itemsOf(patternRes).sort((a, b) => String(b.start_date || '').localeCompare(String(a.start_date || ''))));
+      setScheduleTemplates(itemsOf(templateRes).sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi')));
       const activeEmployee = employeeRows.find((row) => row.status === 'active');
       setPunchEmployee((id) => employeeRows.some((row) => row.id === id && row.status === 'active') ? id : activeEmployee?.id || '');
       setLeaveForm((form) => ({ ...form, employee: employeeRows.some((row) => row.id === form.employee && row.status === 'active') ? form.employee : activeEmployee?.id || '' }));
@@ -168,6 +173,32 @@ export default function HrmOperationsPage() {
     }, can('hrm.work_schedule_pattern.applied') ? 'Đã tạo lịch luân phiên và sinh các ca theo ngày; payroll và hạn mức phép sẽ dùng lịch mới.' : 'Đã lưu mẫu ca nháp để người có quyền áp dụng.');
   }
 
+  function useScheduleTemplate(id) {
+    setScheduleTemplateId(id);
+    const template = scheduleTemplates.find((row) => row.id === id);
+    setScheduleTemplateName(template?.name || '');
+    if (template) setPatternForm((form) => ({ ...form, timezone: template.timezone || form.timezone, cycle: Array.isArray(template.cycle) ? template.cycle.map((day) => ({ ...day })) : form.cycle }));
+  }
+
+  async function saveScheduleTemplate() {
+    const name = scheduleTemplateName.trim();
+    if (!name) return;
+    await run('schedule-template:save', async () => {
+      const body = { name, timezone: patternForm.timezone, cycle: patternForm.cycle };
+      if (scheduleTemplateId && scheduleTemplates.some((row) => row.id === scheduleTemplateId)) {
+        await api(dataPath('hrm.work_schedule_template', scheduleTemplateId), { method: 'PATCH', body });
+      } else {
+        const row = await api(dataPath('hrm.work_schedule_template'), { method: 'POST', body });
+        setScheduleTemplateId(row.id);
+      }
+    }, 'Đã lưu mẫu ca vào thư viện để tái sử dụng.');
+  }
+
+  async function removeScheduleTemplate(row) {
+    await run(`${row.id}:template-remove`, () => api(dataPath('hrm.work_schedule_template', row.id), { method: 'DELETE' }), 'Đã xóa mẫu ca khỏi thư viện.');
+    if (scheduleTemplateId === row.id) { setScheduleTemplateId(''); setScheduleTemplateName(''); }
+  }
+
   async function applySchedulePattern(row) {
     await run(`${row.id}:applied`, () => action('hrm.work_schedule_pattern', row, 'applied'), 'Đã sinh lịch luân phiên thành các ca theo ngày.');
   }
@@ -227,9 +258,14 @@ export default function HrmOperationsPage() {
       {!attendance.length && !loading && <p className="small muted">Chưa có bản ghi chấm công trong ngày đã chọn.</p>}
     </section>
 
-    {(can('hrm.work_schedule_pattern.create') || can('hrm.work_schedule_pattern.read')) && <section className="card card-pad" style={{ marginTop: 16 }}>
+    {(can('hrm.work_schedule_pattern.create') || can('hrm.work_schedule_pattern.read') || can('hrm.work_schedule_template.create') || can('hrm.work_schedule_template.read')) && <section className="card card-pad" style={{ marginTop: 16 }}>
       <h2>Lịch ca luân phiên</h2>
       <p className="small muted">Khai báo chu kỳ ngày làm/nghỉ, ngày bắt đầu và múi giờ. Khi áp dụng, hệ thống sinh lịch theo ngày để chấm công, nghỉ phép và payroll cùng sử dụng.</p>
+      {(can('hrm.work_schedule_template.read') || can('hrm.work_schedule_template.create')) && <div className="row wrap" style={{ marginBottom: 12 }}>
+        {can('hrm.work_schedule_template.read') && <label className="field grow"><span className="label">Dùng mẫu ca trong thư viện</span><select className="select" value={scheduleTemplateId} onChange={(event) => useScheduleTemplate(event.target.value)}><option value="">Chọn mẫu đã lưu</option>{scheduleTemplates.map((row) => <option key={row.id} value={row.id}>{row.name} · {Array.isArray(row.cycle) ? row.cycle.length : 0} ngày</option>)}</select></label>}
+        {can('hrm.work_schedule_template.create') && <><label className="field grow"><span className="label">Tên mẫu để lưu hoặc cập nhật</span><input className="input" maxLength="120" value={scheduleTemplateName} onChange={(event) => setScheduleTemplateName(event.target.value)} placeholder="Ví dụ: Ca xoay 2 ngày"/></label><button type="button" className="btn btn-secondary" disabled={Boolean(busy) || !scheduleTemplateName.trim()} onClick={saveScheduleTemplate}>{scheduleTemplateId ? 'Cập nhật mẫu' : 'Lưu thành mẫu'}</button></>}
+      </div>}
+      {can('hrm.work_schedule_template.read') && scheduleTemplates.length > 0 && <div className="row wrap small muted" style={{ marginBottom: 12 }}><span>Thư viện có {scheduleTemplates.length} mẫu.</span>{can('hrm.work_schedule_template.delete') && scheduleTemplateId && <button type="button" className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => { const row = scheduleTemplates.find((item) => item.id === scheduleTemplateId); if (row) removeScheduleTemplate(row); }}>Xóa mẫu đang chọn</button>}</div>}
       {can('hrm.work_schedule_pattern.create') && <form className="form-grid" onSubmit={createSchedulePattern}>
         <fieldset className="field" style={{ border: 0, padding: 0, margin: 0 }}><legend className="label">Nhân viên trong đội * ({patternForm.employees.length}/50)</legend><input className="input" value={patternEmployeeFilter} onChange={(event) => setPatternEmployeeFilter(event.target.value)} placeholder="Tìm theo tên hoặc mã nhân viên"/><div className="row wrap" style={{ marginTop: 8, gap: 12 }}>{matchingPatternEmployees.map((row) => <label className="row small" key={row.id}><input type="checkbox" checked={patternForm.employees.includes(row.id)} disabled={!patternForm.employees.includes(row.id) && patternForm.employees.length >= 50} onChange={(event) => setPatternForm((form) => ({ ...form, employees: event.target.checked ? [...form.employees, row.id] : form.employees.filter((id) => id !== row.id) }))}/>{recordLabel('hrm.employee', row)}</label>)}</div>{!matchingPatternEmployees.length && <span className="small muted">Không tìm thấy nhân viên đang làm việc phù hợp.</span>}<span className="small muted">Chọn tối đa 50 nhân viên; lịch sẽ được áp dụng cho cả đội trong cùng giao dịch.</span></fieldset>
         <label className="field"><span className="label">Ngày bắt đầu chu kỳ *</span><input className="input" required type="date" value={patternForm.start_date} onChange={(event) => setPatternForm({ ...patternForm, start_date: event.target.value })}/></label>

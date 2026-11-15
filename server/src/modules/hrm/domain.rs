@@ -65,6 +65,7 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
         "salary_revision" => validate_salary_revision(document),
         "work_schedule_entry" => validate_work_schedule_entry(document),
         "work_schedule_pattern" => validate_work_schedule_pattern(document),
+        "work_schedule_template" => validate_work_schedule_template(document),
         "holiday" => {
             let mut errors = Vec::new();
             if document
@@ -256,6 +257,32 @@ fn validate_work_schedule_pattern(document: &Value) -> Vec<String> {
     {
         errors.push("Shift rotation requires an IANA time zone".into());
     }
+    errors.extend(validate_shift_cycle(document));
+    errors
+}
+
+fn validate_work_schedule_template(document: &Value) -> Vec<String> {
+    let mut errors = Vec::new();
+    if document
+        .get("name")
+        .and_then(Value::as_str)
+        .is_none_or(|value| value.trim().is_empty() || value.chars().count() > 120)
+    {
+        errors.push("Shift template requires a name up to 120 characters".into());
+    }
+    if document
+        .get("timezone")
+        .and_then(Value::as_str)
+        .is_none_or(|value| value.trim().is_empty())
+    {
+        errors.push("Shift template requires an IANA time zone".into());
+    }
+    errors.extend(validate_shift_cycle(document));
+    errors
+}
+
+fn validate_shift_cycle(document: &Value) -> Vec<String> {
+    let mut errors = Vec::new();
     let Some(cycle) = document.get("cycle").and_then(Value::as_array) else {
         return {
             errors.push("Shift rotation cycle must be a JSON array".into());

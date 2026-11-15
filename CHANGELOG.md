@@ -4,6 +4,7 @@
 
 ## [Unreleased]
 ### Added
+- Added a tenant-scoped HR shift-template library with shared cycle validation, reuse across teams and date ranges, and in-place template updates.
 - Added a generic HTTP event connector adapter with provider headers, HMAC signing, public HTTPS/SSRF protections, transactional event enqueueing, bounded retries, dead-letter operations, connectivity probes, and secret redaction.
 - Added optional account-level TOTP MFA with AES-256-GCM encrypted secrets, one-time recovery codes, replay protection, bounded login challenges, step-up controls, and reason-audited administrator reset.
 - Added self-service visibility into active browser sessions and one-click revocation of other sessions from account security settings.

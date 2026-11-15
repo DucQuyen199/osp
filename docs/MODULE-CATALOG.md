@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **50 module**, **192 loại dữ liệu**, **867 sự kiện**.
+Tổng: **50 module**, **194 loại dữ liệu**, **873 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -91,7 +91,7 @@ Tổng: **50 module**, **192 loại dữ liệu**, **867 sự kiện**.
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
 | `quotation` Báo giá | `draft` → **accepted** (sent→accepted), **expired** (sent→expired), **rejected** (sent→rejected), **sent** (draft/rejected→sent) |
-| `sales_order` Đơn bán hàng | `draft` → **cancelled** (draft→cancelled), **confirmed** (draft→confirmed), **delivered** (confirmed/partially_delivered→delivered), **partially_delivered** (confirmed→partially_delivered) |
+| `sales_order` Đơn bán hàng | `draft` → **cancelled** (draft/confirmed→cancelled), **confirmed** (draft→confirmed), **delivered** (confirmed/partially_delivered→delivered), **partially_delivered** (confirmed→partially_delivered) |
 | `sales_return` Phiếu trả hàng bán | `draft` → **approved** (submitted→approved), **cancelled** (draft/rejected→cancelled), **received** (approved→received), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 | `price_list` Bảng giá | — |
 
@@ -111,7 +111,7 @@ Tổng: **50 module**, **192 loại dữ liệu**, **867 sự kiện**.
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
 | `storefront` Gian hàng | — |
-| `web_order` Đơn online | `cart` → **cancelled** (cart→cancelled), **placed** (cart→placed) |
+| `web_order` Đơn online | `cart` → **cancelled** (cart/placed→cancelled), **placed** (cart→placed) |
 
 ### helpdesk
 **Chăm sóc khách hàng** — Ticket hỗ trợ, chính sách SLA, cơ sở tri thức.
@@ -120,6 +120,7 @@ Tổng: **50 module**, **192 loại dữ liệu**, **867 sự kiện**.
 |---|---|
 | `ticket` Ticket | `open` → **closed** (resolved→closed), **reopened** (resolved/closed→open), **resolved** (open/in_progress→resolved), **responded** (open→in_progress) |
 | `sla_policy` Chính sách SLA | — |
+| `message` Trao đổi ticket | — |
 | `kb_article` Bài viết tri thức | — |
 
 ### field-service
@@ -308,6 +309,7 @@ Tổng: **50 module**, **192 loại dữ liệu**, **867 sự kiện**.
 | `holiday` Ngày lễ doanh nghiệp | — |
 | `attendance` Chấm công | — |
 | `work_schedule_entry` Lịch ca theo ngày | — |
+| `work_schedule_template` Thư viện mẫu ca | — |
 | `work_schedule_pattern` Mẫu ca luân phiên | `draft` → **applied** (draft→applied) |
 
 ### lms
