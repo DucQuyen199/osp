@@ -4,6 +4,7 @@
 
 ## [Unreleased]
 ### Added
+- Event tickets receive tenant-unique immutable scan codes; the event desk shows each code and supports keyboard-wedge scanner check-in for sold tickets, subject to the server-side attendance window and ticket-state checks.
 - CRM pipeline stages can now be configured per tenant with custom lowercase stage codes, names, and probabilities; custom stages appear in the board/report, and stages in use cannot be deleted.
 - CRM deals now capture sales lines, warehouse, price list, and shipping address; winning a deal requires a valid customer, warehouse, positive amount, and at least one line, then creates a reviewable draft sales order with those details.
 - Corrected the agricultural harvest pesticide-withdrawal error to display in Vietnamese with the product and allowed harvest date.

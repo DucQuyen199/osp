@@ -87,6 +87,29 @@ async fn validate_ticket(
     let mut errors = Vec::new();
     let ticket_id = parse_id(document, "id");
     if action == "created" {
+        let ticket_code = document
+            .get("ticket_code")
+            .and_then(Value::as_str)
+            .filter(|code| !code.is_empty());
+        let Some(ticket_code) = ticket_code else {
+            return Ok(vec!["Mã vé chưa được tạo".into()]);
+        };
+        let code_lock = format!("events.ticket-code:{}:{ticket_code}", tenant.id);
+        tx.query_opt(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            &[&code_lock],
+        )
+        .await?;
+        if tx
+            .query_opt(
+                "SELECT id FROM events__ticket WHERE tenant_id = $1 AND lower(ticket_code) = lower($2) LIMIT 1 FOR UPDATE",
+                &[&tenant.id, &ticket_code],
+            )
+            .await?
+            .is_some()
+        {
+            return Ok(vec!["Mã vé đã tồn tại; hãy tạo lại lượt giữ chỗ".into()]);
+        }
         if event_status != "published" {
             errors.push("Chỉ giữ chỗ cho sự kiện đang mở bán".into());
         }

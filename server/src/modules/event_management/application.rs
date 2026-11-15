@@ -68,6 +68,12 @@ pub async fn prepare_document(
         return Ok(Vec::new());
     }
     trim(document, &["refund_reason"]);
+    if !document.contains_key("id") {
+        document.insert(
+            "ticket_code".into(),
+            Value::String(Uuid::new_v4().simple().to_string().to_ascii_uppercase()),
+        );
+    }
     let Some(event) = document
         .get("event")
         .and_then(Value::as_str)

@@ -33,7 +33,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Lễ tân khách sạn có thể gia hạn ngày trả cho khách đang lưu trú; máy chủ khóa thông tin khách/phòng/giá, kiểm tra chồng lịch và sức chứa, rồi tính lại số đêm cùng folio theo giá đã chốt.
 - Xưởng sửa chữa lưu trạng thái khách từ chối báo giá kèm lý do; lệnh được giữ làm lịch sử nhưng không còn khóa xe, xuất phụ tùng hay lập hóa đơn.
 - Sổ học phí liên kết ghi danh với khoản thu; phát hành tạo hóa đơn kế toán có đúng hạn thanh toán và thanh toán đủ tự đồng bộ trạng thái học phí.
-- Bán và hoàn vé sự kiện lưu phương thức thanh toán/lý do hoàn cùng lần chuyển trạng thái; bút toán kế toán và trạng thái vé cùng commit hoặc rollback.
+- Bán và hoàn vé sự kiện lưu phương thức thanh toán/lý do hoàn cùng lần chuyển trạng thái; bút toán kế toán và trạng thái vé cùng commit hoặc rollback. Mỗi vé có mã quét bất biến; quầy sự kiện có thể tìm/check-in bằng máy quét bàn phím, còn backend vẫn kiểm tra vé đã bán và khung giờ check-in.
 - Nhà hàng ghi nhận phương thức thanh toán và lý do hủy cùng lần chuyển trạng thái; xuất kho, thanh toán và hủy phiếu bếp chờ cùng commit hoặc rollback.
 - Màn hình KDS có thể in riêng từng phiếu bếp theo khổ ticket qua hộp thoại in của trình duyệt, dùng máy in nhiệt đã cấu hình trên thiết bị vận hành.
 - Bảo hiểm lưu lý do từ chối bồi thường; số tiền duyệt, quyết định bồi thường và thông tin chi trả cùng kiểm tra hạn mức/bút toán trong giao dịch.

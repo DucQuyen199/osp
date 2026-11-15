@@ -111,6 +111,13 @@
           "ref": "master-data.party"
         },
         {
+          "name": "ticket_code",
+          "label": "Mã vé",
+          "type": "string",
+          "required": false,
+          "system": true
+        },
+        {
           "name": "price",
           "type": "money",
           "required": false,

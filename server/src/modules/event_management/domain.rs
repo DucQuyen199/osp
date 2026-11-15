@@ -170,6 +170,13 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
         return Vec::new();
     }
     if entity == "ticket"
+        && patch
+            .get("ticket_code")
+            .is_some_and(|code| Some(code) != current.get("ticket_code"))
+    {
+        return vec!["Mã vé do hệ thống tạo và không thể thay đổi".into()];
+    }
+    if entity == "ticket"
         && current.get("status").and_then(Value::as_str) == Some("sold")
         && let Some(reason) = patch.get("refund_reason")
     {
