@@ -102,13 +102,23 @@ pub fn validate_action_at(
     today: chrono::NaiveDate,
 ) -> Vec<String> {
     if entity == "loan" && action == "disbursed" {
-        if matches!(
+        let mut errors = Vec::new();
+        if !matches!(
             document.get("method").and_then(Value::as_str),
             Some("cash" | "bank")
         ) {
-            return Vec::new();
+            errors.push("Chọn phương thức giải ngân trước khi giải ngân khoản vay".into());
         }
-        return vec!["Chọn phương thức giải ngân trước khi giải ngân khoản vay".into()];
+        if document
+            .get("first_due_date")
+            .and_then(Value::as_str)
+            .and_then(|date| NaiveDate::parse_from_str(date, "%Y-%m-%d").ok())
+            .is_some_and(|date| date <= today)
+        {
+            errors
+                .push("Ngày đến hạn kỳ đầu phải sau ngày giải ngân theo lịch doanh nghiệp".into());
+        }
+        return errors;
     }
     if entity == "repayment"
         && action == "paid"
