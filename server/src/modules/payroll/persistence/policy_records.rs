@@ -387,7 +387,7 @@ pub(super) async fn validate_policy_records(
         let policy = tx
             .query_opt(
                 &format!(
-                    "SELECT min({cap_field})::text, max({cap_field})::text, count(*), bool_and(COALESCE(annual_deductions_require_resident, false)), bool_or(COALESCE(annual_deductions_require_resident, false)) FROM payroll__tax_policy WHERE tenant_id = $1 AND status = 'approved' AND effective_from <= $3 AND COALESCE(effective_to, '9999-12-31'::date) >= $2"
+                    "SELECT min({cap_field})::text, max({cap_field})::text, count(*), count({cap_field}), bool_and(COALESCE(annual_deductions_require_resident, false)), bool_or(COALESCE(annual_deductions_require_resident, false)) FROM payroll__tax_policy WHERE tenant_id = $1 AND status = 'approved' AND effective_from <= $3 AND COALESCE(effective_to, '9999-12-31'::date) >= $2"
                 ),
                 &[&tenant.id, &year_start, &year_end],
             )
@@ -398,8 +398,9 @@ pub(super) async fn validate_policy_records(
         let min_cap: Option<String> = policy.get(0);
         let max_cap: Option<String> = policy.get(1);
         let policy_count: i64 = policy.get(2);
-        let require_resident_and = policy.get::<_, Option<bool>>(3).unwrap_or(false);
-        let require_resident_or = policy.get::<_, Option<bool>>(4).unwrap_or(false);
+        let configured_policy_count: i64 = policy.get(3);
+        let require_resident_and = policy.get::<_, Option<bool>>(4).unwrap_or(false);
+        let require_resident_or = policy.get::<_, Option<bool>>(5).unwrap_or(false);
         let Some(min_cap) = min_cap.and_then(|value| money::decimal_str(&value)) else {
             return Ok(Some(vec![
                 "Tax deduction cap is not configured in an approved tax policy".into(),
@@ -411,6 +412,7 @@ pub(super) async fn validate_policy_records(
             ]));
         };
         if policy_count == 0
+            || configured_policy_count != policy_count
             || min_cap != max_cap
             || min_cap <= Decimal::ZERO
             || require_resident_and != require_resident_or
