@@ -412,8 +412,31 @@ pub async fn prepare_order(
                     ));
                     continue;
                 }
+                let selected_unit = ingredient
+                    .get("uom")
+                    .and_then(Value::as_str)
+                    .and_then(|value| Uuid::parse_str(value).ok());
+                let unit = match crate::modules::master_data::unit_conversion::resolve(
+                    tx,
+                    tenant,
+                    ingredient_id,
+                    selected_unit,
+                )
+                .await?
+                {
+                    Ok(unit) => unit,
+                    Err(message) => {
+                        errors.push(format!(
+                            "Công thức dòng {} có đơn vị nguyên liệu {} không hợp lệ: {message}",
+                            index + 1,
+                            ingredient_index + 1
+                        ));
+                        continue;
+                    }
+                };
                 let Some(consumption_qty) = qty
-                    .checked_mul(order_qty)
+                    .checked_mul(unit.ratio)
+                    .and_then(|base_quantity| base_quantity.checked_mul(order_qty))
                     .and_then(|quantity| quantity.checked_div(output_qty))
                 else {
                     errors.push(format!(

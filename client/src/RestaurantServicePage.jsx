@@ -10,10 +10,12 @@ const METHODS = [['cash', 'Tiền mặt'], ['card', 'Thẻ'], ['transfer', 'Chuy
 export default function RestaurantServicePage() {
   const [tables, setTables] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
+  const [recipes, setRecipes] = useState([]);
   const [orders, setOrders] = useState([]);
   const [tickets, setTickets] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [products, setProducts] = useState(new Map());
+  const [units, setUnits] = useState(new Map());
   const [warehouses, setWarehouses] = useState(new Map());
   const [quantities, setQuantities] = useState({});
   const [tableId, setTableId] = useState('');
@@ -26,20 +28,26 @@ export default function RestaurantServicePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [editingRecipe, setEditingRecipe] = useState('');
+  const [recipeProduct, setRecipeProduct] = useState('');
+  const [recipeOutputQty, setRecipeOutputQty] = useState('1');
+  const [recipeIngredients, setRecipeIngredients] = useState([{ product: '', qty: '1', uom: '' }]);
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const canReadTickets = can('restaurant.kitchen_ticket.read');
       const canReadInvoices = app.meta?.modules?.some((module) => module.id === 'accounting') && can('accounting.payment.read');
-      const [tableResponse, menuResponse, orderResponse, productMap, warehouseMap, ticketResponse, invoiceResponse] = await Promise.all([
+      const [tableResponse, menuResponse, recipeResponse, orderResponse, productMap, unitMap, warehouseMap, ticketResponse, invoiceResponse] = await Promise.all([
         api(`${dataPath('restaurant.table')}?limit=1000`), api(`${dataPath('restaurant.menu_item')}?limit=1000`),
-        api(`${dataPath('restaurant.table_order')}?limit=1000`), loadRefs('master-data.product'), loadRefs('inventory.warehouse'),
+        can('restaurant.recipe.read') ? api(`${dataPath('restaurant.recipe')}?limit=1000`) : Promise.resolve({ items: [] }),
+        api(`${dataPath('restaurant.table_order')}?limit=1000`), loadRefs('master-data.product'),
+        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()), loadRefs('inventory.warehouse'),
         canReadTickets ? api(`${dataPath('restaurant.kitchen_ticket')}?limit=1000`) : Promise.resolve({ items: [] }),
         canReadInvoices ? api(`${dataPath('accounting.payment')}?limit=1000`) : Promise.resolve({ items: [] }),
       ]);
       const nextOrders = itemsOf(orderResponse).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
-      setTables(itemsOf(tableResponse)); setMenuItems(itemsOf(menuResponse)); setOrders(nextOrders); setProducts(productMap); setWarehouses(warehouseMap); setTickets(itemsOf(ticketResponse)); setInvoices(itemsOf(invoiceResponse));
+      setTables(itemsOf(tableResponse)); setMenuItems(itemsOf(menuResponse)); setRecipes(itemsOf(recipeResponse)); setOrders(nextOrders); setProducts(productMap); setUnits(unitMap); setWarehouses(warehouseMap); setTickets(itemsOf(ticketResponse)); setInvoices(itemsOf(invoiceResponse));
       setSelectedId((current) => nextOrders.some((order) => order.id === current) ? current : nextOrders[0]?.id || '');
     } catch (reason) { setError(reason.message || 'Không tải được dữ liệu nhà hàng.'); }
     finally { if (!quiet) setLoading(false); }
@@ -60,6 +68,27 @@ export default function RestaurantServicePage() {
   const cart = Object.entries(quantities).map(([id, qty]) => ({ ...availableMenu.find(({ item }) => item.id === id), menuItemId: id, qty: Number(qty) })).filter((line) => line.product && line.qty > 0);
   const indicativeTotal = cart.reduce((total, line) => total + (Number(line.product.price) || 0) * line.qty, 0);
   const setQuantity = (id, value) => setQuantities((current) => { const next = { ...current }; const qty = Math.max(0, Number(value) || 0); if (qty) next[id] = qty; else delete next[id]; return next; });
+  const recipeProducts = menuItems.map((item) => products.get(item.product)).filter((product) => product && product.active !== false);
+  const ingredientProducts = [...products.values()].filter((product) => product.active !== false && product.kind !== 'service');
+  const unitsFor = (productId) => {
+    const baseUnit = products.get(productId)?.uom;
+    return baseUnit ? [...units.values()].filter((unit) => unit.id === baseUnit || unit.base_uom === baseUnit) : [];
+  };
+  const resetRecipe = () => { setEditingRecipe(''); setRecipeProduct(''); setRecipeOutputQty('1'); setRecipeIngredients([{ product: '', qty: '1', uom: '' }]); };
+  const editRecipe = (recipe) => {
+    setEditingRecipe(recipe.id); setRecipeProduct(recipe.product || ''); setRecipeOutputQty(String(recipe.output_qty || 1));
+    const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
+    setRecipeIngredients(ingredients.length ? ingredients.map((item) => ({ product: item.product || '', qty: String(item.qty || ''), uom: item.uom || '' })) : [{ product: '', qty: '1', uom: '' }]);
+  };
+  const saveRecipe = async (event) => {
+    event.preventDefault(); setBusy('recipe'); setError(''); setNotice('');
+    try {
+      const body = { product: recipeProduct, output_qty: Number(recipeOutputQty), ingredients: recipeIngredients.map((item) => ({ product: item.product, qty: Number(item.qty), ...(item.uom ? { uom: item.uom } : {}) })) };
+      await api(editingRecipe ? dataPath('restaurant.recipe', editingRecipe) : dataPath('restaurant.recipe'), { method: editingRecipe ? 'PATCH' : 'POST', body });
+      resetRecipe(); await load(true); setNotice('Đã lưu công thức món ăn.');
+    } catch (reason) { setError(reason.message || 'Không lưu được công thức.'); }
+    finally { setBusy(''); }
+  };
 
   const createOrder = async (event) => {
     event.preventDefault(); if (!cart.length) return;
@@ -101,6 +130,15 @@ export default function RestaurantServicePage() {
   return <div className="page-content restaurant-service-page">
     <header className="page-header"><div><h1>Phục vụ nhà hàng</h1><p className="muted">Mở bàn, ghi món, gửi bếp, theo dõi món sẵn sàng và thanh toán.</p></div><button className="button" onClick={() => load()} disabled={loading}>Làm mới</button></header>
     {error && <div className="alert error" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {can('restaurant.recipe.read') && <section className="card restaurant-recipes"><header className="restaurant-order-card-head"><div><h2>Công thức món</h2><p className="small muted">Định lượng nguyên liệu trên một lần nấu; kho trừ theo đơn vị gốc.</p></div>{can('restaurant.recipe.create') && <button className="button" type="button" onClick={resetRecipe}>Công thức mới</button>}</header>
+      {(can('restaurant.recipe.create') || can('restaurant.recipe.update')) && <form onSubmit={saveRecipe} className="restaurant-recipe-form">
+        <label className="field"><span>Món trong thực đơn *</span><select className="select" required value={recipeProduct} disabled={Boolean(editingRecipe)} onChange={(event) => setRecipeProduct(event.target.value)}><option value="">Chọn món</option>{recipeProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
+        <label className="field"><span>Khẩu phần đầu ra *</span><input className="input num" type="number" min="0.000001" step="any" required value={recipeOutputQty} onChange={(event) => setRecipeOutputQty(event.target.value)} /></label>
+        <div className="restaurant-recipe-lines"><h3>Nguyên liệu</h3>{recipeIngredients.map((line, index) => { const lineUnits = unitsFor(line.product); return <div className="row wrap" key={index}><select className="select" required aria-label={`Nguyên liệu ${index + 1}`} value={line.product} onChange={(event) => setRecipeIngredients((current) => current.map((item, i) => i === index ? { ...item, product: event.target.value, uom: '' } : item))}><option value="">Chọn nguyên liệu</option>{ingredientProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select><input className="input num" type="number" min="0.000001" step="any" required aria-label={`Lượng nguyên liệu ${index + 1}`} value={line.qty} onChange={(event) => setRecipeIngredients((current) => current.map((item, i) => i === index ? { ...item, qty: event.target.value } : item))} />{lineUnits.length > 1 && <select className="select" aria-label={`Đơn vị nguyên liệu ${index + 1}`} value={line.uom || products.get(line.product)?.uom || ''} onChange={(event) => setRecipeIngredients((current) => current.map((item, i) => i === index ? { ...item, uom: event.target.value } : item))}>{lineUnits.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` · ${unit.ratio} × đơn vị gốc` : ' · đơn vị gốc'}</option>)}</select>}{recipeIngredients.length > 1 && <button className="button" type="button" aria-label={`Xóa nguyên liệu ${index + 1}`} onClick={() => setRecipeIngredients((current) => current.filter((_, i) => i !== index))}>Bỏ</button>}</div>; })}<button className="button" type="button" onClick={() => setRecipeIngredients((current) => [...current, { product: '', qty: '1', uom: '' }])}>Thêm nguyên liệu</button></div>
+        <div className="restaurant-actions"><button className="button primary" type="submit" disabled={busy === 'recipe' || !can(editingRecipe ? 'restaurant.recipe.update' : 'restaurant.recipe.create')}>{busy === 'recipe' ? 'Đang lưu…' : editingRecipe ? 'Lưu công thức' : 'Tạo công thức'}</button>{editingRecipe && <button className="button" type="button" onClick={resetRecipe}>Hủy sửa</button>}</div>
+      </form>}
+      <div className="restaurant-recipe-list">{recipes.map((recipe) => <article className="restaurant-recipe-card" key={recipe.id}><div><strong>{products.get(recipe.product)?.name || recipe.product}</strong><span className="small muted"> {recipe.output_qty || 1} đơn vị đầu ra · {(recipe.ingredients || []).length} nguyên liệu</span><div className="small muted">{(recipe.ingredients || []).map((ingredient) => `${products.get(ingredient.product)?.name || 'Nguyên liệu'} ${ingredient.qty} ${units.get(ingredient.uom)?.name || ''}`).join(' · ')}</div></div>{can('restaurant.recipe.update') && <button className="button" type="button" onClick={() => editRecipe(recipe)}>Sửa</button>}</article>)}{!recipes.length && <p className="small muted">Chưa có công thức nào.</p>}</div>
+    </section>}
     <div className="restaurant-service-layout">
       <section className="restaurant-order-create card"><h2>Tạo order</h2><form onSubmit={createOrder}>
         <div className="restaurant-order-tools">

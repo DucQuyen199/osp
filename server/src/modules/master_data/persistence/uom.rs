@@ -103,6 +103,16 @@ async fn validate_immutable_conversion(
             break;
         }
     }
+    if tx
+        .query_opt(
+            "SELECT 1 FROM restaurant__recipe recipe CROSS JOIN LATERAL jsonb_array_elements(COALESCE(recipe.ingredients, '[]'::jsonb)) ingredient WHERE recipe.tenant_id = $1 AND ingredient->>'uom' = $2 LIMIT 1",
+            &[&tenant.id, &unit_id.to_string()],
+        )
+        .await?
+        .is_some()
+    {
+        used_by_document = true;
+    }
     if used_by_product || used_by_document {
         errors.push(
             "A unit conversion cannot be changed or removed while products or documents use it; create a new unit instead".into(),
@@ -181,6 +191,16 @@ pub async fn validate_product_unit(
             used_by_document = true;
             break;
         }
+    }
+    if tx
+        .query_opt(
+            "SELECT 1 FROM restaurant__recipe recipe WHERE recipe.tenant_id = $1 AND (recipe.product::text = $2 OR EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(recipe.ingredients, '[]'::jsonb)) ingredient WHERE ingredient->>'product' = $2)) LIMIT 1",
+            &[&tenant.id, &product_id.to_string()],
+        )
+        .await?
+        .is_some()
+    {
+        used_by_document = true;
     }
     if has_stock_history || used_by_document {
         errors.push(

@@ -327,5 +327,40 @@ pub async fn validate_persistence(
             }
         }
     }
+    if let Some(ingredients) = document.get("ingredients").and_then(Value::as_array) {
+        for (index, ingredient) in ingredients.iter().enumerate() {
+            let Some(ingredient_id) = ingredient
+                .get("product")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+            else {
+                continue;
+            };
+            let selected_unit = match ingredient.get("uom") {
+                Some(Value::String(value)) => match Uuid::parse_str(value) {
+                    Ok(unit) => Some(unit),
+                    Err(_) => {
+                        errors.push(format!("Unit on ingredient {} is invalid", index + 1));
+                        continue;
+                    }
+                },
+                Some(value) if !value.is_null() => {
+                    errors.push(format!("Unit on ingredient {} is invalid", index + 1));
+                    continue;
+                }
+                _ => None,
+            };
+            if let Err(message) = crate::modules::master_data::unit_conversion::resolve(
+                tx,
+                tenant,
+                ingredient_id,
+                selected_unit,
+            )
+            .await?
+            {
+                errors.push(format!("Unit on ingredient {}: {message}", index + 1));
+            }
+        }
+    }
     Ok(errors)
 }
