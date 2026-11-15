@@ -7,6 +7,7 @@ use crate::{
 };
 use rust_decimal::Decimal;
 use serde_json::{Map, Value, json};
+use std::collections::BTreeMap;
 use uuid::Uuid;
 
 async fn replenishment_rows(
@@ -177,6 +178,29 @@ async fn replenishment_rows(
         &[&tenant.id, &warehouse],
     )
     .await
+}
+
+fn quality_held_qty_by_unit(items: &[Value]) -> Option<Vec<Value>> {
+    let mut totals = BTreeMap::<(Option<String>, Option<String>), Decimal>::new();
+    for item in items {
+        let key = (
+            item.get("uomId").and_then(Value::as_str).map(str::to_owned),
+            item.get("unit").and_then(Value::as_str).map(str::to_owned),
+        );
+        let qty = item.get("heldQty").and_then(money::decimal)?;
+        let total = totals.get(&key).copied().unwrap_or(Decimal::ZERO);
+        totals.insert(key, total.checked_add(qty)?);
+    }
+    totals
+        .into_iter()
+        .map(|((uom_id, unit), qty)| {
+            Some(json!({
+                "uomId": uom_id,
+                "unit": unit.unwrap_or_else(|| "Chưa đặt đơn vị".into()),
+                "qty": money::json_number(qty)?,
+            }))
+        })
+        .collect()
 }
 
 impl Kernel {
@@ -565,7 +589,8 @@ impl Kernel {
                    WHERE sm.tenant_id = $1 AND sm.direction = 'in' AND sm.source IN ('purchase_order', 'purchase_receipt') \
                  ) SELECT jsonb_build_object( \
                    'inspectionId', qi.id, 'inspectionStatus', qi.status, 'source', qi.source, 'sourceId', qi.source_id, \
-                   'productId', p.id, 'sku', p.sku, 'product', p.name, 'warehouseId', w.id, 'warehouse', w.name, \
+                   'productId', p.id, 'sku', p.sku, 'product', p.name, 'uomId', p.uom, 'unit', u.name, \
+                   'warehouseId', w.id, 'warehouse', w.name, \
                    'lotId', lot.id, 'lotCode', lot.code, 'layerId', layer.id, 'layerOriginId', layer.fifo_origin_id, \
                    'layerReceivedAt', layer.created_at, 'layerQty', layer.qty, 'heldQty', qi.held_qty, \
                    'unitCost', COALESCE(qi.unit_cost, layer.unit_cost, 0), \
@@ -573,6 +598,7 @@ impl Kernel {
                    'daysHeld', GREATEST(current_date - qi.created_at::date, 0) \
                  ) FROM held_inspections qi \
                  JOIN master_data__product p ON p.tenant_id = qi.tenant_id AND p.id = qi.product \
+                 LEFT JOIN master_data__uom u ON u.tenant_id = p.tenant_id AND u.id = p.uom \
                  JOIN inventory__warehouse w ON w.tenant_id = qi.tenant_id AND w.id = qi.warehouse \
                  LEFT JOIN inventory__lot lot ON lot.tenant_id = qi.tenant_id AND lot.id = qi.lot \
                  LEFT JOIN source_layers layer ON layer.tenant_id = qi.tenant_id AND layer.source = qi.source \
@@ -585,24 +611,17 @@ impl Kernel {
                 &[&tenant.id, &warehouse, &status],
             )
             .await?;
-        let held_qty = items.iter().try_fold(Decimal::ZERO, |total, item| {
-            total.checked_add(item.get("heldQty").and_then(money::decimal)?)
-        });
         let held_value = items.iter().try_fold(Decimal::ZERO, |total, item| {
             total.checked_add(item.get("heldValue").and_then(money::decimal)?)
         });
-        let (Some(held_qty), Some(held_value)) = (held_qty, held_value) else {
+        let (Some(held_value), Some(held_qty_by_unit)) =
+            (held_value, quality_held_qty_by_unit(&items))
+        else {
             return Err(ApiError::validation(
                 "inventory.quality_report",
                 vec!["Quality hold report values exceed the supported decimal range".into()],
             ));
         };
-        let held_qty = money::json_number(held_qty).ok_or_else(|| {
-            ApiError::validation(
-                "inventory.quality_report",
-                vec!["Quality hold quantity cannot be serialized as a JSON number".into()],
-            )
-        })?;
         let held_value = money::json_number(held_value).ok_or_else(|| {
             ApiError::validation(
                 "inventory.quality_report",
@@ -613,7 +632,7 @@ impl Kernel {
             "warehouseId": warehouse,
             "status": status.unwrap_or("all"),
             "itemCount": items.len(),
-            "heldQty": held_qty,
+            "heldQtyByUnit": held_qty_by_unit,
             "heldValue": held_value,
             "items": items,
         }))

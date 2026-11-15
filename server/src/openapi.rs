@@ -1017,7 +1017,7 @@ pub fn build(reg: &Registry) -> Value {
                 { "name": "warehouse", "in": "query", "schema": { "type": "string", "format": "uuid" } },
                 { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["all", "pending", "failed"], "default": "all" } }
             ],
-            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Remaining quality-held quantity and value by inspection, lot, warehouse, and matched receipt stock movement layer" })), ("403".to_string(), err("Requires inventory.stock_move.read and quality.inspection.read permissions")), ("422".to_string(), err("Invalid warehouse or inspection status"))]))
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Remaining quality-held quantity grouped by each product base unit, plus held value by inspection, lot, warehouse, and matched receipt stock movement layer" })), ("403".to_string(), err("Requires inventory.stock_move.read and quality.inspection.read permissions")), ("422".to_string(), err("Invalid warehouse or inspection status"))]))
         } }),
     );
     paths.insert(

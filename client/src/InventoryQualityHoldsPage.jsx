@@ -4,6 +4,7 @@ import { fmtMoney } from './lib/i18n.js';
 import { can, loadRefs } from './lib/state.js';
 
 const quantity = (value) => Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 3 });
+const unitName = (item) => item.unit || 'Chưa đặt đơn vị';
 const statusLabel = (value) => value === 'failed' ? 'Không đạt' : 'Chờ kiểm tra';
 const sourceLabel = (value) => value === 'purchase_receipt' ? 'Phiếu nhận mua' : value === 'purchase_order' ? 'Đơn mua' : value;
 
@@ -80,16 +81,16 @@ export default function InventoryQualityHoldsPage() {
     {loading && !report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : report && <div className="stack">
       <div className="stats">
         <div className="card stat"><span className="stat-label">Phiếu kiểm tra còn giữ hàng</span><strong className="stat-value num">{Number(report.itemCount || 0).toLocaleString()}</strong></div>
-        <div className="card stat"><span className="stat-label">Số lượng đang giữ</span><strong className="stat-value num">{quantity(report.heldQty)}</strong></div>
+        <div className="card stat"><span className="stat-label">Số lượng đang giữ theo đơn vị gốc</span><strong className="stat-value num">{report.heldQtyByUnit?.length ? report.heldQtyByUnit.map((row) => `${quantity(row.qty)} ${row.unit}`).join(' · ') : '0'}</strong></div>
         <div className="card stat"><span className="stat-label">Giá trị đang giữ</span><strong className="stat-value num">{fmtMoney(report.heldValue)}</strong></div>
       </div>
       {!report.items?.length ? <div className="empty"><h3>Không có hàng tồn đang giữ QC</h3><p>Các phiếu chờ kiểm tra hoặc không đạt đã được xử lý.</p></div> : <div className="card table-wrap"><table className="table">
-        <thead><tr><th scope="col">Trạng thái</th><th scope="col">Sản phẩm</th><th scope="col">Kho</th><th scope="col">Lô</th><th scope="col">Nguồn / lớp nhập</th><th scope="col" className="right">Đang giữ</th><th scope="col" className="right">Đơn giá</th><th scope="col" className="right">Giá trị</th><th scope="col" className="right">Số ngày</th><th scope="col">Thao tác QC</th></tr></thead>
+        <thead><tr><th scope="col">Trạng thái</th><th scope="col">Sản phẩm</th><th scope="col">Kho</th><th scope="col">Lô</th><th scope="col">Nguồn / lớp nhập</th><th scope="col" className="right">Đang giữ (đơn vị gốc)</th><th scope="col" className="right">Đơn giá / đơn vị gốc</th><th scope="col" className="right">Giá trị</th><th scope="col" className="right">Số ngày</th><th scope="col">Thao tác QC</th></tr></thead>
         <tbody>{report.items.map((item) => <tr key={item.inspectionId}>
           <td><span className={`badge ${item.inspectionStatus === 'failed' ? 'danger' : 'warning'}`}>{statusLabel(item.inspectionStatus)}</span></td>
           <td><span className="mono">{item.sku || '—'}</span><br />{item.product}</td><td>{item.warehouse}</td><td>{item.lotCode || 'Không gán lô'}</td>
           <td>{sourceLabel(item.source)}<br /><span className="faint mono">{item.layerId || item.sourceId}</span></td>
-          <td className="right">{quantity(item.heldQty)}</td><td className="right money">{fmtMoney(item.unitCost)}</td><td className="right money">{fmtMoney(item.heldValue)}</td><td className="right">{quantity(item.daysHeld)}</td>
+          <td className="right">{quantity(item.heldQty)} {unitName(item)}</td><td className="right money">{fmtMoney(item.unitCost)} / {unitName(item)}</td><td className="right money">{fmtMoney(item.heldValue)}</td><td className="right">{quantity(item.daysHeld)}</td>
           <td><div className="quality-hold-actions">
             {item.inspectionStatus === 'pending' && can('quality.inspection.passed') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => decide(item, 'passed')}>Đạt, nhập kho</button>}
             {item.inspectionStatus === 'pending' && can('quality.inspection.failed') && can('quality.inspection.update') && <>
@@ -98,7 +99,7 @@ export default function InventoryQualityHoldsPage() {
             </>}
             {item.inspectionStatus === 'failed' && can('quality.inspection.retest') && <button className="btn btn-ghost btn-sm" type="button" disabled={Boolean(busy)} onClick={() => decide(item, 'retest')}>Kiểm tra lại</button>}
             {item.inspectionStatus === 'pending' && can('quality.inspection_disposition.create') && can('quality.inspection_disposition.posted') && <div className="quality-partial-release">
-              <input className="input" aria-label="Số lượng giải phóng" type="number" min="0.001" max={item.heldQty} step="any" placeholder={`Tối đa ${quantity(item.heldQty)}`} value={releaseDrafts[item.inspectionId]?.qty || ''} onChange={(event) => setReleaseDrafts((rows) => ({ ...rows, [item.inspectionId]: { ...rows[item.inspectionId], qty: event.target.value } }))} />
+              <label className="field"><span className="small muted">Số lượng giải phóng ({unitName(item)})</span><input className="input" aria-label={`Số lượng giải phóng (${unitName(item)})`} type="number" min="0.001" max={item.heldQty} step="any" placeholder={`Tối đa ${quantity(item.heldQty)} ${unitName(item)}`} value={releaseDrafts[item.inspectionId]?.qty || ''} onChange={(event) => setReleaseDrafts((rows) => ({ ...rows, [item.inspectionId]: { ...rows[item.inspectionId], qty: event.target.value } }))} /></label>
               <input className="input" aria-label="Lý do giải phóng một phần" placeholder="Lý do giải phóng" maxLength={500} value={releaseDrafts[item.inspectionId]?.note || ''} onChange={(event) => setReleaseDrafts((rows) => ({ ...rows, [item.inspectionId]: { ...rows[item.inspectionId], note: event.target.value } }))} />
               <button className="btn btn-ghost btn-sm" type="button" disabled={Boolean(busy) || !releaseDrafts[item.inspectionId]?.note?.trim() || !(Number(releaseDrafts[item.inspectionId]?.qty) > 0)} onClick={() => releasePartial(item)}>Giải phóng một phần</button>
             </div>}

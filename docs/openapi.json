@@ -1657,6 +1657,16 @@
       "agriculture_harvest": {
         "description": "Thu hoạch",
         "properties": {
+          "base_qty": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "base_uom": {
+            "description": "Tham chiếu tới master-data.uom",
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
           "createdAt": {
             "format": "date-time",
             "readOnly": true,
@@ -1690,6 +1700,19 @@
           "qty": {
             "type": "number"
           },
+          "uom": {
+            "description": "Tham chiếu tới master-data.uom",
+            "format": "uuid",
+            "type": "string"
+          },
+          "uom_name": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "uom_ratio": {
+            "readOnly": true,
+            "type": "number"
+          },
           "updatedAt": {
             "format": "date-time",
             "readOnly": true,
@@ -1707,6 +1730,16 @@
         "additionalProperties": false,
         "description": "Thu hoạch (dữ liệu gửi lên)",
         "properties": {
+          "base_qty": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "base_uom": {
+            "description": "Tham chiếu tới master-data.uom",
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
           "cycle": {
             "description": "Tham chiếu tới agriculture.crop_cycle",
             "format": "uuid",
@@ -1728,6 +1761,19 @@
             "type": "string"
           },
           "qty": {
+            "type": "number"
+          },
+          "uom": {
+            "description": "Tham chiếu tới master-data.uom",
+            "format": "uuid",
+            "type": "string"
+          },
+          "uom_name": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "uom_ratio": {
+            "readOnly": true,
             "type": "number"
           },
           "warehouse": {
@@ -1748,6 +1794,16 @@
       "agriculture_input_application": {
         "description": "Vật tư canh tác",
         "properties": {
+          "base_qty": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "base_uom": {
+            "description": "Tham chiếu tới master-data.uom",
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
           "createdAt": {
             "format": "date-time",
             "readOnly": true,
@@ -1788,6 +1844,19 @@
           "qty": {
             "type": "number"
           },
+          "uom": {
+            "description": "Tham chiếu tới master-data.uom",
+            "format": "uuid",
+            "type": "string"
+          },
+          "uom_name": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "uom_ratio": {
+            "readOnly": true,
+            "type": "number"
+          },
           "updatedAt": {
             "format": "date-time",
             "readOnly": true,
@@ -1805,6 +1874,16 @@
         "additionalProperties": false,
         "description": "Vật tư canh tác (dữ liệu gửi lên)",
         "properties": {
+          "base_qty": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "base_uom": {
+            "description": "Tham chiếu tới master-data.uom",
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
           "cycle": {
             "description": "Tham chiếu tới agriculture.crop_cycle",
             "format": "uuid",
@@ -1833,6 +1912,19 @@
             "type": "string"
           },
           "qty": {
+            "type": "number"
+          },
+          "uom": {
+            "description": "Tham chiếu tới master-data.uom",
+            "format": "uuid",
+            "type": "string"
+          },
+          "uom_name": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "uom_ratio": {
+            "readOnly": true,
             "type": "number"
           },
           "warehouse": {
@@ -8507,6 +8599,10 @@
             "readOnly": true,
             "type": "string"
           },
+          "first_due_date": {
+            "format": "date",
+            "type": "string"
+          },
           "id": {
             "format": "uuid",
             "readOnly": true,
@@ -8557,6 +8653,10 @@
         "additionalProperties": false,
         "description": "Khoản vay (dữ liệu gửi lên)",
         "properties": {
+          "first_due_date": {
+            "format": "date",
+            "type": "string"
+          },
           "method": {
             "enum": [
               "cash",
@@ -12548,6 +12648,9 @@
           "prescription": {
             "type": "string"
           },
+          "refund_reason": {
+            "type": "string"
+          },
           "refund_session": {
             "description": "Tham chiếu tới pos.pos_session",
             "format": "uuid",
@@ -12616,6 +12719,9 @@
             "type": "string"
           },
           "prescription": {
+            "type": "string"
+          },
+          "refund_reason": {
             "type": "string"
           },
           "refund_session": {
@@ -146632,7 +146738,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Remaining quality-held quantity and value by inspection, lot, warehouse, and matched receipt stock movement layer"
+            "description": "Remaining quality-held quantity grouped by each product base unit, plus held value by inspection, lot, warehouse, and matched receipt stock movement layer"
           },
           "401": {
             "content": {
