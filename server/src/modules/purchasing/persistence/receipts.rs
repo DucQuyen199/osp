@@ -6,7 +6,9 @@ use serde_json::Value;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-fn receipt_quantities(lines: &Value) -> R<HashMap<(Uuid, Decimal, Option<Uuid>), Decimal>> {
+pub(super) fn receipt_quantities(
+    lines: &Value,
+) -> R<HashMap<(Uuid, Decimal, Option<Uuid>), Decimal>> {
     let Some(lines) = lines.as_array() else {
         return Err(crate::error::ApiError::validation(
             "purchasing.purchase_receipt",

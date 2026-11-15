@@ -55,7 +55,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - POS ghi nhận số tiền khách đưa, tự tính/in tiền thối và chặn hoàn tất giao dịch tiền mặt khi nhận thiếu; tiền thực đếm và chốt ca dùng cùng giao dịch sau khi kiểm tra đơn/phiếu quỹ nháp và tính chênh lệch tiền.
 - Bảo trì lưu kết quả sửa chữa và cặp giờ công/đơn giá đầy đủ cùng lần hoàn tất, xuất vật tư và cập nhật lịch định kỳ.
 - Bảo trì có danh mục kỹ thuật viên nội bộ/nhà thầu, chuyên môn và liên hệ; lệnh mở có thể được phân công và chỉ gán kỹ thuật viên còn hoạt động thuộc tenant.
-- Mua hàng lưu lý do tranh chấp hóa đơn nhà cung cấp và ghi chú xử lý cùng lần chuyển trạng thái, tránh tạo công nợ khi hóa đơn đang tranh chấp.
+- Mua hàng lưu lý do tranh chấp hóa đơn nhà cung cấp và ghi chú xử lý cùng lần chuyển trạng thái, tránh tạo công nợ khi hóa đơn đang tranh chấp; hàng lỗi đã nhận có thể trả cả khi đơn còn nhận từng phần, với hạn mức khóa theo số thực nhận.
 - Nhân sự ghi ngày nghỉ việc cùng action chấm dứt sau khi kiểm tra chấm công/nghỉ phép và đồng bộ payroll trong một giao dịch.
 - Payroll quy đổi thời lượng chấm công đã đủ giờ vào/ra thành ngày công tương đương theo số giờ chuẩn của kỳ; ngày công một phần được kết hợp với nghỉ hưởng lương/ngày lễ nhưng không vượt một ngày.
 - Khách sạn lưu lý do vắng mặt cùng action no-show sau khi kiểm tra ngày đến và phí folio, rồi giải phóng lịch phòng trong cùng giao dịch.

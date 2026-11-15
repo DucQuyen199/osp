@@ -54,8 +54,8 @@ pub(super) async fn validate_return_persistence(
     let order_warehouse: Option<Uuid> = order.get(1);
     let order_lines: Value = order.get(2);
     let mut errors = Vec::new();
-    if status != "received" {
-        errors.push("Returns can only be created from a received purchase order".into());
+    if !matches!(status.as_str(), "partially_received" | "received") {
+        errors.push("Returns can only be created from a purchase order with received goods".into());
     }
     let invoice_lines = if let Some(invoice_id) = supplier_invoice_id {
         match tx.query_opt(
@@ -100,6 +100,22 @@ pub(super) async fn validate_return_persistence(
         errors.push("Return warehouse must match the purchase order receiving warehouse".into());
     }
     let bought_lines = order_lines.as_array().cloned().unwrap_or_default();
+    let receipt_rows = tx
+        .query(
+            "SELECT lines FROM purchasing__purchase_receipt WHERE tenant_id = $1 AND purchase_order = $2 AND status = 'received'",
+            &[&tenant.id, &order_id],
+        )
+        .await?;
+    let mut actually_received = HashMap::<(Uuid, Decimal, Option<Uuid>), Decimal>::new();
+    for row in receipt_rows {
+        let lines: Value = row.get(0);
+        for (key, quantity) in super::receipts::receipt_quantities(&lines)? {
+            let received = actually_received.entry(key).or_insert(Decimal::ZERO);
+            *received = received
+                .checked_add(quantity)
+                .ok_or_else(purchasing_quantity_error)?;
+        }
+    }
     let return_lines = document
         .get("lines")
         .and_then(Value::as_array)
@@ -294,6 +310,27 @@ pub(super) async fn validate_return_persistence(
             ));
             continue;
         }
+        let product_id = Uuid::parse_str(&product).unwrap_or_default();
+        let unit_id = unit
+            .as_deref()
+            .and_then(|value| Uuid::parse_str(value).ok());
+        let actually_received_qty = actually_received
+            .iter()
+            .filter(|((received_product, received_price, received_unit), _)| {
+                *received_product == product_id
+                    && *received_unit == unit_id
+                    && money::within_tolerance(*received_price, order_price, Decimal::new(5, 3))
+            })
+            .try_fold(Decimal::ZERO, |sum, (_, quantity)| {
+                sum.checked_add(*quantity)
+            })
+            .ok_or_else(purchasing_quantity_error)?;
+        if actually_received_qty <= Decimal::ZERO {
+            errors.push(format!(
+                "Product {product} at PO price {order_price} has no received quantity to return"
+            ));
+            continue;
+        }
         if let Some(invoice_lines) = &invoice_lines {
             let invoiced_qty = invoice_lines
                 .as_array()
@@ -349,15 +386,15 @@ pub(super) async fn validate_return_persistence(
             .unwrap_or(Decimal::ZERO);
         if prior
             .checked_add(return_qty)
-            .zip(bought_qty.checked_add(Decimal::new(1, 6)))
+            .zip(actually_received_qty.checked_add(Decimal::new(1, 6)))
             .is_none_or(|(returned, maximum)| returned > maximum)
         {
-            let remaining = bought_qty
+            let remaining = actually_received_qty
                 .checked_sub(prior)
                 .unwrap_or(Decimal::ZERO)
                 .max(Decimal::ZERO);
             errors.push(format!(
-                "Return quantity for {product} exceeds the remaining received quantity ({remaining})"
+                "Return quantity for {product} exceeds the remaining quantity actually received ({remaining})"
             ));
         }
     }
