@@ -12,6 +12,7 @@ export default function ClinicWorkbenchPage() {
   const [prescriptions, setPrescriptions] = useState([]);
   const [labOrders, setLabOrders] = useState([]);
   const [products, setProducts] = useState(new Map());
+  const [units, setUnits] = useState(new Map());
   const [warehouses, setWarehouses] = useState(new Map());
   const [selectedId, setSelectedId] = useState('');
   const [patientId, setPatientId] = useState('');
@@ -25,7 +26,7 @@ export default function ClinicWorkbenchPage() {
   const [testEncounterId, setTestEncounterId] = useState('');
   const [testResult, setTestResult] = useState({});
   const [rxWarehouse, setRxWarehouse] = useState('');
-  const [rxItems, setRxItems] = useState([{ product: '', qty: 1, dosage: '' }]);
+  const [rxItems, setRxItems] = useState([{ product: '', qty: 1, dosage: '', uom: '' }]);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -34,15 +35,16 @@ export default function ClinicWorkbenchPage() {
   const load = useCallback(async (preserveNotice = false) => {
     setLoading(true); setError(''); if (!preserveNotice) setNotice('');
     try {
-      const [patientResponse, partyMap, encounterResponse, prescriptionResponse, labResponse, productMap, warehouseMap] = await Promise.all([
+      const [patientResponse, partyMap, encounterResponse, prescriptionResponse, labResponse, productMap, unitMap, warehouseMap] = await Promise.all([
         api(`${dataPath('clinic.patient')}?limit=1000`), loadRefs('master-data.party'),
         api(`${dataPath('clinic.encounter')}?limit=1000`), api(`${dataPath('clinic.prescription')}?limit=1000`),
-        api(`${dataPath('clinic.lab_order')}?limit=1000`), loadRefs('master-data.product'), loadRefs('inventory.warehouse'),
+        api(`${dataPath('clinic.lab_order')}?limit=1000`), loadRefs('master-data.product'),
+        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()), loadRefs('inventory.warehouse'),
       ]);
       const encounterItems = itemsOf(encounterResponse).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
       setPatients(itemsOf(patientResponse)); setParties(partyMap); setEncounters(encounterItems);
       setPrescriptions(itemsOf(prescriptionResponse)); setLabOrders(itemsOf(labResponse));
-      setProducts(productMap); setWarehouses(warehouseMap);
+      setProducts(productMap); setUnits(unitMap); setWarehouses(warehouseMap);
       setSelectedId((current) => encounterItems.some((item) => item.id === current) ? current : encounterItems.find((item) => item.status === 'open')?.id || encounterItems[0]?.id || '');
     } catch (reason) { setError(reason.message || 'Không tải được dữ liệu phòng khám.'); }
     finally { setLoading(false); }
@@ -61,6 +63,10 @@ export default function ClinicWorkbenchPage() {
   const encounterLabs = useMemo(() => labOrders.filter((item) => item.encounter === selectedId), [labOrders, selectedId]);
   const openEncounters = encounters.filter((item) => item.status === 'open');
   const updateRxItem = (index, patchValue) => setRxItems((current) => current.map((item, i) => i === index ? { ...item, ...patchValue } : item));
+  const unitsFor = (productId) => {
+    const baseUnit = products.get(productId)?.uom;
+    return baseUnit ? [...units.values()].filter((unit) => unit.id === baseUnit || unit.base_uom === baseUnit) : [];
+  };
 
   useEffect(() => {
     if (!selected) return;
@@ -118,8 +124,8 @@ export default function ClinicWorkbenchPage() {
     event.preventDefault(); if (!selected) return;
     setBusy(true); setError(''); setNotice('');
     try {
-      await api(dataPath('clinic.prescription'), { method: 'POST', body: { encounter: selected.id, warehouse: rxWarehouse, items: rxItems.filter((item) => item.product && Number(item.qty) > 0).map((item) => ({ product: item.product, qty: Number(item.qty), dosage: item.dosage.trim() })) } });
-      await load(true); setRxItems([{ product: '', qty: 1, dosage: '' }]); setNotice('Đã lưu đơn thuốc nháp. Chỉ có thể phát sau khi hoàn tất lượt khám.');
+      await api(dataPath('clinic.prescription'), { method: 'POST', body: { encounter: selected.id, warehouse: rxWarehouse, items: rxItems.filter((item) => item.product && Number(item.qty) > 0).map((item) => ({ product: item.product, qty: Number(item.qty), ...(item.uom ? { uom: item.uom } : {}), dosage: item.dosage.trim() })) } });
+      await load(true); setRxItems([{ product: '', qty: 1, dosage: '', uom: '' }]); setNotice('Đã lưu đơn thuốc nháp. Chỉ có thể phát sau khi hoàn tất lượt khám.');
     } catch (reason) { setError(reason.message || 'Không lưu được đơn thuốc.'); }
     finally { setBusy(false); }
   };
@@ -181,8 +187,8 @@ export default function ClinicWorkbenchPage() {
           <dl className="clinic-summary"><div><dt>Lý do khám</dt><dd>{selected.complaint || 'Chưa ghi nhận'}</dd></div><div><dt>Chẩn đoán</dt><dd>{selected.diagnosis || 'Chưa ghi nhận'}</dd></div><div><dt>Bác sĩ</dt><dd>{selected.doctor || 'Chưa phân công'}</dd></div><div><dt>Phí khám</dt><dd>{selected.fee != null ? fmtMoney(selected.fee) : 'Chưa lập'}</dd></div></dl>
           {selected.status === 'open' && <form className="clinic-complete-form" onSubmit={completeEncounter}><h3>Chẩn đoán và hoàn tất</h3><label className="field"><span className="label">Bác sĩ phụ trách *</span><input className="input" required value={doctor} onChange={(event) => setDoctor(event.target.value)} /></label><label className="field"><span className="label">Chẩn đoán *</span><textarea className="textarea" required value={diagnosis} onChange={(event) => setDiagnosis(event.target.value)} /></label><label className="field"><span className="label">Phí khám *</span><input className="input num" required type="number" min="0.01" step="any" value={fee} onChange={(event) => setFee(event.target.value)} /></label><button className="btn btn-primary" type="submit" disabled={busy || !can('clinic.encounter.update') || !can('clinic.encounter.completed')}>Hoàn tất lượt khám</button></form>}
         </article>
-        <article className="card clinic-record"><h3>Đơn thuốc</h3>{encounterPrescriptions.map((rx) => <div className="clinic-linked-record" key={rx.id}><div><strong>{rx.items?.length || 0} loại thuốc · {statusLabel(rx.status)}</strong><div className="small muted">{rx.items?.map((item) => `${products.get(item.product)?.name || 'Thuốc'} × ${item.qty}${item.dosage ? ` · ${item.dosage}` : ''}`).join('; ')}</div></div>{rx.status === 'draft' && <button className="btn btn-primary btn-sm" type="button" disabled={busy || selected.status !== 'completed' || !can('clinic.prescription.dispensed')} onClick={() => dispensePrescription(rx)}>Phát thuốc</button>}</div>)}
-          {selected.status === 'open' && can('clinic.prescription.create') && <form className="clinic-rx-form" onSubmit={createPrescription}><div className="clinic-inline-fields"><label className="field"><span className="label">Kho cấp phát *</span><select className="select" required value={rxWarehouse} onChange={(event) => setRxWarehouse(event.target.value)}><option value="">Chọn kho</option>{[...warehouses.values()].filter((item) => item.active !== false).map((item) => <option key={item.id} value={item.id}>{recordLabel('inventory.warehouse', item)}</option>)}</select></label></div>{rxItems.map((item, index) => <div className="clinic-rx-line" key={index}><select className="select" required aria-label={`Thuốc dòng ${index + 1}`} value={item.product} onChange={(event) => updateRxItem(index, { product: event.target.value })}><option value="">Chọn thuốc</option>{[...products.values()].filter((product) => product.active !== false && product.kind !== 'service').map((product) => <option key={product.id} value={product.id}>{product.name}{product.sku ? ` · ${product.sku}` : ''}</option>)}</select><input className="input num" required min="0.001" step="any" type="number" aria-label="Số lượng" value={item.qty} onChange={(event) => updateRxItem(index, { qty: event.target.value })} /><input className="input" required aria-label="Liều dùng" placeholder="Liều dùng / hướng dẫn" value={item.dosage} onChange={(event) => updateRxItem(index, { dosage: event.target.value })} /><button className="btn btn-ghost btn-sm" type="button" aria-label="Xóa thuốc" disabled={rxItems.length === 1} onClick={() => setRxItems((current) => current.length > 1 ? current.filter((_, row) => row !== index) : current)}>×</button></div>)}<div className="row wrap"><button className="btn btn-secondary btn-sm" type="button" onClick={() => setRxItems((current) => [...current, { product: '', qty: 1, dosage: '' }])}>Thêm thuốc</button><button className="btn btn-primary btn-sm" type="submit" disabled={busy || !rxWarehouse || !can('clinic.prescription.create')}>Lưu đơn thuốc nháp</button></div></form>}
+        <article className="card clinic-record"><h3>Đơn thuốc</h3>{encounterPrescriptions.map((rx) => <div className="clinic-linked-record" key={rx.id}><div><strong>{rx.items?.length || 0} loại thuốc · {statusLabel(rx.status)}</strong><div className="small muted">{rx.items?.map((item) => `${products.get(item.product)?.name || 'Thuốc'} × ${item.qty} ${item.uom_name || units.get(item.uom)?.name || ''}${item.dosage ? ` · ${item.dosage}` : ''}`).join('; ')}</div></div>{rx.status === 'draft' && <button className="btn btn-primary btn-sm" type="button" disabled={busy || selected.status !== 'completed' || !can('clinic.prescription.dispensed')} onClick={() => dispensePrescription(rx)}>Phát thuốc</button>}</div>)}
+          {selected.status === 'open' && can('clinic.prescription.create') && <form className="clinic-rx-form" onSubmit={createPrescription}><div className="clinic-inline-fields"><label className="field"><span className="label">Kho cấp phát *</span><select className="select" required value={rxWarehouse} onChange={(event) => setRxWarehouse(event.target.value)}><option value="">Chọn kho</option>{[...warehouses.values()].filter((item) => item.active !== false).map((item) => <option key={item.id} value={item.id}>{recordLabel('inventory.warehouse', item)}</option>)}</select></label></div>{rxItems.map((item, index) => <div className="clinic-rx-line" key={index}><select className="select" required aria-label={`Thuốc dòng ${index + 1}`} value={item.product} onChange={(event) => updateRxItem(index, { product: event.target.value, uom: '' })}><option value="">Chọn thuốc</option>{[...products.values()].filter((product) => product.active !== false && product.kind !== 'service').map((product) => <option key={product.id} value={product.id}>{product.name}{product.sku ? ` · ${product.sku}` : ''}</option>)}</select>{unitsFor(item.product).length > 0 && <select className="select" aria-label={`Đơn vị thuốc ${index + 1}`} value={item.uom || products.get(item.product)?.uom || ''} onChange={(event) => updateRxItem(index, { uom: event.target.value })}>{unitsFor(item.product).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` · ${unit.ratio} × đơn vị gốc` : ' · đơn vị gốc'}</option>)}</select>}<input className="input num" required min="0.001" step="any" type="number" aria-label="Số lượng" value={item.qty} onChange={(event) => updateRxItem(index, { qty: event.target.value })} /><input className="input" required aria-label="Liều dùng" placeholder="Liều dùng / hướng dẫn" value={item.dosage} onChange={(event) => updateRxItem(index, { dosage: event.target.value })} /><button className="btn btn-ghost btn-sm" type="button" aria-label={`Xóa thuốc ${index + 1}`} disabled={rxItems.length === 1} onClick={() => setRxItems((current) => current.length > 1 ? current.filter((_, row) => row !== index) : current)}>×</button></div>)}<div className="row wrap"><button className="btn btn-secondary btn-sm" type="button" onClick={() => setRxItems((current) => [...current, { product: '', qty: 1, dosage: '', uom: '' }])}>Thêm thuốc</button><button className="btn btn-primary btn-sm" type="submit" disabled={busy || !rxWarehouse || !can('clinic.prescription.create')}>Lưu đơn thuốc nháp</button></div></form>}
         </article>
         <article className="card clinic-record"><h3>Xét nghiệm</h3>{encounterLabs.map((lab) => <div className="clinic-linked-record" key={lab.id}><div className="grow"><strong>{lab.test} · {statusLabel(lab.status)}</strong>{lab.status === 'ordered' ? <textarea className="textarea clinic-result" aria-label={`Kết quả ${lab.test}`} placeholder="Nhập kết quả xét nghiệm" value={testResult[lab.id] ?? lab.result ?? ''} onChange={(event) => setTestResult((current) => ({ ...current, [lab.id]: event.target.value }))} /> : <div className="small muted">{lab.result}</div>}</div>{lab.status === 'ordered' && <button className="btn btn-primary btn-sm" type="button" disabled={busy || !can('clinic.lab_order.update') || !can('clinic.lab_order.resulted')} onClick={() => completeLab(lab)}>Xác nhận kết quả</button>}</div>)}
         </article>
