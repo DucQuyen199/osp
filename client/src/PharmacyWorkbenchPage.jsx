@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
-import { fmtDateTime, statusLabel } from './lib/i18n.js';
+import { fmtDateTime, statusLabel, fmtNumber } from './lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
 const today = localDate;
@@ -136,7 +136,7 @@ export default function PharmacyWorkbenchPage() {
       {loading ? <div className="skeleton" data-h="row" /> : prescriptions.length === 0 ? <div className="empty">Chưa có đơn thuốc.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Số đơn</th><th>Khách hàng</th><th>Ngày kê</th><th>Hiệu lực đến</th><th>Thuốc</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{prescriptions.map((rx) => <tr key={rx.id}>
         <td><strong>{rx.prescription_no}</strong><div className="small muted">{rx.prescriber}{rx.prescriber_license ? ` · ${rx.prescriber_license}` : ''}</div></td>
         <td>{parties.get(rx.party)?.name || 'Khách hàng'}</td><td>{rx.issued_at}</td><td>{rx.valid_until}</td>
-        <td>{prescriptionLines(rx).map((item, index) => <div key={`${item.product}-${item.dosage}-${index}`}>{productName(item.product)} · kê {item.qty} {item.unitName}{item.balance && <span className="small muted"> · tổng kê {item.balance.prescribed.toLocaleString()} {item.balance.unit} · đã cấp {item.balance.dispensed.toLocaleString()} {item.balance.unit} · còn {item.balance.remaining.toLocaleString()} {item.balance.unit}</span>}<div className="small muted">{item.dosage}</div></div>)}</td>
+        <td>{prescriptionLines(rx).map((item, index) => <div key={`${item.product}-${item.dosage}-${index}`}>{productName(item.product)} · kê {item.qty} {item.unitName}{item.balance && <span className="small muted"> · tổng kê {fmtNumber(item.balance.prescribed)} {item.balance.unit} · đã cấp {fmtNumber(item.balance.dispensed)} {item.balance.unit} · còn {fmtNumber(item.balance.remaining)} {item.balance.unit}</span>}<div className="small muted">{item.dosage}</div></div>)}</td>
         <td>{statusLabel(rx.status)}{rx.dispensed_at && <div className="small muted">{fmtDateTime(rx.dispensed_at)}</div>}</td>
         <td className="row wrap">{rx.status === 'draft' && <button className="btn btn-primary btn-sm" type="button" disabled={busy || !can('pharmacy.prescription.verified')} onClick={() => transition(rx, 'verified')}>Xác minh</button>}{['draft', 'verified'].includes(rx.status) && <button className="btn btn-ghost btn-sm" type="button" disabled={busy || !can('pharmacy.prescription.cancelled')} onClick={() => transition(rx, 'cancelled')}>Hủy</button>}</td>
       </tr>)}</tbody></table></div>}

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { api, tenantPath } from './lib/api.js';
-import { fmtDate, fmtDateTime, fmtMoney } from './lib/i18n.js';
+import { fmtDate, fmtDateTime, fmtMoney, fmtNumber } from './lib/i18n.js';
 import { recordHref } from './lib/routes.js';
 import { can, entityLabel } from './lib/state.js';
 
-const quantity = (value) => Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 3 });
+const quantity = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
 
 export default function InventoryLotTraceabilityPage({ lotId }) {
   const [report, setReport] = useState(null);
@@ -32,7 +32,7 @@ export default function InventoryLotTraceabilityPage({ lotId }) {
       <div className="stats">
         <div className="card stat"><span className="stat-label">Còn trong kho</span><strong className="stat-value num">{quantity(report.quantity)}{report.lot.unit ? ` ${report.lot.unit}` : ''}</strong></div>
         <div className="card stat"><span className="stat-label">Giá trị còn lại</span><strong className="stat-value money">{fmtMoney(report.value)}</strong></div>
-        <div className="card stat"><span className="stat-label">Biến động</span><strong className="stat-value num">{Number(report.movementCountTotal).toLocaleString()}</strong></div>
+        <div className="card stat"><span className="stat-label">Biến động</span><strong className="stat-value num">{fmtNumber(Number(report.movementCountTotal))}</strong></div>
       </div>
       <section className="card report-section"><div className="card-head"><h2>Số dư theo kho</h2></div>
         {!report.balances.length ? <div className="empty"><p>Lô chưa có số dư tồn kho.</p></div> : <div className="table-wrap"><table className="table">

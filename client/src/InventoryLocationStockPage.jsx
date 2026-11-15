@@ -1,9 +1,9 @@
 ﻿import React, { useCallback, useEffect, useState } from 'react';
 import { api, tenantPath } from './lib/api.js';
-import { fmtMoney } from './lib/i18n.js';
+import { fmtMoney, fmtNumber } from './lib/i18n.js';
 import { loadRefs } from './lib/state.js';
 
-const quantity = (value) => Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 3 });
+const quantity = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
 
 export default function InventoryLocationStockPage() {
   const [warehouses, setWarehouses] = useState(new Map());

@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { localDate } from './lib/dates.js';
 import { api, dataPath, tenantPath } from './lib/api.js';
-import { fmtMoney, statusLabel } from './lib/i18n.js';
+import { fmtMoney, statusLabel, fmtNumber } from './lib/i18n.js';
 import { can, loadRefs, loadAllResponse } from './lib/state.js';
 
 const today = localDate;
-const qty = (value) => Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 3 });
+const qty = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
 
 export default function ManufacturingWipPage() {
   const [asOf, setAsOf] = useState(today());
@@ -334,7 +334,7 @@ export default function ManufacturingWipPage() {
     </section>
     {report && <div className="stack">
       <div className="stats">
-        <div className="card stat"><span className="stat-label">Lệnh có số dư WIP</span><strong className="stat-value num">{Number(report.orderCount || 0).toLocaleString()}</strong></div>
+        <div className="card stat"><span className="stat-label">Lệnh có số dư WIP</span><strong className="stat-value num">{fmtNumber(Number(report.orderCount || 0))}</strong></div>
         <div className="card stat"><span className="stat-label">Tổng giá trị WIP</span><strong className="stat-value num">{fmtMoney(report.totalWipValue)}</strong></div>
         {report.ledgerComparisonAvailable && <div className="card stat"><span className="stat-label">Số dư TK 154 trên sổ cái</span><strong className="stat-value num">{fmtMoney(report.ledgerWipBalance)}</strong></div>}
         {report.ledgerComparisonAvailable && <div className="card stat"><span className="stat-label">Chênh lệch WIP - TK 154</span><strong className="stat-value num">{fmtMoney(report.wipVariance)}</strong><span className={`badge ${report.reconciled ? 'success' : 'danger'}`}>{report.reconciled ? 'Khớp' : 'Cần đối chiếu'}</span></div>}

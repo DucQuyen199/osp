@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, tenantPath } from './lib/api.js';
-import { fmtMoney } from './lib/i18n.js';
+import { fmtMoney, fmtNumber } from './lib/i18n.js';
 
 export default function AssetDepreciationSchedulePage() {
   const [months, setMonths] = useState('12');
@@ -44,13 +44,13 @@ export default function AssetDepreciationSchedulePage() {
     {error && <div className="alert danger" role="alert">{error}</div>}
     {loading && !report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : report && <div className="stack">
       <div className="stats">
-        <div className="card stat"><span className="stat-label">Tài sản đang hoạt động</span><strong className="stat-value num">{Number(report.assetCount || 0).toLocaleString()}</strong></div>
+        <div className="card stat"><span className="stat-label">Tài sản đang hoạt động</span><strong className="stat-value num">{fmtNumber(Number(report.assetCount || 0))}</strong></div>
         <div className="card stat"><span className="stat-label">Kỳ dự báo</span><strong className="stat-value">{report.from} – {report.to}</strong></div>
         <div className="card stat"><span className="stat-label">Tổng khấu hao dự kiến</span><strong className="stat-value num">{fmtMoney(report.totalProjected)}</strong></div>
       </div>
       <div className="alert info" role="status">Dự báo được tính từ hao mòn đã ghi sổ tại {report.asOf}. Kỳ đã có phiếu nháp được đánh dấu; báo cáo không tạo phiếu khấu hao hoặc bút toán.</div>
       <section className="card report-section">
-        <div className="card-head"><h2>Chi tiết theo kỳ</h2><span className="faint">{Number(report.scheduleRows || 0).toLocaleString()} dòng</span></div>
+        <div className="card-head"><h2>Chi tiết theo kỳ</h2><span className="faint">{fmtNumber(Number(report.scheduleRows || 0))} dòng</span></div>
         {rows.length ? <div className="table-wrap"><table className="table">
           <thead><tr><th scope="col">Mã tài sản</th><th scope="col">Tài sản</th><th scope="col">Kỳ</th><th scope="col">Phiếu</th><th scope="col" className="right">Khấu hao kỳ</th><th scope="col" className="right">Hao mòn lũy kế dự kiến</th><th scope="col" className="right">Giá trị còn lại</th></tr></thead>
           <tbody>{rows.map((row) => <tr key={`${row.assetId}:${row.period}`}>

@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from './lib/api.js';
-import { fmtDateTime } from './lib/i18n.js';
+import { fmtDateTime, fmtNumber } from './lib/i18n.js';
 import { can, loadAllResponse, loadRefs, recordLabel } from './lib/state.js';
 
 const rows = (response) => Array.isArray(response?.items) ? response.items : [];
 const tiers = ['bronze', 'silver', 'gold', 'platinum'];
 const tierLabels = { bronze: 'Đồng', silver: 'Bạc', gold: 'Vàng', platinum: 'Bạch kim' };
 const sourceLabels = { pos_order: 'Đơn POS', sales_order: 'Đơn bán hàng', pos_order_refund: 'Hoàn POS', sales_return: 'Trả hàng' };
-const points = (value) => Number(value || 0).toLocaleString('vi-VN', { maximumFractionDigits: 2 });
+const points = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 2 });
 
 export default function LoyaltyWorkbenchPage() {
   const [members, setMembers] = useState([]);
@@ -88,6 +88,6 @@ export default function LoyaltyWorkbenchPage() {
         <h3 style={{ marginTop: 18 }}>Sổ điểm</h3>{!can('loyalty.point_txn.read') ? <div className="empty">Bạn chưa có quyền xem lịch sử điểm.</div> : !ledger.length ? <div className="empty">Chưa có giao dịch điểm. Điểm được phát sinh khi đơn hàng hoàn tất.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Thời gian</th><th>Nguồn</th><th>Mã chứng từ</th><th className="right">Điểm</th></tr></thead><tbody>{ledger.map((row) => <tr key={row.id}><td>{fmtDateTime(row.createdAt)}</td><td>{sourceLabels[row.source] || row.source}</td><td className="mono small">{String(row.source_id || '').slice(0, 8)}</td><td className="right"><strong className={Number(row.points) < 0 ? 'danger-text' : ''}>{Number(row.points) > 0 ? '+' : ''}{points(row.points)}</strong></td></tr>)}</tbody></table></div>}
         <p className="small muted" style={{ marginTop: 12 }}>Số dư và giao dịch điểm chỉ cập nhật từ sự kiện bán hàng, hoàn tiền hoặc trả hàng; nhân viên không thể sửa sổ điểm thủ công.</p>
       </section>}</div>}
-    {can('loyalty.voucher.read') && <section className="card card-pad"><h2>Voucher đã phát hành</h2>{!vouchers.length ? <div className="empty">Chưa có voucher.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Mã</th><th>Mức giảm</th><th>Hạn dùng</th><th>Trạng thái</th><th>Đơn sử dụng</th></tr></thead><tbody>{vouchers.map((voucher) => <tr key={voucher.id}><td><strong className="mono">{voucher.code}</strong></td><td>{voucher.percent != null ? `${voucher.percent}%` : `−${Number(voucher.amount || 0).toLocaleString('vi-VN')} ₫`}</td><td>{voucher.valid_until || 'Không hết hạn'}</td><td><span className={`badge ${voucher.used ? 'plain' : 'success'}`}>{voucher.used ? 'Đã sử dụng' : 'Còn hiệu lực'}</span></td><td>{voucher.redeemed_source && voucher.redeemed_order ? <a href={`#/e/${voucher.redeemed_source === 'pos_order' ? 'pos' : 'sales'}/${voucher.redeemed_source}/${voucher.redeemed_order}`}>{String(voucher.redeemed_order).slice(0, 8)}</a> : '—'}</td></tr>)}</tbody></table></div>}<p className="small muted">Mỗi mã dùng một lần cho một đơn POS hoặc đơn bán hàng; giảm giá được phân bổ trước thuế theo từng dòng.</p></section>}
+    {can('loyalty.voucher.read') && <section className="card card-pad"><h2>Voucher đã phát hành</h2>{!vouchers.length ? <div className="empty">Chưa có voucher.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Mã</th><th>Mức giảm</th><th>Hạn dùng</th><th>Trạng thái</th><th>Đơn sử dụng</th></tr></thead><tbody>{vouchers.map((voucher) => <tr key={voucher.id}><td><strong className="mono">{voucher.code}</strong></td><td>{voucher.percent != null ? `${voucher.percent}%` : `−${fmtNumber(Number(voucher.amount || 0))} ₫`}</td><td>{voucher.valid_until || 'Không hết hạn'}</td><td><span className={`badge ${voucher.used ? 'plain' : 'success'}`}>{voucher.used ? 'Đã sử dụng' : 'Còn hiệu lực'}</span></td><td>{voucher.redeemed_source && voucher.redeemed_order ? <a href={`#/e/${voucher.redeemed_source === 'pos_order' ? 'pos' : 'sales'}/${voucher.redeemed_source}/${voucher.redeemed_order}`}>{String(voucher.redeemed_order).slice(0, 8)}</a> : '—'}</td></tr>)}</tbody></table></div>}<p className="small muted">Mỗi mã dùng một lần cho một đơn POS hoặc đơn bán hàng; giảm giá được phân bổ trước thuế theo từng dòng.</p></section>}
   </div>;
 }

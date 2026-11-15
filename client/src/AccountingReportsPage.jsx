@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { localDate } from './lib/dates.js';
 import { api, tenantPath } from './lib/api.js';
-import { fmtMoney } from './lib/i18n.js';
+import { fmtMoney, fmtNumber } from './lib/i18n.js';
 import { can } from './lib/state.js';
 import AccountingChartTemplateDialog from './AccountingChartTemplateDialog.jsx';
 
@@ -179,8 +179,8 @@ export default function AccountingReportsPage() {
             <thead><tr><th scope="col">Type</th><th scope="col">Currency</th><th scope="col" className="right">Open balance</th><th scope="col" className="right">Carrying amount</th><th scope="col" className="right">Closing rate</th><th scope="col" className="right">Target base amount</th><th scope="col" className="right">Proposed adjustment</th></tr></thead>
             <tbody>{report.positions.map((position) => <tr key={`${position.side}:${position.currencyId}`}>
               <td>{position.side === 'receivable' ? 'Receivable' : 'Payable'}</td><td>{position.currency} · {position.currencyName}</td>
-              <td className="right">{Number(position.foreignBalance || 0).toLocaleString()} {position.currency}</td><td className="right money">{fmtMoney(num(position.carryingBase))}</td>
-              <td className="right">{position.closingRate == null ? 'Missing' : Number(position.closingRate).toLocaleString(undefined, { maximumFractionDigits: 8 })}{position.rateDate ? ` · ${position.rateDate}` : ''}</td>
+              <td className="right">{fmtNumber(Number(position.foreignBalance || 0))} {position.currency}</td><td className="right money">{fmtMoney(num(position.carryingBase))}</td>
+              <td className="right">{position.closingRate == null ? 'Missing' : fmtNumber(Number(position.closingRate), { maximumFractionDigits: 8 })}{position.rateDate ? ` · ${position.rateDate}` : ''}</td>
               <td className="right money">{position.targetBase == null ? '—' : fmtMoney(num(position.targetBase))}</td><td className="right money">{position.adjustment == null ? '—' : fmtMoney(num(position.adjustment))}</td>
             </tr>)}</tbody>
           </table></div>}

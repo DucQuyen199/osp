@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api, tenantPath } from './lib/api.js';
-import { fmtMoney, statusLabel } from './lib/i18n.js';
+import { fmtMoney, statusLabel, fmtNumber } from './lib/i18n.js';
 
 export default function MarketingCampaignPerformancePage() {
   const [report, setReport] = useState(null);
@@ -26,19 +26,19 @@ export default function MarketingCampaignPerformancePage() {
     {error && <div className="alert danger" role="alert">{error}</div>}
     {loading ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : report && <div className="stack">
       <div className="stats">
-        <div className="card stat"><span className="stat-label">Chiến dịch</span><strong className="stat-value num">{Number(report.campaignCount || 0).toLocaleString()}</strong></div>
-        <div className="card stat"><span className="stat-label">Lead được ghi nhận</span><strong className="stat-value num">{Number(report.leadCount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</strong></div>
-        <div className="card stat"><span className="stat-label">Đã chuyển đổi</span><strong className="stat-value num">{Number(report.conversionCount || 0).toLocaleString()}</strong></div>
-        <div className="card stat"><span className="stat-label">Tỷ lệ chuyển đổi</span><strong className="stat-value num">{Number(report.conversionRate || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })}%</strong></div>
+        <div className="card stat"><span className="stat-label">Chiến dịch</span><strong className="stat-value num">{fmtNumber(Number(report.campaignCount || 0))}</strong></div>
+        <div className="card stat"><span className="stat-label">Lead được ghi nhận</span><strong className="stat-value num">{fmtNumber(Number(report.leadCount || 0), { maximumFractionDigits: 2 })}</strong></div>
+        <div className="card stat"><span className="stat-label">Đã chuyển đổi</span><strong className="stat-value num">{fmtNumber(Number(report.conversionCount || 0))}</strong></div>
+        <div className="card stat"><span className="stat-label">Tỷ lệ chuyển đổi</span><strong className="stat-value num">{fmtNumber(Number(report.conversionRate || 0), { maximumFractionDigits: 1 })}%</strong></div>
         <div className="card stat"><span className="stat-label">Chi thực tế</span><strong className="stat-value num">{fmtMoney(report.actualCostTotal)}</strong></div>
         <div className="card stat"><span className="stat-label">Doanh thu cơ hội thắng</span><strong className="stat-value num">{fmtMoney(report.attributedRevenue)}</strong></div>
-        <div className="card stat"><span className="stat-label">Doanh thu / chi phí</span><strong className="stat-value num">{report.revenueToSpend == null ? '—' : `${Number(report.revenueToSpend).toLocaleString(undefined, { maximumFractionDigits: 2 })}×`}</strong></div>
+        <div className="card stat"><span className="stat-label">Doanh thu / chi phí</span><strong className="stat-value num">{report.revenueToSpend == null ? '—' : `${fmtNumber(Number(report.revenueToSpend), { maximumFractionDigits: 2 })}×`}</strong></div>
       </div>
       {!report.campaigns?.length ? <div className="empty"><h3>Chưa có chiến dịch</h3><p>Tạo chiến dịch, khởi chạy rồi gắn lead để bắt đầu đo hiệu quả.</p></div> : <div className="card table-wrap"><table className="table">
         <thead><tr><th scope="col">Chiến dịch</th><th scope="col">Kênh</th><th scope="col">Trạng thái</th><th scope="col" className="right">Ngân sách kế hoạch</th><th scope="col" className="right">Chi thực tế</th><th scope="col" className="right">Lead được ghi nhận</th><th scope="col" className="right">Chuyển đổi</th><th scope="col" className="right">Tỷ lệ</th><th scope="col" className="right">Cơ hội thắng</th><th scope="col" className="right">Doanh thu gắn nguồn</th><th scope="col" className="right">Doanh thu / chi</th></tr></thead>
         <tbody>{report.campaigns.map((campaign) => <tr key={campaign.id}>
           <td><a href={`#/e/marketing/campaign/${encodeURIComponent(campaign.id)}`}>{campaign.name}</a></td><td>{campaign.channel ? statusLabel(campaign.channel) : '—'}</td><td>{statusLabel(campaign.status)}</td>
-          <td className="right money">{fmtMoney(campaign.budget)}</td><td className="right money">{fmtMoney(campaign.actualCost)}</td><td className="right">{Number(campaign.leads || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td><td className="right">{Number(campaign.conversions || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td><td className="right">{Number(campaign.conversionRate || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })}%</td><td className="right">{Number(campaign.wonDeals || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td><td className="right money">{fmtMoney(campaign.attributedRevenue)}</td><td className="right">{campaign.revenueToSpend == null ? '—' : `${Number(campaign.revenueToSpend).toLocaleString(undefined, { maximumFractionDigits: 2 })}×`}</td>
+          <td className="right money">{fmtMoney(campaign.budget)}</td><td className="right money">{fmtMoney(campaign.actualCost)}</td><td className="right">{fmtNumber(Number(campaign.leads || 0), { maximumFractionDigits: 2 })}</td><td className="right">{fmtNumber(Number(campaign.conversions || 0), { maximumFractionDigits: 2 })}</td><td className="right">{fmtNumber(Number(campaign.conversionRate || 0), { maximumFractionDigits: 1 })}%</td><td className="right">{fmtNumber(Number(campaign.wonDeals || 0), { maximumFractionDigits: 2 })}</td><td className="right money">{fmtMoney(campaign.attributedRevenue)}</td><td className="right">{campaign.revenueToSpend == null ? '—' : `${fmtNumber(Number(campaign.revenueToSpend), { maximumFractionDigits: 2 })}×`}</td>
         </tr>)}</tbody>
       </table></div>}
     </div>}

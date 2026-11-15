@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, tenantPath } from './lib/api.js';
-import { fmtMoney } from './lib/i18n.js';
+import { fmtMoney, fmtNumber } from './lib/i18n.js';
 
 const year = () => String(new Date().getFullYear());
 const amount = (value) => Number(value || 0);
@@ -13,7 +13,7 @@ function VarianceStats({ summary }) {
     <div className="card stat"><span className="stat-label">Doanh thu kế hoạch</span><strong className="stat-value num">{fmtMoney(summary.revenuePlannedTotal)}</strong></div>
     <div className="card stat"><span className="stat-label">Doanh thu thực tế</span><strong className="stat-value num">{fmtMoney(summary.revenueActualTotal)}</strong></div>
     <div className="card stat"><span className="stat-label">Chênh lệch doanh thu</span><strong className="stat-value num">{fmtMoney(summary.revenueVarianceTotal)}</strong></div>
-    <div className="card stat"><span className="stat-label">Dòng bất lợi</span><strong className="stat-value num">{Number(summary.unfavorableLines || summary.overBudgetLines || 0).toLocaleString()}</strong></div>
+    <div className="card stat"><span className="stat-label">Dòng bất lợi</span><strong className="stat-value num">{fmtNumber(Number(summary.unfavorableLines || summary.overBudgetLines || 0))}</strong></div>
   </div>;
 }
 
@@ -59,7 +59,7 @@ export default function BudgetVariancePage() {
         <tbody>{report.lines.map((line) => <tr key={line.lineId}>
           <td>{line.period}</td><td>{line.budget}</td><td>{line.accountCode} · {line.account}</td><td>{line.accountKind === 'revenue' ? 'Doanh thu' : 'Chi phí'}</td><td>{line.budgetStatus}</td>
           <td className="right money">{fmtMoney(line.planned)}</td><td className="right money">{fmtMoney(line.actual)}</td>
-          <td className="right money" data-over={amount(line.variance) < 0 || undefined}>{fmtMoney(line.variance)}</td><td className="right">{amount(line.utilization).toLocaleString(undefined, { maximumFractionDigits: 1 })}%</td>
+          <td className="right money" data-over={amount(line.variance) < 0 || undefined}>{fmtMoney(line.variance)}</td><td className="right">{fmtNumber(amount(line.utilization), { maximumFractionDigits: 1 })}%</td>
         </tr>)}</tbody>
       </table></div>}
       <p className="faint">Thực tế doanh thu/chi phí dùng số dư tự nhiên của tài khoản và cập nhật cùng transaction kế toán.</p>

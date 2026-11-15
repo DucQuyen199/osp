@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { api, dataPath, tenantPath } from './lib/api.js';
 import { confirmDialog, textDialog, toast } from './lib/feedback.js';
-import { fmtMoney, statusLabel } from './lib/i18n.js';
+import { fmtMoney, statusLabel, fmtNumber } from './lib/i18n.js';
 import { can } from './lib/state.js';
 
 const STAGES = ['qualification', 'discovery', 'proposal', 'negotiation', 'unclassified'];
@@ -108,7 +108,7 @@ export default function CrmPipelinePage() {
     {error && <div className="alert danger" role="alert">{error}</div>}
     {loading && !report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : report && <div className="stack">
       <div className="stats">
-        <div className="card stat"><span className="stat-label">Cơ hội đang mở</span><strong className="stat-value num">{Number(report.dealCount || 0).toLocaleString()}</strong></div>
+        <div className="card stat"><span className="stat-label">Cơ hội đang mở</span><strong className="stat-value num">{fmtNumber(Number(report.dealCount || 0))}</strong></div>
         <div className="card stat"><span className="stat-label">Tổng giá trị pipeline</span><strong className="stat-value num">{fmtMoney(report.pipelineAmount)}</strong></div>
         <div className="card stat"><span className="stat-label">Dự báo có trọng số</span><strong className="stat-value num">{fmtMoney(report.weightedForecast)}</strong></div>
       </div>
@@ -125,7 +125,7 @@ export default function CrmPipelinePage() {
             {deals.map((deal) => <article className="card crm-deal-card" key={deal.id}>
               <a href={`#/e/crm/deal/${encodeURIComponent(deal.id)}`}><strong>{deal.title}</strong></a>
               <span className="small muted">{deal.party || 'Chưa có khách hàng'}</span>
-              <div className="crm-deal-metrics"><span>{fmtMoney(deal.amount)}</span><span>{Number(deal.probability || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })}%</span></div>
+              <div className="crm-deal-metrics"><span>{fmtMoney(deal.amount)}</span><span>{fmtNumber(Number(deal.probability || 0), { maximumFractionDigits: 1 })}%</span></div>
               <span className="small muted">Dự báo: {fmtMoney(deal.weightedAmount)} · {deal.expectedClose || 'Chưa có ngày chốt'}</span>
               {can('crm.deal.update') && <label className="field"><span className="label">Chuyển giai đoạn</span><select className="select" value={deal.pipelineStage === 'unclassified' ? '' : deal.pipelineStage} disabled={loading} onChange={(event) => event.target.value && moveDeal(deal, event.target.value)}>
                 {deal.pipelineStage === 'unclassified' && <option value="">Chưa phân loại</option>}
@@ -140,14 +140,14 @@ export default function CrmPipelinePage() {
       <section className="card table-wrap"><table className="table">
         <thead><tr><th scope="col">Giai đoạn</th><th scope="col" className="right">Cơ hội</th><th scope="col" className="right">Giá trị</th><th scope="col" className="right">Dự báo có trọng số</th></tr></thead>
         <tbody>{report.stages.map((stage) => <tr key={stage.stage}>
-          <td>{stage.name || statusLabel(stage.stage)}</td><td className="right">{Number(stage.count || 0).toLocaleString()}</td><td className="right money">{fmtMoney(stage.amount)}</td><td className="right money">{fmtMoney(stage.weightedAmount)}</td>
+          <td>{stage.name || statusLabel(stage.stage)}</td><td className="right">{fmtNumber(Number(stage.count || 0))}</td><td className="right money">{fmtMoney(stage.amount)}</td><td className="right money">{fmtMoney(stage.weightedAmount)}</td>
         </tr>)}</tbody>
       </table></section>
       <div role="tabpanel" id="crm-pipeline-list-panel" aria-labelledby="crm-pipeline-list-tab" tabIndex={0} hidden={view !== 'list'}>{view === 'list' && (!report.deals?.length ? <div className="empty"><h3>Chưa có cơ hội đang mở</h3><p>Tạo cơ hội trong CRM để theo dõi giá trị và ngày dự kiến chốt.</p></div> : <section className="card table-wrap"><table className="table">
         <thead><tr><th scope="col">Cơ hội</th><th scope="col">Khách hàng</th><th scope="col">Giai đoạn</th><th scope="col" className="right">Xác suất</th><th scope="col" className="right">Giá trị</th><th scope="col" className="right">Dự báo</th><th scope="col">Ngày dự kiến chốt</th><th scope="col">Đóng cơ hội</th></tr></thead>
         <tbody>{report.deals.map((deal) => <tr key={deal.id}>
           <td><a href={`#/e/crm/deal/${encodeURIComponent(deal.id)}`}>{deal.title}</a></td><td>{deal.party}</td><td>{deal.pipelineStageName || statusLabel(deal.pipelineStage)}</td>
-          <td className="right">{Number(deal.probability || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })}%</td><td className="right money">{fmtMoney(deal.amount)}</td><td className="right money">{fmtMoney(deal.weightedAmount)}</td><td>{deal.expectedClose || '—'}</td><td>{outcomeButtons(deal)}</td>
+          <td className="right">{fmtNumber(Number(deal.probability || 0), { maximumFractionDigits: 1 })}%</td><td className="right money">{fmtMoney(deal.amount)}</td><td className="right money">{fmtMoney(deal.weightedAmount)}</td><td>{deal.expectedClose || '—'}</td><td>{outcomeButtons(deal)}</td>
         </tr>)}</tbody>
       </table></section>)}</div>
     </div>}

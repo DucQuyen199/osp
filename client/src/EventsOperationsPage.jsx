@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from './lib/api.js';
-import { fmtDateTime, statusLabel } from './lib/i18n.js';
+import { fmtDateTime, statusLabel, fmtNumber } from './lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
 const localDateTime = (value) => {
@@ -10,7 +10,7 @@ const localDateTime = (value) => {
 };
 const inMinutes = (minutes) => localDateTime(new Date(Date.now() + minutes * 60000).toISOString());
 const paymentMethods = [['cash', 'Tiền mặt'], ['card', 'Thẻ'], ['transfer', 'Chuyển khoản'], ['ewallet', 'Ví điện tử'], ['bank', 'Ngân hàng']];
-const price = (value) => Number(value || 0).toLocaleString('vi-VN', { maximumFractionDigits: 2 });
+const price = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 2 });
 
 export default function EventsOperationsPage() {
   const [events, setEvents] = useState([]);

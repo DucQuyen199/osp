@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, dataPath, tenantPath } from './lib/api.js';
-import { fmtMoney } from './lib/i18n.js';
+import { fmtMoney, fmtNumber } from './lib/i18n.js';
 import { can, loadRefs } from './lib/state.js';
 
-const quantity = (value) => Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 3 });
+const quantity = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
 const unitName = (item) => item.unit || 'Chưa đặt đơn vị';
 const statusLabel = (value) => value === 'failed' ? 'Không đạt' : 'Chờ kiểm tra';
 const sourceLabel = (value) => value === 'purchase_receipt' ? 'Phiếu nhận mua' : value === 'purchase_order' ? 'Đơn mua' : value;
@@ -80,7 +80,7 @@ export default function InventoryQualityHoldsPage() {
     {error && <div className="alert danger" role="alert">{error}</div>}
     {loading && !report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : report && <div className="stack">
       <div className="stats">
-        <div className="card stat"><span className="stat-label">Phiếu kiểm tra còn giữ hàng</span><strong className="stat-value num">{Number(report.itemCount || 0).toLocaleString()}</strong></div>
+        <div className="card stat"><span className="stat-label">Phiếu kiểm tra còn giữ hàng</span><strong className="stat-value num">{fmtNumber(Number(report.itemCount || 0))}</strong></div>
         <div className="card stat"><span className="stat-label">Số lượng đang giữ theo đơn vị gốc</span><strong className="stat-value num">{report.heldQtyByUnit?.length ? report.heldQtyByUnit.map((row) => `${quantity(row.qty)} ${row.unit}`).join(' · ') : '0'}</strong></div>
         <div className="card stat"><span className="stat-label">Giá trị đang giữ</span><strong className="stat-value num">{fmtMoney(report.heldValue)}</strong></div>
       </div>

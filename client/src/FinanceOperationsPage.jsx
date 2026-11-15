@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
-import { fmtDate, statusLabel } from './lib/i18n.js';
+import { fmtDate, statusLabel, fmtNumber } from './lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
 const today = localDate;
@@ -13,7 +13,7 @@ const defaultFirstDueDate = () => {
   nextMonth.setDate(Math.min(day, lastDay));
   return today(nextMonth);
 };
-const money = (value) => Number(value || 0).toLocaleString('vi-VN', { maximumFractionDigits: 2 });
+const money = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 2 });
 const actions = async (qname, row, action) => api(dataPath(qname, row.id, action), { method: 'POST' });
 
 export default function FinanceOperationsPage() {

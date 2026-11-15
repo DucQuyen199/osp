@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath, tenantPath } from './lib/api.js';
-import { fmtAgo, fmtDateTime, statusLabel } from './lib/i18n.js';
+import { fmtAgo, fmtDateTime, statusLabel, fmtNumber } from './lib/i18n.js';
 import { can } from './lib/state.js';
 import { recordHref } from './lib/routes.js';
 
@@ -148,7 +148,7 @@ export default function LogisticsDeliveryBoardPage() {
     <div className="delivery-meta small muted">
       <span>{shipment.driver || 'Chưa phân công tài xế'}</span>
       <span>{shipment.vehicle || 'Chưa phân công xe'}</span>
-      {shipment.weight != null && <span>{Number(shipment.weight).toLocaleString(undefined, { maximumFractionDigits: 3 })} kg</span>}
+      {shipment.weight != null && <span>{fmtNumber(Number(shipment.weight), { maximumFractionDigits: 3 })} kg</span>}
     </div>
     {shipment.failureReason && <div className="alert danger delivery-alert">{shipment.failureReason}</div>}
     {shipment.lastTrackingEvent && <div className="small delivery-tracking"><strong>{statusLabel(shipment.lastTrackingEvent)}</strong>{shipment.lastTrackingLocation && ` · ${shipment.lastTrackingLocation}`}{shipment.lastTrackingAt && ` · ${fmtDateTime(shipment.lastTrackingAt)}`}</div>}

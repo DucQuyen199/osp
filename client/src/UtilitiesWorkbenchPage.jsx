@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from './lib/api.js';
-import { statusLabel } from './lib/i18n.js';
+import { statusLabel, fmtNumber } from './lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
 const currentPeriod = () => {
@@ -12,7 +12,7 @@ const nextPeriod = (period) => {
   if (!year || !month) return currentPeriod();
   return month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, '0')}`;
 };
-const money = (value) => Number(value || 0).toLocaleString('vi-VN', { maximumFractionDigits: 2 });
+const money = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 2 });
 const estimateUtilityCharge = (consumption, meter) => {
   const tiers = Array.isArray(meter?.tariff_tiers) ? meter.tariff_tiers : [];
   let usageAmount = 0;

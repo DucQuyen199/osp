@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { api, tenantPath } from './lib/api.js';
-import { fmtDate, fmtMoney } from './lib/i18n.js';
+import { fmtDate, fmtMoney, fmtNumber } from './lib/i18n.js';
 import { can } from './lib/state.js';
 
-const quantity = (value) => Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 3 });
+const quantity = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
 
 export default function InventoryLotExpiryPage() {
   const [days, setDays] = useState(90);
@@ -64,7 +64,7 @@ export default function InventoryLotExpiryPage() {
     {notice && <div className="alert success" role="status">{notice.message} {notice.id && <a href={`#/e/inventory/stock_count/${encodeURIComponent(notice.id)}`}>Mở phiếu để rà soát và duyệt</a>}</div>}
     {report?.items.some((item) => item.expired && !item.warehouseId) && <div className="alert warning" role="status">Một số lô hết hạn chưa gán kho nên chưa thể tạo phiếu kiểm kê xử lý. Hãy gán tồn vào kho trước.</div>}
     {loading && !report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : report && <section className="card report-section">
-      <div className="card-head"><h2>{Number(report.itemCount).toLocaleString()} dòng tồn theo kho</h2><span className="faint">{report.items.length ? `${offset + 1}–${offset + report.items.length} / ${report.itemCount}` : ''}</span></div>
+      <div className="card-head"><h2>{fmtNumber(Number(report.itemCount))} dòng tồn theo kho</h2><span className="faint">{report.items.length ? `${offset + 1}–${offset + report.items.length} / ${report.itemCount}` : ''}</span></div>
       {can('inventory.stock_count.create') && expiredByWarehouse.size > 0 && <div className="card-pad stack-sm">
         <p className="small muted">Tạo phiếu kiểm kê nháp đặt số đếm các lô hết hạn về 0. Tồn kho và bút toán hao hụt chỉ thay đổi sau khi phiếu được gửi duyệt và phê duyệt.</p>
         <div className="row wrap">{[...expiredByWarehouse.values()].map((warehouse) => <button className="btn btn-primary" key={warehouse.id} type="button" disabled={Boolean(creatingWarehouse)} onClick={() => createWriteoff(warehouse)}>

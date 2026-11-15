@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from './lib/api.js';
-import { statusLabel } from './lib/i18n.js';
+import { statusLabel, fmtDateTime } from './lib/i18n.js';
 import { app, can } from './lib/state.js';
 import { recordHref } from './lib/routes.js';
 
@@ -17,7 +17,7 @@ async function listAll(qname) {
 }
 
 const timestamp = (row) => row.updatedAt || row.updated_at || row.createdAt || row.created_at || '';
-const formatDateTime = (value) => value ? new Date(value).toLocaleString('vi-VN') : '—';
+const formatDateTime = (value) => value ? fmtDateTime(value) : '—';
 const statusTone = (status) => status === 'issued' || status === 'cancelled' ? 'success' : status === 'failed' ? 'danger' : 'warning';
 
 export default function EInvoiceWorkbenchPage() {

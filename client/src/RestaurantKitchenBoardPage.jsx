@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath, tenantPath } from './lib/api.js';
-import { fmtAgo, fmtDateTime, statusLabel } from './lib/i18n.js';
+import { fmtAgo, fmtDateTime, statusLabel, fmtNumber } from './lib/i18n.js';
 import { can, loadRefs, recordLabel } from './lib/state.js';
 import { recordHref } from './lib/routes.js';
 
@@ -76,7 +76,7 @@ export default function RestaurantKitchenBoardPage() {
       const productId = line.product;
       const product = products.get(productId);
       return <li key={`${productId || 'line'}:${index}`}>
-        <strong>{line.qty ? `${Number(line.qty).toLocaleString(undefined, { maximumFractionDigits: 3 })} × ` : ''}{product ? recordLabel('master-data.product', product) : 'Món'}</strong>
+        <strong>{line.qty ? `${fmtNumber(Number(line.qty), { maximumFractionDigits: 3 })} × ` : ''}{product ? recordLabel('master-data.product', product) : 'Món'}</strong>
         {line.note && <span className="small muted">{line.note}</span>}
       </li>;
     })}</ul>

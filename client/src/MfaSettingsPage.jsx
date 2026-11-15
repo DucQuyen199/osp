@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, tenantPath } from './lib/api.js';
+import { fmtDateTime } from './lib/i18n.js';
 import { app } from './lib/state.js';
 
 export default function MfaSettingsPage() {
@@ -88,8 +89,8 @@ export default function MfaSettingsPage() {
         <thead><tr><th>Phiên</th><th>Bắt đầu</th><th>Hết hạn</th></tr></thead>
         <tbody>{sessions.map((item) => <tr key={item.id}>
           <td>{item.current ? <span className="badge success">Thiết bị này</span> : <span className="badge plain">{item.label || 'Trình duyệt'}</span>}</td>
-          <td>{new Date(item.createdAt).toLocaleString()}</td>
-          <td>{item.expiresAt ? new Date(item.expiresAt).toLocaleString() : 'Không hết hạn'}</td>
+          <td>{fmtDateTime(item.createdAt)}</td>
+          <td>{item.expiresAt ? fmtDateTime(item.expiresAt) : 'Không hết hạn'}</td>
         </tr>)}</tbody>
       </table></div>}
       {sessions.some((item) => !item.current) && <div><button className="btn btn-secondary" type="button" disabled={busy} onClick={revokeOtherSessions}>Đăng xuất các phiên khác</button></div>}

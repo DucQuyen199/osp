@@ -1,8 +1,9 @@
+import { fmtNumber } from './lib/i18n.js';
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, tenantPath } from './lib/api.js';
 import { can } from './lib/state.js';
 
-const quantity = (value) => Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 3 });
+const quantity = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
 
 export default function InventoryReplenishmentPage() {
   const [report, setReport] = useState(null);
@@ -62,8 +63,8 @@ export default function InventoryReplenishmentPage() {
     {notice && <div className="alert success" role="status">{notice.message} {notice.id && <a href={`#/e/purchasing/purchase_requisition/${encodeURIComponent(notice.id)}`}>Mở đề nghị mua</a>}</div>}
     {loading && !report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : report && <div className="stack">
       <div className="stats">
-        <div className="card stat"><span className="stat-label">Sản phẩm cần xử lý</span><strong className="stat-value num">{Number(report.itemCount || 0).toLocaleString()}</strong></div>
-        <div className="card stat"><span className="stat-label">Dòng cần đặt hàng</span><strong className="stat-value num">{Number(report.purchaseLines || 0).toLocaleString()}</strong></div>
+        <div className="card stat"><span className="stat-label">Sản phẩm cần xử lý</span><strong className="stat-value num">{fmtNumber(Number(report.itemCount || 0))}</strong></div>
+        <div className="card stat"><span className="stat-label">Dòng cần đặt hàng</span><strong className="stat-value num">{fmtNumber(Number(report.purchaseLines || 0))}</strong></div>
       </div>
       {can('purchasing.purchase_requisition.create') && suggestedByWarehouse.size > 0 && <section className="card card-pad" aria-labelledby="replenishment-create-title">
         <div className="card-head"><h2 id="replenishment-create-title">Tạo đề nghị mua nháp</h2><span className="faint">Máy chủ tính lại số lượng trước khi tạo</span></div>

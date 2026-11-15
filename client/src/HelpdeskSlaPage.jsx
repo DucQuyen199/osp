@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api, tenantPath } from './lib/api.js';
-import { fmtDateTime } from './lib/i18n.js';
+import { fmtDateTime, fmtNumber } from './lib/i18n.js';
 
 const labels = {
   met: 'Đạt',
@@ -41,9 +41,9 @@ export default function HelpdeskSlaPage() {
     {!report && !error && <div className="card-pad"><div className="skeleton" data-h="row" /></div>}
     {report && <div className="stack">
       <div className="stats">
-        {stats.map(([label, value]) => <div className="card stat" key={label}><span className="stat-label">{label}</span><strong className="stat-value num">{Number(value || 0).toLocaleString()}</strong></div>)}
-        <div className="card stat"><span className="stat-label">Ticket chưa gán SLA</span><strong className="stat-value num">{Number(report.responseUnassigned || 0).toLocaleString()}</strong></div>
-        <div className="card stat"><span className="stat-label">Tổng ticket</span><strong className="stat-value num">{Number(report.totalTickets || 0).toLocaleString()}</strong></div>
+        {stats.map(([label, value]) => <div className="card stat" key={label}><span className="stat-label">{label}</span><strong className="stat-value num">{fmtNumber(Number(value || 0))}</strong></div>)}
+        <div className="card stat"><span className="stat-label">Ticket chưa gán SLA</span><strong className="stat-value num">{fmtNumber(Number(report.responseUnassigned || 0))}</strong></div>
+        <div className="card stat"><span className="stat-label">Tổng ticket</span><strong className="stat-value num">{fmtNumber(Number(report.totalTickets || 0))}</strong></div>
       </div>
       {!report.tickets?.length ? <div className="empty"><h3>Chưa có ticket</h3><p>Tạo ticket và gắn chính sách SLA để theo dõi thời hạn phản hồi, giải quyết.</p></div> : <div className="card table-wrap"><table className="table">
         <thead><tr><th scope="col">Ticket</th><th scope="col">Trạng thái</th><th scope="col">Tạo lúc</th><th scope="col">Phản hồi đầu</th><th scope="col">Hạn phản hồi</th><th scope="col">SLA phản hồi</th><th scope="col">Hạn giải quyết</th><th scope="col">SLA giải quyết</th></tr></thead>
