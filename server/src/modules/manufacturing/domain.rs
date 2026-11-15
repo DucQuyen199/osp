@@ -94,6 +94,22 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                 errors.push("A reason is required for production rework".into());
             }
         }
+        "production_disposition" => {
+            if !document
+                .get("qty")
+                .and_then(decimal)
+                .is_some_and(|qty| qty > Decimal::ZERO)
+            {
+                errors.push("Số lượng loại bỏ phải lớn hơn 0".into());
+            }
+            if document
+                .get("note")
+                .and_then(Value::as_str)
+                .is_none_or(|note| note.trim().len() < 5)
+            {
+                errors.push("Lý do loại bỏ cần ít nhất 5 ký tự".into());
+            }
+        }
         "work_center" => {
             if document
                 .get("capacity_per_day")
@@ -119,6 +135,14 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
             .any(|field| patch.get(*field).is_some())
     {
         return vec!["Started rework orders are immutable".into()];
+    }
+    if entity == "production_disposition"
+        && current.get("status").and_then(Value::as_str) != Some("draft")
+        && ["inspection", "qty", "note", "expense_account"]
+            .iter()
+            .any(|field| patch.get(*field).is_some())
+    {
+        return vec!["Posted production dispositions are immutable".into()];
     }
     if entity == "production_order"
         && current.get("status").and_then(Value::as_str) == Some("planned")
@@ -153,6 +177,11 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
 }
 
 pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
+    if entity == "production_disposition"
+        && document.get("status").and_then(Value::as_str) != Some("draft")
+    {
+        return vec!["Posted production dispositions must be kept as accounting history".into()];
+    }
     if entity == "rework_order" && document.get("status").and_then(Value::as_str) != Some("planned")
     {
         return vec!["Started rework orders must be kept as production history".into()];

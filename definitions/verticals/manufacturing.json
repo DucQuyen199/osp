@@ -49,14 +49,18 @@
     "permissions": [
       "manufacturing.*",
       "inventory.*.read",
-      "sales.sales_order.read"
+      "sales.sales_order.read",
+      "accounting.account.read"
     ]
   },
   "qc": {
     "name": "QC",
     "permissions": [
       "quality.*",
-      "manufacturing.production_order.read"
+      "manufacturing.production_order.read",
+      "manufacturing.production_disposition.read",
+      "manufacturing.production_disposition.create",
+      "accounting.account.read"
     ]
   },
   "technician": {

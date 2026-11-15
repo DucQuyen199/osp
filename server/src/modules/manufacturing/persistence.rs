@@ -146,6 +146,75 @@ pub async fn validate_persistence(
 ) -> R<Vec<String>> {
     let mut errors = Vec::new();
     match (entity, action) {
+        ("production_disposition", "created" | "posted") => {
+            let (Some(disposition_id), Some(inspection_id), Some(qty), Some(account_id)) = (
+                id(document, "id"),
+                id(document, "inspection"),
+                document.get("qty").and_then(money::decimal),
+                id(document, "expense_account"),
+            ) else {
+                return Ok(vec!["Loại bỏ thành phẩm cần phiếu QC, số lượng và tài khoản chi phí hợp lệ".into()]);
+            };
+            let inspection = tx.query_opt(
+                "SELECT qty::text, status, source, source_id, product, warehouse, rework_order FROM quality__inspection WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                &[&tenant.id, &inspection_id],
+            ).await?;
+            let Some(inspection) = inspection else {
+                return Ok(vec!["Không tìm thấy phiếu QC thành phẩm trong doanh nghiệp".into()]);
+            };
+            let inspection_qty = decimal_column(&inspection, 0, "inspection quantity")?;
+            let source = inspection.get::<_, String>(2);
+            let Some(order_id) = inspection
+                .get::<_, String>(3)
+                .parse::<Uuid>()
+                .ok()
+            else {
+                return Ok(vec!["Phiếu QC không liên kết lệnh sản xuất hợp lệ".into()]);
+            };
+            let order = tx.query_opt(
+                "SELECT product, warehouse, status, COALESCE(good_qty, qty)::text FROM manufacturing__production_order WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                &[&tenant.id, &order_id],
+            ).await?;
+            let Some(order) = order else {
+                return Ok(vec!["Không tìm thấy lệnh sản xuất của phiếu QC".into()]);
+            };
+            let mut source_valid = source == "production_order";
+            if source == "production_rework" {
+                source_valid = false;
+                let linked_rework: Option<String> = inspection.get(6);
+                if let Some(rework_id) = linked_rework.and_then(|value| Uuid::parse_str(&value).ok()) {
+                    source_valid = tx.query_opt(
+                        "SELECT id FROM manufacturing__rework_order WHERE tenant_id = $1 AND id = $2 AND production_order = $3 AND status = 'done' FOR SHARE",
+                        &[&tenant.id, &rework_id, &order_id],
+                    ).await?.is_some();
+                }
+            }
+            let valid = source_valid
+                && inspection.get::<_, String>(1) == "failed"
+                && inspection.get::<_, Uuid>(4) == order.get::<_, Uuid>(0)
+                && inspection.get::<_, Uuid>(5) == order.get::<_, Uuid>(1)
+                && order.get::<_, String>(2) == "done"
+                && decimal_column(&order, 3, "accepted production quantity")? > Decimal::ZERO;
+            if !valid {
+                errors.push("Chỉ được loại bỏ lượng lỗi trên phiếu QC của lệnh sản xuất đã hoàn tất".into());
+            }
+            let accounted = tx.query_one_row(
+                "SELECT (COALESCE((SELECT SUM(qty::numeric) FROM manufacturing__rework_order WHERE tenant_id = $1 AND inspection = $2 AND status <> 'cancelled'), 0) + COALESCE((SELECT SUM(qty::numeric) FROM manufacturing__production_disposition WHERE tenant_id = $1 AND inspection = $2 AND status IN ('draft', 'posted') AND id <> $3), 0))::text",
+                &[&tenant.id, &inspection_id, &disposition_id],
+            ).await?;
+            let accounted_qty = decimal_column(&accounted, 0, "previously reworked or discarded quantity")?;
+            if accounted_qty.checked_add(qty).is_none_or(|total| total > inspection_qty.checked_add(Decimal::new(1, 6)).unwrap_or(inspection_qty)) {
+                errors.push(format!("Số lượng sửa và loại bỏ vượt lượng QC trượt còn lại ({})", (inspection_qty - accounted_qty).max(Decimal::ZERO)));
+            }
+            if action == "posted" || document.get("expense_account").is_some() {
+                if tx.query_opt(
+                    "SELECT id FROM accounting__account WHERE tenant_id = $1 AND id = $2 AND kind = 'expense' FOR SHARE",
+                    &[&tenant.id, &account_id],
+                ).await?.is_none() {
+                    errors.push("Tài khoản loại bỏ phải là tài khoản chi phí thuộc doanh nghiệp".into());
+                }
+            }
+        }
         ("rework_order", "created" | "started" | "done") => {
             let (Some(rework_id), Some(order_id), Some(inspection_id)) = (
                 id(document, "id"),
@@ -205,15 +274,13 @@ pub async fn validate_persistence(
             if !valid {
                 errors.push("Rework must reference a failed inspection for an eligible quantity of its completed production order".into());
             }
-            let committed = tx.query_opt(
-                "SELECT COALESCE(SUM(qty::numeric), 0)::text FROM manufacturing__rework_order WHERE tenant_id = $1 AND inspection = $2 AND status <> 'cancelled' AND id <> $3",
+            let committed = tx.query_one_row(
+                "SELECT (COALESCE((SELECT SUM(qty::numeric) FROM manufacturing__rework_order WHERE tenant_id = $1 AND inspection = $2 AND status <> 'cancelled' AND id <> $3), 0) + COALESCE((SELECT SUM(qty::numeric) FROM manufacturing__production_disposition WHERE tenant_id = $1 AND inspection = $2 AND status IN ('draft', 'posted')), 0))::text",
                 &[&tenant.id, &inspection_id, &rework_id],
             ).await?;
-            if let Some(committed) = committed {
-                let committed_qty = decimal_column(&committed, 0, "reserved rework quantity")?;
-                if committed_qty.checked_add(qty).is_none_or(|total| total > inspection_qty.checked_add(Decimal::new(1, 6)).unwrap_or(inspection_qty)) {
-                    errors.push(format!("Rework quantity exceeds the remaining failed quantity ({})", (inspection_qty - committed_qty).max(Decimal::ZERO)));
-                }
+            let committed_qty = decimal_column(&committed, 0, "reserved rework and discarded quantity")?;
+            if committed_qty.checked_add(qty).is_none_or(|total| total > inspection_qty.checked_add(Decimal::new(1, 6)).unwrap_or(inspection_qty)) {
+                errors.push(format!("Rework quantity exceeds the remaining failed quantity ({})", (inspection_qty - committed_qty).max(Decimal::ZERO)));
             }
         }
         ("work_center", "updated") => {

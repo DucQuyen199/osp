@@ -1,9 +1,9 @@
 {
  "id": "manufacturing",
  "name": "Sản xuất",
- "description": "Định mức BOM, lệnh sản xuất theo trung tâm máy và công suất ngày. Bắt đầu lệnh xuất nguyên liệu vào WIP; QC đạt sẽ nhập thành phẩm vào kho. Cho phép sửa một phần lượng lỗi; mỗi lệnh sửa bổ sung chi phí vào WIP gốc và tạo phiếu QC riêng cho đúng số lượng sau sửa.",
+ "description": "Định mức BOM, lệnh sản xuất theo trung tâm máy và công suất ngày. Bắt đầu lệnh xuất nguyên liệu vào WIP; QC đạt sẽ nhập thành phẩm vào kho. Cho phép sửa hoặc loại bỏ một phần lượng lỗi, tạo phiếu QC riêng cho lượng sửa và hạch toán chi phí loại bỏ từ WIP sang chi phí.",
  "category": "supply",
- "version": "0.4.0",
+ "version": "0.5.0",
  "depends": [
   "master-data",
   "inventory",
@@ -172,6 +172,27 @@
      "started": { "from": ["planned"], "to": "in_progress" },
      "done": { "from": ["in_progress"], "to": "done" },
      "cancelled": { "from": ["planned"], "to": "cancelled" }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "production_disposition",
+   "label": "Xử lý hàng thành phẩm QC lỗi",
+   "fields": [
+    { "name": "inspection", "type": "ref", "required": true, "ref": "quality.inspection" },
+    { "name": "qty", "type": "number", "required": true },
+    { "name": "note", "type": "text", "required": true },
+    { "name": "expense_account", "type": "ref", "required": true, "ref": "accounting.account" },
+    { "name": "status", "type": "enum", "required": false, "options": ["draft", "posted", "cancelled"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "posted": { "from": ["draft"], "to": "posted" },
+     "cancelled": { "from": ["draft"], "to": "cancelled" }
     }
    },
    "computed": {},

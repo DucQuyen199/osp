@@ -38,7 +38,7 @@ use journal_posting::{
     create_posted_journal_decimal, create_posted_journal_decimal_at, journal_line_decimal,
     journal_line_decimal_with_department,
 };
-pub use manufacturing::post_abnormal_scrap_cost;
+pub use manufacturing::{post_abnormal_scrap_cost, post_production_qc_scrap_cost};
 
 mod returns;
 

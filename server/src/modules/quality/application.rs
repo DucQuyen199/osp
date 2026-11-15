@@ -494,14 +494,20 @@ pub async fn handle_source_event(
             if document.get("source").and_then(Value::as_str) == Some("production_rework") {
                 if let Some(order_id) = id(document, "source_id") {
                     let accepted = tx.query_opt(
-                        "SELECT COALESCE(po.good_qty, po.qty)::text, COALESCE(SUM(qi.qty::numeric) FILTER (WHERE qi.source = 'production_rework' AND qi.status = 'passed'), 0)::text FROM manufacturing__production_order po LEFT JOIN quality__inspection qi ON qi.tenant_id = po.tenant_id AND qi.source_id = po.id::text WHERE po.tenant_id = $1 AND po.id = $2 GROUP BY po.id, po.good_qty, po.qty",
+                        "SELECT COALESCE(po.good_qty, po.qty)::text, COALESCE(SUM(qi.qty::numeric) FILTER (WHERE qi.source = 'production_rework' AND qi.status = 'passed'), 0)::text, COALESCE((SELECT SUM(pd.qty::numeric) FROM manufacturing__production_disposition pd JOIN quality__inspection inspected ON inspected.tenant_id = pd.tenant_id AND inspected.id = pd.inspection WHERE pd.tenant_id = po.tenant_id AND inspected.source_id = po.id::text AND inspected.source IN ('production_order', 'production_rework') AND pd.status = 'posted'), 0)::text FROM manufacturing__production_order po LEFT JOIN quality__inspection qi ON qi.tenant_id = po.tenant_id AND qi.source_id = po.id::text WHERE po.tenant_id = $1 AND po.id = $2 GROUP BY po.id, po.good_qty, po.qty",
                         &[&tenant.id, &order_id],
                     ).await?;
                     if let Some(accepted) = accepted {
                         let planned_good =
                             decimal_column(&accepted, 0, "accepted production quantity")?;
                         let reworked_good = decimal_column(&accepted, 1, "passed rework quantity")?;
-                        if money::within_tolerance(reworked_good, planned_good, Decimal::new(1, 6))
+                        let disposed_qty =
+                            decimal_column(&accepted, 2, "disposed production quantity")?;
+                        if reworked_good
+                            .checked_add(disposed_qty)
+                            .is_some_and(|total| {
+                                money::within_tolerance(total, planned_good, Decimal::new(1, 6))
+                            })
                         {
                             let initial = tx.query(
                                 "SELECT nc.id FROM quality__nonconformance nc JOIN quality__inspection qi ON qi.tenant_id = nc.tenant_id AND qi.id = nc.inspection WHERE nc.tenant_id = $1 AND qi.source = 'production_order' AND qi.source_id = $2 AND nc.status = 'open' ORDER BY nc.created_at, nc.id FOR UPDATE OF nc",
@@ -512,6 +518,98 @@ pub async fn handle_source_event(
                     }
                 }
             }
+            for row in open {
+                let nonconformance_id: Uuid = row.get(0);
+                kernel
+                    .act_in(
+                        tx,
+                        &Actor::System,
+                        tenant,
+                        &entity,
+                        &nonconformance_id.to_string(),
+                        "closed",
+                        &opts,
+                    )
+                    .await?;
+            }
+            Ok(true)
+        }
+        "manufacturing.production_disposition.posted" => {
+            let inspection_id = id(document, "inspection").ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    event_type,
+                    vec!["Production scrap disposition requires a quality-inspection id".into()],
+                )
+            })?;
+            let inspection = tx.query_opt(
+                "SELECT source, source_id, qty::text FROM quality__inspection WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                &[&tenant.id, &inspection_id],
+            ).await?;
+            let Some(inspection) = inspection else {
+                return Err(crate::error::ApiError::validation(
+                    event_type,
+                    vec!["Production quality inspection was not found".into()],
+                ));
+            };
+            let source: String = inspection.get(0);
+            let order_id = inspection
+                .get::<_, String>(1)
+                .parse::<Uuid>()
+                .map_err(|_| {
+                    crate::error::ApiError::validation(
+                        event_type,
+                        vec!["Inspection source order is invalid".into()],
+                    )
+                })?;
+            let inspected_qty = decimal_column(&inspection, 2, "inspection quantity")?;
+            let scrapped = tx.query_one_row(
+                "SELECT COALESCE(SUM(qty::numeric), 0)::text FROM manufacturing__production_disposition WHERE tenant_id = $1 AND inspection = $2 AND status = 'posted'",
+                &[&tenant.id, &inspection_id],
+            ).await?;
+            let scrapped_qty = decimal_column(&scrapped, 0, "disposed inspection quantity")?;
+            let order = tx.query_opt(
+                "SELECT COALESCE(good_qty, qty)::text FROM manufacturing__production_order WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                &[&tenant.id, &order_id],
+            ).await?;
+            let mut close_order_nc = false;
+            if let Some(order) = order {
+                let good_qty = decimal_column(&order, 0, "accepted production quantity")?;
+                let received = tx.query_one_row(
+                    "SELECT COALESCE(SUM(sm.qty::numeric), 0)::text FROM inventory__stock_move sm LEFT JOIN manufacturing__rework_order ro ON ro.tenant_id = sm.tenant_id AND ro.id::text = sm.source_id WHERE sm.tenant_id = $1 AND sm.direction = 'in' AND ((sm.source = 'production_order' AND sm.source_id = $2) OR (sm.source = 'production_rework' AND ro.production_order::text = $2))",
+                    &[&tenant.id, &order_id.to_string()],
+                ).await?;
+                let received_qty = decimal_column(&received, 0, "received production quantity")?;
+                let disposed = tx.query_one_row(
+                    "SELECT COALESCE(SUM(pd.qty::numeric), 0)::text FROM manufacturing__production_disposition pd JOIN quality__inspection qi ON qi.tenant_id = pd.tenant_id AND qi.id = pd.inspection WHERE pd.tenant_id = $1 AND qi.source_id = $2 AND qi.source IN ('production_order', 'production_rework') AND pd.status = 'posted'",
+                    &[&tenant.id, &order_id.to_string()],
+                ).await?;
+                let disposed_qty = decimal_column(&disposed, 0, "disposed production quantity")?;
+                close_order_nc = received_qty.checked_add(disposed_qty).is_some_and(|total| {
+                    money::within_tolerance(total, good_qty, Decimal::new(1, 6))
+                });
+            }
+            if !matches!(source.as_str(), "production_order" | "production_rework") {
+                return Ok(false);
+            }
+            if scrapped_qty
+                .checked_add(Decimal::new(1, 6))
+                .is_some_and(|total| total < inspected_qty)
+                && !close_order_nc
+            {
+                return Ok(true);
+            }
+            let open = if close_order_nc {
+                tx.query(
+                    "SELECT nc.id FROM quality__nonconformance nc JOIN quality__inspection qi ON qi.tenant_id = nc.tenant_id AND qi.id = nc.inspection WHERE nc.tenant_id = $1 AND qi.source_id = $2 AND qi.source IN ('production_order', 'production_rework') AND nc.status = 'open' ORDER BY nc.created_at, nc.id FOR UPDATE OF nc",
+                    &[&tenant.id, &order_id.to_string()],
+                ).await?
+            } else {
+                tx.query(
+                    "SELECT id FROM quality__nonconformance WHERE tenant_id = $1 AND inspection = $2 AND status = 'open' ORDER BY created_at, id FOR UPDATE",
+                    &[&tenant.id, &inspection_id],
+                ).await?
+            };
+            let entity = kernel.ent(tenant, "quality.nonconformance")?;
             for row in open {
                 let nonconformance_id: Uuid = row.get(0);
                 kernel

@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **50 module**, **196 loại dữ liệu**, **880 sự kiện**.
+Tổng: **50 module**, **197 loại dữ liệu**, **885 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -215,13 +215,14 @@ Tổng: **50 module**, **196 loại dữ liệu**, **880 sự kiện**.
 | `nonconformance` Sự không phù hợp | `open` → **closed** (open→closed) |
 
 ### manufacturing
-**Sản xuất** — Định mức BOM, lệnh sản xuất theo trung tâm máy và công suất ngày. Bắt đầu lệnh xuất nguyên liệu vào WIP; QC đạt sẽ nhập thành phẩm vào kho. Cho phép sửa một phần lượng lỗi; mỗi lệnh sửa bổ sung chi phí vào WIP gốc và tạo phiếu QC riêng cho đúng số lượng sau sửa.
+**Sản xuất** — Định mức BOM, lệnh sản xuất theo trung tâm máy và công suất ngày. Bắt đầu lệnh xuất nguyên liệu vào WIP; QC đạt sẽ nhập thành phẩm vào kho. Cho phép sửa hoặc loại bỏ một phần lượng lỗi, tạo phiếu QC riêng cho lượng sửa và hạch toán chi phí loại bỏ từ WIP sang chi phí.
 
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
 | `bom` Định mức (BOM) | — |
 | `production_order` Lệnh sản xuất | `planned` → **cancelled** (planned/in_progress→cancelled), **done** (in_progress→done), **started** (planned→in_progress) |
 | `rework_order` Lệnh sửa hàng lỗi | `planned` → **cancelled** (planned→cancelled), **done** (in_progress→done), **started** (planned→in_progress) |
+| `production_disposition` Xử lý hàng thành phẩm QC lỗi | `draft` → **cancelled** (draft→cancelled), **posted** (draft→posted) |
 | `work_center` Trung tâm sản xuất | — |
 
 ### purchasing

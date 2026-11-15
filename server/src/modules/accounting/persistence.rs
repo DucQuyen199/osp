@@ -301,6 +301,9 @@ pub async fn validate_persistence(
             }
         }
         ("journal_entry", "reversed") => {
+            if document.get("source").and_then(Value::as_str) == Some("production_qc_scrap") {
+                errors.push("Không đảo trực tiếp bút toán loại bỏ thành phẩm; cần lập nghiệp vụ điều chỉnh QC và số lượng tương ứng".into());
+            }
             let id = document
                 .get("id")
                 .and_then(Value::as_str)

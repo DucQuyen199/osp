@@ -267,5 +267,22 @@ pub(super) async fn dispatch(
             "outcome": "ok"
         }));
     }
+    if event.ty == "manufacturing.production_disposition.posted"
+        && crate::modules::accounting::post_production_qc_scrap_cost(
+            kernel,
+            tx,
+            tenant,
+            &event.payload,
+            event.id,
+            event.depth,
+        )
+        .await?
+    {
+        handled.push(json!({
+            "module": "accounting",
+            "rule": "production_qc_scrap_to_expense",
+            "outcome": "ok"
+        }));
+    }
     Ok(())
 }

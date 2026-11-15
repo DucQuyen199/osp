@@ -16,10 +16,12 @@ export default function ManufacturingWipPage() {
   const [adjustment, setAdjustment] = useState(null);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
   const [boms, setBoms] = useState([]);
   const [productionOrders, setProductionOrders] = useState([]);
   const [reworkOrders, setReworkOrders] = useState([]);
+  const [productionDispositions, setProductionDispositions] = useState([]);
   const [inspections, setInspections] = useState([]);
   const [workCenters, setWorkCenters] = useState(new Map());
   const [products, setProducts] = useState(new Map());
@@ -37,6 +39,10 @@ export default function ManufacturingWipPage() {
   const [reworkInspection, setReworkInspection] = useState('');
   const [reworkQty, setReworkQty] = useState('');
   const [reworkReason, setReworkReason] = useState('');
+  const [dispositionInspection, setDispositionInspection] = useState('');
+  const [dispositionQty, setDispositionQty] = useState('');
+  const [dispositionNote, setDispositionNote] = useState('');
+  const [dispositionAccount, setDispositionAccount] = useState('');
   const [outputLot, setOutputLot] = useState('');
   const [outputExpiry, setOutputExpiry] = useState('');
   const [scrapMethod, setScrapMethod] = useState('absorb');
@@ -51,12 +57,13 @@ export default function ManufacturingWipPage() {
     try {
       const params = new URLSearchParams();
       if (asOf) params.set('asOf', asOf);
-      const [reportData, bomResponse, orderResponse, reworkResponse, inspectionResponse, centerMap, productMap, warehouseMap, unitMap, accountMap] = await Promise.all([
+      const [reportData, bomResponse, orderResponse, reworkResponse, inspectionResponse, dispositionResponse, centerMap, productMap, warehouseMap, unitMap, accountMap] = await Promise.all([
         api(`${tenantPath('/reports/manufacturing/wip')}?${params}`),
         can('manufacturing.bom.read') ? loadAllResponse('manufacturing.bom') : Promise.resolve({ items: [] }),
         can('manufacturing.production_order.read') ? loadAllResponse('manufacturing.production_order') : Promise.resolve({ items: [] }),
         can('manufacturing.rework_order.read') ? loadAllResponse('manufacturing.rework_order') : Promise.resolve({ items: [] }),
         can('quality.inspection.read') ? loadAllResponse('quality.inspection') : Promise.resolve({ items: [] }),
+        can('manufacturing.production_disposition.read') ? loadAllResponse('manufacturing.production_disposition') : Promise.resolve({ items: [] }),
         can('manufacturing.work_center.read') ? loadRefs('manufacturing.work_center') : Promise.resolve(new Map()),
         can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
         can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
@@ -67,6 +74,7 @@ export default function ManufacturingWipPage() {
       setBoms(Array.isArray(bomResponse.items) ? bomResponse.items : []);
       setProductionOrders(Array.isArray(orderResponse.items) ? orderResponse.items : []);
       setReworkOrders(Array.isArray(reworkResponse.items) ? reworkResponse.items : []);
+      setProductionDispositions(Array.isArray(dispositionResponse.items) ? dispositionResponse.items : []);
       setInspections(Array.isArray(inspectionResponse.items) ? inspectionResponse.items : []);
       setWorkCenters(centerMap); setProducts(productMap); setWarehouses(warehouseMap); setUnits(unitMap); setAccounts(accountMap);
     } catch (reason) {
@@ -85,6 +93,11 @@ export default function ManufacturingWipPage() {
     const baseUnit = products.get(productId)?.uom;
     return units.get(baseUnit)?.name || (baseUnit ? 'đơn vị gốc' : 'chưa đặt đơn vị');
   };
+  const alreadyAccountedReworkQty = (inspectionId) => (
+    reworkOrders.filter((order) => order.inspection === inspectionId && order.status !== 'cancelled').reduce((total, order) => total + Number(order.qty || 0), 0)
+    + productionDispositions.filter((row) => row.inspection === inspectionId && ['draft', 'posted'].includes(row.status)).reduce((total, row) => total + Number(row.qty || 0), 0)
+  );
+  const remainingFailedQty = (inspection) => Math.max(0, Number(inspection?.qty || 0) - alreadyAccountedReworkQty(inspection?.id));
   const resetBom = () => { setEditingBom(''); setBomProduct(''); setBomOutputQty('1'); setComponents([{ product: '', qty: '1', uom: '' }]); };
   const editBom = (bom) => {
     setEditingBom(bom.id); setBomProduct(bom.product); setBomOutputQty(String(bom.output_qty || 1));
@@ -169,6 +182,34 @@ export default function ManufacturingWipPage() {
     finally { setBusy(''); }
   };
 
+  const createProductionDisposition = async (event) => {
+    event.preventDefault();
+    if (!dispositionInspection) return;
+    setBusy('production-disposition'); setError('');
+    try {
+      const created = await api(dataPath('manufacturing.production_disposition'), { method: 'POST', body: {
+        inspection: dispositionInspection, qty: Number(dispositionQty), note: dispositionNote.trim(), expense_account: dispositionAccount,
+      } });
+      if (can('manufacturing.production_disposition.posted')) {
+        await api(dataPath('manufacturing.production_disposition', created.id, 'posted'), { method: 'POST' });
+        setNotice('Đã ghi sổ loại bỏ thành phẩm và hạch toán chi phí từ WIP.');
+      } else {
+        setNotice('Đã tạo phiếu loại bỏ; phiếu đang chờ người có quyền ghi sổ.');
+      }
+      setDispositionInspection(''); setDispositionQty(''); setDispositionNote(''); setDispositionAccount(''); await load();
+    } catch (reason) { await load(); setError(reason.message || 'Không ghi nhận được lượng thành phẩm loại bỏ.'); }
+    finally { setBusy(''); }
+  };
+
+  const operateProductionDisposition = async (row, action) => {
+    setBusy(`${row.id}:${action}`); setError('');
+    try {
+      await api(dataPath('manufacturing.production_disposition', row.id, action), { method: 'POST' });
+      await load();
+    } catch (reason) { setError(reason.message || 'Không cập nhật được phiếu xử lý thành phẩm.'); }
+    finally { setBusy(''); }
+  };
+
   useEffect(() => { document.title = 'WIP sản xuất · OSP Suite'; load(); }, [load]);
 
   const createDraft = async () => {
@@ -193,6 +234,7 @@ export default function ManufacturingWipPage() {
   return <div className="page">
     <div className="page-head"><div><h1>WIP sản xuất</h1><p className="sub">Đối chiếu giá trị vật tư theo lệnh sản xuất với số dư tài khoản 154 trên sổ cái.</p></div></div>
     {error && <div className="alert danger" role="alert">{error}</div>}
+    {notice && <div className="alert success" role="status">{notice}</div>}
     <section className="card card-pad manufacturing-workbench">
       <header className="card-head"><div><h2>BOM và lệnh sản xuất</h2><p className="small muted">Lập định mức, giữ lịch sử BOM đã dùng, xuất vật tư khi bắt đầu và chuyển thành phẩm sang QC khi hoàn tất.</p></div></header>
       {can('manufacturing.bom.read') && <div className="manufacturing-bom-area">
@@ -221,7 +263,19 @@ export default function ManufacturingWipPage() {
       <div className="manufacturing-orders"><h3>Lệnh sản xuất</h3>{productionOrders.map((order) => { const draft = outputs[order.id] || {}; return <article className="manufacturing-order-card" key={order.id}><div className="manufacturing-order-summary"><strong>{products.get(order.product)?.name || order.product}</strong><span className="badge">{statusLabel(order.status)}</span><span className="small muted">Kế hoạch {qty(order.qty)} · {order.planned_start || 'Chưa xếp lịch'} · {workCenters.get(order.work_center)?.name || 'Không gán trung tâm'}</span></div>{order.status === 'in_progress' && <div className="manufacturing-output"><label className="field"><span>Đạt</span><input className="input num" type="number" min="0" step="any" value={draft.good_qty ?? order.good_qty ?? order.qty} onChange={(event) => setOutputs((rows) => ({ ...rows, [order.id]: { ...rows[order.id], good_qty: event.target.value } }))} /></label><label className="field"><span>Phế phẩm</span><input className="input num" type="number" min="0" step="any" value={draft.scrap_qty ?? order.scrap_qty ?? ''} onChange={(event) => setOutputs((rows) => ({ ...rows, [order.id]: { ...rows[order.id], scrap_qty: event.target.value } }))} /></label><label className="field"><span>Lý do phế phẩm</span><input className="input" value={draft.scrap_reason ?? order.scrap_reason ?? ''} onChange={(event) => setOutputs((rows) => ({ ...rows, [order.id]: { ...rows[order.id], scrap_reason: event.target.value } }))} /></label></div>}{order.status === 'planned' && can('manufacturing.production_order.started') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateOrder(order, 'started')}>Bắt đầu, xuất vật tư</button>}{order.status === 'in_progress' && can('manufacturing.production_order.done') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateOrder(order, 'done')}>Hoàn tất, gửi QC</button>}{['planned', 'in_progress'].includes(order.status) && can('manufacturing.production_order.cancelled') && <button className="btn btn-ghost btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateOrder(order, 'cancelled')}>Hủy lệnh</button>}</article>; })}{!productionOrders.length && <p className="small muted">Chưa có lệnh sản xuất.</p>}</div>
       {can('quality.inspection.read') && <div className="manufacturing-orders"><h3>Kiểm tra thành phẩm</h3>{inspections.filter((inspection) => ['production_order', 'production_rework'].includes(inspection.source) && inspection.status === 'pending').map((inspection) => <article className="manufacturing-order-card" key={inspection.id}><div className="manufacturing-order-summary"><strong>{products.get(inspection.product)?.name || inspection.product}</strong><span className="small muted">Lệnh {String(inspection.source_id).slice(0, 8)} · Số lượng {qty(inspection.qty)} {baseUnitName(inspection.product)}{inspection.lot ? ` · Lô ${inspection.lot}` : ''}</span></div>{can('quality.inspection.failed') && can('quality.inspection.update') && <label className="field"><span>Mô tả lỗi nếu không đạt</span><input className="input" minLength="5" maxLength="500" value={qcNotes[inspection.id] || ''} onChange={(event) => setQcNotes((rows) => ({ ...rows, [inspection.id]: event.target.value }))} /></label>}{can('quality.inspection.passed') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => decideInspection(inspection, 'passed')}>Đạt, nhập kho</button>}{can('quality.inspection.failed') && can('quality.inspection.update') && <button className="btn btn-ghost btn-sm" type="button" disabled={Boolean(busy) || (qcNotes[inspection.id] || '').trim().length < 5} onClick={() => decideInspection(inspection, 'failed')}>Không đạt, lập NCR</button>}</article>)}{!inspections.some((inspection) => ['production_order', 'production_rework'].includes(inspection.source) && inspection.status === 'pending') && <p className="small muted">Không có lô thành phẩm chờ kiểm tra.</p>}</div>}
     </section>
-      {can('manufacturing.rework_order.read') && <div className="manufacturing-orders"><h3>Sửa hàng không đạt</h3>{can('manufacturing.rework_order.create') && <form className="manufacturing-form" onSubmit={createReworkOrder}><label className="field"><span>Phiếu QC trượt *</span><select className="select" required value={reworkInspection} onChange={(event) => { const nextId = event.target.value; const selected = inspections.find((row) => row.id === nextId); const alreadyAssigned = reworkOrders.filter((order) => order.inspection === nextId && order.status !== 'cancelled').reduce((total, order) => total + Number(order.qty || 0), 0); setReworkInspection(nextId); setReworkQty(selected ? String(Math.max(0, Number(selected.qty || 0) - alreadyAssigned)) : ''); }}><option value="">Chọn phiếu QC</option>{inspections.filter((inspection) => ['production_order', 'production_rework'].includes(inspection.source) && inspection.status === 'failed' && Number(inspection.qty || 0) - reworkOrders.filter((order) => order.inspection === inspection.id && order.status !== 'cancelled').reduce((total, order) => total + Number(order.qty || 0), 0) > 0.000001).map((inspection) => { const remaining = Math.max(0, Number(inspection.qty || 0) - reworkOrders.filter((order) => order.inspection === inspection.id && order.status !== 'cancelled').reduce((total, order) => total + Number(order.qty || 0), 0)); return <option key={inspection.id} value={inspection.id}>{products.get(inspection.product)?.name || inspection.product} · còn {qty(remaining)} {baseUnitName(inspection.product)} · lệnh {String(inspection.source_id).slice(0, 8)}</option>; })}</select></label>{reworkInspection && <><label className="field"><span>Số lượng sửa *</span><input className="input num" type="number" min="0.000001" max={inspections.find((row) => row.id === reworkInspection)?.qty} step="any" required value={reworkQty} onChange={(event) => setReworkQty(event.target.value)} /></label><p className="small muted">Sau khi sửa, đúng số lượng này sẽ được kiểm tra lại riêng; phần còn lỗi vẫn được giữ trong phiếu QC ban đầu.</p></>}<label className="field"><span>Lý do sửa *</span><input className="input" minLength={5} maxLength={500} required value={reworkReason} onChange={(event) => setReworkReason(event.target.value)} /></label><button className="btn btn-primary btn-sm" type="submit" disabled={busy === 'rework' || !reworkInspection || !Number(reworkQty) || reworkReason.trim().length < 5}>{busy === 'rework' ? 'Đang tạo…' : 'Tạo lệnh sửa'}</button></form>}{reworkOrders.map((order) => { const inspection = inspections.find((row) => row.id === order.inspection); return <article className="manufacturing-order-card" key={order.id}><div className="manufacturing-order-summary"><strong>{products.get(inspection?.product)?.name || 'Lô sửa hàng'}</strong><span className="badge">{statusLabel(order.status)}</span><span className="small muted">Lệnh {String(order.production_order).slice(0, 8)} · Số lượng {qty(order.qty)} · {order.reason}</span></div>{order.status === 'planned' && can('manufacturing.rework_order.started') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateRework(order, 'started')}>Bắt đầu, xuất vật tư</button>}{order.status === 'in_progress' && can('manufacturing.rework_order.done') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateRework(order, 'done')}>Hoàn tất, gửi QC kiểm tra lại</button>}{order.status === 'planned' && can('manufacturing.rework_order.cancelled') && <button className="btn btn-ghost btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateRework(order, 'cancelled')}>Hủy lệnh sửa</button>}</article>; })}{!reworkOrders.length && <p className="small muted">Chưa có lệnh sửa hàng.</p>}</div>}
+      {can('manufacturing.rework_order.read') && <div className="manufacturing-orders"><h3>Sửa hàng không đạt</h3>{can('manufacturing.rework_order.create') && <form className="manufacturing-form" onSubmit={createReworkOrder}><label className="field"><span>Phiếu QC trượt *</span><select className="select" required value={reworkInspection} onChange={(event) => { const nextId = event.target.value; const selected = inspections.find((row) => row.id === nextId); const alreadyAssigned = alreadyAccountedReworkQty(nextId); setReworkInspection(nextId); setReworkQty(selected ? String(Math.max(0, Number(selected.qty || 0) - alreadyAssigned)) : ''); }}><option value="">Chọn phiếu QC</option>{inspections.filter((inspection) => ['production_order', 'production_rework'].includes(inspection.source) && inspection.status === 'failed' && Number(inspection.qty || 0) - alreadyAccountedReworkQty(inspection.id) > 0.000001).map((inspection) => { const remaining = Math.max(0, Number(inspection.qty || 0) - alreadyAccountedReworkQty(inspection.id)); return <option key={inspection.id} value={inspection.id}>{products.get(inspection.product)?.name || inspection.product} · còn {qty(remaining)} {baseUnitName(inspection.product)} · lệnh {String(inspection.source_id).slice(0, 8)}</option>; })}</select></label>{reworkInspection && <><label className="field"><span>Số lượng sửa *</span><input className="input num" type="number" min="0.000001" max={remainingFailedQty(inspections.find((row) => row.id === reworkInspection))} step="any" required value={reworkQty} onChange={(event) => setReworkQty(event.target.value)} /></label><p className="small muted">Sau khi sửa, đúng số lượng này sẽ được kiểm tra lại riêng; phần còn lỗi vẫn được giữ trong phiếu QC ban đầu.</p></>}<label className="field"><span>Lý do sửa *</span><input className="input" minLength={5} maxLength={500} required value={reworkReason} onChange={(event) => setReworkReason(event.target.value)} /></label><button className="btn btn-primary btn-sm" type="submit" disabled={busy === 'rework' || !reworkInspection || !Number(reworkQty) || reworkReason.trim().length < 5}>{busy === 'rework' ? 'Đang tạo…' : 'Tạo lệnh sửa'}</button></form>}{reworkOrders.map((order) => { const inspection = inspections.find((row) => row.id === order.inspection); return <article className="manufacturing-order-card" key={order.id}><div className="manufacturing-order-summary"><strong>{products.get(inspection?.product)?.name || 'Lô sửa hàng'}</strong><span className="badge">{statusLabel(order.status)}</span><span className="small muted">Lệnh {String(order.production_order).slice(0, 8)} · Số lượng {qty(order.qty)} · {order.reason}</span></div>{order.status === 'planned' && can('manufacturing.rework_order.started') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateRework(order, 'started')}>Bắt đầu, xuất vật tư</button>}{order.status === 'in_progress' && can('manufacturing.rework_order.done') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateRework(order, 'done')}>Hoàn tất, gửi QC kiểm tra lại</button>}{order.status === 'planned' && can('manufacturing.rework_order.cancelled') && <button className="btn btn-ghost btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateRework(order, 'cancelled')}>Hủy lệnh sửa</button>}</article>; })}{!reworkOrders.length && <p className="small muted">Chưa có lệnh sửa hàng.</p>}</div>}
+    {can('manufacturing.production_disposition.read') && <section className="card card-pad">
+      <h3>Loại bỏ thành phẩm QC lỗi</h3>
+      {can('manufacturing.production_disposition.create') && <form className="manufacturing-form" onSubmit={createProductionDisposition}>
+        <label className="field"><span>Phiếu QC trượt *</span><select className="select" required value={dispositionInspection} onChange={(event) => { const nextId = event.target.value; const selected = inspections.find((row) => row.id === nextId); setDispositionInspection(nextId); setDispositionQty(selected ? String(remainingFailedQty(selected)) : ''); }}><option value="">Chọn phiếu QC</option>{inspections.filter((inspection) => ['production_order', 'production_rework'].includes(inspection.source) && inspection.status === 'failed' && remainingFailedQty(inspection) > 0.000001).map((inspection) => <option key={inspection.id} value={inspection.id}>{products.get(inspection.product)?.name || inspection.product} · còn {qty(remainingFailedQty(inspection))} {baseUnitName(inspection.product)} · lệnh {String(inspection.source_id).slice(0, 8)}</option>)}</select></label>
+        {dispositionInspection && <label className="field"><span>Số lượng loại bỏ *</span><input className="input num" type="number" min="0.000001" max={remainingFailedQty(inspections.find((row) => row.id === dispositionInspection))} step="any" required value={dispositionQty} onChange={(event) => setDispositionQty(event.target.value)} /></label>}
+        <label className="field"><span>Tài khoản chi phí *</span><select className="select" required value={dispositionAccount} onChange={(event) => setDispositionAccount(event.target.value)}><option value="">Chọn tài khoản chi phí</option>{[...accounts.values()].filter((account) => account.kind === 'expense' && account.active !== false).map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}</select></label>
+        <label className="field"><span>Lý do loại bỏ *</span><input className="input" minLength="5" maxLength="500" required value={dispositionNote} onChange={(event) => setDispositionNote(event.target.value)} /></label>
+        <button className="btn btn-primary btn-sm" type="submit" disabled={Boolean(busy) || !dispositionInspection || !Number(dispositionQty) || !dispositionAccount || dispositionNote.trim().length < 5}>{busy === 'production-disposition' ? 'Đang ghi nhận…' : 'Ghi sổ loại bỏ'}</button>
+      </form>}
+      {productionDispositions.map((row) => { const inspection = inspections.find((item) => item.id === row.inspection); return <article className="manufacturing-order-card" key={row.id}><div className="manufacturing-order-summary"><strong>{products.get(inspection?.product)?.name || 'Thành phẩm QC lỗi'}</strong><span className="badge">{statusLabel(row.status)}</span><span className="small muted">Số lượng {qty(row.qty)} · {row.note}</span></div>{row.status === 'draft' && can('manufacturing.production_disposition.posted') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateProductionDisposition(row, 'posted')}>Ghi sổ</button>}{row.status === 'draft' && can('manufacturing.production_disposition.cancelled') && <button className="btn btn-ghost btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateProductionDisposition(row, 'cancelled')}>Hủy phiếu</button>}</article>; })}
+      {!productionDispositions.length && <p className="small muted">Chưa có phiếu loại bỏ thành phẩm.</p>}
+    </section>}
     <section className="card">
       <form className="toolbar" onSubmit={(event) => { event.preventDefault(); load(); }}>
         <label className="field"><span className="label">Chốt phát sinh đến ngày</span><input className="input" type="date" value={asOf} onChange={(event) => setAsOf(event.target.value)} /></label>
@@ -249,11 +303,11 @@ export default function ManufacturingWipPage() {
       </section>}
       {adjustment && <div className="alert success" role="status">{adjustment.existing ? 'Đã có bút toán đối chiếu cho chênh lệch này.' : 'Đã tạo bút toán nháp.'} {adjustment.id && <a href={`#/e/accounting/journal_entry/${encodeURIComponent(adjustment.id)}`}>Mở bút toán</a>} <span>Trạng thái: {adjustment.status}</span></div>}
       {!report.orders?.length ? <div className="empty"><h3>Không có số dư WIP theo lệnh</h3><p>Chưa có vật tư được xuất cho lệnh đang chạy, hoặc thành phẩm đạt QC đã được nhập kho.</p></div> : <div className="card table-wrap"><table className="table">
-        <thead><tr><th scope="col">Lệnh sản xuất</th><th scope="col">Thành phẩm</th><th scope="col">Trạng thái</th><th scope="col">QC</th><th scope="col" className="right">Kế hoạch</th><th scope="col" className="right">Đạt</th><th scope="col" className="right">Phế phẩm</th><th scope="col" className="right">Giá trị NVL</th><th scope="col" className="right">Đã nhập</th><th scope="col" className="right">Còn WIP</th></tr></thead>
+        <thead><tr><th scope="col">Lệnh sản xuất</th><th scope="col">Thành phẩm</th><th scope="col">Trạng thái</th><th scope="col">QC</th><th scope="col" className="right">Kế hoạch</th><th scope="col" className="right">Đạt</th><th scope="col" className="right">Phế phẩm</th><th scope="col" className="right">Giá trị NVL</th><th scope="col" className="right">Đã nhập</th><th scope="col" className="right">Loại bỏ QC</th><th scope="col" className="right">Còn WIP</th></tr></thead>
         <tbody>{report.orders.map((order) => <tr key={order.id}>
           <td>{order.id}</td><td>{order.product}</td><td>{statusLabel(order.status)}</td><td>{order.qualityStatus ? statusLabel(order.qualityStatus) : 'Chưa tạo QC'}</td>
           <td className="right">{qty(order.plannedQty)}</td><td className="right">{qty(order.goodQty)}</td><td className="right" title={order.scrapReason || undefined}>{qty(order.scrapQty)}</td>
-          <td className="right money">{fmtMoney(order.materialCost)}</td><td className="right money">{fmtMoney(order.finishedCost)}</td><td className="right money"><strong>{fmtMoney(order.wipValue)}</strong></td>
+          <td className="right money">{fmtMoney(order.materialCost)}</td><td className="right money">{fmtMoney(order.finishedCost)}</td><td className="right money">{fmtMoney(order.qcScrapCost)}</td><td className="right money"><strong>{fmtMoney(order.wipValue)}</strong></td>
         </tr>)}</tbody>
       </table></div>}
       <p className="faint">Giá trị tính theo phiếu kho phát sinh đến {report.asOf}. Trạng thái QC phản ánh trạng thái hiện tại; số dư âm theo lệnh vẫn được hiển thị để phục vụ đối chiếu.</p>
