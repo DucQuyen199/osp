@@ -917,6 +917,20 @@ pub fn build(reg: &Registry) -> Value {
         } }),
     );
     paths.insert(
+        "/api/t/{tenantId}/reports/agriculture/crop-cycles/{cycleId}/input-costs".into(),
+        json!({ "get": {
+            "tags": ["agriculture", "inventory"], "summary": "Crop-cycle inventory input costs", "security": sec,
+            "parameters": [tid, { "name": "cycleId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "description": "Aggregates inventory issue total_cost values at the time each input was issued for fertilizer, pesticide, seed, and water product applications. Does not include labor, non-stocked water, or landed-cost adjustments posted later. The per-hectare amount is null when farm area is missing or zero. Requires agriculture.crop_cycle.read, agriculture.input_application.read, and inventory.stock_move.read.",
+            "responses": with_common(Map::from_iter([
+                ("200".to_string(), json!({ "description": "Base-currency material costs by application kind and per hectare" })),
+                ("403".to_string(), err("Missing crop-cycle, input-application, or inventory stock-move read permission")),
+                ("404".to_string(), err("Crop cycle not found in this tenant")),
+                ("422".to_string(), err("Invalid cycleId UUID"))
+            ]))
+        } }),
+    );
+    paths.insert(
         "/api/t/{tenantId}/reports/asset/depreciation-schedule".into(),
         json!({ "get": {
             "tags": ["asset"], "summary": "Forecast monthly depreciation for active fixed assets", "security": sec,

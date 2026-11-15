@@ -1231,6 +1231,23 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                 .map(|(_, value)| value.as_str());
             return json_ok(k.manufacturing_wip_report(&actor, &t, as_of).await?);
         }
+        (
+            &Method::GET,
+            [
+                "reports",
+                "agriculture",
+                "crop-cycles",
+                cycle_id,
+                "input-costs",
+            ],
+        ) => {
+            let cycle_id = Uuid::parse_str(cycle_id)
+                .map_err(|_| ApiError::new(422, "INVALID_ID", "Mã vụ mùa không hợp lệ"))?;
+            return json_ok(
+                k.agriculture_crop_cycle_input_costs(&actor, &t, cycle_id)
+                    .await?,
+            );
+        }
         (&Method::GET, ["reports", "asset", "depreciation-schedule"]) => {
             let months = query
                 .iter()
