@@ -288,6 +288,14 @@ impl Kernel {
                 return Err(ApiError::validation(&qname, errors));
             }
         }
+        if (qname == "sales.sales_order" && action == "confirmed")
+            || (qname == "pos.pos_order" && action == "completed")
+        {
+            let errors = crate::modules::loyalty::apply_voucher_to_order(tx, t, &mut cur).await?;
+            if !errors.is_empty() {
+                return Err(ApiError::validation(&qname, errors));
+            }
+        }
         if qname == "restaurant.table_order" && action == "completed" {
             let errors = crate::modules::restaurant::prepare_order(tx, t, &mut cur, false).await?;
             if !errors.is_empty() {
@@ -413,6 +421,25 @@ impl Kernel {
                     tr.from.join("|")
                 ),
             ));
+        }
+        let voucher_source = match (qname.as_str(), action) {
+            ("sales.sales_order", "confirmed") => Some("sales_order"),
+            ("pos.pos_order", "completed") => Some("pos_order"),
+            _ => None,
+        };
+        if let Some(source) = voucher_source {
+            let errors = crate::modules::loyalty::redeem_for_order(
+                self,
+                tx,
+                t,
+                &Value::Object(cur.clone()),
+                source,
+                opts,
+            )
+            .await?;
+            if !errors.is_empty() {
+                return Err(ApiError::validation(&qname, errors));
+            }
         }
         cur.insert(states.field.clone(), json!(tr.to));
         cur.insert("updatedAt".into(), json!(now_iso()));

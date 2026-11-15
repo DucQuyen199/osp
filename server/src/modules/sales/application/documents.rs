@@ -92,6 +92,8 @@ async fn prepare_document_with_lock(
             "tax_name",
             "tax_amount",
             "line_total",
+            "voucher_discount_amount",
+            "effective_discount_pct",
         ] {
             line_map.remove(field);
         }
@@ -262,7 +264,11 @@ async fn prepare_document_with_lock(
         line_map.insert("tracked".into(), json!(tracked));
         if entity == "sales_return" {
             let discount = original
-                .and_then(|source| source.get("discount_pct"))
+                .and_then(|source| {
+                    source
+                        .get("effective_discount_pct")
+                        .or_else(|| source.get("discount_pct"))
+                })
                 .and_then(money::decimal)
                 .unwrap_or_default();
             let Some(discount) = money::json_number(discount) else {

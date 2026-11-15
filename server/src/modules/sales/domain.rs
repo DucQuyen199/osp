@@ -145,6 +145,7 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
             "price_list",
             "lines",
             "total",
+            "voucher_code",
             "order_date",
             "source",
             "source_id",

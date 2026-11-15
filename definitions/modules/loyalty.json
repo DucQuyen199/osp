@@ -102,7 +102,20 @@
     {
      "name": "used",
      "type": "bool",
-     "required": false
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "redeemed_source",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "redeemed_order",
+     "type": "string",
+     "required": false,
+     "system": true
     }
    ],
    "states": null,

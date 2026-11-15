@@ -9,10 +9,13 @@ impl Kernel {
         t: &Tenant,
         ent: &Ent,
         id: &str,
-        patch: Obj,
+        mut patch: Obj,
         opts: &Opts,
     ) -> R<Value> {
         let qname = ent.qname();
+        if qname.starts_with("loyalty.") {
+            crate::modules::loyalty::prepare_document(ent.def.name.as_str(), &mut patch);
+        }
         // Serialize updates with other updates and state transitions before
         // validating the current record.
         let uid = Uuid::parse_str(id).map_err(|_| ApiError::not_found(format!("{qname} {id}")))?;
@@ -67,6 +70,8 @@ impl Kernel {
         }
         let previous_total = cur.get("total").cloned();
         let previous_tax_total = cur.get("tax_total").cloned();
+        let previous_lines = cur.get("lines").cloned();
+        let previous_voucher_discount = cur.get("voucher_discount").cloned();
         let refresh_auto_prices = patch.contains_key("lines");
         let mut changed: Vec<String> = patch.keys().cloned().collect();
         for (k, v) in patch {
@@ -328,6 +333,16 @@ impl Kernel {
             if !errors.is_empty() {
                 return Err(ApiError::validation(&qname, errors));
             }
+            if previous_total != cur.get("total").cloned()
+                && !changed.iter().any(|key| key == "total")
+            {
+                changed.push("total".into());
+            }
+            if previous_tax_total != cur.get("tax_total").cloned()
+                && !changed.iter().any(|key| key == "tax_total")
+            {
+                changed.push("tax_total".into());
+            }
         }
         if qname == "restaurant.table_order"
             && cur.get("status").and_then(Value::as_str) == Some("open")
@@ -455,6 +470,37 @@ impl Kernel {
             let errors = crate::modules::sales::recalculate_lines(&mut cur);
             if !errors.is_empty() {
                 return Err(ApiError::validation(&qname, errors));
+            }
+        }
+        if matches!(qname.as_str(), "sales.sales_order" | "pos.pos_order")
+            && matches!(
+                cur.get("status").and_then(Value::as_str),
+                Some("draft" | "open")
+            )
+        {
+            let errors = crate::modules::loyalty::apply_voucher_to_order(tx, t, &mut cur).await?;
+            if !errors.is_empty() {
+                return Err(ApiError::validation(&qname, errors));
+            }
+            if previous_total != cur.get("total").cloned()
+                && !changed.iter().any(|key| key == "total")
+            {
+                changed.push("total".into());
+            }
+            if previous_tax_total != cur.get("tax_total").cloned()
+                && !changed.iter().any(|key| key == "tax_total")
+            {
+                changed.push("tax_total".into());
+            }
+            if previous_lines != cur.get("lines").cloned()
+                && !changed.iter().any(|key| key == "lines")
+            {
+                changed.push("lines".into());
+            }
+            if previous_voucher_discount != cur.get("voucher_discount").cloned()
+                && !changed.iter().any(|key| key == "voucher_discount")
+            {
+                changed.push("voucher_discount".into());
             }
         }
         if qname == "logistics.shipment"

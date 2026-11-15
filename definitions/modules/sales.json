@@ -135,6 +135,17 @@
      "ref": "sales.price_list"
     },
     {
+     "name": "voucher_code",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "voucher_discount",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
      "name": "lines",
      "type": "json",
      "required": false

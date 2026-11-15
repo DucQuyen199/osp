@@ -26,6 +26,7 @@ export default function PosTerminalPage() {
   const [openingCash, setOpeningCash] = useState('0');
   const [closingCash, setClosingCash] = useState('');
   const [partyId, setPartyId] = useState('');
+  const [voucherCode, setVoucherCode] = useState('');
   const [method, setMethod] = useState('cash');
   const [cashDirection, setCashDirection] = useState('cash_out');
   const [cashAmount, setCashAmount] = useState('');
@@ -80,6 +81,7 @@ export default function PosTerminalPage() {
 
   const activeSession = sessions.find((item) => item.id === sessionId) || null;
   const pharmacyEnabled = app.meta?.modules?.some((module) => module.id === 'pharmacy');
+  const loyaltyEnabled = app.meta?.modules?.some((module) => module.id === 'loyalty');
   const activeWarehouse = activeSession ? warehouses.get(activeSession.warehouse) : null;
   const sessionOrders = useMemo(() => orders.filter((item) => item.session === sessionId && item.status === 'open'), [orders, sessionId]);
   const recentTransactions = useMemo(() => orders.filter((item) => ['completed', 'refunded'].includes(item.status)).slice(0, 20), [orders]);
@@ -126,10 +128,10 @@ export default function PosTerminalPage() {
       const created = await api(dataPath('pos.pos_order'), { method: 'POST', body: {
         session: activeSession.id, warehouse: activeSession.warehouse,
         ...(activeSession.branch ? { branch: activeSession.branch } : {}),
-        ...(partyId ? { party: partyId } : {}), ...(prescriptionId ? { prescription: prescriptionId } : {}), method,
+        ...(partyId ? { party: partyId } : {}), ...(prescriptionId ? { prescription: prescriptionId } : {}), ...(voucherCode.trim() ? { voucher_code: voucherCode.trim() } : {}), method,
         lines: cart.map(({ product, uom, qty }) => ({ product: product.id, uom: uom || undefined, qty, price: priceFor(product, uom) })),
       } });
-      setQuantities({}); setSelectedUnits({}); setPartyId(''); setPrescriptionId('');
+      setQuantities({}); setSelectedUnits({}); setPartyId(''); setPrescriptionId(''); setVoucherCode('');
       let completionError = '';
       try {
         await api(dataPath('pos.pos_order', created.id, 'completed'), { method: 'POST' });
@@ -253,6 +255,7 @@ export default function PosTerminalPage() {
         </section>
         <aside className="card pos-cart"><h2>Đơn hàng</h2>{cart.length ? <div className="pos-cart-lines">{cart.map(({ product, uom, qty }) => <div className="pos-cart-line" key={product.id}><div><strong>{product.name}</strong>{unitsFor(product).length > 1 && <select className="select" aria-label={`Đơn vị bán ${product.name}`} value={uom} onChange={(event) => setSelectedUnits((current) => ({ ...current, [product.id]: event.target.value }))}>{unitsFor(product).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` · ${unit.ratio} × đơn vị gốc` : ' · đơn vị gốc'}</option>)}</select>}<div className="small muted">{fmtMoney(priceFor(product, uom))} / {units.get(uom)?.name || 'sp'}</div></div><div className="pos-qty"><button className="btn btn-ghost btn-sm" type="button" aria-label={`Giảm ${product.name}`} onClick={() => setQty(product.id, qty - 1)}>−</button><input className="input num" type="number" min="0" step="any" aria-label={`Số lượng ${product.name}`} value={qty} onChange={(event) => setQty(product.id, event.target.value)} /><button className="btn btn-ghost btn-sm" type="button" aria-label={`Tăng ${product.name}`} onClick={() => setQty(product.id, qty + 1)}>+</button></div><strong className="num">{fmtMoney(priceFor(product, uom) * qty)}</strong></div>)}</div> : <div className="empty">Chọn sản phẩm để thêm vào đơn.</div>}
           <label className="field"><span className="label">Khách hàng {rxRequired ? '*' : '(tùy chọn)'}</span><select className="select" required={rxRequired} value={partyId} onChange={(event) => setPartyId(event.target.value)}><option value="">Khách lẻ</option>{[...parties.values()].filter((item) => item.active !== false && item.is_customer !== false).map((item) => <option key={item.id} value={item.id}>{recordLabel('master-data.party', item)}</option>)}</select></label>
+          {loyaltyEnabled && <label className="field"><span className="label">Mã voucher thành viên</span><input className="input" maxLength="80" autoCapitalize="characters" value={voucherCode} onChange={(event) => setVoucherCode(event.target.value.toUpperCase())}/><span className="small muted">Cần chọn khách hàng đã đăng ký thành viên; mã chỉ được sử dụng một lần.</span></label>}
           {pharmacyEnabled && <label className="field"><span className="label">Đơn thuốc {rxRequired ? '*' : '(nếu có)'}</span><select className="select" required={rxRequired} value={prescriptionId} onChange={(event) => { const id = event.target.value; setPrescriptionId(id); const rx = prescriptions.find((item) => item.id === id); if (rx?.party) setPartyId(rx.party); }}><option value="">Chọn đơn còn thuốc được kê</option>{prescriptions.filter((item) => !item.valid_until || item.valid_until >= localDate()).map((item) => <option key={item.id} value={item.id}>{item.prescription_no} · {item.status === 'partially_dispensed' ? 'cấp một phần' : 'đã xác minh'} · hết hạn {item.valid_until}</option>)}</select>{rxRequired && <small className="muted">Thuốc kê đơn chỉ được bán theo đơn còn hạn, đúng khách hàng; số lượng bán cộng dồn không vượt số lượng kê.</small>}</label>}
           <label className="field"><span className="label">Thanh toán</span><select className="select" value={method} onChange={(event) => setMethod(event.target.value)}><option value="cash">Tiền mặt</option><option value="card">Thẻ</option><option value="transfer">Chuyển khoản</option><option value="ewallet">Ví điện tử</option></select></label>
           <div className="pos-total"><span>Tạm tính</span><span>Tiền hàng <strong className="num">{fmtMoney(subtotal)}</strong></span><span>Thuế ước tính <strong className="num">{fmtMoney(estimatedTax)}</strong></span><strong className="num">{fmtMoney(total)}</strong><small>Thuế và số tiền chính thức do máy chủ tính theo danh mục khi tạo đơn.</small></div>

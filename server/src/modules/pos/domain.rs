@@ -98,6 +98,8 @@ pub fn validate_update(current: &Value, patch: &Value) -> Vec<String> {
         "lines",
         "total",
         "method",
+        "voucher_code",
+        "voucher_discount",
         "refund_reason",
     ];
     if protected.iter().any(|field| patch.get(*field).is_some()) {

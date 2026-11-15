@@ -1,4 +1,5 @@
 use crate::money;
+use chrono::{NaiveDate, Utc};
 use rust_decimal::Decimal;
 use serde_json::Value;
 use uuid::Uuid;
@@ -49,6 +50,47 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
             })
             .then(Vec::new)
             .unwrap_or_else(|| vec!["Số dư điểm phải là số không âm".into()]),
+        "voucher" => {
+            if document.get("code").is_none() {
+                return Vec::new();
+            }
+            let mut errors = Vec::new();
+            let percent = document.get("percent").and_then(money::decimal);
+            let amount = document.get("amount").and_then(money::decimal);
+            if percent.is_some() == amount.is_some() {
+                errors
+                    .push("Voucher phải có đúng một hình thức giảm: phần trăm hoặc số tiền".into());
+            }
+            if percent.is_some_and(|value| !(Decimal::ZERO < value && value < Decimal::ONE_HUNDRED))
+            {
+                errors.push("Phần trăm voucher phải lớn hơn 0 và nhỏ hơn 100".into());
+            }
+            if amount.is_some_and(|value| value <= Decimal::ZERO) {
+                errors.push("Số tiền voucher phải lớn hơn 0".into());
+            }
+            if document
+                .get("code")
+                .and_then(Value::as_str)
+                .is_none_or(|code| {
+                    code.trim().is_empty()
+                        || code.len() > 80
+                        || !code
+                            .bytes()
+                            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+                })
+            {
+                errors.push("Mã voucher phải có từ 1 đến 80 ký tự".into());
+            }
+            if let Some(value) = document.get("valid_until").and_then(Value::as_str) {
+                if NaiveDate::parse_from_str(value, "%Y-%m-%d")
+                    .map_or(true, |date| date < Utc::now().date_naive())
+                {
+                    errors
+                        .push("Hạn dùng voucher phải là ngày hôm nay hoặc trong tương lai".into());
+                }
+            }
+            errors
+        }
         "point_txn" => {
             let mut errors = Vec::new();
             if !document
@@ -93,6 +135,16 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
         {
             return vec!["Thành viên không thể chuyển sang khách hàng khác".into()];
         }
+    }
+    if entity == "voucher" {
+        if current.get("used").and_then(Value::as_bool) == Some(true) {
+            return vec!["Voucher đã sử dụng không thể thay đổi".into()];
+        }
+        let mut merged = current.as_object().cloned().unwrap_or_default();
+        if let Some(fields) = patch.as_object() {
+            merged.extend(fields.clone());
+        }
+        return validate(entity, &Value::Object(merged));
     }
     Vec::new()
 }

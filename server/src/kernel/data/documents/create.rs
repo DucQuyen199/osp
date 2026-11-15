@@ -23,6 +23,9 @@ impl Kernel {
             .filter(|key| ent.field(key).is_some_and(|field| field.system))
             .cloned()
             .collect::<Vec<_>>();
+        if qname.starts_with("loyalty.") {
+            crate::modules::loyalty::prepare_document(ent.def.name.as_str(), &mut clean);
+        }
         if qname == "accounting.account" {
             crate::modules::accounting::prepare_document(ent.def.name.as_str(), &mut clean);
         }
@@ -286,6 +289,10 @@ impl Kernel {
         }
         if errors.is_empty() && qname == "pos.pos_order" {
             errors.extend(crate::modules::pos::prepare_document(tx, t, &mut clean).await?);
+        }
+        if errors.is_empty() && matches!(qname.as_str(), "sales.sales_order" | "pos.pos_order") {
+            errors
+                .extend(crate::modules::loyalty::apply_voucher_to_order(tx, t, &mut clean).await?);
         }
         if errors.is_empty() && qname.starts_with("pharmacy.") {
             errors.extend(

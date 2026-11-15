@@ -33,6 +33,7 @@ export default function WholesaleSalesDeskPage() {
   const [returnQuantities, setReturnQuantities] = useState({});
   const [returnReasons, setReturnReasons] = useState({});
   const [shipmentQuantities, setShipmentQuantities] = useState({});
+  const [orderVoucherCodes, setOrderVoucherCodes] = useState({});
   const [busy, setBusy] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -107,6 +108,17 @@ export default function WholesaleSalesDeskPage() {
             : action === 'expired' ? 'Đã đánh dấu báo giá hết hạn.' : 'Đã cập nhật trạng thái chứng từ.';
       setNotice(message);
     } catch (reason) { setError(reason.message || 'Không cập nhật được chứng từ. Kiểm tra giá, tín dụng và tồn kho.'); await load(true); }
+    finally { setBusy(''); }
+  };
+
+  const applyVoucher = async (order) => {
+    const code = (orderVoucherCodes[order.id] ?? order.voucher_code ?? '').trim().toUpperCase();
+    setBusy(`${order.id}:voucher`); setError(''); setNotice('');
+    try {
+      await api(dataPath('sales.sales_order', order.id), { method: 'PATCH', body: { voucher_code: code } });
+      await load(true);
+      setNotice(code ? 'Đã áp dụng voucher; số tiền và thuế đã được máy chủ tính lại.' : 'Đã gỡ voucher khỏi đơn nháp.');
+    } catch (reason) { setError(reason.message || 'Không áp dụng được voucher. Kiểm tra ngày hiệu lực, thành viên và mã.'); }
     finally { setBusy(''); }
   };
 
@@ -257,6 +269,7 @@ export default function WholesaleSalesDeskPage() {
           <header><div><strong>{recordLabel('master-data.party', parties.get(order.party))}</strong><div className="small muted">Đơn {String(order.id).slice(0, 8)} · {order.shipping_address || 'Bán trực tiếp'}</div></div><span className={`badge ${order.status === 'delivered' ? 'success' : order.status === 'cancelled' ? 'plain' : 'warning'}`}>{statusLabel(order.status)}</span></header>
           <ul>{(order.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{products.get(line.product)?.name || 'Mặt hàng'} × {line.qty} {line.uom_name || units.get(line.uom)?.name || ''}</span><strong className="num">{fmtMoney(line.line_total ?? Number(line.qty || 0) * Number(line.price || 0))}</strong></li>)}</ul>
           <div className="wholesale-total"><span>Tổng gồm thuế</span><strong className="num">{fmtMoney(order.total || 0)}</strong></div>
+          {app.meta?.modules?.some((module) => module.id === 'loyalty') && order.status === 'draft' && can('sales.sales_order.update') && <div className="wholesale-related"><label className="field grow"><span className="label">Voucher thành viên</span><input className="input" maxLength="80" autoCapitalize="characters" value={orderVoucherCodes[order.id] ?? order.voucher_code ?? ''} onChange={(event) => setOrderVoucherCodes((current) => ({ ...current, [order.id]: event.target.value.toUpperCase() }))}/></label><button className="button" type="button" disabled={Boolean(busy)} onClick={() => applyVoucher(order)}>{order.voucher_code ? 'Cập nhật voucher' : 'Áp dụng voucher'}</button>{order.voucher_discount > 0 && <span className="small muted">Giảm trước thuế {fmtMoney(order.voucher_discount)}</span>}</div>}
           {shipmentsForOrder.map((shipment) => <div className="wholesale-related" key={shipment.id}><span>Chuyến giao · {statusLabel(shipment.status)}</span><a href={recordHref('logistics.shipment', shipment.id)}>Mở {String(shipment.id).slice(0, 8)}</a></div>)}
           {app.meta?.modules?.some((module) => module.id === 'logistics') && can('logistics.shipment.read') && can('logistics.shipment.create') && order.shipping_address?.trim() && ['confirmed', 'partially_delivered'].includes(order.status) && <div className="wholesale-related wholesale-shipment-create">
             <div><strong>Giao phần hàng còn lại</strong><div className="small muted">Chỉ tính các vận đơn đang mở hoặc đã giao; vận đơn thất bại không giữ số lượng.</div></div>

@@ -37,6 +37,33 @@ pub async fn validate_persistence(
     action: &str,
     document: &serde_json::Value,
 ) -> R<Vec<String>> {
+    if entity == "voucher" && matches!(action, "created" | "updated") {
+        let Some(code) = document.get("code").and_then(serde_json::Value::as_str) else {
+            return Ok(Vec::new());
+        };
+        tx.query_opt(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            &[&format!(
+                "loyalty.voucher-code:{}:{}",
+                tenant.id,
+                code.to_ascii_uppercase()
+            )],
+        )
+        .await?;
+        let id = document
+            .get("id")
+            .and_then(serde_json::Value::as_str)
+            .and_then(|id| Uuid::parse_str(id).ok());
+        let duplicate = tx.query_opt(
+            "SELECT id FROM loyalty__voucher WHERE tenant_id = $1 AND upper(code) = upper($2) AND ($3::uuid IS NULL OR id <> $3) LIMIT 1 FOR SHARE",
+            &[&tenant.id, &code, &id],
+        ).await?.is_some();
+        return Ok(if duplicate {
+            vec!["Mã voucher đã được sử dụng trong tenant này".into()]
+        } else {
+            Vec::new()
+        });
+    }
     if entity != "member" || action != "removed" {
         return Ok(Vec::new());
     }
