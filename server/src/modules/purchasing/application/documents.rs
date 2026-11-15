@@ -153,7 +153,12 @@ async fn prepare_document_with_lock(
     }
     if !matches!(
         entity,
-        "rfq" | "purchase_order" | "purchase_receipt" | "purchase_return" | "supplier_invoice"
+        "rfq"
+            | "purchase_requisition"
+            | "purchase_order"
+            | "purchase_receipt"
+            | "purchase_return"
+            | "supplier_invoice"
     ) {
         return Ok(Vec::new());
     }
@@ -182,6 +187,36 @@ async fn prepare_document_with_lock(
                 (lines.as_array().cloned().unwrap_or_default(), department)
             },
         )
+    } else if matches!(entity, "purchase_order" | "rfq")
+        && let Some(requisition_id) = document
+            .get("source_id")
+            .or_else(|| document.get("purchase_requisition"))
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+    {
+        let source = if entity == "purchase_order"
+            && document.get("source").and_then(Value::as_str) == Some("rfq")
+        {
+            tx.query_opt(
+                &format!("SELECT pr.lines FROM purchasing__rfq r JOIN purchasing__purchase_requisition pr ON pr.tenant_id = r.tenant_id AND pr.id = r.purchase_requisition WHERE r.tenant_id = $1 AND r.id = $2{lock}"),
+                &[&tenant.id, &requisition_id],
+            )
+            .await?
+        } else {
+            tx.query_opt(
+                &format!("SELECT lines FROM purchasing__purchase_requisition WHERE tenant_id = $1 AND id = $2{lock}"),
+                &[&tenant.id, &requisition_id],
+            )
+            .await?
+        };
+        let lines = source.map_or_else(
+            || Vec::new(),
+            |row| {
+                let lines: Value = row.get(0);
+                lines.as_array().cloned().unwrap_or_default()
+            },
+        );
+        (lines, None)
     } else {
         (Vec::new(), None)
     };
