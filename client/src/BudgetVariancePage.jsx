@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { localDate } from './lib/dates.js';
 import { api, tenantPath } from './lib/api.js';
 import { fmtMoney, fmtNumber } from './lib/i18n.js';
 
-const year = () => String(new Date().getFullYear());
+const year = () => localDate().slice(0, 4);
 const amount = (value) => Number(value || 0);
 
 function VarianceStats({ summary }) {
