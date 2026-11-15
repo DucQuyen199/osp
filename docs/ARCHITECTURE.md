@@ -33,6 +33,8 @@ Scheduled job actions run in tenant-scoped PostgreSQL transactions under tenant 
 
 Each tenant can set `settings.businessTimezone` to an IANA timezone. Date-only domain validations, business-date defaults and client calendar defaults use that tenant-local date; database timestamps remain UTC. New tenants and older tenants without this setting use UTC until an administrator configures their business timezone. Timezone identifiers are validated against the IANA database via [`chrono-tz`](https://docs.rs/chrono-tz/latest/chrono_tz/).
 
+The client is installable as a PWA and caches only the application shell and static assets. The service worker never caches `/api` responses or queues transactions. Writes are rejected when the browser reports offline; if a connection drops during a write, the client reports that the result is unknown and asks the operator to reload and reconcile before retrying. Offline transaction entry and synchronization are not supported.
+
 New domain contexts use:
 
 ```text

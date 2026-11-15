@@ -121,6 +121,7 @@ a.stat:hover { text-decoration: none; border-color: var(--accent); }
 .alert.warning { background: var(--warning-bg); color: var(--warning-text); }
 .alert.success { background: var(--success-bg); color: var(--success-text); }
 .alert ul { margin: var(--sp-1) 0 0; padding-left: var(--sp-5); }
+.offline-notice { position: sticky; top: 0; z-index: 300; padding: var(--sp-2) var(--sp-4); background: var(--warning-bg); color: var(--warning-text); border-bottom: 1px solid var(--border); text-align: center; font-size: var(--fs-sm); }
 .empty { display: flex; flex-direction: column; align-items: center; gap: var(--sp-3); padding: var(--sp-10) var(--sp-6); text-align: center; color: var(--text-muted); }
 .empty .empty-icon { width: 3rem; height: 3rem; border-radius: 50%; background: var(--surface-2); display: grid; place-items: center; color: var(--text-faint); }
 .empty h3 { color: var(--text); }

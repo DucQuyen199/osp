@@ -43,6 +43,11 @@ export const onUnauthorized = (fn) => {
 };
 
 export async function api(path, { method = 'GET', body, token, raw = false, headers = {}, signal } = {}) {
+  const requestMethod = method.toUpperCase();
+  const isWrite = !['GET', 'HEAD', 'OPTIONS'].includes(requestMethod);
+  if (isWrite && typeof navigator !== 'undefined' && navigator.onLine === false) {
+    throw new ApiError(0, 'OFFLINE_WRITE', 'Thiết bị đang ngoại tuyến. Thay đổi chưa được gửi; hãy kết nối lại rồi kiểm tra dữ liệu trước khi thử lại.');
+  }
   const s = session.current();
   const tok = token ?? s?.token;
   const h = { ...headers };
@@ -60,8 +65,11 @@ export async function api(path, { method = 'GET', body, token, raw = false, head
   }
   let res;
   try {
-    res = await fetch(path, { method, headers: h, body: payload, signal });
+    res = await fetch(path, { method: requestMethod, headers: h, body: payload, signal });
   } catch {
+    if (isWrite) {
+      throw new ApiError(0, 'NETWORK_WRITE_UNKNOWN', 'Mất kết nối khi gửi thay đổi nên chưa thể xác nhận giao dịch đã được lưu. Hãy tải lại dữ liệu và kiểm tra trạng thái trước khi thử lại.');
+    }
     throw new ApiError(0, 'NETWORK', 'Không kết nối được máy chủ. Kiểm tra mạng và thử lại.');
   }
   if (raw && res.ok) return res;
