@@ -5,12 +5,15 @@ use crate::{
     error::{ApiError, R},
     kernel::{Actor, Kernel, Opts, Tenant},
 };
+use futures::{StreamExt, stream};
 use serde_json::{Map, Value};
 use std::{env, time::Duration};
 use uuid::Uuid;
 
 const BATCH_SIZE: i64 = 10;
 const LEASE_SECONDS: i64 = 180;
+const DEFAULT_PROVIDER_CONCURRENCY: usize = 2;
+const MAX_PROVIDER_CONCURRENCY: usize = 16;
 
 struct Job {
     tenant_id: String,
@@ -33,6 +36,7 @@ pub async fn run_once(kernel: &Kernel) -> R<usize> {
 
 /// Process a bounded batch using an injected vendor adapter.
 pub async fn run_once_with_provider(kernel: &Kernel, provider: &dyn EInvoiceProvider) -> R<usize> {
+    let concurrency = provider_concurrency()?;
     let tenant_ids: Vec<String> = {
         let conn = kernel.pool.get().await?;
         conn.query(
@@ -57,14 +61,38 @@ pub async fn run_once_with_provider(kernel: &Kernel, provider: &dyn EInvoiceProv
             continue;
         }
         let jobs = claim(kernel, &tenant, BATCH_SIZE).await?;
-        for job in &jobs {
-            if let Err(error) = process(kernel, &tenant, provider, job).await {
-                tracing::error!(einvoice_id = %job.id, tenant_id = %job.tenant_id, error = %error, "e-invoice job failed");
-            }
-            processed += 1;
-        }
+        processed += jobs.len();
+        stream::iter(jobs)
+            .for_each_concurrent(concurrency, |job| {
+                let tenant = tenant.clone();
+                async move {
+                    if let Err(error) = process(kernel, &tenant, provider, &job).await {
+                        tracing::error!(einvoice_id = %job.id, tenant_id = %job.tenant_id, error = %error, "e-invoice job failed");
+                    }
+                }
+            })
+            .await;
     }
     Ok(processed)
+}
+
+fn provider_concurrency() -> R<usize> {
+    let Ok(value) = env::var("OSP_EINVOICE_CONCURRENCY") else {
+        return Ok(DEFAULT_PROVIDER_CONCURRENCY);
+    };
+    value
+        .parse::<usize>()
+        .ok()
+        .filter(|value| (1..=MAX_PROVIDER_CONCURRENCY).contains(value))
+        .ok_or_else(|| {
+            ApiError::new(
+                500,
+                "EINVOICE_CONFIG",
+                format!(
+                    "OSP_EINVOICE_CONCURRENCY must be between 1 and {MAX_PROVIDER_CONCURRENCY}"
+                ),
+            )
+        })
 }
 
 fn configured_provider() -> R<Option<HttpEInvoiceProvider>> {

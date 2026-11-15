@@ -51,7 +51,7 @@ Set `OSP_METRICS_TOKEN` to a random secret of at least 32 characters to enable `
 
 ### E-invoice provider (optional)
 
-The Rust worker issues posted accounting invoices and processes cancellation requests through the configured HTTPS REST contract. Set `OSP_EINVOICE_ENDPOINT`, `OSP_EINVOICE_PROVIDER`, and `OSP_EINVOICE_TOKEN` in `.env`; `OSP_EINVOICE_TIMEOUT_SEC` accepts 1–120 seconds and `OSP_EINVOICE_INTERVAL_SEC=0` disables the worker. Without an endpoint, requests remain pending. The provider must honor the `Idempotency-Key` header for safe recovery after a worker restart. The generic adapter is not certified for a vendor API; map the payload and response to the actual provider contract before enabling production issuance.
+The Rust worker issues posted accounting invoices and processes cancellation requests through the configured HTTPS REST contract. Set `OSP_EINVOICE_ENDPOINT`, `OSP_EINVOICE_PROVIDER`, and `OSP_EINVOICE_TOKEN` in `.env`; `OSP_EINVOICE_TIMEOUT_SEC` accepts 1–120 seconds, `OSP_EINVOICE_CONCURRENCY` accepts 1–16 (default 2) to control simultaneous requests per worker, and `OSP_EINVOICE_INTERVAL_SEC=0` disables the worker. Without an endpoint, requests remain pending. The provider must honor the `Idempotency-Key` header for safe recovery after a worker restart. The generic adapter is not certified for a vendor API; map the payload and response to the actual provider contract before enabling production issuance.
 
 Máy cục bộ có thể tạo SSH tunnel bằng lệnh `ssh -L 3000:127.0.0.1:3000` với tài khoản và máy chủ của bạn, mở `http://127.0.0.1:3000`, tạo doanh nghiệp và tài khoản admin, rồi đóng tunnel. Khi signup đã tắt và health check xanh, mới trỏ domain/reverse proxy vào app.
 
@@ -75,6 +75,7 @@ Doanh nghiệp tạo ra chỉ chọn được trong số module đã cài; modul
 | `OSP_MODULES` / `--modules=` | tất cả | Danh sách module cần cài |
 | `OSP_JOBS_INTERVAL_SEC` | `60` | Chu kỳ scheduler; đặt `0` để tắt |
 | `OSP_COMM_CONCURRENCY` | `4` | Số lần gửi đồng thời trên mỗi worker (1–64); giới hạn theo rate limit của nhà cung cấp |
+| `OSP_EINVOICE_CONCURRENCY` | `2` | Số request hóa đơn điện tử đồng thời trên mỗi worker (1–16); điều chỉnh theo provider |
 | `OSP_DEMO` | `1` (dev) · `0` (production) | Bật `POST /api/demo` và nút "Dùng thử" |
 | `OSP_SIGNUP` | `0` trong Compose; script khởi tạo đặt `1` | Tắt sau khi tạo tenant/quản trị viên đầu tiên |
 | `OSP_TOTP_ENCRYPTION_KEY` | rỗng | Khóa Base64 32 byte để mã hóa bí mật TOTP; bắt buộc trước khi bất kỳ người dùng nào bật MFA |
