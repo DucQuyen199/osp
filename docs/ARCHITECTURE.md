@@ -164,7 +164,7 @@ Manufacturing validates BOM and production quantities in Decimal, snapshots good
 
 Logistics validates partial delivery reservations by product and rounded source price using Decimal quantities. Shipment preparation snapshots server-derived product weights and total shipment weight as JSON numbers, while dispatch checks the captured weight against the vehicle's PostgreSQL numeric capacity.
 
-Event ticket reservations snapshot the published price and tax rate as Decimal; net and tax are calculated with cent rounding and checked against the captured gross. POS order lines, session cash and completed totals validate against the same decimal parser used by Rust pricing workflows.
+Event ticket reservations snapshot the published price and tax rate as Decimal; net and tax are calculated with cent rounding and checked against the captured gross. POS order lines, session cash and completed totals validate against the same decimal parser used by Rust pricing workflows. The POS workbench lists recent completed transactions and exposes the supported full-refund action with a required audit reason; refund processing restores eligible stock, reverses the accounting/payment effects, and records cash refunds against a compatible open cashier session.
 
 Subscription billing snapshots the plan's PostgreSQL numeric price as Decimal when creating each cycle and checks the persisted cycle amount against the locked current plan price before accepting the record.
 

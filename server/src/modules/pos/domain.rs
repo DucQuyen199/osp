@@ -74,6 +74,18 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_update(current: &Value, patch: &Value) -> Vec<String> {
+    if patch.get("refund_reason").is_some() {
+        let reason = patch.get("refund_reason").and_then(Value::as_str);
+        let can_add_refund_reason = current.get("status").and_then(Value::as_str)
+            == Some("completed")
+            && current.get("refund_reason").is_none()
+            && patch.as_object().is_some_and(|fields| fields.len() == 1)
+            && reason.is_some_and(|value| (5..=500).contains(&value.trim().chars().count()));
+        if can_add_refund_reason {
+            return Vec::new();
+        }
+        return vec!["Lý do hoàn tiền chỉ được ghi một lần cùng lúc hoàn đơn POS".into()];
+    }
     if current.get("status").and_then(Value::as_str) == Some("open") {
         return Vec::new();
     }
@@ -86,6 +98,7 @@ pub fn validate_update(current: &Value, patch: &Value) -> Vec<String> {
         "lines",
         "total",
         "method",
+        "refund_reason",
     ];
     if protected.iter().any(|field| patch.get(*field).is_some()) {
         vec!["Đơn POS đã hoàn tất không thể sửa dữ liệu giao dịch".into()]
@@ -176,6 +189,12 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
             Some("cash" | "card" | "transfer" | "ewallet")
         ) {
             return vec!["Đơn POS cần phương thức thanh toán hợp lệ trước khi hoàn tất".into()];
+        }
+    }
+    if entity == "pos_order" && action == "refunded" {
+        let reason = document.get("refund_reason").and_then(Value::as_str);
+        if !reason.is_some_and(|value| (5..=500).contains(&value.trim().chars().count())) {
+            return vec!["Hoàn đơn POS cần lý do từ 5 đến 500 ký tự".into()];
         }
     }
     Vec::new()

@@ -148,6 +148,11 @@
      ]
     },
     {
+     "name": "refund_reason",
+     "type": "string",
+     "required": false
+    },
+    {
      "name": "status",
      "type": "enum",
      "required": false,

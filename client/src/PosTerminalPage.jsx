@@ -60,7 +60,7 @@ export default function PosTerminalPage() {
       setTaxes(taxMap);
       setAccounts(accountMap);
       const nextSessions = readItems(sessionResponse).filter((item) => item.status === 'open').sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
-      const nextOrders = readItems(orderResponse).filter((item) => item.status === 'open').sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+      const nextOrders = readItems(orderResponse).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
       setSessions(nextSessions);
       setOrders(nextOrders);
       setCashMovements(readItems(movementResponse).filter((item) => item.status === 'draft').sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))));
@@ -81,7 +81,8 @@ export default function PosTerminalPage() {
   const activeSession = sessions.find((item) => item.id === sessionId) || null;
   const pharmacyEnabled = app.meta?.modules?.some((module) => module.id === 'pharmacy');
   const activeWarehouse = activeSession ? warehouses.get(activeSession.warehouse) : null;
-  const sessionOrders = useMemo(() => orders.filter((item) => item.session === sessionId), [orders, sessionId]);
+  const sessionOrders = useMemo(() => orders.filter((item) => item.session === sessionId && item.status === 'open'), [orders, sessionId]);
+  const recentTransactions = useMemo(() => orders.filter((item) => ['completed', 'refunded'].includes(item.status)).slice(0, 20), [orders]);
   const cart = useMemo(() => Object.entries(quantities).map(([id, qty]) => ({ product: products.get(id), uom: selectedUnits[id] || products.get(id)?.uom || '', qty: Number(qty) })).filter((row) => row.product && row.qty > 0), [quantities, products, selectedUnits]);
   const unitsFor = (product) => product?.uom ? [...units.values()].filter((unit) => unit.id === product.uom || unit.base_uom === product.uom) : [];
   const priceFor = (product, uomId) => {
@@ -167,6 +168,23 @@ export default function PosTerminalPage() {
     finally { setBusy(false); }
   };
 
+  const refundOrder = async (order) => {
+    const refundReason = window.prompt('Lý do hoàn đơn (5–500 ký tự):')?.trim();
+    if (!refundReason) return;
+    if (refundReason.length < 5 || refundReason.length > 500) {
+      setError('Lý do hoàn đơn cần từ 5 đến 500 ký tự.');
+      return;
+    }
+    if (!window.confirm(`Hoàn toàn bộ giao dịch ${String(order.id).slice(0, 8)} trị giá ${fmtMoney(order.total || 0)}? Hàng hóa theo dõi tồn kho sẽ được nhập lại và chứng từ kế toán sẽ được đảo.`)) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      await api(dataPath('pos.pos_order', order.id, 'refunded'), { method: 'POST', body: { refund_reason: refundReason } });
+      setNotice(`Đã hoàn toàn bộ giao dịch ${String(order.id).slice(0, 8)}.`);
+      await load(true);
+    } catch (reason) { setError(reason.message || 'Không hoàn được giao dịch. Với tiền mặt, cần ca đang mở cùng thu ngân và chi nhánh với ca bán.'); }
+    finally { setBusy(false); }
+  };
+
   const createCashMovement = async (event) => {
     event.preventDefault();
     if (!activeSession) return;
@@ -240,6 +258,7 @@ export default function PosTerminalPage() {
           <div className="pos-total"><span>Tạm tính</span><span>Tiền hàng <strong className="num">{fmtMoney(subtotal)}</strong></span><span>Thuế ước tính <strong className="num">{fmtMoney(estimatedTax)}</strong></span><strong className="num">{fmtMoney(total)}</strong><small>Thuế và số tiền chính thức do máy chủ tính theo danh mục khi tạo đơn.</small></div>
           <button className="btn btn-primary pos-checkout" type="button" disabled={busy || !cart.length || !can('pos.pos_order.create')} onClick={checkout}>{busy ? 'Đang xử lý…' : `Tạo đơn & thanh toán · ${fmtMoney(total)}`}</button>
           {sessionOrders.length > 0 && <section className="pos-pending"><h3>Đơn chờ xử lý ({sessionOrders.length})</h3>{sessionOrders.map((order) => <div className="pos-pending-item" key={order.id}><div><strong>{fmtMoney(order.total || 0)}</strong><div className="small muted">{fmtDateTime(order.created_at)} · {statusLabel(order.status)}</div></div><button className="btn btn-primary btn-sm" type="button" disabled={busy || !can('pos.pos_order.completed')} onClick={() => completeOrder(order)}>Hoàn tất</button><button className="btn btn-ghost btn-sm" type="button" disabled={busy || !can('pos.pos_order.delete')} onClick={() => removeOrder(order)}>Hủy</button></div>)}</section>}
+          <section className="pos-pending"><h3>Giao dịch gần đây</h3>{recentTransactions.length ? recentTransactions.map((order) => <div className="pos-pending-item" key={order.id}><div className="grow"><strong>{fmtMoney(order.total || 0)} · {parties.get(order.party)?.name || 'Khách lẻ'}</strong><div className="small muted">{fmtDateTime(order.created_at)} · {order.method === 'cash' ? 'Tiền mặt' : order.method === 'card' ? 'Thẻ' : order.method === 'transfer' ? 'Chuyển khoản' : order.method === 'ewallet' ? 'Ví điện tử' : '—'} · {statusLabel(order.status)}</div><div className="small muted">{(order.lines || []).map((line, index) => `${line.product_name || products.get(line.product)?.name || 'Mặt hàng'} × ${line.qty}${line.uom_name ? ` ${line.uom_name}` : ''}`).join(' · ')}</div>{order.refund_reason && <div className="small muted">Lý do hoàn: {order.refund_reason}</div>}</div>{order.status === 'completed' && can('pos.pos_order.refunded') && can('pos.pos_order.update') && <button className="btn btn-ghost btn-sm" type="button" disabled={busy} onClick={() => refundOrder(order)}>Hoàn toàn bộ</button>}</div>) : <div className="empty">Chưa có giao dịch hoàn tất trong danh sách gần đây.</div>}</section>
           <details className="pos-cash-panel"><summary>Thu / chi quỹ tiền mặt</summary><form className="pos-cash-form" onSubmit={createCashMovement}>
             <label className="field"><span className="label">Loại giao dịch</span><select className="select" value={cashDirection} onChange={(event) => setCashDirection(event.target.value)}><option value="cash_out">Chi tiền</option><option value="cash_in">Nộp tiền vào quỹ</option></select></label>
             <label className="field"><span className="label">Số tiền</span><input className="input num" required type="number" min="0.01" step="any" value={cashAmount} onChange={(event) => setCashAmount(event.target.value)} /></label>
