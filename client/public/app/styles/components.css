@@ -82,6 +82,21 @@ a.stat:hover { text-decoration: none; border-color: var(--accent); }
 .stat .stat-label { font-size: var(--fs-sm); color: var(--text-muted); }
 .stat .stat-value { font-size: var(--fs-2xl); font-weight: var(--fw-bold); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 
+/* ───── LMS completion certificates ───── */
+.lms-certificate-body { margin-top: 1rem; padding: 1.5rem; border: 1px solid var(--border-strong); border-radius: var(--r-md); text-align: center; }
+.lms-certificate-kicker { color: var(--text-muted); font-size: var(--fs-xs); font-weight: var(--fw-semibold); letter-spacing: 0.12em; }
+.lms-certificate-body h2 { margin: 0.75rem 0; }
+.lms-certificate-learner { display: block; margin: 0.75rem 0; font-size: var(--fs-xl); }
+.lms-certificate-number { margin: 1rem 0 0.375rem; font-family: var(--font-mono); font-size: var(--fs-sm); }
+.lms-certificate-lookup { margin-top: 1rem; }
+@media print {
+  body:has(.lms-certificate.is-printing) * { visibility: hidden !important; }
+  body:has(.lms-certificate.is-printing) .lms-certificate.is-printing,
+  body:has(.lms-certificate.is-printing) .lms-certificate.is-printing * { visibility: visible !important; }
+  body:has(.lms-certificate.is-printing) .lms-certificate.is-printing { position: fixed; inset: 12mm; display: flex; flex-direction: column; justify-content: center; border: 2px solid #222; border-radius: 0; box-shadow: none; color: #111; }
+  .lms-certificate-toolbar { display: none !important; }
+}
+
 /* ───── Table ───── */
 .table-wrap { overflow-x: auto; border-radius: var(--r-md); }
 .table { font-size: var(--fs-md); }

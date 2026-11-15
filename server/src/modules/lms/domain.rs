@@ -46,8 +46,12 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
 }
 
 pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<String> {
-    if entity == "lesson_progress" {
-        return vec!["Lesson completion records are immutable learning history".into()];
+    if matches!(entity, "lesson_progress" | "certificate") {
+        return vec![if entity == "certificate" {
+            "Issued certificates are immutable training evidence".into()
+        } else {
+            "Lesson completion records are immutable learning history".into()
+        }];
     }
     if entity != "enrollment" || !patch.as_object().is_some_and(|patch| !patch.is_empty()) {
         return Vec::new();
@@ -70,7 +74,7 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
 }
 
 pub fn validate_remove(entity: &str, _document: &Value) -> Vec<String> {
-    if matches!(entity, "enrollment" | "lesson_progress") {
+    if matches!(entity, "enrollment" | "lesson_progress" | "certificate") {
         return vec!["Learning progress records are retained as training history".into()];
     }
     Vec::new()

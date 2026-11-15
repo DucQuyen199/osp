@@ -4,6 +4,7 @@
 
 ## [Unreleased]
 ### Added
+- Added automatic immutable LMS completion certificates with learner/course snapshots, certificate-number lookup, and print-ready issuance records.
 - Added progressive utility tariffs with cumulative usage bands and fixed period charges; readings and bills retain immutable tariff snapshots and per-band charge breakdowns.
 - Added actual delivered quantities and required short-delivery reasons to the delivery board; inventory issues, sales fulfillment, repeat shipments, and return eligibility now use received quantities.
 - Added keyboard-operable CRM pipeline tabs with labelled Kanban and list panels for screen-reader users.

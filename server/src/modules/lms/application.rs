@@ -46,7 +46,13 @@ pub async fn handle_source_event(
     event_id: Uuid,
     depth: u32,
 ) -> R<bool> {
-    if !tenant.has_module("lms") || event_type != "lms.lesson_progress.created" {
+    if !tenant.has_module("lms") {
+        return Ok(false);
+    }
+    if event_type == "lms.enrollment.completed" {
+        return issue_certificate(kernel, tx, tenant, document, event_id, depth).await;
+    }
+    if event_type != "lms.lesson_progress.created" {
         return Ok(false);
     }
     let Some(enrollment) = document
@@ -129,5 +135,77 @@ pub async fn handle_source_event(
             )
             .await?;
     }
+    Ok(true)
+}
+
+async fn issue_certificate(
+    kernel: &Kernel,
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    event: &Value,
+    event_id: Uuid,
+    depth: u32,
+) -> R<bool> {
+    let Some(enrollment) = event
+        .get("id")
+        .and_then(Value::as_str)
+        .and_then(|value| Uuid::parse_str(value).ok())
+    else {
+        return Err(ApiError::validation(
+            "lms.enrollment.completed",
+            vec!["Completed enrollment requires a valid id".into()],
+        ));
+    };
+    let names = tx
+        .query_opt(
+            "SELECT party.name, course.title FROM lms__enrollment enrollment JOIN master_data__party party ON party.tenant_id = enrollment.tenant_id AND party.id = enrollment.learner JOIN lms__course course ON course.tenant_id = enrollment.tenant_id AND course.id = enrollment.course WHERE enrollment.tenant_id = $1 AND enrollment.id = $2 AND enrollment.status = 'completed' FOR UPDATE OF enrollment",
+            &[&tenant.id, &enrollment],
+        )
+        .await?
+        .ok_or_else(|| {
+            ApiError::validation(
+                "lms.enrollment.completed",
+                vec!["Only a completed enrollment can receive a certificate".into()],
+            )
+        })?;
+    if tx
+        .query_opt(
+            "SELECT id FROM lms__certificate WHERE tenant_id = $1 AND enrollment = $2 LIMIT 1 FOR UPDATE",
+            &[&tenant.id, &enrollment],
+        )
+        .await?
+        .is_some()
+    {
+        return Ok(true);
+    }
+    let learner_name: String = names.get(0);
+    let course_title: String = names.get(1);
+    let mut data = Map::new();
+    data.insert("enrollment".into(), json!(enrollment));
+    data.insert(
+        "certificate_number".into(),
+        json!(format!(
+            "OSP-LMS-{}",
+            Uuid::new_v4().simple().to_string().to_uppercase()
+        )),
+    );
+    data.insert("learner_name".into(), json!(learner_name));
+    data.insert("course_title".into(), json!(course_title));
+    data.insert("issued_at".into(), json!(chrono::Utc::now().to_rfc3339()));
+    let entity = kernel.ent(tenant, "lms.certificate")?;
+    kernel
+        .create_in(
+            tx,
+            &Actor::System,
+            tenant,
+            &entity,
+            data,
+            &Opts {
+                depth: Some(depth + 1),
+                causation: Some(event_id),
+                silent: false,
+            },
+        )
+        .await?;
     Ok(true)
 }

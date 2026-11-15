@@ -18,6 +18,7 @@ pub async fn validate_persistence(
             validate_enrollment(tx, tenant, action, document).await
         }
         ("lesson_progress", "created") => validate_lesson_progress(tx, tenant, document).await,
+        ("certificate", "created") => validate_certificate(tx, tenant, document).await,
         ("course", _) => validate_course(tx, tenant, action, document).await,
         _ => Ok(Vec::new()),
     }
@@ -246,6 +247,49 @@ async fn validate_lesson_progress(
         .is_some()
     {
         return Ok(vec!["This lesson is already completed in the enrollment".into()]);
+    }
+    Ok(Vec::new())
+}
+
+async fn validate_certificate(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<Vec<String>> {
+    let Some(enrollment) = parse_id(document, "enrollment") else {
+        return Ok(vec!["Certificate requires a valid enrollment".into()]);
+    };
+    let row = tx
+        .query_opt(
+            "SELECT party.name, course.title, enrollment.status FROM lms__enrollment enrollment JOIN master_data__party party ON party.tenant_id = enrollment.tenant_id AND party.id = enrollment.learner JOIN lms__course course ON course.tenant_id = enrollment.tenant_id AND course.id = enrollment.course WHERE enrollment.tenant_id = $1 AND enrollment.id = $2 FOR SHARE OF enrollment, party, course",
+            &[&tenant.id, &enrollment],
+        )
+        .await?;
+    let Some(row) = row else {
+        return Ok(vec![
+            "Certificate enrollment does not exist in this tenant".into(),
+        ]);
+    };
+    let status: String = row.get(2);
+    if status != "completed" {
+        return Ok(vec![
+            "A certificate can be issued only for a completed enrollment".into(),
+        ]);
+    }
+    let learner_name: String = row.get(0);
+    let course_title: String = row.get(1);
+    if document.get("learner_name").and_then(Value::as_str) != Some(learner_name.as_str())
+        || document.get("course_title").and_then(Value::as_str) != Some(course_title.as_str())
+    {
+        return Ok(vec![
+            "Certificate learner and course snapshots must match the enrollment".into(),
+        ]);
+    }
+    if tx
+        .query_opt(
+            "SELECT id FROM lms__certificate WHERE tenant_id = $1 AND (enrollment = $2 OR certificate_number = $3) LIMIT 1 FOR UPDATE",
+            &[&tenant.id, &enrollment, &document.get("certificate_number").and_then(Value::as_str).unwrap_or_default()],
+        )
+        .await?
+        .is_some()
+    {
+        return Ok(vec!["This enrollment already has a certificate or the certificate number is in use".into()]);
     }
     Ok(Vec::new())
 }

@@ -128,6 +128,20 @@
    "states": null,
    "computed": {},
    "constraints": []
+  },
+  {
+   "name": "certificate",
+   "label": "Chứng chỉ hoàn thành",
+   "fields": [
+    {"name": "enrollment", "type": "ref", "required": true, "ref": "lms.enrollment", "system": true},
+    {"name": "certificate_number", "type": "string", "required": true, "system": true},
+    {"name": "learner_name", "type": "string", "required": true, "system": true},
+    {"name": "course_title", "type": "string", "required": true, "system": true},
+    {"name": "issued_at", "type": "datetime", "required": true, "system": true}
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
   }
  ],
  "rules": [],

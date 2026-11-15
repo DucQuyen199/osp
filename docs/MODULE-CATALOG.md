@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **50 module**, **194 loại dữ liệu**, **873 sự kiện**.
+Tổng: **50 module**, **195 loại dữ liệu**, **876 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -321,6 +321,7 @@ Tổng: **50 module**, **194 loại dữ liệu**, **873 sự kiện**.
 | `lesson` Bài học | — |
 | `enrollment` Ghi danh | `active` → **completed** (active→completed) |
 | `lesson_progress` Hoàn thành bài học | — |
+| `certificate` Chứng chỉ hoàn thành | — |
 
 ### payroll
 **Tính lương** — Bảng lương, phiếu lương. Phiếu lương được khóa theo bảng nháp; gửi bảng lương tạo yêu cầu duyệt, duyệt ghi bút toán và đánh dấu đã trả tạo payment.

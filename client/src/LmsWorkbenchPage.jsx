@@ -11,6 +11,7 @@ export default function LmsWorkbenchPage() {
   const [lessons, setLessons] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
   const [progress, setProgress] = useState([]);
+  const [certificates, setCertificates] = useState([]);
   const [parties, setParties] = useState(new Map());
   const [courseId, setCourseId] = useState('');
   const [courseForm, setCourseForm] = useState({ title: '', description: '' });
@@ -20,19 +21,22 @@ export default function LmsWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [certificateLookup, setCertificateLookup] = useState('');
+  const [printingCertificate, setPrintingCertificate] = useState('');
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
-      const [courseRes, lessonRes, enrollmentRes, progressRes, partyMap] = await Promise.all([
+      const [courseRes, lessonRes, enrollmentRes, progressRes, certificateRes, partyMap] = await Promise.all([
         can('lms.course.read') ? loadAllResponse('lms.course') : Promise.resolve({ items: [] }),
         can('lms.lesson.read') ? loadAllResponse('lms.lesson') : Promise.resolve({ items: [] }),
         can('lms.enrollment.read') ? loadAllResponse('lms.enrollment') : Promise.resolve({ items: [] }),
         can('lms.lesson_progress.read') ? loadAllResponse('lms.lesson_progress') : Promise.resolve({ items: [] }),
+        can('lms.certificate.read') ? loadAllResponse('lms.certificate') : Promise.resolve({ items: [] }),
         can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
       ]);
       const courseRows = rows(courseRes).sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')));
-      setCourses(courseRows); setLessons(rows(lessonRes)); setEnrollments(rows(enrollmentRes)); setProgress(rows(progressRes)); setParties(partyMap);
+      setCourses(courseRows); setLessons(rows(lessonRes)); setEnrollments(rows(enrollmentRes)); setProgress(rows(progressRes)); setCertificates(rows(certificateRes)); setParties(partyMap);
       setCourseId((id) => courseRows.some((course) => course.id === id) ? id : courseRows[0]?.id || '');
       setLearner((id) => id && partyMap.has(id) ? id : [...partyMap.keys()][0] || '');
     } catch (reason) { setError(reason.message || 'Không tải được dữ liệu đào tạo.'); }
@@ -49,6 +53,8 @@ export default function LmsWorkbenchPage() {
     for (const row of progress) { const set = map.get(row.enrollment) || new Set(); set.add(row.lesson); map.set(row.enrollment, set); }
     return map;
   }, [progress]);
+  const certificateByEnrollment = useMemo(() => new Map(certificates.map((certificate) => [certificate.enrollment, certificate])), [certificates]);
+  const matchedCertificate = certificates.find((certificate) => certificate.certificateNumber?.toLowerCase() === certificateLookup.trim().toLowerCase());
   const activeLearners = enrollments.filter((row) => row.status === 'active').length;
   const completedLearners = enrollments.filter((row) => row.status === 'completed').length;
   const learnerName = (id) => parties.has(id) ? recordLabel('master-data.party', parties.get(id)) : 'Học viên';
@@ -94,6 +100,17 @@ export default function LmsWorkbenchPage() {
   const activeCourse = selected?.status === 'published';
   const canEditLessons = selected?.status === 'draft' && !courseEnrollments.length;
 
+  useEffect(() => {
+    const clearPrinting = () => setPrintingCertificate('');
+    window.addEventListener('afterprint', clearPrinting);
+    return () => window.removeEventListener('afterprint', clearPrinting);
+  }, []);
+
+  function printCertificate(certificate) {
+    setPrintingCertificate(certificate.id);
+    window.setTimeout(() => window.print(), 50);
+  }
+
   return <div className="page">
     <div className="page-head"><div><h1>Đào tạo trực tuyến</h1><p className="sub">Xây dựng khóa học, mở ghi danh, theo dõi tiến độ và lưu lịch sử hoàn thành tự động theo bài học bắt buộc.</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>Làm mới</button></div>
     {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
@@ -105,7 +122,8 @@ export default function LmsWorkbenchPage() {
         {canEditLessons && can('lms.lesson.create') && <form className="form-grid" style={{ marginTop: 16 }} onSubmit={createLesson}><h3 className="full">Thêm bài học</h3><label className="field"><span className="label">Tên bài học *</span><input className="input" required maxLength="240" value={lessonForm.title} onChange={(event) => setLessonForm({ ...lessonForm, title: event.target.value })}/></label><label className="field"><span className="label">Nội dung / hướng dẫn</span><textarea className="input" rows="3" maxLength="10000" value={lessonForm.content} onChange={(event) => setLessonForm({ ...lessonForm, content: event.target.value })}/></label><label className="row"><input type="checkbox" checked={lessonForm.required} onChange={(event) => setLessonForm({ ...lessonForm, required: event.target.checked })}/> Bài học bắt buộc để hoàn thành khóa</label><div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy)}>Thêm bài học</button></div></form>}
         <h3 style={{ marginTop: 18 }}>Nội dung khóa học</h3>{!courseLessons.length ? <div className="empty">Chưa có bài học. Cần ít nhất một bài bắt buộc để xuất bản.</div> : <div className="stack-sm">{courseLessons.map((lesson, index) => <article className="card card-pad" key={lesson.id}><div className="row wrap"><strong>{index + 1}. {lesson.title}</strong><span className="grow"/><span className={`badge ${lesson.required === false ? 'plain' : 'warning'}`}>{lesson.required === false ? 'Tùy chọn' : 'Bắt buộc'}</span></div>{lesson.content && <p className="small" style={{ whiteSpace: 'pre-wrap' }}>{lesson.content}</p>}</article>)}</div>}
         {activeCourse && can('lms.enrollment.create') && <form className="row wrap" style={{ marginTop: 18 }} onSubmit={enroll}><label className="field grow"><span className="label">Ghi danh học viên</span><select className="select" required value={learner} onChange={(event) => setLearner(event.target.value)}><option value="">Chọn người học</option>{[...parties.values()].filter((party) => !courseEnrollments.some((row) => row.learner === party.id)).map((party) => <option key={party.id} value={party.id}>{recordLabel('master-data.party', party)}</option>)}</select></label><button className="btn btn-primary" disabled={Boolean(busy) || !learner}>Ghi danh</button></form>}
-        <h3 style={{ marginTop: 18 }}>Học viên và tiến độ</h3>{!can('lms.enrollment.read') ? <div className="empty">Bạn chưa có quyền xem danh sách ghi danh.</div> : !courseEnrollments.length ? <div className="empty">Chưa có học viên ghi danh.</div> : <div className="stack-sm">{courseEnrollments.map((enrollment) => { const done = completedByEnrollment.get(enrollment.id) || new Set(); const nextLesson = courseLessons.find((lesson) => !done.has(lesson.id)); return <article className="card card-pad" key={enrollment.id}><div className="row wrap"><div><strong>{learnerName(enrollment.learner)}</strong><div className="small muted">Ghi danh {fmtDateTime(enrollment.createdAt)}</div></div><span className="grow"/><strong>{Number(enrollment.progress || 0).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}%</strong><span className={`badge ${enrollment.status === 'completed' ? 'success' : 'warning'}`}>{enrollment.status === 'completed' ? 'Hoàn thành' : 'Đang học'}</span></div>{can('lms.lesson_progress.create') && enrollment.status === 'active' && nextLesson && <div className="row wrap" style={{ marginTop: 8 }}><span className="small muted">Bài tiếp theo: {nextLesson.title}</span><span className="grow"/><button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => completeLesson(enrollment, nextLesson)}>Ghi nhận hoàn thành</button></div>}{!nextLesson && enrollment.status === 'active' && <p className="small success-text" style={{ marginTop: 8 }}>Đã ghi nhận toàn bộ bài học; trạng thái hoàn thành được cập nhật tự động.</p>}</article>; })}</div>}
+        <h3 style={{ marginTop: 18 }}>Học viên và tiến độ</h3>{!can('lms.enrollment.read') ? <div className="empty">Bạn chưa có quyền xem danh sách ghi danh.</div> : !courseEnrollments.length ? <div className="empty">Chưa có học viên ghi danh.</div> : <div className="stack-sm">{courseEnrollments.map((enrollment) => { const done = completedByEnrollment.get(enrollment.id) || new Set(); const nextLesson = courseLessons.find((lesson) => !done.has(lesson.id)); const certificate = certificateByEnrollment.get(enrollment.id); return <article className={`card card-pad ${printingCertificate === certificate?.id ? 'lms-certificate is-printing' : ''}`} key={enrollment.id}><div className="row wrap"><div><strong>{learnerName(enrollment.learner)}</strong><div className="small muted">Ghi danh {fmtDateTime(enrollment.createdAt)}</div></div><span className="grow"/><strong>{Number(enrollment.progress || 0).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}%</strong><span className={`badge ${enrollment.status === 'completed' ? 'success' : 'warning'}`}>{enrollment.status === 'completed' ? 'Hoàn thành' : 'Đang học'}</span></div>{can('lms.lesson_progress.create') && enrollment.status === 'active' && nextLesson && <div className="row wrap" style={{ marginTop: 8 }}><span className="small muted">Bài tiếp theo: {nextLesson.title}</span><span className="grow"/><button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => completeLesson(enrollment, nextLesson)}>Ghi nhận hoàn thành</button></div>}{!nextLesson && enrollment.status === 'active' && <p className="small success-text" style={{ marginTop: 8 }}>Đã ghi nhận toàn bộ bài học; trạng thái hoàn thành được cập nhật tự động.</p>}{certificate && <div className="lms-certificate-body"><div className="lms-certificate-kicker">OSP SUITE · CHỨNG NHẬN HOÀN THÀNH</div><h2>{certificate.courseTitle}</h2><p>Chứng nhận được cấp cho</p><strong className="lms-certificate-learner">{certificate.learnerName}</strong><p>đã hoàn thành đầy đủ các bài học bắt buộc của khóa học.</p><div className="lms-certificate-number">Số chứng chỉ: {certificate.certificateNumber}</div><div className="small muted">Ngày cấp {fmtDateTime(certificate.issuedAt)}</div></div>}{certificate && can('lms.certificate.read') && <div className="row lms-certificate-toolbar" style={{ marginTop: 10 }}><span className="small muted">Chứng chỉ {certificate.certificateNumber}</span><span className="grow"/><button className="btn btn-secondary btn-sm" type="button" onClick={() => printCertificate(certificate)}>In chứng chỉ</button></div>}</article>; })}</div>}
+        {can('lms.certificate.read') && <section className="card card-pad lms-certificate-lookup"><h3>Tra cứu chứng chỉ</h3><div className="row wrap"><label className="field grow"><span className="label">Số chứng chỉ</span><input className="input" value={certificateLookup} onChange={(event) => setCertificateLookup(event.target.value)} placeholder="OSP-LMS-…"/></label></div>{certificateLookup.trim() && <div className={matchedCertificate ? 'alert success' : 'alert'} role="status">{matchedCertificate ? <>Chứng chỉ hợp lệ · {matchedCertificate.learnerName} · {matchedCertificate.courseTitle} · cấp {fmtDateTime(matchedCertificate.issuedAt)}</> : 'Không tìm thấy số chứng chỉ này.'}</div>}</section>}
       </section>}</div>}
   </div>;
 }
