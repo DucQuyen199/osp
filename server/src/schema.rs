@@ -26,6 +26,25 @@ CREATE TABLE IF NOT EXISTS osp_tenants (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS osp_idempotency_keys (
+  tenant_id text NOT NULL REFERENCES osp_tenants(id) ON DELETE CASCADE,
+  actor_id text NOT NULL,
+  entity text NOT NULL,
+  idempotency_key text NOT NULL,
+  request_hash text NOT NULL CHECK (request_hash ~ '^[a-f0-9]{64}$'),
+  response jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (tenant_id, actor_id, entity, idempotency_key)
+);
+CREATE INDEX IF NOT EXISTS osp_idempotency_expiry
+  ON osp_idempotency_keys (tenant_id, created_at);
+ALTER TABLE osp_idempotency_keys ENABLE ROW LEVEL SECURITY;
+ALTER TABLE osp_idempotency_keys FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON osp_idempotency_keys;
+CREATE POLICY tenant_isolation ON osp_idempotency_keys
+  USING (tenant_id = current_setting('app.tenant_id', true))
+  WITH CHECK (tenant_id = current_setting('app.tenant_id', true));
+
 CREATE TABLE IF NOT EXISTS osp_roles (
   tenant_id text NOT NULL,
   id text NOT NULL,

@@ -80,6 +80,8 @@ Tenant admin có thể gọi `POST /api/t/{tenantId}/auth/mfa/users/{userId}/res
 
 Bulk action nhận `{ "ids": ["<uuid>", "…"] }`. Danh sách phải có 1–100 ID duy nhất. Máy chủ sắp khóa theo ID để tránh deadlock giữa các lô giao nhau, kiểm tra quyền và chạy đầy đủ validation/event của action trên từng bản ghi; response có `{ action, count, items }`.
 
+Khi tạo bản ghi, client có thể gửi `Idempotency-Key` (1–200 ký tự ASCII in được). Khóa được phân theo tenant, người gửi và entity. Gửi lại cùng khóa và cùng JSON trong 30 ngày trả lại phản hồi `201` đã lưu mà không tạo thêm bản ghi hay lặp lại nghiệp vụ. Dùng lại khóa cho JSON khác trả `409 IDEMPOTENCY_KEY_REUSED`. Sau 30 ngày, khóa hết hạn và có thể được tạo lại.
+
 ### Truy xuất lô hàng
 
 `GET /api/t/{tenantId}/reports/inventory/lots/{lotId}/traceability` cần `inventory.lot.read` và `inventory.stock_move.read`. Kết quả gồm thông tin và hạn dùng lô, số dư lượng/giá trị theo kho, cùng lịch sử phiếu kho và mã nguồn liên quan. Dữ liệu được giới hạn trong tenant hiện tại; lịch sử phân trang bằng `limit` (mặc định 100, tối đa 500) và `offset` (tối đa 1.000.000).

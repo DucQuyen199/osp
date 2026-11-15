@@ -105,8 +105,9 @@ pub fn build(reg: &Registry) -> Value {
                         { "name": "dir", "in": "query", "schema": { "type": "string", "enum": ["asc", "desc"] } },
                         { "name": "<field>", "in": "query", "description": "Lọc bằng nhau theo bất kỳ trường nào, ví dụ ?status=draft", "schema": { "type": "string" } }],
                     "responses": with_common(Map::from_iter([("200".to_string(), ok(&json!({ "type": "object", "properties": { "items": { "type": "array", "items": r#ref }, "total": { "type": "integer" } } })))])) },
-                "post": { "tags": [def.module], "summary": format!("Tạo {}", def.label), "security": sec, "parameters": [tid], "requestBody": body,
-                    "responses": with_common(Map::from_iter([("201".to_string(), ok(&r#ref)), ("422".to_string(), err("Dữ liệu không hợp lệ"))])) },
+                "post": { "tags": [def.module], "summary": format!("Tạo {}", def.label), "security": sec,
+                    "parameters": [tid, { "name": "Idempotency-Key", "in": "header", "required": false, "description": "Khóa retry cho thao tác tạo; cùng khóa/cùng nội dung trả lại phản hồi đã lưu trong 30 ngày.", "schema": { "type": "string", "minLength": 1, "maxLength": 200, "pattern": "^[!-~]+$" } }], "requestBody": body,
+                    "responses": with_common(Map::from_iter([("201".to_string(), ok(&r#ref)), ("409".to_string(), err("Idempotency-Key đã được dùng với nội dung khác")), ("422".to_string(), err("Dữ liệu không hợp lệ"))])) },
             }));
             paths.insert(format!("{base}/{{id}}"), json!({
                 "get": { "tags": [def.module], "summary": format!("Xem {}", def.label), "security": sec, "parameters": [tid, rid], "responses": with_common(Map::from_iter([("200".to_string(), ok(&r#ref))])) },

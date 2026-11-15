@@ -1,4 +1,5 @@
 use super::shared::*;
+use sha2::Digest;
 
 impl Kernel {
     // ───────────────────── Chuyển đổi bản ghi <-> hàng DB ─────────────────────
@@ -59,6 +60,68 @@ impl Kernel {
             qname.strip_prefix("integration-hub.").unwrap_or_default(),
             out,
         ))
+    }
+
+    /// Create an entity with a durable, tenant-scoped retry key. The key record
+    /// and all business side effects commit in the same transaction.
+    pub async fn create_idempotent(
+        &self,
+        actor: &Actor,
+        t: &Tenant,
+        qname: &str,
+        data: Obj,
+        key: &str,
+    ) -> R<Value> {
+        let ent = self.ent(t, qname)?;
+        self.authorize(t, actor, &format!("{qname}.create"))?;
+        let canonical =
+            serde_json::to_vec(&data).map_err(|error| ApiError::internal(error.to_string()))?;
+        let request_hash = hex::encode(sha2::Sha256::digest(canonical));
+        let actor_id = actor.user_id().to_owned();
+        let entity = qname.to_owned();
+        let mut conn = self.pool.get().await?;
+        let tx = Tx::begin(&mut conn, &t.id, true).await?;
+
+        // Keep retry responses for 30 days, bounding storage for long-lived
+        // integrations while allowing normal delayed retries.
+        tx.execute(
+            "DELETE FROM osp_idempotency_keys WHERE tenant_id = $1 AND created_at < now() - interval '30 days'",
+            &[&t.id],
+        )
+        .await?;
+        if let Some(row) = tx
+            .query_opt(
+                "SELECT request_hash, response FROM osp_idempotency_keys WHERE tenant_id = $1 AND actor_id = $2 AND entity = $3 AND idempotency_key = $4",
+                &[&t.id, &actor_id, &entity, &key],
+            )
+            .await?
+        {
+            let saved_hash: String = row.get(0);
+            if saved_hash != request_hash {
+                return Err(ApiError::new(
+                    409,
+                    "IDEMPOTENCY_KEY_REUSED",
+                    "Idempotency-Key đã được dùng với nội dung yêu cầu khác",
+                ));
+            }
+            tx.commit().await?;
+            return Ok(row.get(1));
+        }
+
+        let out = self
+            .create_in(&tx, actor, t, &ent, data, &Opts::top())
+            .await?;
+        let response = crate::modules::integration_hub::redact_document(
+            qname.strip_prefix("integration-hub.").unwrap_or_default(),
+            out,
+        );
+        tx.execute(
+            "INSERT INTO osp_idempotency_keys (tenant_id, actor_id, entity, idempotency_key, request_hash, response) VALUES ($1, $2, $3, $4, $5, $6)",
+            &[&t.id, &actor_id, &entity, &key, &request_hash, &response],
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(response)
     }
 
     pub async fn update(

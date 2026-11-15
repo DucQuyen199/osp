@@ -1771,10 +1771,44 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                 return json_ok(k.list(&actor, &t, &q, &lq).await?);
             }
             (&Method::POST, []) => {
-                return Ok(Reply::Json(
-                    201,
-                    k.create(&actor, &t, &q, json_obj(&bytes)?).await?,
-                ));
+                let idempotency_values = parts.headers.get_all("idempotency-key");
+                let mut idempotency_values = idempotency_values.iter();
+                let idempotency_key = idempotency_values.next();
+                if idempotency_values.next().is_some() {
+                    return Err(ApiError::new(
+                        400,
+                        "BAD_IDEMPOTENCY_KEY",
+                        "Chỉ được gửi một header Idempotency-Key",
+                    ));
+                }
+                let key = idempotency_key
+                    .map(|value| {
+                        let key = value.to_str().map_err(|_| {
+                            ApiError::new(
+                                400,
+                                "BAD_IDEMPOTENCY_KEY",
+                                "Idempotency-Key phải là chuỗi ASCII in được",
+                            )
+                        })?;
+                        if key.is_empty()
+                            || key.len() > 200
+                            || !key.bytes().all(|byte| (0x21..=0x7e).contains(&byte))
+                        {
+                            return Err(ApiError::new(
+                                400,
+                                "BAD_IDEMPOTENCY_KEY",
+                                "Idempotency-Key phải có 1–200 ký tự ASCII in được",
+                            ));
+                        }
+                        Ok(key)
+                    })
+                    .transpose()?;
+                let data = json_obj(&bytes)?;
+                let created = match key {
+                    Some(key) => k.create_idempotent(&actor, &t, &q, data, key).await?,
+                    None => k.create(&actor, &t, &q, data).await?,
+                };
+                return Ok(Reply::Json(201, created));
             }
             (&Method::GET, [id]) => return json_ok(k.get(&actor, &t, &q, id).await?),
             (&Method::PATCH, [id]) => {
