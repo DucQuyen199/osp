@@ -114,9 +114,7 @@ pub async fn validate_persistence(
             }
         }
         ("budget", "approved") => {
-            if tenant.setting_bool("enforceBudgetControl")
-                && let Some(period) = document.get("period").and_then(Value::as_str)
-            {
+            if let Some(period) = document.get("period").and_then(Value::as_str) {
                 journal_control::lock_control_period(tx, tenant, period).await?;
             }
             let Some(id) = budget_id(document, "id") else {
