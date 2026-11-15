@@ -180,34 +180,70 @@ pub async fn handle_source_stock_event(
                         vec!["BOM output quantity must be positive".into()],
                     ));
                 }
+                let Some(components) = components.as_array().filter(|rows| !rows.is_empty()) else {
+                    return Err(crate::error::ApiError::validation(
+                        event_type,
+                        vec![
+                            "Production BOM must contain item lines before stock can be consumed"
+                                .into(),
+                        ],
+                    ));
+                };
                 let mut prepared = components
-                    .as_array()
+                    .iter()
                     .cloned()
-                    .unwrap_or_default()
                     .into_iter()
-                    .map(|mut line| -> R<Value> {
-                        if let Some(qty) = line
+                    .enumerate()
+                    .map(|(index, mut line)| -> R<Value> {
+                        let product = line
+                            .get("product")
+                            .and_then(Value::as_str)
+                            .and_then(|value| Uuid::parse_str(value).ok());
+                        if product.is_none() {
+                            return Err(crate::error::ApiError::validation(
+                                event_type,
+                                vec![format!(
+                                    "Production BOM line {} has an invalid product",
+                                    index + 1
+                                )],
+                            ));
+                        }
+                        let qty = line
                             .get("base_qty")
                             .or_else(|| line.get("qty"))
                             .and_then(money::decimal)
-                        {
-                            let scaled = qty
-                                .checked_mul(produced)
-                                .and_then(|value| value.checked_div(divisor))
-                                .ok_or_else(|| {
-                                    crate::error::ApiError::validation(
-                                        event_type,
-                                        vec!["Scaled BOM quantity exceeds the supported decimal range".into()],
-                                    )
-                                })?;
-                            line["qty"] = money::json_number(scaled).ok_or_else(|| {
+                            .filter(|qty| *qty > Decimal::ZERO)
+                            .ok_or_else(|| {
                                 crate::error::ApiError::validation(
                                     event_type,
-                                    vec!["Scaled BOM quantity exceeds the supported decimal range".into()],
+                                    vec![format!(
+                                        "Production BOM line {} has an invalid quantity",
+                                        index + 1
+                                    )],
                                 )
                             })?;
-                            line["base_qty"] = line["qty"].clone();
-                        }
+                        let scaled = qty
+                            .checked_mul(produced)
+                            .and_then(|value| value.checked_div(divisor))
+                            .ok_or_else(|| {
+                                crate::error::ApiError::validation(
+                                    event_type,
+                                    vec![
+                                        "Scaled BOM quantity exceeds the supported decimal range"
+                                            .into(),
+                                    ],
+                                )
+                            })?;
+                        line["qty"] = money::json_number(scaled).ok_or_else(|| {
+                            crate::error::ApiError::validation(
+                                event_type,
+                                vec![
+                                    "Scaled BOM quantity exceeds the supported decimal range"
+                                        .into(),
+                                ],
+                            )
+                        })?;
+                        line["base_qty"] = line["qty"].clone();
                         Ok(line)
                     })
                     .collect::<R<Vec<_>>>()?;
