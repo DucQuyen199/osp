@@ -125,7 +125,7 @@ impl Kernel {
                  LEFT JOIN LATERAL (SELECT status, occurred_at, location FROM logistics__tracking_event event \
                    WHERE event.tenant_id = shipment.tenant_id AND event.shipment = shipment.id \
                    ORDER BY event.occurred_at DESC, event.id DESC LIMIT 1) latest ON true \
-                 WHERE shipment.tenant_id = $1 AND (shipment.status IN ('created', 'dispatched', 'failed') OR (shipment.status = 'delivered' AND NULLIF(btrim(shipment.short_delivery_reason), '') IS NOT NULL)) \
+                 WHERE shipment.tenant_id = $1 AND (shipment.status IN ('created', 'dispatched') OR (shipment.status = 'failed' OR (shipment.status = 'delivered' AND NULLIF(btrim(shipment.short_delivery_reason), '') IS NOT NULL)) AND NOT EXISTS (SELECT 1 FROM logistics__shipment retry WHERE retry.tenant_id = shipment.tenant_id AND retry.redelivery_of = shipment.id)) \
                  ORDER BY CASE WHEN shipment.status = 'failed' THEN 0 WHEN shipment.status = 'delivered' THEN 1 WHEN shipment.status = 'created' THEN 2 ELSE 3 END, shipment.created_at, shipment.id \
                  LIMIT 500",
                 &[&tenant.id],
@@ -219,6 +219,18 @@ impl Kernel {
                 vec!["Failed shipment has no item lines to redeliver".into()],
             ));
         }
+        if let Some(existing) = tx
+            .query_opt(
+                "SELECT id, status FROM logistics__shipment WHERE tenant_id = $1 AND redelivery_of = $2 ORDER BY created_at, id LIMIT 1 FOR UPDATE",
+                &[&tenant.id, &failed_id],
+            )
+            .await?
+        {
+            let id: uuid::Uuid = existing.get(0);
+            let status: String = existing.get(1);
+            tx.commit().await?;
+            return Ok(json!({"id": id, "status": status, "existing": true}));
+        }
         if source.as_deref() == Some("sales_order") {
             if !tenant.has_module("sales") {
                 return Err(ApiError::validation(
@@ -249,27 +261,6 @@ impl Kernel {
                 ));
             }
         }
-        if let Some(existing) = tx
-            .query_opt(
-                "SELECT id, status FROM logistics__shipment WHERE tenant_id = $1 AND source IS NOT DISTINCT FROM $2 AND source_id IS NOT DISTINCT FROM $3 AND status IN ('created', 'dispatched') AND party IS NOT DISTINCT FROM $4 AND warehouse IS NOT DISTINCT FROM $5 AND origin IS NOT DISTINCT FROM $6 AND destination IS NOT DISTINCT FROM $7 AND lines = $8::jsonb ORDER BY created_at, id LIMIT 1 FOR UPDATE",
-                &[
-                    &tenant.id,
-                    &source,
-                    &source_id,
-                    &party,
-                    &warehouse,
-                    &origin,
-                    &destination,
-                    &lines,
-                ],
-            )
-            .await?
-        {
-            let id: uuid::Uuid = existing.get(0);
-            let status: String = existing.get(1);
-            tx.commit().await?;
-            return Ok(json!({"id": id, "status": status, "existing": true}));
-        }
         let mut data = serde_json::Map::new();
         data.insert("source".into(), json!(source));
         data.insert("source_id".into(), json!(source_id));
@@ -286,6 +277,16 @@ impl Kernel {
             .get("id")
             .and_then(Value::as_str)
             .ok_or_else(|| ApiError::internal("Created redelivery shipment has no id"))?;
+        self.update_in(
+            &tx,
+            &Actor::System,
+            tenant,
+            &entity,
+            id,
+            Map::from_iter([("redelivery_of".into(), json!(failed_id))]),
+            &Opts::top(),
+        )
+        .await?;
         tx.commit().await?;
         Ok(json!({"id": id, "status": "created", "existing": false}))
     }

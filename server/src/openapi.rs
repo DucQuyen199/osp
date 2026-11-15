@@ -1028,15 +1028,15 @@ pub fn build(reg: &Registry) -> Value {
         json!({ "get": {
             "tags": ["logistics"], "summary": "Open shipment dispatch and delivery board", "security": sec,
             "parameters": [tid],
-            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Tenant-scoped failed, created and dispatched shipments ordered by operational priority and age, with latest tracking event; result is capped at 500 rows" })), ("403".to_string(), err("Requires logistics.shipment.read")), ("404".to_string(), err("Logistics module is not enabled"))]))
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Tenant-scoped failed, short-delivered, created and dispatched shipments ordered by operational priority and age, with latest tracking event; result is capped at 500 rows" })), ("403".to_string(), err("Requires logistics.shipment.read")), ("404".to_string(), err("Logistics module is not enabled"))]))
         } }),
     );
     paths.insert(
         "/api/t/{tenantId}/reports/logistics/shipments/{shipmentId}/redeliver".into(),
         json!({ "post": {
-            "tags": ["logistics"], "summary": "Create an idempotent replacement shipment from a failed delivery", "security": sec,
+            "tags": ["logistics"], "summary": "Create an idempotent retry shipment from a failed or short delivery", "security": sec,
             "parameters": [tid, { "name": "shipmentId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
-            "responses": with_common(Map::from_iter([("201".to_string(), json!({ "description": "New shipment created in created state with the failed shipment lines and destination; original failure history is preserved" })), ("200".to_string(), json!({ "description": "Existing equivalent open replacement returned idempotently" })), ("403".to_string(), err("Requires logistics.shipment.read and logistics.shipment.create")), ("404".to_string(), err("Logistics module is not enabled")), ("422".to_string(), err("Shipment is not failed, has no lines, or its source order is no longer open"))]))
+            "responses": with_common(Map::from_iter([("201".to_string(), json!({ "description": "New shipment created in created state; failed shipments retain their lines and short deliveries include only undelivered quantities. Original history is preserved." })), ("200".to_string(), json!({ "description": "Existing retry shipment returned idempotently, including retries already completed or in progress" })), ("403".to_string(), err("Requires logistics.shipment.read and logistics.shipment.create")), ("404".to_string(), err("Logistics module is not enabled")), ("422".to_string(), err("Shipment is not failed or short-delivered, has no remaining lines, or its source order is no longer open"))]))
         } }),
     );
     paths.insert(

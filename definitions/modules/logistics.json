@@ -143,6 +143,14 @@
      "required": false
     },
     {
+     "name": "redelivery_of",
+     "label": "Vận đơn gốc",
+     "type": "ref",
+     "required": false,
+     "ref": "logistics.shipment",
+     "system": true
+    },
+    {
      "name": "weight",
      "type": "number",
      "required": false
