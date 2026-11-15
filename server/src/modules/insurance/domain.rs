@@ -184,6 +184,14 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
     if !patch.as_object().is_some_and(|patch| !patch.is_empty()) {
         return Vec::new();
     }
+    if entity == "policy"
+        && current.get("status").and_then(Value::as_str) == Some("active")
+        && patch
+            .as_object()
+            .is_some_and(|fields| fields.keys().all(|field| field == "cancellation_reason"))
+    {
+        return Vec::new();
+    }
     if entity == "claim"
         && let Some(reason) = patch.get("rejection_reason")
     {
