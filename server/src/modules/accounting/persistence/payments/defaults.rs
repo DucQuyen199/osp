@@ -29,7 +29,7 @@ pub(super) async fn validate(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> 
     } else if document.get("source").and_then(Value::as_str) == Some("expense_claim")
         || document.get("source").and_then(Value::as_str) == Some("payroll_run")
     {
-        &["111", "334"]
+        &[cash_code, "334"]
     } else {
         &[]
     };
