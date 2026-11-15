@@ -46,7 +46,7 @@ export default function HomePage({ summary }) {
       <div><strong>Tác vụ tích hợp cần xử lý</strong><p className="small">Mở danh sách tương ứng để xem chi tiết và xử lý.</p></div>
       <div className="row wrap">
         {failures > 0 && <a className="btn btn-sm" href="#/settings/failures">{failures} luồng lỗi cần xử lý</a>}
-        {dead > 0 && <a className="btn btn-sm" href="#/settings/outbox">{dead} webhook dead-letter</a>}
+        {dead > 0 && <a className="btn btn-sm" href="#/settings/outbox">{dead} giao nhận tích hợp lỗi</a>}
       </div>
     </div>}
     {total === 0

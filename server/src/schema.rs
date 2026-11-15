@@ -203,11 +203,16 @@ CREATE TABLE IF NOT EXISTS osp_outbox (
   locked_at timestamptz,
   delivered_at timestamptz,
   last_error text,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (tenant_id, webhook_id, event_id)
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS osp_outbox_ready ON osp_outbox (available_at, created_at) WHERE status IN ('pending', 'retry');
 CREATE INDEX IF NOT EXISTS osp_outbox_tenant_status ON osp_outbox (tenant_id, status, created_at DESC);
+ALTER TABLE osp_outbox ADD COLUMN IF NOT EXISTS destination_kind text NOT NULL DEFAULT 'webhook' CHECK (destination_kind IN ('webhook', 'connector'));
+ALTER TABLE osp_outbox ADD COLUMN IF NOT EXISTS destination_id uuid;
+UPDATE osp_outbox SET destination_id = webhook_id WHERE destination_id IS NULL;
+ALTER TABLE osp_outbox ALTER COLUMN destination_id SET NOT NULL;
+ALTER TABLE osp_outbox DROP CONSTRAINT IF EXISTS osp_outbox_tenant_id_webhook_id_event_id_key;
+CREATE UNIQUE INDEX IF NOT EXISTS osp_outbox_destination_event ON osp_outbox (tenant_id, destination_kind, destination_id, event_id);
 "#;
 
 const DOCUMENT_ATTACHMENTS_DDL: &str = r#"

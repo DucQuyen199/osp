@@ -159,10 +159,11 @@ curl -X POST $BASE/api/t/$T/data/sales/sales_order/bulk/confirmed \
 | `POST /modules/enable` `{ids[]}` · `POST /modules/disable` `{id}` | Bật (kéo theo phụ thuộc) / tắt module. Tắt không xóa dữ liệu; `409 HAS_DEPENDENTS` nếu module khác còn cần |
 | `POST /custom-fields` | `{entity, field}` — thêm trường mở rộng cho riêng tenant. `field` dạng `"ngay_sinh:date"`, `"xep_hang:enum:A\|B"`… |
 | `PATCH /settings` | Cập nhật cài đặt tenant. `{ "allowNegativeStock": false }` bật/tắt xuất âm; `{ "inventoryCostMethod": "fifo" }` hoặc `"moving_average"` chọn giá vốn. `{ "enforceBudgetControl": true }` yêu cầu ngân sách đã duyệt và chặn ghi sổ chi phí vượt kế hoạch (cần bật module `budget`). Phương pháp giá vốn khóa sau phiếu kho/tồn đầu kỳ đầu tiên; FIFO yêu cầu chặn tồn âm. |
-| `GET /outbox?status=dead` | Xem tối đa 200 webhook delivery theo trạng thái: `pending`, `processing`, `retry`, `delivered`, `dead`, `cancelled` |
+| `GET /outbox?status=dead` | Xem tối đa 200 webhook/connector delivery theo trạng thái: `pending`, `processing`, `retry`, `delivered`, `dead`, `cancelled`; mỗi dòng có `destinationKind` và `destinationId` |
 | `POST /outbox/:id/retry` · `POST /outbox/:id/dismiss` | Retry hoặc chuyển dead-letter sang cancelled |
+| `POST /webhooks/:id/test` · `POST /connectors/:id/test` | Gửi một payload thử có ký; trả về mã HTTP nhận được, yêu cầu `tenant.admin` |
 
-Webhook outbox được ghi cùng transaction phát event. Worker gửi HTTPS, không theo redirect, có timeout 15 giây, retry tối đa 8 lần với backoff; delivery không thành công được đưa vào dead-letter để quản trị viên xử lý. Request gửi `X-OSP-Event-Id`, `X-OSP-Event-Type`; nếu webhook có secret, `X-OSP-Signature` là `sha256=<hex HMAC-SHA256 của raw JSON body>`. Receiver nên dùng event ID để chống xử lý lặp khi mạng lỗi sau khi phía nhận đã ghi nhận.
+Webhook và connector outbox được ghi cùng transaction phát event. Worker gửi HTTPS, không theo redirect, có timeout 15 giây, retry tối đa 8 lần với backoff; delivery không thành công được đưa vào dead-letter để quản trị viên xử lý. Request gửi `X-OSP-Event-Id`, `X-OSP-Event-Type`; nếu endpoint có secret, `X-OSP-Signature` là `sha256=<hex HMAC-SHA256 của raw JSON body>`. HTTP connector được tạo với `config` gồm `adapter=http_event_sink`, HTTPS `url`, danh sách `events`, object `headers` và `secret` tùy chọn; secret/header nhạy cảm không được trả lại qua API. Receiver nên dùng event ID để chống xử lý lặp khi mạng lỗi sau khi phía nhận đã ghi nhận.
 
 (Tiền tố đầy đủ: `/api/t/:tid`.)
 

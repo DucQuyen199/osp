@@ -1408,6 +1408,11 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                 crate::modules::integration_hub::test_webhook(k, &actor, &t, id).await?,
             );
         }
+        (&Method::POST, ["connectors", id, "test"]) => {
+            return json_ok(
+                crate::modules::integration_hub::test_connector(k, &actor, &t, id).await?,
+            );
+        }
         (&Method::GET, ["audit"]) => {
             return json_ok(k.audit_log(&actor, &t, qnum("limit", 200)).await?);
         }

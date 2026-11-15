@@ -44,8 +44,31 @@ pub async fn enqueue_event(
             continue;
         }
         tx.execute(
-            "INSERT INTO osp_outbox (id, tenant_id, webhook_id, event_id, event_type, payload) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (tenant_id, webhook_id, event_id) DO NOTHING",
+            "INSERT INTO osp_outbox (id, tenant_id, webhook_id, event_id, event_type, payload, destination_kind, destination_id) VALUES ($1, $2, $3, $4, $5, $6, 'webhook', $3) ON CONFLICT (tenant_id, destination_kind, destination_id, event_id) DO NOTHING",
             &[&Uuid::new_v4(), &tenant.id, &webhook_id, &event_id, &event_type, &envelope],
+        )
+        .await?;
+    }
+    for row in tx
+        .query(
+            "SELECT id, config FROM integration_hub__connector WHERE tenant_id = $1 AND enabled = true",
+            &[&tenant.id],
+        )
+        .await?
+    {
+        let connector_id: Uuid = row.get(0);
+        let config: Option<Value> = row.get(1);
+        let Some(config) = config.filter(|config| {
+            config.get("adapter").and_then(Value::as_str) == Some("http_event_sink")
+        }) else {
+            continue;
+        };
+        if !subscribes_to(config.get("events"), event_type) {
+            continue;
+        }
+        tx.execute(
+            "INSERT INTO osp_outbox (id, tenant_id, webhook_id, event_id, event_type, payload, destination_kind, destination_id) VALUES ($1, $2, $3, $4, $5, $6, 'connector', $3) ON CONFLICT (tenant_id, destination_kind, destination_id, event_id) DO NOTHING",
+            &[&Uuid::new_v4(), &tenant.id, &connector_id, &event_id, &event_type, &envelope],
         )
         .await?;
     }
@@ -80,6 +103,14 @@ pub fn prepare_document(entity: &str, document: &mut Map<String, Value>) {
         "connector" => {
             trim_field(document, "kind");
             trim_field(document, "name");
+            if let Some(config) = document.get_mut("config").and_then(Value::as_object_mut) {
+                if let Some(raw) = config.get("url").and_then(Value::as_str) {
+                    if let Ok(url) = Url::parse(raw.trim()) {
+                        config.insert("url".into(), Value::String(url.to_string()));
+                    }
+                }
+                normalize_string_list(config, "events");
+            }
         }
         "api_key" => {
             trim_field(document, "name");
@@ -133,20 +164,7 @@ fn redact_config(value: &mut Value) {
                     .filter(|character| character.is_ascii_alphanumeric())
                     .flat_map(char::to_lowercase)
                     .collect::<String>();
-                if normalized == "key"
-                    || [
-                        "secret",
-                        "password",
-                        "token",
-                        "authorization",
-                        "apikey",
-                        "credential",
-                        "privatekey",
-                        "accesskey",
-                    ]
-                    .iter()
-                    .any(|marker| normalized.contains(marker))
-                {
+                if normalized == "key" || sensitive_config_key(&normalized) {
                     *value = json!("[redacted]");
                 } else if matches!(normalized.as_str(), "value" | "header")
                     && ["authorization", "cookie", "token", "secret", "api-key"]
@@ -162,6 +180,73 @@ fn redact_config(value: &mut Value) {
         Value::Array(items) => items.iter_mut().for_each(redact_config),
         _ => {}
     }
+}
+
+pub fn restore_redacted_credentials(current: Option<&Value>, replacement: &mut Value) {
+    if let Some(current) = current {
+        restore_redacted_config(current, replacement);
+    }
+}
+
+fn restore_redacted_config(current: &Value, replacement: &mut Value) {
+    match (current, replacement) {
+        (Value::Object(current), Value::Object(replacement)) => {
+            let header_name = replacement
+                .get("name")
+                .or_else(|| replacement.get("key"))
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_ascii_lowercase();
+            for (key, value) in replacement {
+                let Some(previous) = current.get(key) else {
+                    continue;
+                };
+                let normalized = key
+                    .chars()
+                    .filter(|character| character.is_ascii_alphanumeric())
+                    .flat_map(char::to_lowercase)
+                    .collect::<String>();
+                let sensitive_header_value = matches!(normalized.as_str(), "value" | "header")
+                    && ["authorization", "cookie", "token", "secret", "api-key"]
+                        .iter()
+                        .any(|marker| header_name.contains(marker));
+                if (normalized == "key"
+                    || sensitive_config_key(&normalized)
+                    || sensitive_header_value)
+                    && value.as_str() == Some("[redacted]")
+                {
+                    *value = previous.clone();
+                } else {
+                    restore_redacted_config(previous, value);
+                }
+            }
+        }
+        (Value::Array(current), Value::Array(replacement)) => {
+            for (previous, value) in current.iter().zip(replacement.iter_mut()) {
+                restore_redacted_config(previous, value);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn sensitive_config_key(normalized: &str) -> bool {
+    [
+        "secret",
+        "password",
+        "token",
+        "authorization",
+        "apikey",
+        "credential",
+        "privatekey",
+        "accesskey",
+        "signingkey",
+        "sessionid",
+        "cookie",
+        "bearer",
+    ]
+    .iter()
+    .any(|marker| normalized.contains(marker))
 }
 
 fn trim_field(document: &mut Map<String, Value>, field: &str) {

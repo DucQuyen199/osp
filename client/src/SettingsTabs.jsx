@@ -4,7 +4,7 @@ const TABS = [
   ['currency', 'Currency'],
   ['users', 'Người dùng'], ['roles', 'Vai trò'], ['modules', 'Module'], ['fields', 'Trường mở rộng'],
   ['inventory', 'Kho'], ['budget', 'Ngân sách'], ['data', 'Dữ liệu'], ['tokens', 'API token'], ['audit', 'Nhật ký'],
-  ['failures', 'Lỗi tích hợp'], ['outbox', 'Webhook outbox'],
+  ['failures', 'Lỗi tích hợp'], ['outbox', 'Outbox tích hợp'],
 ];
 
 export default function SettingsTabs({ active }) {

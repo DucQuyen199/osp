@@ -37,6 +37,15 @@ impl Kernel {
             .get_row(tx, t, &qname, id)
             .await?
             .ok_or_else(|| ApiError::not_found(format!("Không tìm thấy {qname} {id}")))?;
+        if qname == "integration-hub.connector"
+            && let (Some(previous), Some(replacement)) =
+                (cur.get("config"), patch.get_mut("config"))
+        {
+            crate::modules::integration_hub::restore_redacted_credentials(
+                Some(previous),
+                replacement,
+            );
+        }
         let domain_errors = if matches!(actor, Actor::System) {
             Vec::new()
         } else {

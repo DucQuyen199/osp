@@ -6,6 +6,7 @@ use crate::{
 };
 use futures::{StreamExt, stream};
 use hmac::{Hmac, KeyInit, Mac};
+use reqwest::header::{HeaderName, HeaderValue};
 use reqwest::redirect::Policy;
 use serde_json::{Value, json};
 use sha2::Sha256;
@@ -23,7 +24,8 @@ const MAX_ATTEMPTS: i32 = 8;
 struct Delivery {
     id: Uuid,
     tenant_id: String,
-    webhook_id: Uuid,
+    destination_kind: String,
+    destination_id: Uuid,
     event_type: String,
     payload: Value,
     attempts: i32,
@@ -33,6 +35,7 @@ struct Destination {
     url: String,
     secret: Option<String>,
     events: Option<Value>,
+    headers: Vec<(String, String)>,
 }
 
 /// Claim and deliver one bounded batch. The function can be called by the
@@ -76,13 +79,95 @@ pub async fn test_webhook(
         url: row.get(0),
         secret: row.get(1),
         events: None,
+        headers: Vec::new(),
     };
+    send_test(
+        tenant,
+        destination,
+        webhook_id,
+        "osp.webhook.test",
+        "OSP webhook connectivity test",
+    )
+    .await
+}
+
+pub async fn test_connector(
+    kernel: &Kernel,
+    actor: &Actor,
+    tenant: &Tenant,
+    connector_id: &str,
+) -> R<Value> {
+    kernel.authorize(tenant, actor, "tenant.admin")?;
+    let connector_id = Uuid::parse_str(connector_id)
+        .map_err(|_| ApiError::not_found("Connector configuration not found"))?;
+    let mut conn = kernel.pool.get().await?;
+    let tx = Tx::begin(&mut conn, &tenant.id, false).await?;
+    let row = tx
+        .query_opt(
+            "SELECT config FROM integration_hub__connector WHERE tenant_id = $1 AND id = $2",
+            &[&tenant.id, &connector_id],
+        )
+        .await?;
+    tx.commit().await?;
+    let row = row.ok_or_else(|| ApiError::not_found("Connector configuration not found"))?;
+    let config: Option<Value> = row.get(0);
+    let config = config
+        .filter(|value| value.get("adapter").and_then(Value::as_str) == Some("http_event_sink"))
+        .ok_or_else(|| {
+            ApiError::validation(
+                "integration-hub.connector",
+                vec!["Connector does not have a supported HTTP event adapter".into()],
+            )
+        })?;
+    let destination = Destination {
+        url: config
+            .get("url")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        secret: config
+            .get("secret")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        events: config.get("events").cloned(),
+        headers: config
+            .get("headers")
+            .and_then(Value::as_object)
+            .map(|headers| {
+                headers
+                    .iter()
+                    .filter_map(|(name, value)| {
+                        value
+                            .as_str()
+                            .map(|value| (name.clone(), value.to_string()))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default(),
+    };
+    send_test(
+        tenant,
+        destination,
+        connector_id,
+        "osp.connector.test",
+        "OSP connector connectivity test",
+    )
+    .await
+}
+
+async fn send_test(
+    tenant: &Tenant,
+    destination: Destination,
+    destination_id: Uuid,
+    event_type: &str,
+    message: &str,
+) -> R<Value> {
     let event_id = Uuid::new_v4();
-    let event_type = "osp.webhook.test";
     let delivery = Delivery {
         id: Uuid::new_v4(),
         tenant_id: tenant.id.clone(),
-        webhook_id,
+        destination_kind: "webhook".into(),
+        destination_id,
         event_type: event_type.into(),
         payload: json!({
             "id": event_id,
@@ -92,13 +177,13 @@ pub async fn test_webhook(
             "depth": 0,
             "recordId": null,
             "causationId": null,
-            "data": { "test": true, "message": "OSP webhook connectivity test" },
+            "data": { "test": true, "message": message },
         }),
         attempts: 1,
     };
     let status = send(&destination, &delivery)
         .await
-        .map_err(|failure| ApiError::new(502, "WEBHOOK_TEST_FAILED", failure.message))?;
+        .map_err(|failure| ApiError::new(502, "INTEGRATION_TEST_FAILED", failure.message))?;
     Ok(json!({ "ok": true, "status": status, "eventType": event_type, "eventId": event_id }))
 }
 
@@ -121,7 +206,7 @@ pub async fn list_deliveries(
     }
     let conn = kernel.pool.get().await?;
     let rows = conn.query(
-        "SELECT jsonb_build_object('id', id, 'webhookId', webhook_id, 'eventId', event_id, 'eventType', event_type, 'status', status, 'attempts', attempts, 'error', last_error, 'createdAt', created_at, 'deliveredAt', delivered_at) FROM osp_outbox WHERE tenant_id = $1 AND status = $2 ORDER BY created_at DESC LIMIT 200",
+        "SELECT jsonb_build_object('id', id, 'webhookId', webhook_id, 'destinationKind', destination_kind, 'destinationId', destination_id, 'eventId', event_id, 'eventType', event_type, 'status', status, 'attempts', attempts, 'error', last_error, 'createdAt', created_at, 'deliveredAt', delivered_at) FROM osp_outbox WHERE tenant_id = $1 AND status = $2 ORDER BY created_at DESC LIMIT 200",
         &[&tenant.id, &status],
     ).await?;
     Ok(Value::Array(
@@ -183,7 +268,7 @@ async fn claim(kernel: &Kernel) -> R<Vec<Delivery>> {
              UPDATE osp_outbox o \
              SET status = 'processing', attempts = o.attempts + 1, locked_at = now() \
              FROM ready WHERE o.id = ready.id \
-             RETURNING o.id, o.tenant_id, o.webhook_id, o.event_type, o.payload, o.attempts",
+             RETURNING o.id, o.tenant_id, o.destination_kind, o.destination_id, o.event_type, o.payload, o.attempts",
             &[&BATCH_SIZE],
         )
         .await?;
@@ -193,10 +278,11 @@ async fn claim(kernel: &Kernel) -> R<Vec<Delivery>> {
         .map(|row| Delivery {
             id: row.get(0),
             tenant_id: row.get(1),
-            webhook_id: row.get(2),
-            event_type: row.get(3),
-            payload: row.get(4),
-            attempts: row.get(5),
+            destination_kind: row.get(2),
+            destination_id: row.get(3),
+            event_type: row.get(4),
+            payload: row.get(5),
+            attempts: row.get(6),
         })
         .collect())
 }
@@ -226,18 +312,50 @@ async fn load_destination(kernel: &Kernel, delivery: &Delivery) -> R<Option<Dest
     }
     let mut conn = kernel.pool.get().await?;
     let tx = Tx::begin(&mut conn, &delivery.tenant_id, false).await?;
-    let row = tx
-        .query_opt(
-            "SELECT url, secret, events FROM integration_hub__webhook WHERE tenant_id = $1 AND id = $2 AND active = true",
-            &[&delivery.tenant_id, &delivery.webhook_id],
-        )
-        .await?;
+    let destination = match delivery.destination_kind.as_str() {
+        "webhook" => tx
+            .query_opt(
+                "SELECT url, secret, events FROM integration_hub__webhook WHERE tenant_id = $1 AND id = $2 AND active = true",
+                &[&delivery.tenant_id, &delivery.destination_id],
+            )
+            .await?
+            .map(|row| Destination {
+                url: row.get(0),
+                secret: row.get(1),
+                events: row.get(2),
+                headers: Vec::new(),
+            }),
+        "connector" => tx
+            .query_opt(
+                "SELECT config FROM integration_hub__connector WHERE tenant_id = $1 AND id = $2 AND enabled = true",
+                &[&delivery.tenant_id, &delivery.destination_id],
+            )
+            .await?
+            .and_then(|row| {
+                let config: Option<Value> = row.get(0);
+                config.filter(|value| value.get("adapter").and_then(Value::as_str) == Some("http_event_sink"))
+            })
+            .map(|config| Destination {
+                url: config.get("url").and_then(Value::as_str).unwrap_or_default().to_string(),
+                secret: config.get("secret").and_then(Value::as_str).map(str::to_string),
+                events: config.get("events").cloned(),
+                headers: config
+                    .get("headers")
+                    .and_then(Value::as_object)
+                    .map(|headers| {
+                        headers
+                            .iter()
+                            .filter_map(|(name, value)| {
+                                value.as_str().map(|value| (name.clone(), value.to_string()))
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+            }),
+        _ => None,
+    };
     tx.commit().await?;
-    Ok(row.map(|row| Destination {
-        url: row.get(0),
-        secret: row.get(1),
-        events: row.get(2),
-    }))
+    Ok(destination)
 }
 
 async fn send(destination: &Destination, delivery: &Delivery) -> Result<u16, Failure> {
@@ -291,6 +409,24 @@ async fn send(destination: &Destination, delivery: &Delivery) -> Result<u16, Fai
             delivery.payload["id"].as_str().unwrap_or_default(),
         )
         .header("X-OSP-Event-Type", &delivery.event_type);
+    for (name, value) in &destination.headers {
+        let lower = name.to_ascii_lowercase();
+        if lower.starts_with("x-osp-")
+            || matches!(
+                lower.as_str(),
+                "host" | "content-length" | "content-type" | "transfer-encoding" | "connection"
+            )
+        {
+            return Err(Failure::permanent(
+                "connector config contains an invalid or reserved HTTP header",
+            ));
+        }
+        let name = HeaderName::from_bytes(name.as_bytes())
+            .map_err(|_| Failure::permanent("connector has an invalid HTTP header name"))?;
+        let value = HeaderValue::from_str(value)
+            .map_err(|_| Failure::permanent("connector has an invalid HTTP header value"))?;
+        request = request.header(name, value);
+    }
     if let Some(secret) = destination
         .secret
         .as_deref()

@@ -1,6 +1,6 @@
 //! Pure configuration invariants for external integration records.
 use serde_json::Value;
-use std::net::IpAddr;
+use std::{collections::HashSet, net::IpAddr};
 use url::Url;
 
 pub fn validate(entity: &str, document: &Value) -> Vec<String> {
@@ -12,11 +12,18 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
     }
 }
 
-pub fn validate_update(entity: &str, _current: &Value, patch: &Value) -> Vec<String> {
+pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<String> {
     if !matches!(entity, "webhook" | "connector" | "api_key") {
         return Vec::new();
     }
-    validate(entity, patch)
+    if entity != "connector" {
+        return validate(entity, patch);
+    }
+    let mut merged = current.clone();
+    if let (Some(current), Some(patch)) = (merged.as_object_mut(), patch.as_object()) {
+        current.extend(patch.clone());
+    }
+    validate(entity, &merged)
 }
 
 fn validate_webhook(document: &Value) -> Vec<String> {
@@ -78,7 +85,109 @@ fn validate_connector(document: &Value) -> Vec<String> {
             errors.push("Connector name must contain 1 to 120 characters".into());
         }
     }
+    let enabled = document
+        .get("enabled")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let config = document.get("config").filter(|value| !value.is_null());
+    if let Some(config) = config {
+        if !config.is_object() {
+            errors.push("Connector configuration must be an object".into());
+        } else if enabled {
+            if config.get("adapter").and_then(Value::as_str) == Some("http_event_sink") {
+                validate_http_event_sink(config, &mut errors);
+            } else {
+                errors.push(
+                    "Enabled connectors must use the supported http_event_sink adapter".into(),
+                );
+            }
+        }
+    } else if enabled {
+        errors
+            .push("An enabled connector requires the http_event_sink adapter configuration".into());
+    }
     errors
+}
+
+fn validate_http_event_sink(config: &Value, errors: &mut Vec<String>) {
+    match config.get("url").and_then(Value::as_str) {
+        Some(raw) => match Url::parse(raw.trim()) {
+            Ok(url) => {
+                if url.scheme() != "https"
+                    || url.host_str().is_none()
+                    || !url.username().is_empty()
+                    || url.password().is_some()
+                    || url.fragment().is_some()
+                    || is_local_host(&url)
+                {
+                    errors.push("HTTP connector URL must be a public HTTPS URL without embedded credentials or fragments".into());
+                }
+            }
+            Err(_) => errors.push("HTTP connector URL must be a valid absolute URL".into()),
+        },
+        None => errors.push("HTTP connector requires a URL".into()),
+    }
+    match config.get("events").and_then(Value::as_array) {
+        Some(events) if !events.is_empty() && events.len() <= 100 => {
+            for (index, event) in events.iter().enumerate() {
+                if !event.as_str().is_some_and(valid_event_type) {
+                    errors.push(format!("events[{}] must be a valid event name", index + 1));
+                }
+            }
+        }
+        Some(_) => errors.push("HTTP connector must subscribe to 1 to 100 event types".into()),
+        None => errors.push("HTTP connector events must be a list of event names".into()),
+    }
+    if let Some(secret) = config.get("secret").and_then(Value::as_str) {
+        if !secret.is_empty() && !(16..=256).contains(&secret.len()) {
+            errors.push("HTTP connector signing secret must contain 16 to 256 bytes".into());
+        }
+    }
+    if let Some(headers) = config.get("headers").filter(|value| !value.is_null()) {
+        match headers.as_object() {
+            Some(headers) if headers.len() <= 32 => {
+                let mut seen = HashSet::with_capacity(headers.len());
+                for (name, value) in headers {
+                    let valid_name = !name.is_empty()
+                        && name.len() <= 128
+                        && name.bytes().all(|byte| {
+                            byte.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&byte)
+                        });
+                    let lower = name.to_ascii_lowercase();
+                    if !seen.insert(lower.clone()) {
+                        errors.push(format!(
+                            "HTTP connector header {name} duplicates another header"
+                        ));
+                    }
+                    if !valid_name
+                        || lower.starts_with("x-osp-")
+                        || matches!(
+                            lower.as_str(),
+                            "host"
+                                | "content-length"
+                                | "content-type"
+                                | "transfer-encoding"
+                                | "connection"
+                        )
+                    {
+                        errors.push(format!(
+                            "HTTP connector header name {name} is invalid or reserved"
+                        ));
+                    }
+                    if !value.as_str().is_some_and(|value| {
+                        value.len() <= 8192
+                            && value
+                                .bytes()
+                                .all(|byte| byte == b'\t' || (0x20..=0x7e).contains(&byte))
+                    }) {
+                        errors.push(format!("HTTP connector header {name} must be a string without line breaks and at most 8192 bytes"));
+                    }
+                }
+            }
+            Some(_) => errors.push("HTTP connector can configure at most 32 headers".into()),
+            None => errors.push("HTTP connector headers must be an object of string values".into()),
+        }
+    }
 }
 
 fn validate_api_key(document: &Value) -> Vec<String> {
@@ -114,12 +223,17 @@ fn valid_event_type(value: &str) -> bool {
     if value == "*" {
         return true;
     }
+    let parts: Vec<&str> = value.split('.').collect();
     value.len() <= 128
-        && value.split('.').count() >= 3
-        && value.split('.').enumerate().all(|(index, part)| {
-            (part == "*" && index == value.split('.').count() - 1)
-                || (!part.is_empty() && part.bytes().all(event_byte))
+        && parts.len() >= 2
+        && parts.iter().enumerate().all(|(index, part)| {
+            if *part == "*" {
+                index == parts.len() - 1
+            } else {
+                !part.is_empty() && part.bytes().all(event_byte)
+            }
         })
+        && (parts.len() >= 3 || parts.last() == Some(&"*"))
 }
 
 fn event_byte(byte: u8) -> bool {
