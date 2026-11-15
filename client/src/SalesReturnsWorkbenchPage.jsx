@@ -88,7 +88,7 @@ export default function SalesReturnsWorkbenchPage() {
     const requiresDelivery = logisticsEnabled && Boolean(order?.shipping_address?.trim());
     return [...groups.values()].map((line) => {
       const delivered = requiresDelivery
-        ? shipmentsFor(order).filter((shipment) => shipment.status === 'delivered').flatMap((shipment) => shipment.lines || []).filter((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && Math.abs(Number(item.price || 0) - line.price) <= .005).reduce((sum, item) => sum + Number(item.qty || 0), 0)
+        ? shipmentsFor(order).filter((shipment) => shipment.status === 'delivered').flatMap((shipment) => shipment.delivered_lines || shipment.lines || []).filter((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && Math.abs(Number(item.price || 0) - line.price) <= .005).reduce((sum, item) => sum + Number(item.qty || 0), 0)
         : line.ordered;
       const reserved = returns.filter((row) => row.sales_order === order.id && ['submitted','approved','received'].includes(row.status)).flatMap((row) => row.lines || []).filter((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && Math.abs(Number(item.price || 0) - line.price) <= .005).reduce((sum, item) => sum + Number(item.qty || 0), 0);
       return { ...line, delivered: Math.min(line.ordered, delivered), remaining: Math.max(0, Math.min(line.ordered, delivered) - reserved) };

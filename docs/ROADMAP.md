@@ -23,7 +23,8 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Lệnh sản xuất theo dõi sản lượng đạt/phế phẩm riêng trong QC; thành phẩm theo dõi lô nhận mã lô và hạn dùng được liên kết tới phiếu QC và tồn kho.
 - Sửa hàng lỗi sản xuất theo lệnh rework: bổ sung chi phí BOM vào WIP của lệnh gốc, khóa trùng lệnh đang chạy, kiểm tra lại QC sau sửa và đóng NC liên quan khi đạt.
 - Các ngày mặc định trong những màn hình kế toán, ngân hàng, mua hàng, nhân sự, nhà thuốc, xây dựng, lưu trú và các ngành khác dùng ngày lịch địa phương thay vì UTC để tránh lệch ngày quanh nửa đêm.
-- Bàn bán buôn cho phép lập thêm vận đơn theo số lượng còn lại, tính cả chuyến nháp/đang giao/đã giao và loại phần giao thất bại khỏi lượng đã phân công.
+- Luồng logistics hỗ trợ xác nhận số lượng thực nhận theo từng dòng và lưu lý do giao thiếu; tồn kho, tiến độ đơn bán, quyền trả hàng và lượng còn có thể giao tiếp đều tính theo số thực nhận.
+- Bàn bán buôn cho phép lập thêm vận đơn theo số lượng còn lại, tính cả chuyến nháp/đang giao và số đã giao thực tế; phần giao thất bại hoặc giao thiếu được giải phóng để giao lại.
 - Lịch hẹn ở trạng thái yêu cầu tính lại giờ kết thúc và giá mặc định khi đổi dịch vụ hoặc giờ bắt đầu; khung giờ mới tiếp tục qua kiểm tra khóa tài nguyên và trùng lịch.
 - Lễ tân khách sạn có thể gia hạn ngày trả cho khách đang lưu trú; máy chủ khóa thông tin khách/phòng/giá, kiểm tra chồng lịch và sức chứa, rồi tính lại số đêm cùng folio theo giá đã chốt.
 - Xưởng sửa chữa lưu trạng thái khách từ chối báo giá kèm lý do; lệnh được giữ làm lịch sử nhưng không còn khóa xe, xuất phụ tùng hay lập hóa đơn.

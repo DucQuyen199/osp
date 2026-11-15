@@ -65,8 +65,38 @@ export default function LogisticsDeliveryBoardPage() {
     const proof = deliveryProof[shipment.id] || {};
     const receivedBy = proof.receivedBy?.trim() || '';
     const evidence = proof.evidence?.trim() || '';
+    const lines = shipment.lines || [];
+    const deliveredLines = lines.map((line, index) => {
+      const shippedQty = Number(line.qty || 0);
+      const receivedQty = Number(proof.deliveredQuantities?.[index] ?? shippedQty);
+      const ratio = shippedQty > 0 ? receivedQty / shippedQty : 0;
+      const shipmentLine = { ...line };
+      delete shipmentLine.productName;
+      return {
+        ...shipmentLine,
+        qty: receivedQty,
+        ...(line.base_qty != null ? { base_qty: Number((Number(line.base_qty) * ratio).toFixed(12)) } : {}),
+      };
+    }).filter((line) => line.qty > 0);
+    const invalidQuantity = lines.some((line, index) => {
+      const shippedQty = Number(line.qty || 0);
+      const receivedQty = Number(proof.deliveredQuantities?.[index] ?? shippedQty);
+      return !Number.isFinite(receivedQty) || receivedQty < 0 || receivedQty > shippedQty;
+    });
+    const hasShortDelivery = lines.some((line, index) =>
+      Number(proof.deliveredQuantities?.[index] ?? line.qty ?? 0) + 0.000001 < Number(line.qty || 0),
+    );
+    const shortReason = proof.shortDeliveryReason?.trim() || '';
     if (!receivedBy && !evidence) {
       setError('Nhập tên người nhận hoặc mã/bằng chứng giao hàng trước khi xác nhận.');
+      return;
+    }
+    if (!deliveredLines.length || invalidQuantity) {
+      setError('Số lượng giao thực tế phải hợp lệ và không vượt số lượng trên vận đơn.');
+      return;
+    }
+    if (hasShortDelivery && (shortReason.length < 5 || shortReason.length > 500)) {
+      setError('Giao thiếu cần lý do từ 5 đến 500 ký tự.');
       return;
     }
     const key = `${shipment.id}:delivered`;
@@ -78,6 +108,8 @@ export default function LogisticsDeliveryBoardPage() {
         body: {
           ...(receivedBy ? { received_by: receivedBy } : {}),
           ...(evidence ? { delivery_evidence: evidence } : {}),
+          delivered_lines: deliveredLines,
+          ...(hasShortDelivery ? { short_delivery_reason: shortReason } : {}),
         },
       });
       setDeliveryProof((current) => { const next = { ...current }; delete next[shipment.id]; return next; });
@@ -121,6 +153,14 @@ export default function LogisticsDeliveryBoardPage() {
     {shipment.failureReason && <div className="alert danger delivery-alert">{shipment.failureReason}</div>}
     {shipment.lastTrackingEvent && <div className="small delivery-tracking"><strong>{statusLabel(shipment.lastTrackingEvent)}</strong>{shipment.lastTrackingLocation && ` · ${shipment.lastTrackingLocation}`}{shipment.lastTrackingAt && ` · ${fmtDateTime(shipment.lastTrackingAt)}`}</div>}
     {shipment.status === 'dispatched' && can('logistics.shipment.delivered') && <div className="delivery-proof" role="group" aria-label="Bằng chứng giao hàng">
+      <div className="delivery-proof-lines">
+        <strong>Số lượng thực nhận theo vận đơn</strong>
+        {(shipment.lines || []).map((line, index) => <label className="field" key={`${line.product || 'line'}-${index}`}>
+          <span>{line.productName || line.name || line.product || `Mặt hàng ${index + 1}`} · đã điều phối {line.qty} {line.uom_name || ''}</span>
+          <input className="input num" aria-label={`Số lượng thực nhận dòng ${index + 1}`} type="number" min="0" max={line.qty} step="any" value={deliveryProof[shipment.id]?.deliveredQuantities?.[index] ?? line.qty} onChange={(event) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], deliveredQuantities: { ...current[shipment.id]?.deliveredQuantities, [index]: event.target.value } } }))}/>
+        </label>)}
+      </div>
+      {(shipment.lines || []).some((line, index) => Number(deliveryProof[shipment.id]?.deliveredQuantities?.[index] ?? line.qty ?? 0) + 0.000001 < Number(line.qty || 0)) && <label className="field"><span>Lý do giao thiếu (bắt buộc, 5–500 ký tự)</span><textarea className="input" rows="2" maxLength="500" value={deliveryProof[shipment.id]?.shortDeliveryReason || ''} onChange={(event) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], shortDeliveryReason: event.target.value } }))}/></label>}
       <label className="field"><span>Người nhận hàng (nếu có)</span><input className="input" maxLength="160" value={deliveryProof[shipment.id]?.receivedBy || ''} onChange={(event) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], receivedBy: event.target.value } }))}/></label>
       <label className="field"><span>Mã POD / bằng chứng giao hàng</span><input className="input" maxLength="1000" value={deliveryProof[shipment.id]?.evidence || ''} onChange={(event) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], evidence: event.target.value } }))}/></label>
       <p className="small muted">Điền tên người nhận hoặc mã tham chiếu/bằng chứng từ đơn vị vận chuyển.</p>

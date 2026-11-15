@@ -102,7 +102,7 @@ async fn validate_sales_shipment_quantities(
     }
     let current_id = id(document, "id").unwrap_or(Uuid::nil());
     let prior_rows = tx.query(
-        "SELECT lines FROM logistics__shipment WHERE tenant_id = $1 AND source = 'sales_order' AND source_id = $2 AND id <> $3 AND status IN ('created', 'dispatched', 'delivered') FOR UPDATE",
+        "SELECT CASE WHEN status = 'delivered' THEN COALESCE(delivered_lines, lines) ELSE lines END FROM logistics__shipment WHERE tenant_id = $1 AND source = 'sales_order' AND source_id = $2 AND id <> $3 AND status IN ('created', 'dispatched', 'delivered') FOR UPDATE",
         &[&tenant.id, &order_id.to_string(), &current_id],
     ).await?;
     let mut reserved = HashMap::<(String, PriceBucket), Decimal>::new();

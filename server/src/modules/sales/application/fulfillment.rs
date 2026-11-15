@@ -56,7 +56,7 @@ pub(in crate::modules::sales) async fn all_order_quantities_delivered(
 ) -> R<bool> {
     let ordered = shipment_quantities(order_lines)?;
     let delivered_rows = tx.query(
-        "SELECT lines FROM logistics__shipment WHERE tenant_id = $1 AND source = 'sales_order' AND source_id = $2 AND status = 'delivered'",
+        "SELECT COALESCE(delivered_lines, lines) FROM logistics__shipment WHERE tenant_id = $1 AND source = 'sales_order' AND source_id = $2 AND status = 'delivered'",
         &[&tenant.id, &order_id.to_string()],
     ).await?;
     let mut delivered = HashMap::<(String, PriceBucket), Decimal>::new();
@@ -85,7 +85,7 @@ pub(in crate::modules::sales) async fn has_delivered_order_quantities(
     order_id: Uuid,
 ) -> R<bool> {
     let rows = tx.query(
-        "SELECT lines FROM logistics__shipment WHERE tenant_id = $1 AND source = 'sales_order' AND source_id = $2 AND status = 'delivered'",
+        "SELECT COALESCE(delivered_lines, lines) FROM logistics__shipment WHERE tenant_id = $1 AND source = 'sales_order' AND source_id = $2 AND status = 'delivered'",
         &[&tenant.id, &order_id.to_string()],
     ).await?;
     for row in rows {

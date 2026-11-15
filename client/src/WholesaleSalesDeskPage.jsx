@@ -141,7 +141,7 @@ export default function WholesaleSalesDeskPage() {
     const requiresDelivery = app.meta?.modules?.some((module) => module.id === 'logistics') && Boolean(order.shipping_address?.trim());
     return [...groups.values()].map((line) => {
       const eligible = requiresDelivery
-        ? shipmentForOrder(order).filter((shipment) => shipment.status === 'delivered').flatMap((shipment) => shipment.lines || []).filter((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && Math.abs(Number(item.price || 0) - line.price) <= .005).reduce((sum, item) => sum + Number(item.qty || 0), 0)
+        ? shipmentForOrder(order).filter((shipment) => shipment.status === 'delivered').flatMap((shipment) => shipment.delivered_lines || shipment.lines || []).filter((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && Math.abs(Number(item.price || 0) - line.price) <= .005).reduce((sum, item) => sum + Number(item.qty || 0), 0)
         : line.ordered;
       const alreadyReturned = returns.filter((record) => record.sales_order === order.id && ['submitted', 'approved', 'received'].includes(record.status)).flatMap((record) => record.lines || []).filter((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && Math.abs(Number(item.price || 0) - line.price) <= .005).reduce((sum, item) => sum + Number(item.qty || 0), 0);
       return { ...line, eligible, remaining: Math.max(0, eligible - alreadyReturned) };
@@ -162,7 +162,8 @@ export default function WholesaleSalesDeskPage() {
     }
     const reserved = new Map();
     for (const shipment of shipmentForOrder(order).filter((row) => ['created', 'dispatched', 'delivered'].includes(row.status))) {
-      for (const line of shipment.lines || []) {
+      const reservedLines = shipment.status === 'delivered' ? (shipment.delivered_lines || shipment.lines || []) : (shipment.lines || []);
+      for (const line of reservedLines) {
         const key = `${line.product}:${Number(line.price || 0).toFixed(2)}:${line.uom || products.get(line.product)?.uom || ''}`;
         reserved.set(key, (reserved.get(key) || 0) + Number(line.qty || 0));
       }

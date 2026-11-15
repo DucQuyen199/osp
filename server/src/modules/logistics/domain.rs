@@ -2,6 +2,7 @@
 use crate::money;
 use rust_decimal::Decimal;
 use serde_json::Value;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 pub(super) fn number(document: &Value, field: &str) -> Option<Decimal> {
@@ -13,6 +14,74 @@ pub(super) fn id(document: &Value, field: &str) -> Option<Uuid> {
         .get(field)
         .and_then(Value::as_str)
         .and_then(|value| Uuid::parse_str(value).ok())
+}
+
+fn shipment_quantities(
+    lines: &Value,
+) -> Option<HashMap<(String, Decimal, Option<String>), Decimal>> {
+    let mut quantities = HashMap::new();
+    for line in lines.as_array()? {
+        if matches!(
+            line.get("kind").and_then(Value::as_str),
+            Some("service" | "digital")
+        ) {
+            continue;
+        }
+        let product = line.get("product").and_then(Value::as_str)?;
+        let price = number(line, "price")?.round_dp(2);
+        let qty = number(line, "qty")?;
+        if product.is_empty() || price < Decimal::ZERO || qty <= Decimal::ZERO {
+            return None;
+        }
+        let unit = line.get("uom").and_then(Value::as_str).map(str::to_owned);
+        let total = quantities
+            .entry((product.to_owned(), price, unit))
+            .or_insert(Decimal::ZERO);
+        *total = total.checked_add(qty)?;
+    }
+    Some(quantities)
+}
+
+pub(super) fn normalize_delivered_lines(shipped: &Value, delivered: &Value) -> Option<Value> {
+    let mut remaining = shipment_quantities(delivered)?;
+    let mut normalized = Vec::new();
+    for line in shipped.as_array()? {
+        if matches!(
+            line.get("kind").and_then(Value::as_str),
+            Some("service" | "digital")
+        ) {
+            continue;
+        }
+        let product = line.get("product").and_then(Value::as_str)?;
+        let price = number(line, "price")?.round_dp(2);
+        let shipped_qty = number(line, "qty")?;
+        let unit = line.get("uom").and_then(Value::as_str).map(str::to_owned);
+        let key = (product.to_owned(), price, unit);
+        let delivered_qty = remaining
+            .get_mut(&key)
+            .map(|qty| {
+                let applied = (*qty).min(shipped_qty);
+                *qty -= applied;
+                applied
+            })
+            .unwrap_or_default();
+        if delivered_qty <= Decimal::ZERO {
+            continue;
+        }
+        let mut line = line.clone();
+        line["qty"] = money::json_number(delivered_qty)?;
+        if let Some(base_qty) = line.get("base_qty").and_then(money::decimal) {
+            let normalized_base_qty = base_qty
+                .checked_mul(delivered_qty)?
+                .checked_div(shipped_qty)?;
+            line["base_qty"] = money::json_number(normalized_base_qty)?;
+        }
+        normalized.push(line);
+    }
+    if remaining.values().any(|qty| *qty > Decimal::new(1, 6)) || normalized.is_empty() {
+        return None;
+    }
+    Some(Value::Array(normalized))
 }
 
 pub fn validate(entity: &str, document: &Value) -> Vec<String> {
@@ -179,6 +248,45 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
             .is_some_and(|value| value.chars().count() > 1000)
         {
             errors.push("Bằng chứng giao hàng không được vượt quá 1000 ký tự".into());
+        }
+        let shipment = document.get("lines").and_then(shipment_quantities);
+        let delivered_lines = document
+            .get("delivered_lines")
+            .filter(|value| !value.is_null())
+            .or_else(|| document.get("lines"));
+        let delivered = delivered_lines.and_then(shipment_quantities);
+        match (shipment, delivered) {
+            (Some(shipment), Some(delivered)) if !delivered.is_empty() => {
+                if delivered.iter().any(|(key, qty)| {
+                    shipment
+                        .get(key)
+                        .copied()
+                        .unwrap_or_default()
+                        .checked_add(Decimal::new(1, 6))
+                        .is_none_or(|limit| *qty > limit)
+                }) {
+                    errors.push("Số lượng giao thực tế không được vượt số lượng vận đơn".into());
+                }
+                let partial = shipment.iter().any(|(key, qty)| {
+                    delivered
+                        .get(key)
+                        .copied()
+                        .unwrap_or_default()
+                        .checked_add(Decimal::new(1, 6))
+                        .is_some_and(|received| received < *qty)
+                });
+                if partial
+                    && document
+                        .get("short_delivery_reason")
+                        .and_then(Value::as_str)
+                        .is_none_or(|reason| !(5..=500).contains(&reason.trim().chars().count()))
+                {
+                    errors.push("Giao thiếu cần lý do từ 5 đến 500 ký tự".into());
+                }
+            }
+            _ => {
+                errors.push("Cần ghi số lượng giao thực tế hợp lệ cho ít nhất một dòng hàng".into())
+            }
         }
         if !errors.is_empty() {
             return errors;

@@ -171,6 +171,18 @@
      "system": true
     },
     {
+     "name": "delivered_lines",
+     "type": "json",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "short_delivery_reason",
+     "type": "text",
+     "required": false,
+     "system": true
+    },
+    {
      "name": "status",
      "type": "enum",
      "required": false,

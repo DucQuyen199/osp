@@ -30,13 +30,35 @@ impl Kernel {
             "delivered_at".into(),
             json!(chrono::Utc::now().to_rfc3339()),
         );
-        for field in ["received_by", "delivery_evidence"] {
+        for field in ["received_by", "delivery_evidence", "short_delivery_reason"] {
             if let Some(value) = proof.get(field) {
                 patch.insert(field.into(), value.clone());
             }
         }
         let mut conn = self.pool.get().await?;
         let tx = Tx::begin(&mut conn, &tenant.id, true).await?;
+        let shipped_lines: Value = tx
+            .query_opt(
+                "SELECT lines FROM logistics__shipment WHERE tenant_id = $1 AND id = $2 AND status = 'dispatched' FOR UPDATE",
+                &[&tenant.id, &shipment_id],
+            )
+            .await?
+            .ok_or_else(|| {
+                ApiError::validation(
+                    "logistics.shipment",
+                    vec!["Only a dispatched shipment can be confirmed as delivered".into()],
+                )
+            })?
+            .get(0);
+        let requested_lines = proof.get("delivered_lines").unwrap_or(&shipped_lines);
+        let delivered_lines = super::domain::normalize_delivered_lines(&shipped_lines, requested_lines)
+            .ok_or_else(|| {
+                ApiError::validation(
+                    "logistics.shipment",
+                    vec!["Actual delivered quantities must match shipment lines and not exceed their quantities".into()],
+                )
+            })?;
+        patch.insert("delivered_lines".into(), delivered_lines);
         let entity = self.ent(tenant, "logistics.shipment")?;
         let opts = Opts::top();
         self.update_in(
@@ -82,6 +104,11 @@ impl Kernel {
                    'id', shipment.id, 'status', shipment.status, 'source', shipment.source, \
                    'sourceId', shipment.source_id, 'partyId', shipment.party, \
                    'party', party.name, 'warehouseId', shipment.warehouse, \
+                   'lines', COALESCE((SELECT jsonb_agg(line.value || jsonb_build_object('productName', product.name)) \
+                     FROM jsonb_array_elements(shipment.lines) AS line(value) \
+                     LEFT JOIN master_data__product product ON product.tenant_id = shipment.tenant_id AND product.id::text = line.value->>'product'), '[]'::jsonb), \
+                   'deliveredLines', shipment.delivered_lines, \
+                   'shortDeliveryReason', shipment.short_delivery_reason, \
                    'carrier', shipment.carrier, 'trackingNumber', shipment.tracking_number, \
                    'vehicleId', shipment.vehicle, 'vehicle', vehicle.plate, \
                    'driverId', shipment.driver, 'driver', driver.name, \

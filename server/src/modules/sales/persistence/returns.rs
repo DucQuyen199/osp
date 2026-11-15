@@ -139,7 +139,7 @@ pub(super) async fn validate(
         let eligible_qty = if requires_logistics_delivery {
             let eligible_row = tx
                 .query_opt(
-                    "SELECT COALESCE(SUM((item.line->>'qty')::numeric), 0)::text FROM logistics__shipment shipment CROSS JOIN LATERAL jsonb_array_elements(COALESCE(shipment.lines, '[]'::jsonb)) AS item(line) WHERE shipment.tenant_id = $1 AND shipment.source = 'sales_order' AND shipment.source_id = $2 AND shipment.status = 'delivered' AND item.line->>'product' = $3 AND abs((item.line->>'price')::numeric - $4::text::numeric) <= 0.005 AND item.line->>'uom' IS NOT DISTINCT FROM $5",
+                    "SELECT COALESCE(SUM((item.line->>'qty')::numeric), 0)::text FROM logistics__shipment shipment CROSS JOIN LATERAL jsonb_array_elements(COALESCE(shipment.delivered_lines, shipment.lines, '[]'::jsonb)) AS item(line) WHERE shipment.tenant_id = $1 AND shipment.source = 'sales_order' AND shipment.source_id = $2 AND shipment.status = 'delivered' AND item.line->>'product' = $3 AND abs((item.line->>'price')::numeric - $4::text::numeric) <= 0.005 AND item.line->>'uom' IS NOT DISTINCT FROM $5",
                     &[&tenant.id, &order_id.to_string(), &product, &price_text, &unit],
                 )
                 .await?;

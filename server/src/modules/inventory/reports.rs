@@ -21,7 +21,7 @@ async fn replenishment_rows(
                SELECT shipment.source_id::uuid AS order_id, (line->>'product')::uuid AS product, \
                  sum(COALESCE((line->>'base_qty')::numeric, (line->>'qty')::numeric)) AS qty \
                FROM logistics__shipment shipment \
-               CROSS JOIN LATERAL jsonb_array_elements(COALESCE(shipment.lines, '[]'::jsonb)) line \
+               CROSS JOIN LATERAL jsonb_array_elements(COALESCE(shipment.delivered_lines, shipment.lines, '[]'::jsonb)) line \
                WHERE shipment.tenant_id = $1 AND shipment.source = 'sales_order' \
                  AND shipment.status = 'delivered' AND line->>'tracked' = 'true' \
                GROUP BY shipment.source_id, (line->>'product')::uuid \

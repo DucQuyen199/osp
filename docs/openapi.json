@@ -9283,6 +9283,10 @@
             "readOnly": true,
             "type": "string"
           },
+          "delivered_lines": {
+            "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)",
+            "readOnly": true
+          },
           "delivery_evidence": {
             "readOnly": true,
             "type": "string"
@@ -9315,6 +9319,10 @@
             "type": "string"
           },
           "received_by": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "short_delivery_reason": {
             "readOnly": true,
             "type": "string"
           },
@@ -9370,6 +9378,10 @@
             "readOnly": true,
             "type": "string"
           },
+          "delivered_lines": {
+            "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)",
+            "readOnly": true
+          },
           "delivery_evidence": {
             "readOnly": true,
             "type": "string"
@@ -9397,6 +9409,10 @@
             "type": "string"
           },
           "received_by": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "short_delivery_reason": {
             "readOnly": true,
             "type": "string"
           },
@@ -87240,7 +87256,7 @@
     },
     "/api/t/{tenantId}/data/logistics/shipment/{id}/delivered": {
       "post": {
-        "description": "Hoàn tất vận đơn và ghi POD trong cùng giao dịch. Cần nhập tên người nhận hoặc bằng chứng/mã tham chiếu.",
+        "description": "Hoàn tất vận đơn và ghi POD trong cùng giao dịch. Nhập số lượng thực nhận theo từng dòng; nếu giao thiếu cần nêu lý do.",
         "parameters": [
           {
             "in": "path",
@@ -87278,12 +87294,56 @@
                   }
                 ],
                 "properties": {
+                  "delivered_lines": {
+                    "items": {
+                      "additionalProperties": true,
+                      "properties": {
+                        "base_qty": {
+                          "minimum": 0,
+                          "type": "number"
+                        },
+                        "kind": {
+                          "type": "string"
+                        },
+                        "price": {
+                          "minimum": 0,
+                          "type": "number"
+                        },
+                        "product": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "qty": {
+                          "exclusiveMinimum": 0,
+                          "type": "number"
+                        },
+                        "tracked": {
+                          "type": "boolean"
+                        },
+                        "uom": {
+                          "format": "uuid",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "qty"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
                   "delivery_evidence": {
                     "maxLength": 1000,
                     "type": "string"
                   },
                   "received_by": {
                     "maxLength": 160,
+                    "type": "string"
+                  },
+                  "short_delivery_reason": {
+                    "maxLength": 500,
+                    "minLength": 5,
                     "type": "string"
                   }
                 },

@@ -212,6 +212,11 @@ pub async fn handle_source_stock_event(
     } else {
         vec![document.clone()]
     };
+    if event_type == "logistics.shipment.delivered"
+        && let Some(delivered_lines) = document.get("delivered_lines").and_then(Value::as_array)
+    {
+        lines = delivered_lines.clone();
+    }
     if matches!(
         event_type,
         "sales.sales_return.received" | "purchasing.purchase_return.dispatched"

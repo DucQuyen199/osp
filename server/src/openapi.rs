@@ -124,7 +124,7 @@ pub fn build(reg: &Registry) -> Value {
                     });
                     if def.qname() == "logistics.shipment" && action == "delivered" {
                         operation["description"] = json!(
-                            "Hoàn tất vận đơn và ghi POD trong cùng giao dịch. Cần nhập tên người nhận hoặc bằng chứng/mã tham chiếu."
+                            "Hoàn tất vận đơn và ghi POD trong cùng giao dịch. Nhập số lượng thực nhận theo từng dòng; nếu giao thiếu cần nêu lý do."
                         );
                         operation["requestBody"] = json!({
                             "required": true,
@@ -133,7 +133,20 @@ pub fn build(reg: &Registry) -> Value {
                                 "additionalProperties": false,
                                 "properties": {
                                     "received_by": { "type": "string", "maxLength": 160 },
-                                    "delivery_evidence": { "type": "string", "maxLength": 1000 }
+                                    "delivery_evidence": { "type": "string", "maxLength": 1000 },
+                                    "delivered_lines": {
+                                        "type": "array", "minItems": 1,
+                                        "items": { "type": "object", "required": ["qty"], "properties": {
+                                            "product": { "type": "string", "format": "uuid" },
+                                            "price": { "type": "number", "minimum": 0 },
+                                            "qty": { "type": "number", "exclusiveMinimum": 0 },
+                                            "base_qty": { "type": "number", "minimum": 0 },
+                                            "uom": { "type": "string", "format": "uuid" },
+                                            "tracked": { "type": "boolean" },
+                                            "kind": { "type": "string" }
+                                        }, "additionalProperties": true }
+                                    },
+                                    "short_delivery_reason": { "type": "string", "minLength": 5, "maxLength": 500 }
                                 },
                                 "anyOf": [
                                     { "required": ["received_by"] },
