@@ -76,6 +76,7 @@ const AccountingSettlementWorkbenchPage = lazy(() => import('./AccountingSettlem
 const InventoryStockCountWorkbenchPage = lazy(() => import('./InventoryStockCountWorkbenchPage.jsx'));
 const EInvoiceWorkbenchPage = lazy(() => import('./EInvoiceWorkbenchPage.jsx'));
 const HelpdeskWorkbenchPage = lazy(() => import('./HelpdeskWorkbenchPage.jsx'));
+const PerformanceWorkbenchPage = lazy(() => import('./PerformanceWorkbenchPage.jsx'));
 
 function parseRoute(hash = location.hash) {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
@@ -111,6 +112,7 @@ function parseRoute(hash = location.hash) {
   if (a === 'payroll') return { name: 'payroll-workbench' };
   if (a === 'people') return { name: 'hrm-operations' };
   if (a === 'helpdesk') return { name: 'helpdesk-workbench' };
+  if (a === 'performance') return { name: 'performance-workbench' };
   if (a === 'expenses') return { name: 'expense-workbench' };
   if (a === 'returns') return { name: 'sales-returns-workbench' };
   if (a === 'bank-reconciliation') return { name: 'bank-reconciliation-workbench' };
@@ -226,6 +228,7 @@ function Sidebar({ meta, route, onNavigate, open }) {
     {meta.modules.some((module) => module.id === 'recruitment') && can('recruitment.application.read') && link('#/recruitment', 'Tuyển dụng', route.name === 'recruitment-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'payroll') && can('payroll.payroll_run.read') && link('#/payroll', 'Điều hành bảng lương', route.name === 'payroll-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'hrm') && can('hrm.employee.read') && link('#/people', 'Nhân sự và chấm công', route.name === 'hrm-operations', 'list')}
+    {meta.modules.some((module) => module.id === 'performance') && (can('performance.objective.read') || can('performance.review.read')) && link('#/performance', 'Mục tiêu & đánh giá', route.name === 'performance-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'expense') && can('expense.expense_claim.read') && link('#/expenses', 'Chi phí nhân viên', route.name === 'expense-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'sales') && can('sales.sales_return.read') && link('#/returns', 'Trả hàng bán', route.name === 'sales-returns-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'accounting') && can('accounting.bank_statement.read') && link('#/bank-reconciliation', 'Đối soát ngân hàng', route.name === 'bank-reconciliation-workbench', 'list')}
@@ -464,6 +467,7 @@ function App() {
         : route.name === 'budget-variance' ? <BudgetVariancePage />
         : route.name === 'crm-pipeline' ? <CrmPipelinePage />
         : route.name === 'helpdesk-workbench' ? <HelpdeskWorkbenchPage />
+        : route.name === 'performance-workbench' ? <PerformanceWorkbenchPage />
         : route.name === 'marketing-campaign-performance' ? <MarketingCampaignPerformancePage />
         : route.name === 'helpdesk-sla' ? <HelpdeskSlaPage />
         : route.name === 'bi-reports' ? <BiReportsPage route={route} />

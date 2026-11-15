@@ -52,12 +52,17 @@
     {
      "name": "target",
      "type": "number",
-     "required": false
+      "required": true
     },
     {
      "name": "current",
      "type": "number",
      "required": false
+    },
+    {
+      "name": "unit",
+      "type": "string",
+      "required": false
     }
    ],
    "states": null,
@@ -95,6 +100,12 @@
      "name": "comment",
      "type": "text",
      "required": false
+    },
+    {
+      "name": "revision_note",
+      "label": "Lý do yêu cầu chỉnh sửa",
+      "type": "text",
+      "required": false
     },
     {
      "name": "status",

@@ -19,11 +19,10 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
     }
     match entity {
         "key_result" => {
-            if document.get("target").is_some_and(|value| !value.is_null())
-                && !document
-                    .get("target")
-                    .and_then(money::decimal)
-                    .is_some_and(|value| value > Decimal::ZERO)
+            if !document
+                .get("target")
+                .and_then(money::decimal)
+                .is_some_and(|value| value > Decimal::ZERO)
             {
                 errors.push("Key result target must be greater than zero".into());
             }
@@ -39,6 +38,16 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
             }
         }
         "review" => {
+            if document
+                .get("reviewer")
+                .and_then(Value::as_str)
+                .zip(document.get("employee").and_then(Value::as_str))
+                .is_some_and(|(reviewer, employee)| reviewer == employee)
+            {
+                errors.push(
+                    "The reviewer must be a different employee from the review subject".into(),
+                );
+            }
             if document.get("score").is_some_and(|value| !value.is_null())
                 && !document
                     .get("score")
@@ -90,6 +99,17 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
             }
             errors
         }
+        "returned" => {
+            if document
+                .get("revision_note")
+                .and_then(Value::as_str)
+                .is_none_or(|note| note.trim().is_empty())
+            {
+                vec!["A reason is required when returning a review for revision".into()]
+            } else {
+                Vec::new()
+            }
+        }
         _ => Vec::new(),
     }
 }
@@ -106,7 +126,14 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
             Some("submitted" | "acknowledged")
         ) && patch.as_object().is_some_and(|fields| !fields.is_empty())
         {
-            return vec!["Submitted reviews are locked until returned for revision; acknowledged reviews are final".into()];
+            let editable_revision_note = current.get("status").and_then(Value::as_str)
+                == Some("submitted")
+                && patch.as_object().is_some_and(|fields| {
+                    fields.len() == 1 && fields.contains_key("revision_note")
+                });
+            if !editable_revision_note {
+                return vec!["Submitted reviews are locked until returned for revision; acknowledged reviews are final".into()];
+            }
         }
     }
     Vec::new()

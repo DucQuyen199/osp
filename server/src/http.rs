@@ -1781,6 +1781,33 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     }
                     return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
                 }
+                if q == "performance.review" && *action == "returned" {
+                    let body = json_obj(&bytes)?;
+                    if body.len() != 1 || !body.contains_key("revision_note") {
+                        return Err(ApiError::validation(
+                            "performance.review.returned",
+                            vec!["Provide the revision_note field when returning a review".into()],
+                        ));
+                    }
+                    return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
+                }
+                if q == "performance.review" && *action == "submitted" && !bytes.is_empty() {
+                    let body = json_obj(&bytes)?;
+                    if body.is_empty()
+                        || body.keys().any(|field| {
+                            !matches!(field.as_str(), "period" | "reviewer" | "score" | "comment")
+                        })
+                    {
+                        return Err(ApiError::validation(
+                            "performance.review.submitted",
+                            vec![
+                                "Only review period, reviewer, score, and comment can be submitted"
+                                    .into(),
+                            ],
+                        ));
+                    }
+                    return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
+                }
                 if q == "restaurant.table_order" && *action == "completed" {
                     let body = json_obj(&bytes)?;
                     if body.len() != 1 || !body.contains_key("method") {

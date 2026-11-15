@@ -4,8 +4,8 @@ use serde_json::{Map, Value};
 pub fn prepare_document(entity: &str, document: &mut Map<String, Value>) -> Vec<String> {
     let fields: &[&str] = match entity {
         "objective" => &["title", "period"],
-        "key_result" => &["title"],
-        "review" => &["period", "comment"],
+        "key_result" => &["title", "unit"],
+        "review" => &["period", "comment", "revision_note"],
         _ => &[],
     };
     let mut errors = Vec::new();
