@@ -121,6 +121,20 @@ WHERE p.tenant_id = $1 AND p.source IN ('ticket', 'event_ticket_refund', 'pos_or
   AND abs(COALESCE(p.tax_amount, 0)) > 0.005
   AND ($2::date IS NULL OR COALESCE(j.posting_date, (j.created_at AT TIME ZONE 'UTC')::date) >= $2::date)
   AND ($3::date IS NULL OR COALESCE(j.posting_date, (j.created_at AT TIME ZONE 'UTC')::date) <= $3::date)
+UNION ALL
+SELECT p.id::text, abs(COALESCE(p.base_amount, p.amount))::text, abs(COALESCE(p.base_tax_amount, p.tax_amount, 0))::text,
+       COALESCE(order_record.lines, '[]'::jsonb),
+       COALESCE(j.posting_date, (j.created_at AT TIME ZONE 'UTC')::date), 1::int, 'invoice'::text,
+       COALESCE(party.name, ''), COALESCE(party.tax_code, ''), COALESCE(currency.code, ''), COALESCE(p.exchange_rate, 1)::text
+FROM accounting__payment p
+JOIN restaurant__table_order order_record ON order_record.tenant_id = p.tenant_id AND order_record.id::text = p.source_id
+JOIN accounting__journal_entry j ON j.tenant_id = p.tenant_id AND j.source = 'payment' AND j.source_id = p.id::text AND j.status = 'posted'
+LEFT JOIN master_data__party party ON party.tenant_id = p.tenant_id AND party.id = p.party
+LEFT JOIN master_data__currency currency ON currency.tenant_id = p.tenant_id AND currency.id = p.currency
+WHERE p.tenant_id = $1 AND p.source = 'table_order'
+  AND abs(COALESCE(p.tax_amount, 0)) > 0.005
+  AND ($2::date IS NULL OR COALESCE(j.posting_date, (j.created_at AT TIME ZONE 'UTC')::date) >= $2::date)
+  AND ($3::date IS NULL OR COALESCE(j.posting_date, (j.created_at AT TIME ZONE 'UTC')::date) <= $3::date)
 ORDER BY 5, 1"#;
 
 use super::common::parse_date;
