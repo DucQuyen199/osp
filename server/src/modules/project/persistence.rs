@@ -191,6 +191,56 @@ pub async fn validate_persistence(
             }
         }
         ("timesheet", "created" | "updated" | "removed") => {
+            if let Some(employee) = id(document, "employee_ref") {
+                let Some(employee_row) = tx
+                    .query_opt(
+                        "SELECT name, status FROM hrm__employee WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                        &[&tenant.id, &employee],
+                    )
+                    .await?
+                else {
+                    return Ok(vec!["Hồ sơ nhân viên không tồn tại trong doanh nghiệp".into()]);
+                };
+                let employee_name: String = employee_row.get(0);
+                let employee_status: String = employee_row.get(1);
+                let previous_assignment = if action == "updated" {
+                    if let Some(timesheet) = id(document, "id") {
+                        tx.query_opt(
+                            "SELECT employee_ref, employee FROM project__timesheet WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                            &[&tenant.id, &timesheet],
+                        )
+                        .await?
+                        .map(|row| {
+                            (
+                                row.get::<_, Option<Uuid>>(0),
+                                row.get::<_, Option<String>>(1),
+                            )
+                        })
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                let current_employee = document
+                    .get("employee")
+                    .and_then(Value::as_str)
+                    .map(str::trim);
+                let assignment_changed = action == "created"
+                    || (action == "updated"
+                        && previous_assignment.as_ref().is_none_or(
+                            |(previous_employee, previous_name)| {
+                                *previous_employee != Some(employee)
+                                    || previous_name.as_deref().map(str::trim) != current_employee
+                            },
+                        ));
+                if assignment_changed && employee_status != "active" {
+                    errors.push("Chỉ ghi giờ công cho nhân viên đang làm việc".into());
+                }
+                if assignment_changed && current_employee != Some(employee_name.trim()) {
+                    errors.push("Tên nhân viên phải khớp với hồ sơ đã chọn".into());
+                }
+            }
             let Some(project) = id(document, "project") else {
                 return Ok(vec!["Timesheet cần tham chiếu dự án hợp lệ".into()]);
             };

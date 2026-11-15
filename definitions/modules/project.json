@@ -156,6 +156,13 @@
      "required": false
     },
     {
+     "name": "employee_ref",
+     "label": "Hồ sơ nhân viên",
+     "type": "ref",
+     "required": false,
+     "ref": "hrm.employee"
+    },
+    {
      "name": "hours",
      "type": "number",
      "required": true

@@ -13739,6 +13739,11 @@
           "employee": {
             "type": "string"
           },
+          "employee_ref": {
+            "description": "Tham chiếu tới hrm.employee",
+            "format": "uuid",
+            "type": "string"
+          },
           "hours": {
             "type": "number"
           },
@@ -13781,6 +13786,11 @@
             "type": "string"
           },
           "employee": {
+            "type": "string"
+          },
+          "employee_ref": {
+            "description": "Tham chiếu tới hrm.employee",
+            "format": "uuid",
             "type": "string"
           },
           "hours": {
