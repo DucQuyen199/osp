@@ -144,7 +144,8 @@ pub(super) async fn validate_return_persistence(
             let product_matches = line.get("product").and_then(Value::as_str)
                 == Some(inspected_product.to_string().as_str());
             let cost_matches = line
-                .get("price")
+                .get("base_price")
+                .or_else(|| line.get("price"))
                 .and_then(money::decimal)
                 .zip(inspected_cost)
                 .is_some_and(|(price, cost)| {
@@ -157,7 +158,8 @@ pub(super) async fn validate_return_persistence(
             } else {
                 requested_inspection_qty = requested_inspection_qty
                     .checked_add(
-                        line.get("qty")
+                        line.get("base_qty")
+                            .or_else(|| line.get("qty"))
                             .and_then(money::decimal)
                             .unwrap_or(Decimal::ZERO),
                     )
@@ -198,7 +200,7 @@ pub(super) async fn validate_return_persistence(
             .unwrap_or_default();
         let prior_inspection_returns_row = tx
             .query_opt(
-                "SELECT COALESCE(SUM((item.line->>'qty')::numeric), 0)::text FROM purchasing__purchase_return pr CROSS JOIN LATERAL jsonb_array_elements(COALESCE(pr.lines, '[]'::jsonb)) AS item(line) WHERE pr.tenant_id = $1 AND pr.inspection = $2 AND pr.id <> $3 AND pr.status IN ('submitted', 'approved', 'dispatched')",
+                "SELECT COALESCE(SUM(COALESCE((item.line->>'base_qty')::numeric, (item.line->>'qty')::numeric)), 0)::text FROM purchasing__purchase_return pr CROSS JOIN LATERAL jsonb_array_elements(COALESCE(pr.lines, '[]'::jsonb)) AS item(line) WHERE pr.tenant_id = $1 AND pr.inspection = $2 AND pr.id <> $3 AND pr.status IN ('submitted', 'approved', 'dispatched')",
                 &[&tenant.id, &inspection_id, &current_return_id],
             )
             .await?;
@@ -234,7 +236,8 @@ pub(super) async fn validate_return_persistence(
         }
     }
 
-    let mut requested: HashMap<(String, Decimal, Decimal), Decimal> = HashMap::new();
+    let mut requested: HashMap<(String, Decimal, Decimal, Option<String>), Decimal> =
+        HashMap::new();
     for line in &return_lines {
         let Some(product) = line.get("product").and_then(Value::as_str) else {
             continue;
@@ -249,8 +252,9 @@ pub(super) async fn validate_return_persistence(
         let Some(qty) = line.get("qty").and_then(money::decimal) else {
             continue;
         };
+        let unit = line.get("uom").and_then(Value::as_str).map(str::to_owned);
         let requested_qty = requested
-            .entry((product.to_string(), price, order_price))
+            .entry((product.to_string(), price, order_price, unit))
             .or_insert(Decimal::ZERO);
         *requested_qty = requested_qty
             .checked_add(qty)
@@ -263,10 +267,11 @@ pub(super) async fn validate_return_persistence(
     else {
         return Ok(vec!["Could not identify the purchase return record".into()]);
     };
-    for ((product, price, order_price), return_qty) in requested {
+    for ((product, price, order_price, unit), return_qty) in requested {
         let mut bought_qty = Decimal::ZERO;
         for line in &bought_lines {
             if line.get("product").and_then(Value::as_str) == Some(product.as_str())
+                && line.get("uom").and_then(Value::as_str) == unit.as_deref()
                 && line
                     .get("price")
                     .and_then(money::decimal)
@@ -296,6 +301,7 @@ pub(super) async fn validate_return_persistence(
                 .flatten()
                 .filter(|line| {
                     line.get("product").and_then(Value::as_str) == Some(product.as_str())
+                        && line.get("uom").and_then(Value::as_str) == unit.as_deref()
                         && line
                             .get("price")
                             .and_then(money::decimal)
@@ -313,8 +319,8 @@ pub(super) async fn validate_return_persistence(
                 .ok_or_else(purchasing_quantity_error)?;
             let invoice_id = supplier_invoice_id.unwrap_or_default();
             let prior_invoice_returns = tx.query_opt(
-                "SELECT COALESCE(SUM((item.line->>'qty')::numeric),0)::text FROM purchasing__purchase_return pr CROSS JOIN LATERAL jsonb_array_elements(COALESCE(pr.lines,'[]'::jsonb)) AS item(line) WHERE pr.tenant_id=$1 AND pr.supplier_invoice=$2 AND pr.id<>$3 AND pr.status IN ('submitted','approved','dispatched') AND item.line->>'product'=$4 AND abs((item.line->>'price')::numeric-$5::text::numeric)<=0.005",
-                &[&tenant.id, &invoice_id, &return_id, &product, &price.normalize().to_string()],
+                "SELECT COALESCE(SUM((item.line->>'qty')::numeric),0)::text FROM purchasing__purchase_return pr CROSS JOIN LATERAL jsonb_array_elements(COALESCE(pr.lines,'[]'::jsonb)) AS item(line) WHERE pr.tenant_id=$1 AND pr.supplier_invoice=$2 AND pr.id<>$3 AND pr.status IN ('submitted','approved','dispatched') AND item.line->>'product'=$4 AND abs((item.line->>'price')::numeric-$5::text::numeric)<=0.005 AND item.line->>'uom' IS NOT DISTINCT FROM $6",
+                &[&tenant.id, &invoice_id, &return_id, &product, &price.normalize().to_string(), &unit.as_deref()],
             ).await?;
             let prior_invoice_qty = prior_invoice_returns
                 .as_ref()
@@ -332,8 +338,8 @@ pub(super) async fn validate_return_persistence(
         let price_text = order_price.normalize().to_string();
         let prior_row = tx
             .query_opt(
-                "SELECT COALESCE(SUM((item.line->>'qty')::numeric), 0)::text FROM purchasing__purchase_return pr CROSS JOIN LATERAL jsonb_array_elements(COALESCE(pr.lines, '[]'::jsonb)) AS item(line) WHERE pr.tenant_id = $1 AND pr.purchase_order = $2 AND pr.id <> $3 AND pr.status IN ('submitted', 'approved', 'dispatched') AND item.line->>'product' = $4 AND abs(COALESCE((item.line->>'po_price')::numeric, (item.line->>'price')::numeric) - $5::text::numeric) <= 0.005",
-                &[&tenant.id, &order_id, &return_id, &product, &price_text],
+                "SELECT COALESCE(SUM((item.line->>'qty')::numeric), 0)::text FROM purchasing__purchase_return pr CROSS JOIN LATERAL jsonb_array_elements(COALESCE(pr.lines, '[]'::jsonb)) AS item(line) WHERE pr.tenant_id = $1 AND pr.purchase_order = $2 AND pr.id <> $3 AND pr.status IN ('submitted', 'approved', 'dispatched') AND item.line->>'product' = $4 AND abs(COALESCE((item.line->>'po_price')::numeric, (item.line->>'price')::numeric) - $5::text::numeric) <= 0.005 AND item.line->>'uom' IS NOT DISTINCT FROM $6",
+                &[&tenant.id, &order_id, &return_id, &product, &price_text, &unit.as_deref()],
             )
             .await?;
         let prior = prior_row
