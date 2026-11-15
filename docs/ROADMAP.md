@@ -41,7 +41,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Nhà hàng ghi nhận phương thức thanh toán và lý do hủy cùng lần chuyển trạng thái; xuất kho, thanh toán và hủy phiếu bếp chờ cùng commit hoặc rollback. Ghi chú riêng từng món (tối đa 500 ký tự) được chuẩn hóa, giữ trong order và chuyển tới đúng phiếu bếp/quầy pha chế để chuẩn bị/in.
 - Màn hình KDS có thể in riêng từng phiếu bếp theo khổ ticket qua hộp thoại in của trình duyệt, dùng máy in nhiệt đã cấu hình trên thiết bị vận hành.
 - Bảo hiểm lưu lý do từ chối bồi thường; số tiền duyệt, quyết định bồi thường và thông tin chi trả cùng kiểm tra hạn mức/bút toán trong giao dịch.
-- Hồ sơ cho vay chốt ngày đến hạn kỳ đầu theo hợp đồng trước khi duyệt; lịch niên kim bắt đầu đúng ngày này và giữ ngày trong tháng cho các kỳ sau, đồng thời khoản vay cũ chưa có ngày vẫn dùng được quy tắc lịch trước đây.
+- Hồ sơ cho vay chốt ngày đến hạn kỳ đầu theo hợp đồng trước khi duyệt; lịch niên kim bắt đầu đúng ngày này và giữ ngày trong tháng cho các kỳ sau, đồng thời khoản vay cũ chưa có ngày vẫn dùng được quy tắc lịch trước đây. Khoản vay đã chuyển nợ xấu có thể tiếp tục thu các kỳ quá hạn và được đóng sau khi toàn bộ lịch trả đã thanh toán.
 - Đối soát ngân hàng lưu liên kết payment/bút toán khớp thủ công và lý do bỏ qua cùng lần đổi trạng thái của dòng sao kê.
 - Phòng khám check-in lịch hẹn sẽ tạo lượt khám gắn đúng hồ sơ bệnh nhân trong cùng giao dịch; lượt khám hoàn tất tự hoàn tất lịch và chỉ lập hóa đơn theo phí khám, tránh thu trùng giá lịch hẹn.
 - Phòng khám hoàn tất lượt khám cùng thông tin bác sĩ, chẩn đoán, phí và hóa đơn phải thu; kết quả xét nghiệm lưu cùng trạng thái hoàn tất.

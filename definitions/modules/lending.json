@@ -87,7 +87,8 @@
      },
      "closed": {
       "from": [
-       "disbursed"
+      "disbursed",
+      "defaulted"
       ],
       "to": "closed"
      },
