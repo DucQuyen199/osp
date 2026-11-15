@@ -516,7 +516,12 @@ pub async fn migrate(client: &mut Client, reg: &Registry) -> Result<(), String> 
 
     if reg.modules.contains_key("events") {
         tx.batch_execute(
-            "UPDATE events__ticket AS ticket \
+            "UPDATE events__ticket SET ticket_code = upper(replace(gen_random_uuid()::text, '-', '')) \
+             WHERE ticket_code IS NULL OR btrim(ticket_code) = ''; \
+             CREATE UNIQUE INDEX IF NOT EXISTS events_ticket_code_unique \
+             ON events__ticket (tenant_id, lower(ticket_code)) \
+             WHERE ticket_code IS NOT NULL AND btrim(ticket_code) <> ''; \
+             UPDATE events__ticket AS ticket \
              SET reservation_expires_at = ticket.created_at + make_interval(mins => COALESCE(( \
                  SELECT CASE \
                      WHEN event.reservation_minutes BETWEEN 5 AND 60 \
