@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { addCalendarDays, addCalendarMonths, localDate } from './lib/dates.js';
+import { addCalendarDays, addCalendarMonths, localDate, localDateTimeToIso, localTime } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtMoney, statusLabel } from './lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
@@ -12,27 +12,11 @@ const weekdayOptions = [[1, 'T2'], [2, 'T3'], [3, 'T4'], [4, 'T5'], [5, 'T6'], [
 const MAX_ROTATION_DAYS = 3653;
 const MAX_GENERATED_SCHEDULE_ROWS = 40_000;
 const rotationDayLimit = (employeeCount) => Math.min(MAX_ROTATION_DAYS, Math.floor(MAX_GENERATED_SCHEDULE_ROWS / Math.max(employeeCount, 1)));
-const nowIso = () => {
-  const now = new Date();
-  const offsetMinutes = -now.getTimezoneOffset();
-  const sign = offsetMinutes >= 0 ? '+' : '-';
-  const offset = Math.abs(offsetMinutes);
-  const localTimestamp = new Date(now.getTime() + offsetMinutes * 60000).toISOString().slice(0, -1);
-  return `${localTimestamp}${sign}${String(Math.floor(offset / 60)).padStart(2, '0')}:${String(offset % 60).padStart(2, '0')}`;
-};
-const localDateTimeIso = (date, time) => {
-  const [year, month, day] = date.split('-').map(Number);
-  const [hour, minute] = time.split(':').map(Number);
-  const local = new Date(year, month - 1, day, hour, minute);
-  const offsetMinutes = -local.getTimezoneOffset();
-  const sign = offsetMinutes >= 0 ? '+' : '-';
-  const offset = Math.abs(offsetMinutes);
-  return `${date}T${time}:00${sign}${String(Math.floor(offset / 60)).padStart(2, '0')}:${String(offset % 60).padStart(2, '0')}`;
-};
+const nowIso = () => new Date().toISOString();
 const nextLocalDate = (date) => addCalendarDays(date, 1);
 const addLocalDays = addCalendarDays;
 const nextMonthStart = (date) => addCalendarMonths(`${date.slice(0, 7)}-01`, 1);
-const fmtTime = (value) => value ? new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : '--';
+const fmtTime = (value) => value ? localTime(new Date(value)) : '--';
 async function listAllRows(entity, filters = {}) {
   const rows = [];
   let total = Number.POSITIVE_INFINITY;
@@ -156,9 +140,15 @@ export default function HrmOperationsPage() {
     event.preventDefault();
     const existing = scheduleEntries.find((row) => row.employee === scheduleForm.employee && row.work_date === scheduleForm.work_date);
     const endDate = scheduleForm.end_time <= scheduleForm.start_time ? nextLocalDate(scheduleForm.work_date) : scheduleForm.work_date;
+    const startAt = scheduleForm.is_working ? localDateTimeToIso(`${scheduleForm.work_date}T${scheduleForm.start_time}`) : null;
+    const endAt = scheduleForm.is_working ? localDateTimeToIso(`${endDate}T${scheduleForm.end_time}`) : null;
+    if (scheduleForm.is_working && (!startAt || !endAt)) {
+      setError('Giờ ca này không tồn tại trong múi giờ kinh doanh đã chọn do chuyển đổi giờ mùa hè.');
+      return;
+    }
     const details = scheduleForm.is_working ? {
-      start_at: localDateTimeIso(scheduleForm.work_date, scheduleForm.start_time),
-      end_at: localDateTimeIso(endDate, scheduleForm.end_time),
+      start_at: startAt,
+      end_at: endAt,
       break_minutes: Number(scheduleForm.break_minutes || 0),
     } : { start_at: null, end_at: null, break_minutes: 0 };
     await run('schedule:save', async () => {
