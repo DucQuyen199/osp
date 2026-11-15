@@ -1,6 +1,7 @@
 import React from 'react';
 
 const TABS = [
+  ['business-time', 'Múi giờ nghiệp vụ'],
   ['currency', 'Currency'],
   ['users', 'Người dùng'], ['roles', 'Vai trò'], ['modules', 'Module'], ['fields', 'Trường mở rộng'],
   ['inventory', 'Kho'], ['budget', 'Ngân sách'], ['data', 'Dữ liệu'], ['tokens', 'API token'], ['audit', 'Nhật ký'],

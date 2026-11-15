@@ -45,6 +45,16 @@ impl Tenant {
     pub fn setting_str(&self, key: &str) -> Option<&str> {
         self.settings.get(key).and_then(Value::as_str)
     }
+    pub fn business_timezone(&self) -> chrono_tz::Tz {
+        self.setting_str("businessTimezone")
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(chrono_tz::UTC)
+    }
+    pub fn business_today(&self) -> chrono::NaiveDate {
+        chrono::Utc::now()
+            .with_timezone(&self.business_timezone())
+            .date_naive()
+    }
 }
 
 #[derive(Debug, Clone)]

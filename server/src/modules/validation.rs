@@ -1,4 +1,5 @@
 use super::*;
+use crate::kernel::Tenant;
 use std::borrow::Cow;
 
 /// PostgreSQL read models include null columns while create commands omit them.
@@ -20,6 +21,22 @@ fn document_values(document: &serde_json::Value) -> Cow<'_, serde_json::Value> {
 }
 
 pub fn validate_document(qname: &str, document: &serde_json::Value) -> Vec<String> {
+    validate_document_at(chrono::Utc::now().date_naive(), qname, document)
+}
+
+pub fn validate_document_for_tenant(
+    tenant: &Tenant,
+    qname: &str,
+    document: &serde_json::Value,
+) -> Vec<String> {
+    validate_document_at(tenant.business_today(), qname, document)
+}
+
+fn validate_document_at(
+    today: chrono::NaiveDate,
+    qname: &str,
+    document: &serde_json::Value,
+) -> Vec<String> {
     let values = document_values(document);
     let document = values.as_ref();
     let (module, entity) = qname.split_once('.').unwrap_or(("", ""));
@@ -29,26 +46,26 @@ pub fn validate_document(qname: &str, document: &serde_json::Value) -> Vec<Strin
         "asset" => asset::validate(entity, document),
         "auto-service" => auto_service::validate(entity, document),
         "budget" => budget::validate(entity, document),
-        "case-management" => case_management::validate(entity, document),
+        "case-management" => case_management::validate_at(entity, document, today),
         "charity" => charity::validate(entity, document),
-        "clinic" => clinic::validate(entity, document),
+        "clinic" => clinic::validate_at(entity, document, today),
         "communication" => communication::validate(entity, document),
         "booking" => booking::validate(entity, document),
         "bi" => bi::validate(entity, document),
         "contract" => contract::validate(entity, document),
-        "construction" => construction::validate(entity, document),
+        "construction" => construction::validate_at(entity, document, today),
         "document" => document::validate(entity, document),
         "crm" => crm::validate(entity, document),
         "ecommerce" => ecommerce::validate(entity, document),
         "events" => event_management::validate(entity, document),
         "inventory" => inventory::validate(entity, document),
         "integration-hub" => integration_hub::validate(entity, document),
-        "insurance" => insurance::validate(entity, document),
+        "insurance" => insurance::validate_at(entity, document, today),
         "logistics" => logistics::validate(entity, document),
         "lms" => lms::validate(entity, document),
         "marketing" => marketing::validate(entity, document),
         "lending" => lending::validate(entity, document),
-        "loyalty" => loyalty::validate(entity, document),
+        "loyalty" => loyalty::validate_at(entity, document, today),
         "manufacturing" => manufacturing::validate(entity, document),
         "master-data" => master_data::validate(entity, document),
         "maintenance" => maintenance::validate(entity, document),
@@ -58,11 +75,11 @@ pub fn validate_document(qname: &str, document: &serde_json::Value) -> Vec<Strin
         "hotel" => hotel::validate(entity, document),
         "hrm" => hrm::validate(entity, document),
         "sales" => sales::validate(entity, document),
-        "school" => school::validate(entity, document),
+        "school" => school::validate_at(entity, document, today),
         "purchasing" => purchasing::validate(entity, document),
         "payroll" => payroll::validate(entity, document),
         "payments" => payments::validate(entity, document),
-        "pharmacy" => pharmacy::validate(entity, document),
+        "pharmacy" => pharmacy::validate_at(entity, document, today),
         "performance" => performance::validate(entity, document),
         "subscription" => subscription::validate(entity, document),
         "utilities" => utilities::validate(entity, document),
@@ -193,12 +210,30 @@ pub fn validate_remove(qname: &str, document: &serde_json::Value) -> Vec<String>
 }
 
 pub fn validate_action(qname: &str, action: &str, document: &serde_json::Value) -> Vec<String> {
+    validate_action_at(chrono::Utc::now().date_naive(), qname, action, document)
+}
+
+pub fn validate_action_for_tenant(
+    tenant: &Tenant,
+    qname: &str,
+    action: &str,
+    document: &serde_json::Value,
+) -> Vec<String> {
+    validate_action_at(tenant.business_today(), qname, action, document)
+}
+
+fn validate_action_at(
+    today: chrono::NaiveDate,
+    qname: &str,
+    action: &str,
+    document: &serde_json::Value,
+) -> Vec<String> {
     let values = document_values(document);
     let document = values.as_ref();
     let (module, entity) = qname.split_once('.').unwrap_or(("", ""));
-    let mut errors = validate_document(qname, document);
+    let mut errors = validate_document_at(today, qname, document);
     errors.extend(match module {
-        "accounting" => accounting::validate_action(entity, action, document),
+        "accounting" => accounting::validate_action_at(entity, action, document, today),
         "agriculture" => agriculture::validate_action(entity, action, document),
         "asset" => asset::validate_action(entity, action, document),
         "auto-service" => auto_service::validate_action(entity, action, document),
@@ -209,7 +244,7 @@ pub fn validate_action(qname: &str, action: &str, document: &serde_json::Value) 
         "charity" => charity::validate_action(entity, action, document),
         "clinic" => clinic::validate_action(entity, action, document),
         "communication" => communication::validate_action(entity, action, document),
-        "contract" => contract::validate_action(entity, action, document),
+        "contract" => contract::validate_action_at(entity, action, document, today),
         "construction" => construction::validate_action(entity, action, document),
         "document" => document::validate_action(entity, action, document),
         "einvoice" => einvoice::validate_action(entity, action, document),
@@ -217,16 +252,16 @@ pub fn validate_action(qname: &str, action: &str, document: &serde_json::Value) 
         "ecommerce" => ecommerce::validate_action(entity, action, document),
         "events" => event_management::validate_action(entity, action, document),
         "inventory" => inventory::validate_action(entity, action, document),
-        "insurance" => insurance::validate_action(entity, action, document),
+        "insurance" => insurance::validate_action_at(entity, action, document, today),
         "logistics" => logistics::validate_action(entity, action, document),
         "lms" => lms::validate_action(entity, action, document),
-        "marketing" => marketing::validate_action(entity, action, document),
-        "lending" => lending::validate_action(entity, action, document),
-        "manufacturing" => manufacturing::validate_action(entity, action, document),
+        "marketing" => marketing::validate_action_at(entity, action, document, today),
+        "lending" => lending::validate_action_at(entity, action, document, today),
+        "manufacturing" => manufacturing::validate_action_at(entity, action, document, today),
         "maintenance" => maintenance::validate_action(entity, action, document),
-        "sales" => sales::validate_action(entity, action, document),
+        "sales" => sales::validate_action_at(entity, action, document, today),
         "school" => school::validate_action(entity, action, document),
-        "purchasing" => purchasing::validate_action(entity, action, document),
+        "purchasing" => purchasing::validate_action_at(entity, action, document, today),
         "expense" if entity == "expense_claim" => expense::validate_action(action, document),
         "field-service" => field_service::validate_action(entity, action, document),
         "helpdesk" => helpdesk::validate_action(entity, action, document),
@@ -236,14 +271,14 @@ pub fn validate_action(qname: &str, action: &str, document: &serde_json::Value) 
         "payments" => payments::validate_action(entity, action, document),
         "pharmacy" => pharmacy::validate_action(entity, action, document),
         "performance" => performance::validate_action(entity, action, document),
-        "subscription" => subscription::validate_action(entity, action, document),
+        "subscription" => subscription::validate_action_at(entity, action, document, today),
         "utilities" => utilities::validate_action(entity, action, document),
         "pos" => pos::validate_action(entity, action, document),
         "restaurant" => restaurant::validate_action(entity, action, document),
         "project" => project::validate_action(entity, action, document),
         "quality" => quality::validate_action(entity, action, document),
         "recruitment" => recruitment::validate_action(entity, action, document),
-        "real-estate" => real_estate::validate_action(entity, action, document),
+        "real-estate" => real_estate::validate_action_at(entity, action, document, today),
         _ => Vec::new(),
     });
     errors

@@ -245,6 +245,15 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
+    validate_action_at(entity, action, document, chrono::Utc::now().date_naive())
+}
+
+pub fn validate_action_at(
+    entity: &str,
+    action: &str,
+    document: &Value,
+    today: chrono::NaiveDate,
+) -> Vec<String> {
     if entity == "production_order" && action == "done" {
         let planned = document.get("qty").and_then(decimal).unwrap_or_default();
         let good = document
@@ -281,7 +290,7 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
         }
         if let Some(expiry) = document.get("output_expiry").and_then(Value::as_str) {
             match chrono::NaiveDate::parse_from_str(expiry, "%Y-%m-%d") {
-                Ok(expiry) if expiry >= chrono::Utc::now().date_naive() => {}
+                Ok(expiry) if expiry >= today => {}
                 _ => errors
                     .push("Ngày hết hạn thành phẩm phải là ngày hợp lệ trong tương lai".into()),
             }

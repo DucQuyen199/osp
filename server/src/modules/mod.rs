@@ -107,5 +107,6 @@ pub(crate) async fn dispatch_source_events(
 
 mod validation;
 pub use validation::{
-    validate_action, validate_document, validate_persistence, validate_remove, validate_update,
+    validate_action, validate_action_for_tenant, validate_document, validate_document_for_tenant,
+    validate_persistence, validate_remove, validate_update,
 };

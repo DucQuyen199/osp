@@ -18,6 +18,10 @@ fn datetime(document: &Value, field: &str) -> Option<chrono::DateTime<chrono::Fi
 }
 
 pub fn validate(entity: &str, document: &Value) -> Vec<String> {
+    validate_at(entity, document, chrono::Utc::now().date_naive())
+}
+
+pub fn validate_at(entity: &str, document: &Value, today: chrono::NaiveDate) -> Vec<String> {
     let mut errors = Vec::new();
     match entity {
         "student" => {
@@ -27,7 +31,7 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                         .as_str()
                         .filter(|date| date.len() == 10)
                         .and_then(|date| NaiveDate::parse_from_str(date, "%Y-%m-%d").ok())
-                        .is_none_or(|date| date > chrono::Utc::now().date_naive())
+                        .is_none_or(|date| date > today)
                 }
             }) {
                 errors.push("Ngày sinh học viên phải hợp lệ và không ở tương lai".into());

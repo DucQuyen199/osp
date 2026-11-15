@@ -365,8 +365,12 @@ impl Kernel {
                 return Err(ApiError::validation(&qname, errors));
             }
         }
-        let mut domain_errors =
-            crate::modules::validate_action(&qname, action, &Value::Object(cur.clone()));
+        let mut domain_errors = crate::modules::validate_action_for_tenant(
+            t,
+            &qname,
+            action,
+            &Value::Object(cur.clone()),
+        );
         domain_errors.extend(crate::modules::inventory::validate_source_action(
             &qname,
             action,

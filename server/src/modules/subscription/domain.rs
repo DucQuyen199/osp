@@ -79,8 +79,16 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
+    validate_action_at(entity, action, document, chrono::Utc::now().date_naive())
+}
+
+pub fn validate_action_at(
+    entity: &str,
+    action: &str,
+    document: &Value,
+    today: chrono::NaiveDate,
+) -> Vec<String> {
     if entity == "billing_cycle" && action == "due" {
-        let today = chrono::Utc::now().date_naive();
         if date(document, "due_date").is_none_or(|due| due > today) {
             return vec!["Chỉ đánh dấu đến hạn khi ngày thu phí đã tới".into()];
         }

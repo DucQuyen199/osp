@@ -296,6 +296,15 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
+    validate_action_at(entity, action, document, chrono::Utc::now().date_naive())
+}
+
+pub fn validate_action_at(
+    entity: &str,
+    action: &str,
+    document: &Value,
+    today: chrono::NaiveDate,
+) -> Vec<String> {
     if !matches!(
         (entity, action),
         ("rfq", "sent" | "quoted" | "accepted")
@@ -336,7 +345,7 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
             .get("response_due")
             .and_then(Value::as_str)
             .and_then(|value| chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").ok())
-            .is_some_and(|due| due < chrono::Utc::now().date_naive())
+            .is_some_and(|due| due < today)
     {
         errors.push("RFQ response deadline cannot be in the past".into());
     }
@@ -422,7 +431,7 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
             .and_then(|value| chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").ok());
         if issue.is_none() {
             errors.push("Supplier invoice needs a valid issue date".into());
-        } else if issue.is_some_and(|date| date > chrono::Utc::now().date_naive()) {
+        } else if issue.is_some_and(|date| date > today) {
             errors.push("Supplier invoice issue date cannot be in the future".into());
         }
         if document

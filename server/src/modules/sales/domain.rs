@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, Utc};
+use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use serde_json::Value;
 use uuid::Uuid;
@@ -194,12 +194,21 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
+    validate_action_at(entity, action, document, chrono::Utc::now().date_naive())
+}
+
+pub fn validate_action_at(
+    entity: &str,
+    action: &str,
+    document: &Value,
+    today: chrono::NaiveDate,
+) -> Vec<String> {
     if entity == "quotation" && matches!(action, "sent" | "accepted") {
         if let Some(value) = document.get("valid_until").and_then(Value::as_str) {
             let Some(valid_until) = NaiveDate::parse_from_str(value, "%Y-%m-%d").ok() else {
                 return vec!["Quotation valid_until must be a valid calendar date".into()];
             };
-            if valid_until < Utc::now().date_naive() {
+            if valid_until < today {
                 return vec!["An expired quotation cannot be sent or accepted".into()];
             }
         }
@@ -212,7 +221,7 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
         else {
             return vec!["A quotation needs a valid_until date before it can expire".into()];
         };
-        if valid_until < Utc::now().date_naive() {
+        if valid_until < today {
             return Vec::new();
         }
         return vec!["A quotation can expire only after its valid_until date".into()];
@@ -284,9 +293,7 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
     }
     if entity == "quotation" {
         if let Some(valid_until) = document.get("valid_until").and_then(Value::as_str) {
-            if NaiveDate::parse_from_str(valid_until, "%Y-%m-%d")
-                .is_ok_and(|date| date < Utc::now().date_naive())
-            {
+            if NaiveDate::parse_from_str(valid_until, "%Y-%m-%d").is_ok_and(|date| date < today) {
                 errors.push(
                     "The quotation has expired; update its validity date before acceptance".into(),
                 );

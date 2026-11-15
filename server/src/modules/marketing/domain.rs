@@ -74,8 +74,16 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
+    validate_action_at(entity, action, document, chrono::Utc::now().date_naive())
+}
+
+pub fn validate_action_at(
+    entity: &str,
+    action: &str,
+    document: &Value,
+    today: chrono::NaiveDate,
+) -> Vec<String> {
     if entity == "campaign" {
-        let today = chrono::Utc::now().date_naive();
         if action == "launched" {
             if let Some(start) = date(document, "start")
                 && start > today

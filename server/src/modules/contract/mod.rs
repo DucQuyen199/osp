@@ -3,7 +3,7 @@ mod application;
 mod domain;
 mod persistence;
 pub use application::{handle_source_event, prepare_amendment};
-pub use domain::{validate, validate_action, validate_remove, validate_update};
+pub use domain::{validate, validate_action, validate_action_at, validate_remove, validate_update};
 pub use persistence::validate_persistence;
 
 pub(crate) fn scheduled_jobs() -> Vec<crate::defs::JobSpec> {

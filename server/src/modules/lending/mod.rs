@@ -6,7 +6,7 @@ mod persistence;
 pub use application::handle_source_event;
 pub use domain::{
     due_dates_from_first, installment_amounts, installment_components, validate, validate_action,
-    validate_remove, validate_update,
+    validate_action_at, validate_remove, validate_update,
 };
 pub use persistence::validate_persistence;
 

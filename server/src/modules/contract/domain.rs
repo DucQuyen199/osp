@@ -1,6 +1,6 @@
 //! Pure contract dates, terms, and lifecycle policy.
 use crate::money;
-use chrono::{NaiveDate, Utc};
+use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use serde_json::Value;
 
@@ -156,13 +156,22 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
+    validate_action_at(entity, action, document, chrono::Utc::now().date_naive())
+}
+
+pub fn validate_action_at(
+    entity: &str,
+    action: &str,
+    document: &Value,
+    today: chrono::NaiveDate,
+) -> Vec<String> {
     if entity == "amendment" {
         return match action {
             "submitted" | "approved" => {
                 let mut errors = validate_amendment(&Value::Null, document);
                 if action == "approved" {
                     let effective_date = date(document, "effective_date");
-                    if effective_date.is_some_and(|date| date < Utc::now().date_naive()) {
+                    if effective_date.is_some_and(|date| date < today) {
                         errors.push("Không thể phê duyệt phụ lục có ngày hiệu lực đã qua".into());
                     }
                 }
@@ -170,7 +179,7 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
             }
             "applied" => {
                 if date(document, "effective_date")
-                    .is_some_and(|effective_date| effective_date <= Utc::now().date_naive())
+                    .is_some_and(|effective_date| effective_date <= today)
                 {
                     Vec::new()
                 } else {
@@ -192,7 +201,7 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
             errors
         }
         "expired" => {
-            if date(document, "end_date").is_some_and(|end| end < Utc::now().date_naive()) {
+            if date(document, "end_date").is_some_and(|end| end < today) {
                 Vec::new()
             } else {
                 vec!["Chỉ được chuyển hợp đồng sang hết hạn sau ngày kết thúc".into()]

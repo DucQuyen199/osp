@@ -538,7 +538,8 @@ impl Kernel {
                 return Err(ApiError::validation(&qname, errors));
             }
         }
-        let domain_errors = crate::modules::validate_document(&qname, &Value::Object(cur.clone()));
+        let domain_errors =
+            crate::modules::validate_document_for_tenant(t, &qname, &Value::Object(cur.clone()));
         if !domain_errors.is_empty() {
             return Err(ApiError::validation(&qname, domain_errors));
         }

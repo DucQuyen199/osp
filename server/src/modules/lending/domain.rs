@@ -1,6 +1,6 @@
 //! Lending terms, amortization, and repayment lifecycle invariants.
 use crate::money;
-use chrono::{NaiveDate, Utc};
+use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use serde_json::Value;
 
@@ -92,6 +92,15 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
+    validate_action_at(entity, action, document, chrono::Utc::now().date_naive())
+}
+
+pub fn validate_action_at(
+    entity: &str,
+    action: &str,
+    document: &Value,
+    today: chrono::NaiveDate,
+) -> Vec<String> {
     if entity == "loan" && action == "disbursed" {
         if matches!(
             document.get("method").and_then(Value::as_str),
@@ -117,7 +126,7 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
         .get("due_date")
         .and_then(Value::as_str)
         .and_then(|date| NaiveDate::parse_from_str(date, "%Y-%m-%d").ok());
-    if due.is_some_and(|date| date < Utc::now().date_naive()) {
+    if due.is_some_and(|date| date < today) {
         Vec::new()
     } else {
         vec!["Chỉ kỳ đã quá ngày đến hạn mới được đánh dấu quá hạn".into()]

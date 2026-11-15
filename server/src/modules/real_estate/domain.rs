@@ -58,6 +58,15 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
+    validate_action_at(entity, action, document, chrono::Utc::now().date_naive())
+}
+
+pub fn validate_action_at(
+    entity: &str,
+    action: &str,
+    document: &Value,
+    today: chrono::NaiveDate,
+) -> Vec<String> {
     match (entity, action) {
         ("property", "sold") => {
             let mut errors = Vec::new();
@@ -75,9 +84,7 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
         }
         ("reservation", "reserved") => {
             let mut errors = Vec::new();
-            if date(document, "expires_on")
-                .is_none_or(|expiry| expiry < chrono::Utc::now().date_naive())
-            {
+            if date(document, "expires_on").is_none_or(|expiry| expiry < today) {
                 errors.push("A reservation must expire today or on a future date".into());
             }
             if !document

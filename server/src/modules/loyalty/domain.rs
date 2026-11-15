@@ -1,5 +1,5 @@
 use crate::money;
-use chrono::{NaiveDate, Utc};
+use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use serde_json::Value;
 use uuid::Uuid;
@@ -41,6 +41,10 @@ pub fn points_for(total: Decimal) -> Option<Decimal> {
 }
 
 pub fn validate(entity: &str, document: &Value) -> Vec<String> {
+    validate_at(entity, document, chrono::Utc::now().date_naive())
+}
+
+pub fn validate_at(entity: &str, document: &Value, today: chrono::NaiveDate) -> Vec<String> {
     match entity {
         "member" => document
             .get("points")
@@ -82,9 +86,7 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                 errors.push("Mã voucher phải có từ 1 đến 80 ký tự".into());
             }
             if let Some(value) = document.get("valid_until").and_then(Value::as_str) {
-                if NaiveDate::parse_from_str(value, "%Y-%m-%d")
-                    .map_or(true, |date| date < Utc::now().date_naive())
-                {
+                if NaiveDate::parse_from_str(value, "%Y-%m-%d").map_or(true, |date| date < today) {
                     errors
                         .push("Hạn dùng voucher phải là ngày hôm nay hoặc trong tương lai".into());
                 }

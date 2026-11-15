@@ -414,6 +414,15 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
+    validate_action_at(entity, action, document, chrono::Utc::now().date_naive())
+}
+
+pub fn validate_action_at(
+    entity: &str,
+    action: &str,
+    document: &Value,
+    today: chrono::NaiveDate,
+) -> Vec<String> {
     match (entity, action) {
         ("settlement_batch", "submitted" | "approved") => validate("settlement_batch", document),
         ("period", "closed") => {
@@ -425,7 +434,7 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
             };
             if start > end {
                 vec!["Ngày bắt đầu kỳ phải nhỏ hơn hoặc bằng ngày kết thúc".into()]
-            } else if end > chrono::Utc::now().date_naive() {
+            } else if end > today {
                 vec!["An accounting period can only be closed after its end date".into()]
             } else {
                 Vec::new()

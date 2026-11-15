@@ -367,7 +367,8 @@ impl Kernel {
                 crate::modules::accounting::prepare_payment_currency(tx, t, &mut clean).await?,
             );
         }
-        errors.extend(crate::modules::validate_document(
+        errors.extend(crate::modules::validate_document_for_tenant(
+            t,
             &qname,
             &Value::Object(clean.clone()),
         ));

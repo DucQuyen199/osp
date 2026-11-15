@@ -20,6 +20,10 @@ fn date(document: &Value, field: &str) -> Option<NaiveDate> {
 }
 
 pub fn validate(entity: &str, document: &Value) -> Vec<String> {
+    validate_at(entity, document, chrono::Utc::now().date_naive())
+}
+
+pub fn validate_at(entity: &str, document: &Value, today: chrono::NaiveDate) -> Vec<String> {
     match entity {
         "policy" => {
             let mut errors = Vec::new();
@@ -79,9 +83,7 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
             }
             if date(document, "incident_date").is_none() {
                 errors.push("Ngày xảy ra sự cố phải hợp lệ".into());
-            } else if date(document, "incident_date")
-                .is_some_and(|incident| incident > chrono::Utc::now().date_naive())
-            {
+            } else if date(document, "incident_date").is_some_and(|incident| incident > today) {
                 errors.push("Ngày xảy ra sự cố không thể nằm trong tương lai".into());
             }
             errors
@@ -91,6 +93,15 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
+    validate_action_at(entity, action, document, chrono::Utc::now().date_naive())
+}
+
+pub fn validate_action_at(
+    entity: &str,
+    action: &str,
+    document: &Value,
+    today: chrono::NaiveDate,
+) -> Vec<String> {
     if entity == "claim"
         && action == "paid"
         && (!matches!(
@@ -129,7 +140,7 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
             }
         }
         ("policy", "lapsed") => {
-            if date(document, "end_date").is_none_or(|end| end >= chrono::Utc::now().date_naive()) {
+            if date(document, "end_date").is_none_or(|end| end >= today) {
                 return vec!["Chỉ chuyển hợp đồng sang hết hạn sau ngày kết thúc bảo hiểm".into()];
             }
         }

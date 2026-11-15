@@ -301,7 +301,12 @@ fn lint_kernel_dispatch(module_root: &Path, registry: &defs::Registry, issues: &
                     "[{module_id}] domain::{hook} is not exported from its Rust context"
                 ));
             }
-            if !dispatcher.contains(&format!("{context_id}::{hook}(")) {
+            let routed_hook = if domain.contains(&format!("pub fn {hook}_at(")) {
+                format!("{hook}_at")
+            } else {
+                hook.to_string()
+            };
+            if !dispatcher.contains(&format!("{context_id}::{routed_hook}(")) {
                 issues.push(format!(
                     "[{module_id}] domain::{hook} is not routed by server/src/modules/validation.rs"
                 ));
@@ -371,8 +376,13 @@ fn lint_kernel_dispatch(module_root: &Path, registry: &defs::Registry, issues: &
                 ));
             }
         }
+        let routed_action = if domain.contains("pub fn validate_action_at(") {
+            "validate_action_at"
+        } else {
+            "validate_action"
+        };
         if domain.contains("pub fn validate_action(")
-            && !dispatcher.contains(&format!("{context_id}::validate_action("))
+            && !dispatcher.contains(&format!("{context_id}::{routed_action}("))
         {
             issues.push(format!(
                 "[{module_id}] domain::validate_action is not routed by server/src/modules/validation.rs"

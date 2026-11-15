@@ -26,6 +26,7 @@ import RolesSettingsPage from './RolesSettingsPage.jsx';
 import InventorySettingsPage from './InventorySettingsPage.jsx';
 import BudgetSettingsPage from './BudgetSettingsPage.jsx';
 import CurrencySettingsPage from './CurrencySettingsPage.jsx';
+import BusinessTimeSettingsPage from './BusinessTimeSettingsPage.jsx';
 import TokensSettingsPage from './TokensSettingsPage.jsx';
 import AuditSettingsPage from './AuditSettingsPage.jsx';
 import FailuresSettingsPage from './FailuresSettingsPage.jsx';
@@ -35,6 +36,7 @@ import DataSettingsPage from './DataSettingsPage.jsx';
 import MfaSettingsPage from './MfaSettingsPage.jsx';
 import AuthPage from './AuthPage.jsx';
 import { api, onUnauthorized, session } from './lib/api.js';
+import { setBusinessTimezone } from './lib/dates.js';
 import { CATEGORY_ORDER, categoryLabel, formatLocale, setFormatLocale } from './lib/i18n.js';
 import { app, can, entityLabel, isAdmin, loadMeta, loadSummary, resetCaches } from './lib/state.js';
 import { listHref } from './lib/routes.js';
@@ -329,6 +331,7 @@ function App() {
     try {
       const loaded = await loadMeta();
       await loadSummary();
+      setBusinessTimezone(loaded.settings?.businessTimezone || 'UTC');
       setMeta(loaded);
       setUser(app.user);
       setError('');
@@ -345,7 +348,11 @@ function App() {
 
   useEffect(() => {
     const changed = () => { setRoute(parseRoute()); setNavOpen(false); };
-    const metaChanged = () => { setMeta(app.meta); setUser(app.user); };
+    const metaChanged = () => {
+      setBusinessTimezone(app.meta?.settings?.businessTimezone || 'UTC');
+      setMeta(app.meta);
+      setUser(app.user);
+    };
     window.addEventListener('hashchange', changed);
     window.addEventListener('osp:meta', metaChanged);
     document.documentElement.dataset.theme = theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
@@ -369,7 +376,7 @@ function App() {
         try {
           const loaded = await loadMeta();
           await loadSummary();
-          if (alive) { setMeta(loaded); setUser(app.user); }
+          if (alive) { setBusinessTimezone(loaded.settings?.businessTimezone || 'UTC'); setMeta(loaded); setUser(app.user); }
         } catch {
           session.clear();
           resetCaches();
@@ -567,6 +574,7 @@ function App() {
         : route.name === 'settings' && route.tab === 'inventory' ? <InventorySettingsPage />
         : route.name === 'settings' && route.tab === 'budget' ? <BudgetSettingsPage />
         : route.name === 'settings' && route.tab === 'currency' ? <CurrencySettingsPage />
+        : route.name === 'settings' && route.tab === 'business-time' ? <BusinessTimeSettingsPage />
         : route.name === 'settings' && route.tab === 'tokens' ? <TokensSettingsPage />
         : route.name === 'settings' && route.tab === 'audit' ? <AuditSettingsPage />
         : route.name === 'settings' && route.tab === 'failures' ? <FailuresSettingsPage />

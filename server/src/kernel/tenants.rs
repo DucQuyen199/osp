@@ -94,7 +94,7 @@ impl Kernel {
                 .as_ref()
                 .map(|v| v.terminology.clone())
                 .unwrap_or_default(),
-            settings: json!({ "allowNegativeStock": false, "inventoryCostMethod": "moving_average", "baseCurrency": "VND", "enforceBudgetControl": false }),
+            settings: json!({ "allowNegativeStock": false, "inventoryCostMethod": "moving_average", "baseCurrency": "VND", "enforceBudgetControl": false, "businessTimezone": "UTC" }),
             extensions,
             roles: roles.clone(),
             created_at: String::new(),
@@ -416,6 +416,13 @@ impl Kernel {
                 }
                 "inventoryCostMethod"
                     if matches!(value.as_str(), Some("moving_average" | "fifo")) =>
+                {
+                    obj.insert(key.clone(), value.clone());
+                }
+                "businessTimezone"
+                    if value
+                        .as_str()
+                        .is_some_and(|zone| zone.parse::<chrono_tz::Tz>().is_ok()) =>
                 {
                     obj.insert(key.clone(), value.clone());
                 }

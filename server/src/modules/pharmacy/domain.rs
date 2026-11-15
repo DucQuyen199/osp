@@ -3,6 +3,10 @@ use chrono::NaiveDate;
 use serde_json::Value;
 
 pub fn validate(entity: &str, document: &Value) -> Vec<String> {
+    validate_at(entity, document, chrono::Utc::now().date_naive())
+}
+
+pub fn validate_at(entity: &str, document: &Value, today: chrono::NaiveDate) -> Vec<String> {
     if entity != "prescription" {
         return Vec::new();
     }
@@ -30,7 +34,7 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
     if issued.zip(valid).is_some_and(|(a, b)| b < a) {
         errors.push("Ngày hết hạn không được trước ngày kê".into());
     }
-    if issued.is_some_and(|date| date > chrono::Utc::now().date_naive()) {
+    if issued.is_some_and(|date| date > today) {
         errors.push("Ngày kê đơn không được ở tương lai".into());
     }
     match document.get("items").and_then(Value::as_array) {

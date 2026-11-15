@@ -11,6 +11,10 @@ fn positive(value: Option<&Value>) -> bool {
 }
 
 pub fn validate(entity: &str, document: &Value) -> Vec<String> {
+    validate_at(entity, document, chrono::Utc::now().date_naive())
+}
+
+pub fn validate_at(entity: &str, document: &Value, today: chrono::NaiveDate) -> Vec<String> {
     let mut errors = Vec::new();
     match entity {
         "patient" => {
@@ -18,7 +22,7 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                 if dob.len() != 10
                     || NaiveDate::parse_from_str(dob, "%Y-%m-%d")
                         .ok()
-                        .is_none_or(|date| date > chrono::Utc::now().date_naive())
+                        .is_none_or(|date| date > today)
                 {
                     errors.push("Ngày sinh phải hợp lệ và không nằm trong tương lai".into());
                 }

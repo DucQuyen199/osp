@@ -12,6 +12,10 @@ fn positive(document: &Value, field: &str) -> bool {
 }
 
 pub fn validate(entity: &str, document: &Value) -> Vec<String> {
+    validate_at(entity, document, chrono::Utc::now().date_naive())
+}
+
+pub fn validate_at(entity: &str, document: &Value, today: chrono::NaiveDate) -> Vec<String> {
     let mut errors = Vec::new();
     match entity {
         "boq" => {
@@ -93,7 +97,7 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                 .and_then(Value::as_str)
                 .filter(|date| date.len() == 10)
                 .and_then(|date| NaiveDate::parse_from_str(date, "%Y-%m-%d").ok())
-                .is_none_or(|date| date > chrono::Utc::now().date_naive())
+                .is_none_or(|date| date > today)
             {
                 errors.push("Kỳ nghiệm thu cần là ngày hợp lệ, không nằm trong tương lai".into());
             }
@@ -103,7 +107,7 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
             if date
                 .filter(|date| date.len() == 10)
                 .and_then(|date| NaiveDate::parse_from_str(date, "%Y-%m-%d").ok())
-                .is_none_or(|date| date > chrono::Utc::now().date_naive())
+                .is_none_or(|date| date > today)
             {
                 errors.push("Nhật ký cần ngày hợp lệ, không nằm trong tương lai".into());
             }

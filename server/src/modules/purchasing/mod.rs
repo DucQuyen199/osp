@@ -7,5 +7,5 @@ pub use application::{
     create_order_from_requisition, create_order_from_rfq, handle_source_event, prepare_document,
     preview_document,
 };
-pub use domain::{validate, validate_action, validate_remove, validate_update};
+pub use domain::{validate, validate_action, validate_action_at, validate_remove, validate_update};
 pub use persistence::validate_persistence;

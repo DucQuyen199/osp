@@ -12,6 +12,7 @@ axum = { version = "0.8.9", features = ["macros"] }
 base64 = "0.23.1"
 bytes = "1.12.1"
 chrono = { version = "0.4.45", features = ["serde"] }
+chrono-tz = "0.10.4"
 csv = "1.4.0"
 deadpool-postgres = "0.14.2"
 futures = "0.3.34"

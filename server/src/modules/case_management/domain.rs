@@ -9,6 +9,10 @@ fn max_case_money() -> Decimal {
 }
 
 pub fn validate(entity: &str, document: &Value) -> Vec<String> {
+    validate_at(entity, document, chrono::Utc::now().date_naive())
+}
+
+pub fn validate_at(entity: &str, document: &Value, today: chrono::NaiveDate) -> Vec<String> {
     let mut errors = Vec::new();
     match entity {
         "case" => {
@@ -27,7 +31,7 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                     .and_then(Value::as_str)
                     .filter(|date| date.len() == 10)
                     .and_then(|date| NaiveDate::parse_from_str(date, "%Y-%m-%d").ok())
-                    .is_none_or(|date| date > chrono::Utc::now().date_naive())
+                    .is_none_or(|date| date > today)
             {
                 errors.push("Ngày mở vụ việc phải hợp lệ và không nằm trong tương lai".into());
             }
@@ -64,7 +68,7 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                     .and_then(|date| NaiveDate::parse_from_str(date, "%Y-%m-%d").ok())
                 {
                     None => errors.push("Giờ công cần ngày làm việc hợp lệ".into()),
-                    Some(date) if date > chrono::Utc::now().date_naive() => {
+                    Some(date) if date > today => {
                         errors.push("Ngày giờ công không thể nằm trong tương lai".into());
                     }
                     _ => {}
