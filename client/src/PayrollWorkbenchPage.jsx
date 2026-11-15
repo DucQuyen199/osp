@@ -8,6 +8,11 @@ import { listHref } from './lib/routes.js';
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
 const weekdayOptions = [[1, 'T2'], [2, 'T3'], [3, 'T4'], [4, 'T5'], [5, 'T6'], [6, 'T7'], [7, 'CN']];
+const csvCell = (value) => {
+  const text = String(value ?? '');
+  const safe = typeof value === 'string' && (/^[\s]*[=+@]/.test(text) || /^[\s]*-/.test(text)) ? `'${text}` : text;
+  return `"${safe.replaceAll('"', '""')}"`;
+};
 
 export default function PayrollWorkbenchPage() {
   const [runs, setRuns] = useState([]);
@@ -20,6 +25,7 @@ export default function PayrollWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [reportYear, setReportYear] = useState(localMonth().slice(0, 4));
   const workflowApproval = app.meta?.modules?.some((module) => module.id === 'workflow-approval') || false;
 
   const load = useCallback(async (quiet = false) => {
@@ -41,6 +47,30 @@ export default function PayrollWorkbenchPage() {
   useEffect(() => { document.title = 'Bảng lương · OSP Suite'; load(); }, [load]);
   const selected = runs.find((row) => row.id === selectedId);
   const runSlips = useMemo(() => payslips.filter((row) => row.run === selectedId).sort((a, b) => String(employees.get(a.employee)?.name || '').localeCompare(String(employees.get(b.employee)?.name || ''), 'vi')), [payslips, selectedId, employees]);
+  const annualReport = useMemo(() => {
+    const paidRuns = new Set(runs.filter((row) => row.status === 'paid' && String(row.payment_date || '').startsWith(`${reportYear}-`)).map((row) => row.id));
+    const byEmployee = new Map();
+    for (const slip of payslips) {
+      if (!paidRuns.has(slip.run) || !slip.employee) continue;
+      const current = byEmployee.get(slip.employee) || { employee: slip.employee, paidRuns: new Set(), gross: 0, taxable_income: 0, income_tax: 0, employee_contribution: 0, net: 0 };
+      current.paidRuns.add(slip.run);
+      for (const field of ['gross', 'taxable_income', 'income_tax', 'employee_contribution', 'net']) current[field] += Number(slip[field]) || 0;
+      byEmployee.set(slip.employee, current);
+    }
+    return [...byEmployee.values()].map((row) => ({
+      ...row,
+      paidRuns: row.paidRuns.size,
+      gross: Math.round((row.gross + Number.EPSILON) * 100) / 100,
+      taxable_income: Math.round((row.taxable_income + Number.EPSILON) * 100) / 100,
+      income_tax: Math.round((row.income_tax + Number.EPSILON) * 100) / 100,
+      employee_contribution: Math.round((row.employee_contribution + Number.EPSILON) * 100) / 100,
+      net: Math.round((row.net + Number.EPSILON) * 100) / 100,
+    })).sort((a, b) => String(employees.get(a.employee)?.name || '').localeCompare(String(employees.get(b.employee)?.name || ''), 'vi'));
+  }, [runs, payslips, employees, reportYear]);
+  const reportYears = useMemo(() => {
+    const years = new Set([localMonth().slice(0, 4), ...runs.map((row) => String(row.period || '').slice(0, 4)).filter((year) => /^\d{4}$/.test(year))]);
+    return [...years].sort((a, b) => b.localeCompare(a));
+  }, [runs]);
   const requestByRun = approvalRequests.find((row) => row.entity === 'payroll.payroll_run' && row.record_id === selectedId);
   const totals = useMemo(() => ({
     draft: runs.filter((row) => ['draft', 'rejected'].includes(row.status)).length,
@@ -76,6 +106,19 @@ export default function PayrollWorkbenchPage() {
     await run(`${row.id}:${verb}`, () => action('payroll.payroll_run', row, verb), messages[verb]);
   }
 
+  function exportAnnualReport() {
+    const columns = ['Mã nhân viên', 'Nhân viên', 'Số bảng lương đã chi', 'Lương gộp', 'Thu nhập tính thuế', 'Thuế TNCN đã khấu trừ', 'Khoản đóng góp của nhân viên', 'Thực nhận'];
+    const rows = annualReport.map((row) => {
+      const employee = employees.get(row.employee);
+      return [employee?.code || '', employee?.name || 'Nhân viên', row.paidRuns, row.gross, row.taxable_income, row.income_tax, row.employee_contribution, row.net].map(csvCell).join(',');
+    });
+    const blob = new Blob([`\uFEFF${[columns.map(csvCell).join(','), ...rows].join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url; link.download = `payroll-withholding-${reportYear}.csv`; link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   const runApproval = (row) => approvalRequests.find((item) => item.entity === 'payroll.payroll_run' && item.record_id === row.id);
   const canDirectApprove = !workflowApproval && can('payroll.payroll_run.approved');
   const inputLinks = [
@@ -96,6 +139,10 @@ export default function PayrollWorkbenchPage() {
     {can('payroll.payroll_run.create') && <section className="card card-pad"><h2>Mở kỳ lương</h2><form className="form-grid" onSubmit={createRun}><label className="field"><span className="label">Kỳ lương *</span><input className="input" required type="month" value={form.period} onChange={(event) => setForm({ ...form, period: event.target.value })}/></label><label className="field"><span className="label">Giờ chuẩn mỗi ngày</span><input className="input num" type="number" min="1" max="24" step="0.25" value={form.hours_per_day} onChange={(event) => setForm({ ...form, hours_per_day: event.target.value })}/><span className="small muted">Giờ chấm công được quy đổi thành tỷ lệ ngày công theo chuẩn này; thời gian vượt tính qua tăng ca đã duyệt.</span></label><fieldset className="field" style={{ border: 0, padding: 0, margin: 0 }}><legend className="label">Ngày làm việc trong tuần *</legend><div className="row wrap" style={{ gap: 12 }}>{weekdayOptions.map(([day, label]) => <label className="row small" key={day} style={{ gap: 5 }}><input type="checkbox" checked={form.working_weekdays.includes(day)} onChange={() => setForm((current) => ({ ...current, working_weekdays: current.working_weekdays.includes(day) ? current.working_weekdays.filter((value) => value !== day) : [...current.working_weekdays, day].sort((a, b) => a - b) }))}/>{label}</label>)}</div><span className="small muted">Mặc định thứ Hai–thứ Sáu. Lịch này được chốt trong kỳ lương; ca xoay riêng từng nhân viên chưa được áp dụng.</span></fieldset><label className="field"><span className="label">Ngày dự kiến chi *</span><input className="input" required type="date" value={form.payment_date} onChange={(event) => setForm({ ...form, payment_date: event.target.value })}/></label><label className="field"><span className="label">Phương thức chi *</span><select className="select" required value={form.payment_method} onChange={(event) => setForm({ ...form, payment_method: event.target.value })}><option value="bank">Chuyển khoản</option><option value="cash">Tiền mặt</option></select></label><div className="row"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !form.period || !form.payment_date || !form.working_weekdays.length}>Tạo kỳ lương nháp</button></div></form></section>}
 
     <section className="card card-pad" style={{ marginTop: 16 }}><div className="row wrap"><h2>Đầu vào và chính sách</h2><span className="grow"/><span className="small muted">Hoàn tất và duyệt dữ liệu nguồn trước khi tính kỳ lương.</span></div><div className="row wrap" style={{ marginTop: 8 }}>{inputLinks.map(([, entity, label]) => <a className="btn btn-secondary btn-sm" key={entity} href={listHref(entity)}>{label}</a>)}</div></section>
+
+    {can('payroll.payroll_run.read') && can('payroll.payslip.read') && <section className="card card-pad" style={{ marginTop: 16 }}><div className="row wrap"><div><h2>Tổng hợp lương và thuế theo năm</h2><p className="small muted">Cộng phiếu từ các bảng lương có ngày chi trong năm đã chọn. Số liệu chỉ phản ánh payroll tại doanh nghiệp này; chưa phải tờ khai quyết toán cá nhân vì không bao gồm thu nhập/khấu trừ từ nguồn khác.</p></div><span className="grow"/><label className="field"><span className="label">Năm</span><select className="select" value={reportYear} onChange={(event) => setReportYear(event.target.value)}>{reportYears.map((year) => <option key={year} value={year}>{year}</option>)}</select></label><button className="btn btn-secondary" type="button" disabled={!annualReport.length} onClick={exportAnnualReport}>Tải CSV</button></div>
+      {loading ? <div className="skeleton" data-h="row"/> : annualReport.length ? <div className="table-wrap"><table className="table"><thead><tr><th>Nhân viên</th><th>Số bảng lương đã chi</th><th>Lương gộp</th><th>Thu nhập tính thuế</th><th>Thuế TNCN đã khấu trừ</th><th>Đóng góp nhân viên</th><th>Thực nhận</th></tr></thead><tbody>{annualReport.map((row) => <tr key={row.employee}><td>{employees.get(row.employee) ? recordLabel('hrm.employee', employees.get(row.employee)) : 'Nhân viên'}</td><td>{row.paidRuns}</td><td>{fmtMoney(row.gross)}</td><td>{fmtMoney(row.taxable_income)}</td><td>{fmtMoney(row.income_tax)}</td><td>{fmtMoney(row.employee_contribution)}</td><td><strong>{fmtMoney(row.net)}</strong></td></tr>)}</tbody><tfoot><tr><th>Tổng</th><th>—</th>{['gross', 'taxable_income', 'income_tax', 'employee_contribution', 'net'].map((field) => <th key={field}>{fmtMoney(annualReport.reduce((sum, row) => sum + row[field], 0))}</th>)}</tr></tfoot></table></div> : <div className="empty">Chưa có payroll được chi trả trong năm {reportYear}.</div>}
+    </section>}
 
     {loading ? <div className="skeleton" data-h="row"/> : !runs.length ? <div className="card card-pad empty" style={{ marginTop: 16 }}>Chưa có kỳ lương. Mở kỳ mới sau khi xác nhận kỳ chấm công và chính sách lương.</div> : <div className="layout-split" style={{ marginTop: 16 }}>
       <section className="card card-pad"><h2>Các kỳ lương</h2><div className="table-wrap"><table className="table"><thead><tr><th>Kỳ</th><th>Ngày chi</th><th>Thực nhận</th><th>Trạng thái</th></tr></thead><tbody>{runs.map((row) => <tr key={row.id} className={selectedId === row.id ? 'selected' : ''} onClick={() => setSelectedId(row.id)} style={{ cursor: 'pointer' }}><td><strong>{row.period}</strong><div className="small muted">{runSlips.length && selectedId === row.id ? `${runSlips.length} phiếu lương` : ''}</div></td><td>{fmtDate(row.payment_date)}</td><td>{fmtMoney(row.total_net || 0)}</td><td>{statusLabel(row.status)}</td></tr>)}</tbody></table></div></section>
