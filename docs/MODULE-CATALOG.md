@@ -236,7 +236,7 @@ Tổng: **50 module**, **199 loại dữ liệu**, **902 sự kiện**.
 | `purchase_receipt` Phiếu nhận hàng mua | `draft` → **cancelled** (draft→cancelled), **received** (draft→received) |
 | `supplier_invoice` Hóa đơn nhà cung cấp | `draft` → **approved** (draft/submitted→approved), **disputed** (submitted→disputed), **rejected** (submitted→rejected), **submitted** (draft/disputed/rejected→submitted) |
 | `purchase_requisition` Đề nghị mua | `draft` → **approved** (submitted→approved), **rejected** (submitted→rejected), **sourced** (approved→sourced), **submitted** (draft/rejected→submitted) |
-| `purchase_return` Phiếu trả hàng mua | `draft` → **approved** (submitted→approved), **cancelled** (draft/rejected→cancelled), **dispatched** (approved→dispatched), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
+| `purchase_return` Phiếu trả hàng mua | `draft` → **approved** (submitted→approved), **cancelled** (draft/rejected/approved→cancelled), **dispatched** (approved→dispatched), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 
 ## Tài chính
 

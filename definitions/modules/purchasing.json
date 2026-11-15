@@ -549,7 +549,8 @@
      "cancelled": {
       "from": [
        "draft",
-       "rejected"
+       "rejected",
+       "approved"
       ],
       "to": "cancelled"
      }

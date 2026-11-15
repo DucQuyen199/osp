@@ -123586,7 +123586,7 @@
             "bearer": []
           }
         ],
-        "summary": "Phiếu trả hàng mua: cancelled (draft|rejected → cancelled)",
+        "summary": "Phiếu trả hàng mua: cancelled (draft|rejected|approved → cancelled)",
         "tags": [
           "purchasing"
         ]
