@@ -71,7 +71,7 @@ Tổng: **50 module**, **199 loại dữ liệu**, **903 sự kiện**.
 | `uom` Đơn vị tính | — |
 | `branch` Chi nhánh/Cửa hàng | — |
 | `currency` Tiền tệ | — |
-| `currency_rate` Tá»· giÃ¡ tiá»n tá»‡ | — |
+| `currency_rate` Tỷ giá tiền tệ | — |
 | `tax` Thuế | — |
 
 ## Bán hàng & khách hàng
@@ -517,7 +517,7 @@ Tổng: **50 module**, **199 loại dữ liệu**, **903 sự kiện**.
 
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
-| `loan` Khoản vay | `applied` → **approved** (applied→approved), **closed** (disbursed→closed), **defaulted** (disbursed→defaulted), **disbursed** (approved→disbursed), **rejected** (applied→rejected) |
+| `loan` Khoản vay | `applied` → **approved** (applied→approved), **closed** (disbursed/defaulted→closed), **defaulted** (disbursed→defaulted), **disbursed** (approved→disbursed), **rejected** (applied→rejected) |
 | `repayment` Kỳ trả nợ | `due` → **overdue** (due→overdue), **paid** (due/overdue→paid) |
 
 ### pharmacy

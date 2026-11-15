@@ -84,21 +84,15 @@ impl Kernel {
                         "inventory.stock_count" => {
                             "Stock count creator cannot approve or reject their own variance"
                         }
-                        "construction.boq" => {
-                            "NgÆ°á»i láº­p BOQ khÃ´ng Ä‘Æ°á»£c tá»± duyá»‡t baseline dá»± Ã¡n"
-                        }
+                        "construction.boq" => "Người lập BOQ không được tự duyệt baseline dự án",
                         "lending.loan" if action == "disbursed" => {
-                            "NgÆ°á»i duyá»‡t khoáº£n vay khÃ´ng Ä‘Æ°á»£c tá»± giáº£i ngÃ¢n"
+                            "Người duyệt khoản vay không được tự giải ngân"
                         }
-                        "lending.loan" => {
-                            "NgÆ°á»i láº­p há»“ sÆ¡ vay khÃ´ng Ä‘Æ°á»£c tá»± duyá»‡t hoáº·c tá»« chá»‘i"
-                        }
+                        "lending.loan" => "Người lập hồ sơ vay không được tự duyệt hoặc từ chối",
                         "insurance.claim" if action == "paid" => {
-                            "NgÆ°á»i duyá»‡t bá»“i thÆ°á»ng khÃ´ng Ä‘Æ°á»£c tá»± chi tráº£"
+                            "Người duyệt bồi thường không được tự chi trả"
                         }
-                        _ => {
-                            "NgÆ°á»i tiáº¿p nháº­n há»“ sÆ¡ bá»“i thÆ°á»ng khÃ´ng Ä‘Æ°á»£c tá»± duyá»‡t hoáº·c tá»« chá»‘i"
-                        }
+                        _ => "Người tiếp nhận hồ sơ bồi thường không được tự duyệt hoặc từ chối",
                     };
                     return Err(ApiError::validation(&qname, vec![reason.into()]));
                 }

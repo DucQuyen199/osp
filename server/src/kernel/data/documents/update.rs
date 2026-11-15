@@ -29,9 +29,7 @@ impl Kernel {
             )
             .await?;
         if row.is_none() {
-            return Err(ApiError::not_found(format!(
-                "KhÃ´ng tÃ¬m tháº¥y {qname} {id}"
-            )));
+            return Err(ApiError::not_found(format!("Không tìm thấy {qname} {id}")));
         }
         let mut cur = self
             .get_row(tx, t, &qname, id)

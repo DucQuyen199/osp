@@ -7814,6 +7814,10 @@
       "insurance_policy": {
         "description": "Hợp đồng bảo hiểm",
         "properties": {
+          "cancellation_reason": {
+            "readOnly": true,
+            "type": "string"
+          },
           "coverage_limit": {
             "type": "number"
           },
@@ -7871,6 +7875,10 @@
         "additionalProperties": false,
         "description": "Hợp đồng bảo hiểm (dữ liệu gửi lên)",
         "properties": {
+          "cancellation_reason": {
+            "readOnly": true,
+            "type": "string"
+          },
           "coverage_limit": {
             "type": "number"
           },
@@ -9467,6 +9475,12 @@
             "readOnly": true,
             "type": "string"
           },
+          "redelivery_of": {
+            "description": "Tham chiếu tới logistics.shipment",
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
           "short_delivery_reason": {
             "readOnly": true,
             "type": "string"
@@ -9554,6 +9568,12 @@
             "type": "string"
           },
           "received_by": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "redelivery_of": {
+            "description": "Tham chiếu tới logistics.shipment",
+            "format": "uuid",
             "readOnly": true,
             "type": "string"
           },
@@ -11192,7 +11212,7 @@
         "type": "object"
       },
       "master_data_currency_rate": {
-        "description": "Tá»· giÃ¡ tiá»n tá»‡",
+        "description": "Tỷ giá tiền tệ",
         "properties": {
           "createdAt": {
             "format": "date-time",
@@ -11231,7 +11251,7 @@
       },
       "master_data_currency_rateInput": {
         "additionalProperties": false,
-        "description": "Tá»· giÃ¡ tiá»n tá»‡ (dữ liệu gửi lên)",
+        "description": "Tỷ giá tiền tệ (dữ liệu gửi lên)",
         "properties": {
           "effective_date": {
             "format": "date",
@@ -13301,6 +13321,13 @@
             "format": "uuid",
             "type": "string"
           },
+          "cash_received": {
+            "type": "number"
+          },
+          "change_due": {
+            "readOnly": true,
+            "type": "number"
+          },
           "createdAt": {
             "format": "date-time",
             "readOnly": true,
@@ -13390,6 +13417,13 @@
             "description": "Tham chiếu tới master-data.branch",
             "format": "uuid",
             "type": "string"
+          },
+          "cash_received": {
+            "type": "number"
+          },
+          "change_due": {
+            "readOnly": true,
+            "type": "number"
           },
           "lines": {
             "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
@@ -78204,7 +78238,7 @@
     },
     "/api/t/{tenantId}/data/insurance/policy/{id}/cancelled": {
       "post": {
-        "description": "Phát sự kiện `insurance.policy.cancelled` cho các module khác phản ứng.",
+        "description": "Record the cancellation reason and cancel the policy atomically.",
         "parameters": [
           {
             "in": "path",
@@ -78224,6 +78258,27 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "cancellation_reason": {
+                    "maxLength": 500,
+                    "minLength": 5,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "cancellation_reason"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -85715,7 +85770,7 @@
             "bearer": []
           }
         ],
-        "summary": "Khoản vay: closed (disbursed → closed)",
+        "summary": "Khoản vay: closed (disbursed|defaulted → closed)",
         "tags": [
           "lending"
         ]
@@ -104848,7 +104903,7 @@
             "bearer": []
           }
         ],
-        "summary": "Danh sách Tá»· giÃ¡ tiá»n tá»‡",
+        "summary": "Danh sách Tỷ giá tiền tệ",
         "tags": [
           "master-data"
         ]
@@ -104953,7 +105008,7 @@
             "bearer": []
           }
         ],
-        "summary": "Tạo Tá»· giÃ¡ tiá»n tá»‡",
+        "summary": "Tạo Tỷ giá tiền tệ",
         "tags": [
           "master-data"
         ]
@@ -105030,7 +105085,7 @@
             "bearer": []
           }
         ],
-        "summary": "Xóa Tá»· giÃ¡ tiá»n tá»‡",
+        "summary": "Xóa Tỷ giá tiền tệ",
         "tags": [
           "master-data"
         ]
@@ -105102,7 +105157,7 @@
             "bearer": []
           }
         ],
-        "summary": "Xem Tá»· giÃ¡ tiá»n tá»‡",
+        "summary": "Xem Tỷ giá tiền tệ",
         "tags": [
           "master-data"
         ]
@@ -105194,7 +105249,7 @@
             "bearer": []
           }
         ],
-        "summary": "Sửa Tá»· giÃ¡ tiá»n tá»‡",
+        "summary": "Sửa Tỷ giá tiền tệ",
         "tags": [
           "master-data"
         ]
@@ -155359,7 +155414,7 @@
                 }
               }
             },
-            "description": "Khoáº£ng ngÃ y khÃ´ng há»£p lá»‡"
+            "description": "Khoảng ngày không hợp lệ"
           }
         },
         "security": [
@@ -155367,7 +155422,7 @@
             "bearer": []
           }
         ],
-        "summary": "Dá»± bÃ¡o dÃ²ng tiá»n pháº£i thu vÃ  pháº£i tráº£",
+        "summary": "Dự báo dòng tiền phải thu và phải trả",
         "tags": [
           "accounting"
         ]
@@ -157477,7 +157532,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Tenant-scoped failed, created and dispatched shipments ordered by operational priority and age, with latest tracking event; result is capped at 500 rows"
+            "description": "Tenant-scoped failed, short-delivered, created and dispatched shipments ordered by operational priority and age, with latest tracking event; result is capped at 500 rows"
           },
           "401": {
             "content": {
@@ -157544,10 +157599,10 @@
         ],
         "responses": {
           "200": {
-            "description": "Existing equivalent open replacement returned idempotently"
+            "description": "Existing retry shipment returned idempotently, including retries already completed or in progress"
           },
           "201": {
-            "description": "New shipment created in created state with the failed shipment lines and destination; original failure history is preserved"
+            "description": "New shipment created in created state; failed shipments retain their lines and short deliveries include only undelivered quantities. Original history is preserved."
           },
           "401": {
             "content": {
@@ -157587,7 +157642,7 @@
                 }
               }
             },
-            "description": "Shipment is not failed, has no lines, or its source order is no longer open"
+            "description": "Shipment is not failed or short-delivered, has no remaining lines, or its source order is no longer open"
           }
         },
         "security": [
@@ -157595,7 +157650,7 @@
             "bearer": []
           }
         ],
-        "summary": "Create an idempotent replacement shipment from a failed delivery",
+        "summary": "Create an idempotent retry shipment from a failed or short delivery",
         "tags": [
           "logistics"
         ]

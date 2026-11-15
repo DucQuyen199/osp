@@ -329,7 +329,7 @@
   },
   {
    "name": "currency_rate",
-   "label": "Tá»· giÃ¡ tiá»n tá»‡",
+   "label": "Tỷ giá tiền tệ",
    "fields": [
     {
      "name": "from_currency",

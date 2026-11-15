@@ -838,9 +838,9 @@ pub fn build(reg: &Registry) -> Value {
     paths.insert(
         "/api/t/{tenantId}/reports/accounting/cash-flow-forecast".into(),
         json!({ "get": {
-            "tags": ["accounting"], "summary": "Dá»± bÃ¡o dÃ²ng tiá»n pháº£i thu vÃ  pháº£i tráº£", "security": sec,
+            "tags": ["accounting"], "summary": "Dự báo dòng tiền phải thu và phải trả", "security": sec,
             "parameters": report_parameters,
-            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Open posted receivables/payables, unbilled approved purchase orders, approved payroll and approved expense claims with a payment date; balances are calculated as of the forecast start" })), ("422".to_string(), err("Khoáº£ng ngÃ y khÃ´ng há»£p lá»‡"))]))
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Open posted receivables/payables, unbilled approved purchase orders, approved payroll and approved expense claims with a payment date; balances are calculated as of the forecast start" })), ("422".to_string(), err("Khoảng ngày không hợp lệ"))]))
         } }),
     );
     let aging_parameters = json!([

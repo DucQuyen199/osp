@@ -327,7 +327,7 @@ pub async fn validate_persistence(
             };
             if Decimal::from(guest_count) > capacity {
                 return Ok(vec![format!(
-                    "Энэ төрлийн өрөө дээд тал нь {capacity} зочин хүлээн авна"
+                    "Loại phòng này chỉ tiếp nhận tối đa {capacity} khách"
                 )]);
             }
         }

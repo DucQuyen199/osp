@@ -383,7 +383,7 @@ impl Kernel {
                         return Err(ApiError::new(
                             422,
                             "BAD_BASE_CURRENCY",
-                            "Tiá»n tá»‡ cÆ¡ sá»Ÿ pháº£i cÃ³ trong danh má»¥c tiá»n tá»‡ cá»§a doanh nghiá»‡p",
+                            "Tiền tệ cơ sở phải có trong danh mục tiền tệ của doanh nghiệp",
                         ));
                     }
                     let current = obj
@@ -402,7 +402,7 @@ impl Kernel {
                             return Err(ApiError::new(
                                 409,
                                 "BASE_CURRENCY_LOCKED",
-                                "KhÃ´ng thá»ƒ Ä‘á»•i tiá»n tá»‡ cÆ¡ sá»Ÿ sau khi doanh nghiá»‡p Ä‘Ã£ cÃ³ chá»©ng tá»« káº¿ toÃ¡n",
+                                "Không thể đổi tiền tệ cơ sở sau khi doanh nghiệp đã có chứng từ kế toán",
                             ));
                         }
                     }
