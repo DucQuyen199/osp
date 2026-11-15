@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { api, dataPath, tenantPath } from './lib/api.js';
 import { confirmDialog, textDialog, toast } from './lib/feedback.js';
 import { fmtMoney, statusLabel } from './lib/i18n.js';
@@ -14,6 +14,19 @@ export default function CrmPipelinePage() {
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState('board');
   const [workingDeal, setWorkingDeal] = useState('');
+  const boardTabRef = useRef(null);
+  const listTabRef = useRef(null);
+
+  const handleTabKeyDown = (event) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const nextView = event.key === 'Home' ? 'board'
+      : event.key === 'End' ? 'list'
+        : event.key === 'ArrowRight' ? (view === 'board' ? 'list' : 'board')
+          : (view === 'board' ? 'list' : 'board');
+    setView(nextView);
+    (nextView === 'board' ? boardTabRef : listTabRef).current?.focus();
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -100,10 +113,10 @@ export default function CrmPipelinePage() {
         <div className="card stat"><span className="stat-label">Dự báo có trọng số</span><strong className="stat-value num">{fmtMoney(report.weightedForecast)}</strong></div>
       </div>
       <div className="tabs" role="tablist" aria-label="Cách xem pipeline">
-        <button className="tab" type="button" role="tab" aria-selected={view === 'board'} onClick={() => setView('board')}>Kanban</button>
-        <button className="tab" type="button" role="tab" aria-selected={view === 'list'} onClick={() => setView('list')}>Danh sách</button>
+        <button ref={boardTabRef} className="tab" id="crm-pipeline-board-tab" type="button" role="tab" aria-controls="crm-pipeline-board-panel" aria-selected={view === 'board'} tabIndex={view === 'board' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setView('board')}>Kanban</button>
+        <button ref={listTabRef} className="tab" id="crm-pipeline-list-tab" type="button" role="tab" aria-controls="crm-pipeline-list-panel" aria-selected={view === 'list'} tabIndex={view === 'list' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setView('list')}>Danh sách</button>
       </div>
-      {view === 'board' && <div className="crm-kanban" aria-label="Cơ hội theo giai đoạn bán hàng">
+      <div role="tabpanel" id="crm-pipeline-board-panel" aria-labelledby="crm-pipeline-board-tab" tabIndex={0} style={view === 'board' ? undefined : { display: 'none' }} className="crm-kanban" aria-label="Cơ hội theo giai đoạn bán hàng">
         {STAGES.map((stageName) => {
           const summary = report.stages.find((item) => item.stage === stageName);
           const deals = report.deals.filter((deal) => deal.pipelineStage === stageName);
@@ -123,20 +136,20 @@ export default function CrmPipelinePage() {
             {!deals.length && <div className="crm-kanban-empty">Chưa có cơ hội</div>}
           </section>;
         })}
-      </div>}
+      </div>
       <section className="card table-wrap"><table className="table">
         <thead><tr><th scope="col">Giai đoạn</th><th scope="col" className="right">Cơ hội</th><th scope="col" className="right">Giá trị</th><th scope="col" className="right">Dự báo có trọng số</th></tr></thead>
         <tbody>{report.stages.map((stage) => <tr key={stage.stage}>
           <td>{stage.name || statusLabel(stage.stage)}</td><td className="right">{Number(stage.count || 0).toLocaleString()}</td><td className="right money">{fmtMoney(stage.amount)}</td><td className="right money">{fmtMoney(stage.weightedAmount)}</td>
         </tr>)}</tbody>
       </table></section>
-      {view === 'list' && (!report.deals?.length ? <div className="empty"><h3>Chưa có cơ hội đang mở</h3><p>Tạo cơ hội trong CRM để theo dõi giá trị và ngày dự kiến chốt.</p></div> : <section className="card table-wrap"><table className="table">
+      <div role="tabpanel" id="crm-pipeline-list-panel" aria-labelledby="crm-pipeline-list-tab" tabIndex={0} hidden={view !== 'list'}>{view === 'list' && (!report.deals?.length ? <div className="empty"><h3>Chưa có cơ hội đang mở</h3><p>Tạo cơ hội trong CRM để theo dõi giá trị và ngày dự kiến chốt.</p></div> : <section className="card table-wrap"><table className="table">
         <thead><tr><th scope="col">Cơ hội</th><th scope="col">Khách hàng</th><th scope="col">Giai đoạn</th><th scope="col" className="right">Xác suất</th><th scope="col" className="right">Giá trị</th><th scope="col" className="right">Dự báo</th><th scope="col">Ngày dự kiến chốt</th><th scope="col">Đóng cơ hội</th></tr></thead>
         <tbody>{report.deals.map((deal) => <tr key={deal.id}>
           <td><a href={`#/e/crm/deal/${encodeURIComponent(deal.id)}`}>{deal.title}</a></td><td>{deal.party}</td><td>{deal.pipelineStageName || statusLabel(deal.pipelineStage)}</td>
           <td className="right">{Number(deal.probability || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })}%</td><td className="right money">{fmtMoney(deal.amount)}</td><td className="right money">{fmtMoney(deal.weightedAmount)}</td><td>{deal.expectedClose || '—'}</td><td>{outcomeButtons(deal)}</td>
         </tr>)}</tbody>
-      </table></section>)}
+      </table></section>)}</div>
     </div>}
   </div>;
 }

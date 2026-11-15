@@ -4,6 +4,7 @@
 
 ## [Unreleased]
 ### Added
+- Added keyboard-operable CRM pipeline tabs with labelled Kanban and list panels for screen-reader users.
 - Added a tenant-scoped HR shift-template library with shared cycle validation, reuse across teams and date ranges, and in-place template updates.
 - Added a generic HTTP event connector adapter with provider headers, HMAC signing, public HTTPS/SSRF protections, transactional event enqueueing, bounded retries, dead-letter operations, connectivity probes, and secret redaction.
 - Added optional account-level TOTP MFA with AES-256-GCM encrypted secrets, one-time recovery codes, replay protection, bounded login challenges, step-up controls, and reason-audited administrator reset.
