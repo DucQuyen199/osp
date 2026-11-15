@@ -30,6 +30,9 @@ export default function EducationWorkbenchPage() {
   const [gradeTerm, setGradeTerm] = useState('');
   const [gradeSubject, setGradeSubject] = useState('');
   const [feeForm, setFeeForm] = useState({ student: '', enrollment: '', period: '', amount: '', due_date: '', note: '' });
+  const [classForm, setClassForm] = useState({ name: '', subject: '', teacher: '', start_date: '', capacity: '', tuition: '' });
+  const [studentForm, setStudentForm] = useState({ name: '', student_code: '', dob: '', guardian: '', phone: '', email: '' });
+  const [pendingStudentParty, setPendingStudentParty] = useState(null);
   const [form, setForm] = useState({ class: '', topic: '', starts_at: sessionDate(), ends_at: localDateTime(new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()) });
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -104,6 +107,48 @@ export default function EducationWorkbenchPage() {
       setNotice('Đã tạo khoản học phí nháp. Kiểm tra thông tin rồi phát hành để tạo hóa đơn kế toán.');
       setFeeForm((current) => ({ ...current, period: '', amount: '', note: '' })); await load();
     } catch (reason) { setError(reason.message || 'Không thể tạo khoản học phí.'); }
+    finally { setBusy(false); }
+  }
+
+  async function createClass(event) {
+    event.preventDefault(); setBusy(true); setError(''); setNotice('');
+    try {
+      const body = {
+        name: classForm.name.trim(),
+        ...(classForm.subject.trim() ? { subject: classForm.subject.trim() } : {}),
+        ...(classForm.teacher.trim() ? { teacher: classForm.teacher.trim() } : {}),
+        ...(classForm.start_date ? { start_date: classForm.start_date } : {}),
+        ...(classForm.capacity ? { capacity: Number(classForm.capacity) } : {}),
+        ...(classForm.tuition ? { tuition: Number(classForm.tuition) } : {}),
+      };
+      await api(dataPath('school.course_class'), { method: 'POST', body });
+      setNotice('Đã tạo lớp học.'); setClassForm({ name: '', subject: '', teacher: '', start_date: '', capacity: '', tuition: '' }); await load();
+    } catch (reason) { setError(reason.message || 'Không thể tạo lớp học.'); }
+    finally { setBusy(false); }
+  }
+
+  async function createStudent(event) {
+    event.preventDefault(); setBusy(true); setError(''); setNotice('');
+    try {
+      let partyId = pendingStudentParty?.id;
+      if (!partyId) {
+        const party = await api(dataPath('master-data.party'), { method: 'POST', body: {
+          name: studentForm.name.trim(), kind: 'person', is_customer: true,
+          ...(studentForm.phone.trim() ? { phone: studentForm.phone.trim() } : {}),
+          ...(studentForm.email.trim() ? { email: studentForm.email.trim() } : {}),
+        } });
+        partyId = party.id;
+        setPendingStudentParty({ id: party.id, name: party.name || studentForm.name.trim() });
+      }
+      await api(dataPath('school.student'), { method: 'POST', body: {
+        party: partyId,
+        ...(studentForm.student_code.trim() ? { student_code: studentForm.student_code.trim() } : {}),
+        ...(studentForm.dob ? { dob: studentForm.dob } : {}),
+        ...(studentForm.guardian.trim() ? { guardian: studentForm.guardian.trim() } : {}),
+      } });
+      setPendingStudentParty(null); setNotice('Đã tạo hồ sơ học viên.');
+      setStudentForm({ name: '', student_code: '', dob: '', guardian: '', phone: '', email: '' }); await load();
+    } catch (reason) { setError(reason.message || 'Không thể tạo hồ sơ học viên.'); }
     finally { setBusy(false); }
   }
 
@@ -183,6 +228,26 @@ export default function EducationWorkbenchPage() {
   return <div className="page">
     <div className="page-head"><div><h1>Lịch lớp và điểm danh</h1><p className="sub">Lên lịch buổi học, ghi nhận từng học viên và chốt danh sách sau khi buổi học kết thúc.</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={load}>Làm mới</button></div>
     {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    <div className="grid-2" style={{ marginTop: 20 }}>
+      {can('school.course_class.create') && <section className="card card-pad"><h2>Tạo lớp học</h2><form className="form-grid" onSubmit={createClass}>
+        <label className="field"><span className="label">Tên lớp *</span><input className="input" required maxLength="160" value={classForm.name} onChange={(event) => setClassForm((current) => ({ ...current, name: event.target.value }))} /></label>
+        <label className="field"><span className="label">Môn / chương trình</span><input className="input" maxLength="160" value={classForm.subject} onChange={(event) => setClassForm((current) => ({ ...current, subject: event.target.value }))} /></label>
+        <label className="field"><span className="label">Giáo viên</span><input className="input" maxLength="160" value={classForm.teacher} onChange={(event) => setClassForm((current) => ({ ...current, teacher: event.target.value }))} /></label>
+        <label className="field"><span className="label">Ngày bắt đầu</span><input className="input" type="date" value={classForm.start_date} onChange={(event) => setClassForm((current) => ({ ...current, start_date: event.target.value }))} /></label>
+        <label className="field"><span className="label">Sức chứa</span><input className="input num" type="number" min="1" step="1" value={classForm.capacity} onChange={(event) => setClassForm((current) => ({ ...current, capacity: event.target.value }))} /></label>
+        <label className="field"><span className="label">Học phí mỗi kỳ</span><input className="input num" type="number" min="0.01" step="any" value={classForm.tuition} onChange={(event) => setClassForm((current) => ({ ...current, tuition: event.target.value }))} /></label>
+        <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={busy || loading}>Tạo lớp</button></div>
+      </form></section>}
+      {can('school.student.create') && can('master-data.party.create') && <section className="card card-pad"><h2>Tiếp nhận học viên</h2><p className="small muted">Tạo hồ sơ cá nhân và liên kết với hồ sơ học viên trong một luồng.</p>{pendingStudentParty && <div className="alert warning">Đã tạo liên hệ “{pendingStudentParty.name}”. Gửi lại để hoàn tất hồ sơ học viên mà không tạo liên hệ trùng.</div>}<form className="form-grid" onSubmit={createStudent}>
+        <label className="field"><span className="label">Họ và tên *</span><input className="input" required maxLength="160" value={studentForm.name} disabled={Boolean(pendingStudentParty)} onChange={(event) => setStudentForm((current) => ({ ...current, name: event.target.value }))} /></label>
+        <label className="field"><span className="label">Mã học viên</span><input className="input" maxLength="80" value={studentForm.student_code} onChange={(event) => setStudentForm((current) => ({ ...current, student_code: event.target.value }))} /></label>
+        <label className="field"><span className="label">Ngày sinh</span><input className="input" type="date" value={studentForm.dob} onChange={(event) => setStudentForm((current) => ({ ...current, dob: event.target.value }))} /></label>
+        <label className="field"><span className="label">Người giám hộ</span><input className="input" maxLength="160" value={studentForm.guardian} onChange={(event) => setStudentForm((current) => ({ ...current, guardian: event.target.value }))} /></label>
+        <label className="field"><span className="label">Điện thoại</span><input className="input" type="tel" maxLength="80" value={studentForm.phone} disabled={Boolean(pendingStudentParty)} onChange={(event) => setStudentForm((current) => ({ ...current, phone: event.target.value }))} /></label>
+        <label className="field"><span className="label">Email</span><input className="input" type="email" maxLength="254" value={studentForm.email} disabled={Boolean(pendingStudentParty)} onChange={(event) => setStudentForm((current) => ({ ...current, email: event.target.value }))} /></label>
+        <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={busy || loading}>{pendingStudentParty ? 'Hoàn tất hồ sơ' : 'Tiếp nhận học viên'}</button></div>
+      </form></section>}
+    </div>
     {can('school.class_session.create') && <section className="card card-pad"><h2>Lên lịch buổi học</h2>
       <form className="form-grid" onSubmit={createSession}>
         <label className="field"><span className="label">Lớp *</span><select className="select" required value={form.class} onChange={(e) => setForm((x) => ({ ...x, class: e.target.value }))}><option value="">Chọn lớp</option>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}{item.subject ? ` · ${item.subject}` : ''}</option>)}</select></label>
