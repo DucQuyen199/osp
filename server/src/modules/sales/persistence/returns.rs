@@ -9,15 +9,46 @@ use uuid::Uuid;
 type ReturnLineKey = (String, Decimal, Option<String>);
 
 fn line_quantities(lines: &Value, source: &str) -> R<HashMap<ReturnLineKey, Decimal>> {
+    let Some(lines) = lines.as_array() else {
+        return Err(crate::error::ApiError::validation(
+            "sales.return",
+            vec![format!(
+                "{source} lines are missing or invalid; return quantities cannot be verified"
+            )],
+        ));
+    };
+    if lines.is_empty() {
+        return Err(crate::error::ApiError::validation(
+            "sales.return",
+            vec![format!(
+                "{source} has no item lines; return quantities cannot be verified"
+            )],
+        ));
+    }
     let mut quantities = HashMap::new();
-    for line in lines.as_array().into_iter().flatten() {
+    for (index, line) in lines.iter().enumerate() {
         let (Some(product), Some(price), Some(qty)) = (
             line.get("product").and_then(Value::as_str),
             line.get("price").and_then(money::decimal),
             line.get("qty").and_then(money::decimal),
         ) else {
-            continue;
+            return Err(crate::error::ApiError::validation(
+                "sales.return",
+                vec![format!(
+                    "{source} line {} is incomplete; return quantities cannot be verified",
+                    index + 1
+                )],
+            ));
         };
+        if product.trim().is_empty() || price < Decimal::ZERO || qty <= Decimal::ZERO {
+            return Err(crate::error::ApiError::validation(
+                "sales.return",
+                vec![format!(
+                    "{source} line {} has an invalid product, price, or quantity",
+                    index + 1
+                )],
+            ));
+        }
         let key = (
             product.to_owned(),
             price.round_dp(2),
