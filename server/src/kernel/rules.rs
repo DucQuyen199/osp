@@ -611,9 +611,9 @@ impl Kernel {
                         let mut lock_params: Vec<Box<dyn ToSql + Sync + Send>> =
                             vec![Box::new(t.id.clone()), Box::new(record_id)];
                         let mut lock_wh = vec![
-                            "tenant_id = $1".to_string(),
-                            "id = $2".to_string(),
-                            format!("{} {op} {now_expr}", quote(&job.due.field)),
+                            "e.tenant_id = $1".to_string(),
+                            "e.id = $2".to_string(),
+                            format!("e.{} {op} {now_expr}", quote(&job.due.field)),
                         ];
                         if let Some(Value::Object(w)) = &job.where_ {
                             for (k, v) in w {
@@ -629,8 +629,15 @@ impl Kernel {
                                 ));
                             }
                         }
+                        lock_params.push(Box::new(job.id.clone()));
+                        let job_param = lock_params.len();
+                        lock_params.push(Box::new(id.clone()));
+                        let module_param = lock_params.len();
+                        lock_wh.push(format!(
+                            "NOT EXISTS (SELECT 1 FROM osp_failures f WHERE f.tenant_id = $1 AND f.module = ${module_param} AND f.event_type = 'job:' || ${job_param} AND f.rule_index = -1 AND f.status = 'open' AND f.event->>'job' = ${job_param} AND f.event->>'recordId' = e.id::text AND f.updated_at > now() - make_interval(secs => LEAST(21600, (60 * power(2, LEAST(GREATEST(f.attempts - 1, 0), 9)))::integer)))"
+                        ));
                         let lock_sql = format!(
-                            "SELECT id FROM {} WHERE {} FOR UPDATE",
+                            "SELECT e.id FROM {} AS e WHERE {} FOR UPDATE",
                             quote(&ent.def.table()),
                             lock_wh.join(" AND ")
                         );
