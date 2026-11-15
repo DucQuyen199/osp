@@ -27,7 +27,7 @@ export default function PayrollWorkbenchPage() {
     try {
       const [runRes, slipRes, employeeMap, requestRes] = await Promise.all([
         can('payroll.payroll_run.read') ? loadAllResponse('payroll.payroll_run') : Promise.resolve({ items: [] }),
-        can('payroll.payslip.read') ? api(`${dataPath('payroll.payslip')}?limit=2000`) : Promise.resolve({ items: [] }),
+        can('payroll.payslip.read') ? loadAllResponse('payroll.payslip') : Promise.resolve({ items: [] }),
         can('hrm.employee.read') ? loadRefs('hrm.employee') : Promise.resolve(new Map()),
         workflowApproval && can('workflow-approval.approval_request.read') ? loadAllResponse('workflow-approval.approval_request') : Promise.resolve({ items: [] }),
       ]);
