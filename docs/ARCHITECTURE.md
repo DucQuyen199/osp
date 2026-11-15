@@ -142,7 +142,7 @@ Hotel reads room rates, folio charges, and locked reservation totals as PostgreS
 
 An in-house hotel reservation can only be updated through a checkout-date extension. The update must move checkout later and include no other fields; the tenant-serialized persistence check rejects room-type or assigned-room conflicts, and application preparation recomputes nights and folio total from the original nightly-rate snapshot before the eventual checkout invoice is created.
 
-Sales orders fulfilled through Logistics reserve their remaining quantities at confirmation. Shipment lines are locked and checked against the source order; each successful partial delivery creates its stock issue in the same event transaction. The order moves to `partially_delivered` on an incomplete first delivery and closes only when all physical quantities have shipped.
+Sales orders fulfilled through Logistics reserve their remaining quantities at confirmation. Reservation and stock availability checks use base quantities, while shipment lines are locked and checked against the source order's selected unit and price; each successful partial delivery creates its stock issue in the same event transaction. The order moves to `partially_delivered` on an incomplete first delivery and closes only when all physical quantities have shipped.
 
 Sales returns for shipped orders are capped by successfully delivered shipment quantities, less submitted or completed prior returns. The source order row lock serializes delivery and return checks, so pending deliveries cannot be returned and the same delivered units cannot be returned twice.
 

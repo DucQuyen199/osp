@@ -153,7 +153,11 @@ pub(super) async fn validate(
                 else {
                     continue;
                 };
-                let Some(qty) = line.get("qty").and_then(money::decimal) else {
+                let Some(qty) = line
+                    .get("base_qty")
+                    .or_else(|| line.get("qty"))
+                    .and_then(money::decimal)
+                else {
                     stock_errors.push(format!("Tracked product {product} has an invalid quantity"));
                     continue;
                 };
