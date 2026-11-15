@@ -27,15 +27,17 @@ fn csv_cell(value: &Value) -> String {
     format!("\"{}\"", text.replace('"', "\"\""))
 }
 
-fn report_csv(result: &Value) -> String {
+const MAX_SCHEDULED_REPORT_CSV_BYTES: usize = 1_000_000;
+
+fn report_csv(result: &Value) -> R<String> {
     let Some(rows) = result.get("items").and_then(Value::as_array) else {
-        return format!(
+        return Ok(format!(
             "total\n{}\n",
             csv_cell(result.get("total").unwrap_or(&Value::Null))
-        );
+        ));
     };
     let Some(first) = rows.first().and_then(Value::as_object) else {
-        return "message\n\"Báo cáo không có dòng dữ liệu.\"\n".into();
+        return Ok("message\n\"Báo cáo không có dòng dữ liệu.\"\n".into());
     };
     let columns = first.keys().collect::<Vec<_>>();
     let mut output = columns
@@ -51,14 +53,19 @@ fn report_csv(result: &Value) -> String {
             .map(|column| csv_cell(row.get(*column).unwrap_or(&Value::Null)))
             .collect::<Vec<_>>()
             .join(",");
-        if output.len() + line.len() + 1 > 60_000 {
-            output.push_str("\n[CSV content truncated at 60 KB]\n");
-            break;
-        }
         output.push_str(&line);
         output.push('\n');
     }
-    output
+    if output.len() > MAX_SCHEDULED_REPORT_CSV_BYTES {
+        return Err(ApiError::validation(
+            "bi.report.schedule",
+            vec![format!(
+                "Scheduled report CSV exceeds the {} byte email attachment limit",
+                MAX_SCHEDULED_REPORT_CSV_BYTES
+            )],
+        ));
+    }
+    Ok(output)
 }
 
 fn cadence(report: &Value) -> R<Duration> {
@@ -347,7 +354,7 @@ pub async fn handle_source_event(
                 return Ok(true);
             }
             let result = kernel
-                .run_bi_report(&actor, &permission_tenant, &report_id.to_string())
+                .run_scheduled_bi_report(&actor, &permission_tenant, &report_id.to_string())
                 .await?;
             if result.to_string().len() > 2_000_000 {
                 return Err(ApiError::validation(
@@ -384,7 +391,7 @@ pub async fn handle_source_event(
                     .get("id")
                     .and_then(Value::as_str)
                     .unwrap_or_default();
-                let csv = report_csv(saved_run.get("result").unwrap_or(&Value::Null));
+                let csv = report_csv(saved_run.get("result").unwrap_or(&Value::Null))?;
                 for recipient in recipients.iter().filter_map(Value::as_str) {
                     let address = recipient.trim();
                     if address.is_empty() {

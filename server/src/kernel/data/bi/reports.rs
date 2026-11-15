@@ -92,6 +92,59 @@ impl Kernel {
         }
     }
 
+    async fn collect_bi_report_rows(
+        &self,
+        tx: &Tx<'_>,
+        actor: &Actor,
+        t: &Tenant,
+        source: &str,
+        report_query: &ListQuery,
+        aggregate: Option<&crate::modules::bi::AggregateSpec>,
+    ) -> R<(Vec<Value>, i64)> {
+        let data = self
+            .query_bi_report_page(tx, actor, t, source, report_query, aggregate)
+            .await?;
+        let total = data.get("total").and_then(Value::as_i64).unwrap_or(0);
+        if total > MAX_BI_REPORT_EXPORT_ROWS {
+            return Err(ApiError::new(
+                422,
+                "EXPORT_LIMIT",
+                format!("BI report results are limited to {MAX_BI_REPORT_EXPORT_ROWS} rows"),
+            ));
+        }
+        let mut rows = data
+            .get("items")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        let mut offset = rows.len() as i64;
+        while offset < total {
+            let mut page = report_query.clone();
+            page.offset = offset;
+            let data = self
+                .query_bi_report_page(tx, actor, t, source, &page, aggregate)
+                .await?;
+            let next = data
+                .get("items")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            if next.is_empty() {
+                return Err(ApiError::internal(
+                    "BI report result returned fewer rows than its snapshot total",
+                ));
+            }
+            offset += next.len() as i64;
+            rows.extend(next);
+        }
+        if rows.len() as i64 != total {
+            return Err(ApiError::internal(
+                "BI report result row count does not match its snapshot total",
+            ));
+        }
+        Ok((rows, total))
+    }
+
     pub async fn run_bi_report(&self, actor: &Actor, t: &Tenant, report_id: &str) -> R<Value> {
         let report = self.get(actor, t, "bi.report", report_id).await?;
         let Some(query) = report.get("query").filter(|query| !query.is_null()) else {
@@ -113,6 +166,39 @@ impl Kernel {
             "source": source,
             "items": data.get("items"),
             "total": data.get("total")
+        }))
+    }
+
+    /// Run a scheduled report against one database snapshot and retain every matching row.
+    pub async fn run_scheduled_bi_report(
+        &self,
+        actor: &Actor,
+        t: &Tenant,
+        report_id: &str,
+    ) -> R<Value> {
+        let report = self.get(actor, t, "bi.report", report_id).await?;
+        let Some(query) = report.get("query").filter(|query| !query.is_null()) else {
+            return Err(ApiError::validation(
+                "bi.report",
+                vec!["Report has no saved query definition".into()],
+            ));
+        };
+        let (source, mut report_query, aggregate) = self.checked_bi_report_query(t, query)?;
+        report_query.limit = BI_REPORT_EXPORT_PAGE_SIZE;
+        report_query.offset = 0;
+
+        let mut conn = self.pool.get().await?;
+        let tx = Tx::begin_snapshot(&mut conn, &t.id).await?;
+        let (items, total) = self
+            .collect_bi_report_rows(&tx, actor, t, &source, &report_query, aggregate.as_ref())
+            .await?;
+        tx.commit().await?;
+        Ok(json!({
+            "reportId": report_id,
+            "name": report.get("name"),
+            "source": source,
+            "items": items,
+            "total": total
         }))
     }
 
@@ -162,47 +248,9 @@ impl Kernel {
 
         let mut conn = self.pool.get().await?;
         let tx = Tx::begin_snapshot(&mut conn, &t.id).await?;
-        let data = self
-            .query_bi_report_page(&tx, actor, t, &source, &report_query, aggregate.as_ref())
+        let (rows, _) = self
+            .collect_bi_report_rows(&tx, actor, t, &source, &report_query, aggregate.as_ref())
             .await?;
-        let total = data.get("total").and_then(Value::as_i64).unwrap_or(0);
-        if total > MAX_BI_REPORT_EXPORT_ROWS {
-            return Err(ApiError::new(
-                422,
-                "EXPORT_LIMIT",
-                format!("BI report exports are limited to {MAX_BI_REPORT_EXPORT_ROWS} rows"),
-            ));
-        }
-        let mut rows = data
-            .get("items")
-            .and_then(Value::as_array)
-            .cloned()
-            .unwrap_or_default();
-        let mut offset = rows.len() as i64;
-        while offset < total {
-            let mut page = report_query.clone();
-            page.offset = offset;
-            let data = self
-                .query_bi_report_page(&tx, actor, t, &source, &page, aggregate.as_ref())
-                .await?;
-            let next = data
-                .get("items")
-                .and_then(Value::as_array)
-                .cloned()
-                .unwrap_or_default();
-            if next.is_empty() {
-                return Err(ApiError::internal(
-                    "BI report export returned fewer rows than its snapshot total",
-                ));
-            }
-            offset += next.len() as i64;
-            rows.extend(next);
-        }
-        if rows.len() as i64 != total {
-            return Err(ApiError::internal(
-                "BI report export row count does not match its snapshot total",
-            ));
-        }
 
         let csv = if aggregate.is_some() {
             crate::kernel::io::report_rows_to_csv(&["group", "value"], &rows)
