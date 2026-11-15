@@ -216,12 +216,6 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
         }
         return vec!["A quotation can expire only after its valid_until date".into()];
     }
-    if entity == "sales_order"
-        && action == "cancelled"
-        && document.get("status").and_then(Value::as_str) == Some("confirmed")
-    {
-        return vec!["A confirmed order must use the return process to reverse stock".into()];
-    }
     if entity == "sales_return" && matches!(action, "submitted" | "approved" | "received") {
         let mut errors = Vec::new();
         if document

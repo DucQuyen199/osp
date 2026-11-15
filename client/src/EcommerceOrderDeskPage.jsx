@@ -100,6 +100,7 @@ export default function EcommerceOrderDeskPage() {
         <span className="grow" />
         {order.status === 'cart' && can('ecommerce.web_order.placed') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => transition(order, 'placed')}>{busy === `${order.id}:placed` ? 'Đang đặt…' : 'Xác nhận đặt đơn'}</button>}
         {order.status === 'cart' && can('ecommerce.web_order.cancelled') && <button className="btn btn-secondary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => transition(order, 'cancelled')}>{busy === `${order.id}:cancelled` ? 'Đang hủy…' : 'Hủy giỏ'}</button>}
+        {order.status === 'placed' && sale?.status === 'confirmed' && can('ecommerce.web_order.cancelled') && <button className="btn btn-secondary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => transition(order, 'cancelled')}>{busy === `${order.id}:cancelled` ? 'Đang hủy…' : 'Hủy đơn chưa giao'}</button>}
         {sale && !can('sales.sales_order.read') && <span className="small muted">Đã chuyển thành đơn bán</span>}
       </footer>
     </article>;

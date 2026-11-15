@@ -115,6 +115,47 @@ pub async fn handle_source_event(
         silent: false,
     };
     match event_type {
+        "sales.sales_order.cancelled"
+            if document.get("source").and_then(Value::as_str) == Some("ecommerce") =>
+        {
+            let source_id = document
+                .get("source_id")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+                .ok_or_else(|| {
+                    crate::error::ApiError::validation(
+                        event_type,
+                        vec!["Cancelled ecommerce sale requires a valid source order id".into()],
+                    )
+                })?;
+            let Some(order) = tx
+                .query_opt(
+                    "SELECT status FROM ecommerce__web_order WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                    &[&tenant.id, &source_id],
+                )
+                .await?
+            else {
+                return Err(crate::error::ApiError::validation(
+                    event_type,
+                    vec!["Source ecommerce order was not found for this tenant".into()],
+                ));
+            };
+            if order.get::<_, String>(0) == "placed" {
+                let entity = kernel.ent(tenant, "ecommerce.web_order")?;
+                kernel
+                    .act_in(
+                        tx,
+                        &Actor::System,
+                        tenant,
+                        &entity,
+                        &source_id.to_string(),
+                        "cancelled",
+                        &child,
+                    )
+                    .await?;
+            }
+            return Ok(true);
+        }
         "crm.deal.won" | "sales.quotation.accepted" => {
             let mut data = Map::new();
             let mut put = |target: &str, source: &str| {

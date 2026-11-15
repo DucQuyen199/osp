@@ -80,6 +80,50 @@ pub async fn handle_source_event(
     event_id: Uuid,
     depth: u32,
 ) -> R<bool> {
+    if event_type == "ecommerce.web_order.cancelled" {
+        let source_id = parse_id(document, "id").ok_or_else(|| {
+            ApiError::validation(
+                event_type,
+                vec!["ÄÆ¡n online cáº§n mÃ£ há»£p lá»‡ Ä‘á»ƒ há»§y".into()],
+            )
+        })?;
+        let key = format!("ecommerce-order:{}:{source_id}", tenant.id);
+        tx.query_one_row(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            &[&key],
+        )
+        .await?;
+        let sale = tx
+            .query_opt(
+                "SELECT id, status FROM sales__sales_order WHERE tenant_id = $1 AND source = 'ecommerce' AND source_id = $2 FOR UPDATE",
+                &[&tenant.id, &source_id.to_string()],
+            )
+            .await?;
+        if let Some(sale) = sale {
+            let sale_id: Uuid = sale.get(0);
+            let status: String = sale.get(1);
+            if status == "confirmed" {
+                let entity = kernel.ent(tenant, "sales.sales_order")?;
+                kernel
+                    .act_in(
+                        tx,
+                        &Actor::System,
+                        tenant,
+                        &entity,
+                        &sale_id.to_string(),
+                        "cancelled",
+                        &child_opts(event_id, depth),
+                    )
+                    .await?;
+            } else if status != "cancelled" {
+                return Err(ApiError::validation(
+                    event_type,
+                    vec!["Placed order can only be cancelled before shipment or delivery".into()],
+                ));
+            }
+        }
+        return Ok(true);
+    }
     if event_type != "ecommerce.web_order.placed" {
         return Ok(false);
     }

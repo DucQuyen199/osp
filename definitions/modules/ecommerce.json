@@ -118,7 +118,8 @@
      },
      "cancelled": {
       "from": [
-       "cart"
+       "cart",
+       "placed"
       ],
       "to": "cancelled"
      }

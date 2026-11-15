@@ -47,6 +47,44 @@ pub(super) async fn validate(
             }
         }
     }
+    if entity == "sales_order"
+        && action == "cancelled"
+        && document.get("status").and_then(Value::as_str) == Some("confirmed")
+    {
+        let Some(order_id) = document
+            .get("id")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+        else {
+            return Ok(vec![
+                "A confirmed sales order requires a valid id to cancel".into(),
+            ]);
+        };
+        if tx
+            .query_opt(
+                "SELECT id FROM logistics__shipment WHERE tenant_id = $1 AND source = 'sales_order' AND source_id = $2 LIMIT 1 FOR UPDATE",
+                &[&tenant.id, &order_id.to_string()],
+            )
+            .await?
+            .is_some()
+        {
+            return Ok(vec![
+                "A sales order cannot be cancelled after a shipment has been created; use the return workflow after delivery".into(),
+            ]);
+        }
+        if tx
+            .query_opt(
+                "SELECT id FROM accounting__invoice WHERE tenant_id = $1 AND source = 'sales_order' AND source_id = $2 AND status NOT IN ('draft', 'void') LIMIT 1 FOR UPDATE",
+                &[&tenant.id, &order_id.to_string()],
+            )
+            .await?
+            .is_some()
+        {
+            return Ok(vec![
+                "A sales order with an issued invoice cannot be cancelled; use the return and credit-note workflow".into(),
+            ]);
+        }
+    }
     if entity == "sales_order" && action == "confirmed" {
         let Some(party_id) = document
             .get("party")
