@@ -254,6 +254,8 @@ The Rust server, PostgreSQL deployment, and React/Vite client build are active. 
 
 Inventory bin tracking now covers transfers, stock-on-hand reporting, and physical counts. A submitted count snapshots the product/lot/bin book balance while holding the product/warehouse lock, prevents competing stock movements until disposition, and posts only approved variances back to the counted bin.
 
+The manufacturing workbench now manages BOMs, planned production orders, material issue, good/scrap output, and finished-goods QC. BOM ingredient units are validated against each component's base unit; production scales their snapshotted base quantities, then QC pass posts accepted output into inventory.
+
 
 Purchase-order bill posting now performs three-way line matching in the tenant transaction: the bill must cover the same product quantities and per-product net amounts as the fully received source order, in addition to supplier, tax, total, and single-bill checks.
 

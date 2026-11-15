@@ -6,7 +6,6 @@ import EventsPage from './EventsPage.jsx';
 import HomePage from './HomePage.jsx';
 import ModuleOverviewPage from './ModuleOverviewPage.jsx';
 import AccountingReportsPage from './AccountingReportsPage.jsx';
-import ManufacturingWipPage from './ManufacturingWipPage.jsx';
 import InventoryReplenishmentPage from './InventoryReplenishmentPage.jsx';
 import InventoryLocationStockPage from './InventoryLocationStockPage.jsx';
 import InventoryQualityHoldsPage from './InventoryQualityHoldsPage.jsx';
@@ -41,6 +40,7 @@ import { app, can, entityLabel, isAdmin, loadMeta, loadSummary, resetCaches } fr
 import { listHref } from './lib/routes.js';
 
 const PosTerminalPage = lazy(() => import('./PosTerminalPage.jsx'));
+const ManufacturingWipPage = lazy(() => import('./ManufacturingWipPage.jsx'));
 const ClinicWorkbenchPage = lazy(() => import('./ClinicWorkbenchPage.jsx'));
 const EcommerceOrderDeskPage = lazy(() => import('./EcommerceOrderDeskPage.jsx'));
 const AgricultureOperationsPage = lazy(() => import('./AgricultureOperationsPage.jsx'));

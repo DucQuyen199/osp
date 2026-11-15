@@ -167,7 +167,11 @@ pub async fn handle_source_stock_event(
                     .unwrap_or_default()
                     .into_iter()
                     .map(|mut line| -> R<Value> {
-                        if let Some(qty) = line.get("qty").and_then(money::decimal) {
+                        if let Some(qty) = line
+                            .get("base_qty")
+                            .or_else(|| line.get("qty"))
+                            .and_then(money::decimal)
+                        {
                             let scaled = qty
                                 .checked_mul(produced)
                                 .and_then(|value| value.checked_div(divisor))
@@ -183,6 +187,7 @@ pub async fn handle_source_stock_event(
                                     vec!["Scaled BOM quantity exceeds the supported decimal range".into()],
                                 )
                             })?;
+                            line["base_qty"] = line["qty"].clone();
                         }
                         Ok(line)
                     })

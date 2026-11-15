@@ -21,6 +21,9 @@ pub async fn prepare_bom(
             ));
             continue;
         };
+        for field in ["base_qty", "uom_name", "uom_ratio", "base_uom"] {
+            component.remove(field);
+        }
         let Some(product_id) = component
             .get("product")
             .and_then(Value::as_str)
@@ -58,6 +61,55 @@ pub async fn prepare_bom(
         }
         component.insert("tracked".into(), json!(tracked));
         component.insert("kind".into(), json!(kind));
+        let selected_unit = match component.get("uom") {
+            Some(Value::String(value)) => match Uuid::parse_str(value) {
+                Ok(unit) => Some(unit),
+                Err(_) => {
+                    errors.push(format!("Unit on BOM component {} is invalid", index + 1));
+                    continue;
+                }
+            },
+            Some(value) if !value.is_null() => {
+                errors.push(format!("Unit on BOM component {} is invalid", index + 1));
+                continue;
+            }
+            _ => None,
+        };
+        let unit = match crate::modules::master_data::unit_conversion::resolve(
+            tx,
+            tenant,
+            product_id,
+            selected_unit,
+        )
+        .await?
+        {
+            Ok(unit) => unit,
+            Err(message) => {
+                errors.push(format!("Unit on BOM component {}: {message}", index + 1));
+                continue;
+            }
+        };
+        if let Some(quantity) = component.get("qty").and_then(money::decimal) {
+            let Some(base_quantity) = unit.base_quantity(quantity).and_then(money::json_number)
+            else {
+                errors.push(format!(
+                    "BOM component {} quantity exceeds the supported range",
+                    index + 1
+                ));
+                continue;
+            };
+            component.insert("base_qty".into(), base_quantity);
+        }
+        if let Some(unit_id) = unit.unit_id {
+            component.insert("uom".into(), json!(unit_id));
+        }
+        if let Some(name) = unit.unit_name {
+            component.insert("uom_name".into(), json!(name));
+        }
+        if let Some(base_unit) = unit.base_unit_id {
+            component.insert("base_uom".into(), json!(base_unit));
+        }
+        component.insert("uom_ratio".into(), json!(unit.ratio));
     }
     Ok(errors)
 }
