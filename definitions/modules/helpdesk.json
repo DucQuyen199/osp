@@ -130,6 +130,19 @@
    "constraints": []
   },
   {
+   "name": "message",
+   "label": "Trao đổi ticket",
+   "fields": [
+    { "name": "ticket", "type": "ref", "required": true, "ref": "helpdesk.ticket" },
+    { "name": "direction", "type": "enum", "required": true, "options": ["inbound", "outbound", "internal"] },
+    { "name": "author", "type": "string", "required": true },
+    { "name": "body", "type": "text", "required": true }
+   ],
+   "states": null,
+   "computed": {},
+   "constraints": []
+  },
+  {
    "name": "kb_article",
    "label": "Bài viết tri thức",
    "fields": [

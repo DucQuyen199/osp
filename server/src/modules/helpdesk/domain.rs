@@ -17,6 +17,33 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
             }
         }
         "sla_policy" => validate_sla_policy(document),
+        "message" => {
+            let mut errors = Vec::new();
+            if document
+                .get("ticket")
+                .and_then(Value::as_str)
+                .is_none_or(|ticket| uuid::Uuid::parse_str(ticket).is_err())
+            {
+                errors.push("Ticket trao đổi phải là mã hợp lệ".into());
+            }
+            if !matches!(
+                document.get("direction").and_then(Value::as_str),
+                Some("inbound" | "outbound" | "internal")
+            ) {
+                errors.push("Chiều trao đổi phải là inbound, outbound hoặc internal".into());
+            }
+            for (field, max_length) in [("author", 160), ("body", 10_000)] {
+                let length = document
+                    .get(field)
+                    .and_then(Value::as_str)
+                    .map(|value| value.trim().chars().count())
+                    .unwrap_or_default();
+                if !(1..=max_length).contains(&length) {
+                    errors.push(format!("{field} phải có từ 1 đến {max_length} ký tự"));
+                }
+            }
+            errors
+        }
         _ => Vec::new(),
     }
 }
@@ -36,9 +63,9 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
         && document
             .get("resolution")
             .and_then(Value::as_str)
-            .is_none_or(|resolution| resolution.trim().is_empty())
+            .is_none_or(|resolution| !(1..=4000).contains(&resolution.trim().chars().count()))
     {
-        vec!["Cần ghi nội dung xử lý trước khi chuyển ticket sang đã giải quyết".into()]
+        vec!["Cần ghi nội dung xử lý từ 1 đến 4000 ký tự trước khi giải quyết ticket".into()]
     } else {
         Vec::new()
     }

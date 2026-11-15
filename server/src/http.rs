@@ -1844,6 +1844,21 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     }
                     return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
                 }
+                if q == "helpdesk.ticket" && *action == "resolved" && !bytes.is_empty() {
+                    let body = json_obj(&bytes)?;
+                    let resolution = body
+                        .get("resolution")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::trim)
+                        .unwrap_or_default();
+                    if body.len() != 1 || !(1..=4000).contains(&resolution.chars().count()) {
+                        return Err(ApiError::validation(
+                            "helpdesk.ticket.resolved",
+                            vec!["Cần gửi duy nhất resolution có từ 1 đến 4000 ký tự".into()],
+                        ));
+                    }
+                    return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
+                }
                 if q == "accounting.bank_statement_line"
                     && *action == "matched"
                     && !bytes.is_empty()

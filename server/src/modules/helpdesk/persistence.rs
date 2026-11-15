@@ -12,6 +12,52 @@ pub async fn validate_persistence(
 ) -> R<Vec<String>> {
     let mut errors = Vec::new();
     match entity {
+        "message" if action == "created" => {
+            let Some(ticket) = document
+                .get("ticket")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+            else {
+                return Ok(vec!["Ticket trao đổi phải là mã hợp lệ".into()]);
+            };
+            let status = tx
+                .query_opt(
+                    "SELECT status FROM helpdesk__ticket WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                    &[&tenant.id, &ticket],
+                )
+                .await?
+                .map(|row| row.get::<_, String>(0));
+            let Some(status) = status else {
+                return Ok(vec!["Ticket không tồn tại trong doanh nghiệp".into()]);
+            };
+            let direction = document.get("direction").and_then(Value::as_str);
+            if direction == Some("outbound") && matches!(status.as_str(), "resolved" | "closed") {
+                errors.push("Hãy mở lại ticket trước khi gửi phản hồi mới".into());
+            }
+            if direction == Some("internal") && status == "closed" {
+                errors.push("Không thể thêm ghi chú nội bộ vào ticket đã đóng".into());
+            }
+        }
+        "ticket" if action == "responded" => {
+            let Some(ticket) = document
+                .get("id")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+            else {
+                return Ok(vec!["Không xác định được ticket đang phản hồi".into()]);
+            };
+            let ticket_text = ticket.to_string();
+            let has_new_outbound = tx
+                .query_one_row(
+                    "SELECT EXISTS (SELECT 1 FROM helpdesk__message m WHERE m.tenant_id = $1 AND m.ticket = $2 AND m.direction = 'outbound' AND m.created_at > COALESCE((SELECT max(e.at) FROM osp_events e WHERE e.tenant_id = $1 AND e.record_id = $3 AND e.type = 'helpdesk.ticket.reopened'), '-infinity'::timestamptz))",
+                    &[&tenant.id, &ticket, &ticket_text],
+                )
+                .await?
+                .get::<_, bool>(0);
+            if !has_new_outbound {
+                errors.push("Ghi nhận phản hồi sau khi lưu tin nhắn gửi khách hàng".into());
+            }
+        }
         "ticket" => {
             for (field, table, label) in [
                 ("party", "master_data__party", "Khách hàng"),

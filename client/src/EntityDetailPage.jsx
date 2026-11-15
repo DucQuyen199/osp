@@ -206,7 +206,7 @@ export default function EntityDetailPage({ qname, id }) {
   };
   const state = definition?.states && record?.[definition.states.field];
   const actions = definition?.states
-    ? Object.entries(definition.states.actions).filter(([action, transition]) => transition.from.includes(state) && can(`${qname}.${action}`) && (qname !== 'crm.deal' || action !== 'lost' || can(`${qname}.update`)))
+    ? Object.entries(definition.states.actions).filter(([action, transition]) => transition.from.includes(state) && can(`${qname}.${action}`) && !(qname === 'helpdesk.ticket' && action === 'responded') && (qname !== 'crm.deal' || action !== 'lost' || can(`${qname}.update`)))
     : [];
   const fields = definition?.fields.filter((field) => field.name !== definition.states?.field && !field.system) || [];
 

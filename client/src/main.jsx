@@ -75,6 +75,7 @@ const AccountingAdjustmentRefundsPage = lazy(() => import('./AccountingAdjustmen
 const AccountingSettlementWorkbenchPage = lazy(() => import('./AccountingSettlementWorkbenchPage.jsx'));
 const InventoryStockCountWorkbenchPage = lazy(() => import('./InventoryStockCountWorkbenchPage.jsx'));
 const EInvoiceWorkbenchPage = lazy(() => import('./EInvoiceWorkbenchPage.jsx'));
+const HelpdeskWorkbenchPage = lazy(() => import('./HelpdeskWorkbenchPage.jsx'));
 
 function parseRoute(hash = location.hash) {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
@@ -109,6 +110,7 @@ function parseRoute(hash = location.hash) {
   if (a === 'recruitment') return { name: 'recruitment-workbench' };
   if (a === 'payroll') return { name: 'payroll-workbench' };
   if (a === 'people') return { name: 'hrm-operations' };
+  if (a === 'helpdesk') return { name: 'helpdesk-workbench' };
   if (a === 'expenses') return { name: 'expense-workbench' };
   if (a === 'returns') return { name: 'sales-returns-workbench' };
   if (a === 'bank-reconciliation') return { name: 'bank-reconciliation-workbench' };
@@ -242,6 +244,7 @@ function Sidebar({ meta, route, onNavigate, open }) {
     {meta.modules.some((module) => module.id === 'crm') && can('crm.deal.read') && link('#/reports/crm/pipeline', 'Pipeline bán hàng', route.name === 'crm-pipeline', 'list')}
     {meta.modules.some((module) => module.id === 'marketing') && can('marketing.campaign.read') && link('#/reports/marketing/campaign-performance', 'Hiệu quả chiến dịch', route.name === 'marketing-campaign-performance', 'list')}
     {meta.modules.some((module) => module.id === 'helpdesk') && can('helpdesk.ticket.read') && link('#/reports/helpdesk/sla', 'SLA hỗ trợ', route.name === 'helpdesk-sla', 'list')}
+    {meta.modules.some((module) => module.id === 'helpdesk') && can('helpdesk.ticket.read') && link('#/helpdesk', 'Hộp thư hỗ trợ', route.name === 'helpdesk-workbench', 'list')}
     {groups.map(([category, modules]) => <div className="nav-group" key={category}>
       <div className="nav-title">{category === 'core' ? 'Dữ liệu gốc' : categoryLabel(category)}</div>
       {modules.map((module) => <details className="nav-mod" key={module.id} open={activeModule === module.id || module.core}>
@@ -460,6 +463,7 @@ function App() {
         : route.name === 'wholesale-sales-desk' ? <WholesaleSalesDeskPage />
         : route.name === 'budget-variance' ? <BudgetVariancePage />
         : route.name === 'crm-pipeline' ? <CrmPipelinePage />
+        : route.name === 'helpdesk-workbench' ? <HelpdeskWorkbenchPage />
         : route.name === 'marketing-campaign-performance' ? <MarketingCampaignPerformancePage />
         : route.name === 'helpdesk-sla' ? <HelpdeskSlaPage />
         : route.name === 'bi-reports' ? <BiReportsPage route={route} />

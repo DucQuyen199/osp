@@ -13,6 +13,23 @@ pub(super) async fn dispatch(
     event: &Event,
     handled: &mut Vec<Value>,
 ) -> R<()> {
+    if crate::modules::helpdesk::handle_source_event(
+        kernel,
+        tx,
+        tenant,
+        &event.ty,
+        &event.payload,
+        event.id,
+        event.depth,
+    )
+    .await?
+    {
+        handled.push(json!({
+            "module": "helpdesk",
+            "rule": "message_to_ticket_lifecycle",
+            "outcome": "ok"
+        }));
+    }
     if crate::modules::quality::handle_source_event(
         kernel,
         tx,
