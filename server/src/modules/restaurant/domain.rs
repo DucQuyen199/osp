@@ -104,6 +104,12 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
         {
             errors.push(format!("{prefix}.price phải là số không âm"));
         }
+        if line
+            .get("note")
+            .is_some_and(|note| note.as_str().is_none_or(|note| note.chars().count() > 500))
+        {
+            errors.push(format!("{prefix}.note phải là văn bản tối đa 500 ký tự"));
+        }
     }
     errors
 }

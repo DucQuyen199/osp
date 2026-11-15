@@ -18,6 +18,7 @@ export default function RestaurantServicePage() {
   const [units, setUnits] = useState(new Map());
   const [warehouses, setWarehouses] = useState(new Map());
   const [quantities, setQuantities] = useState({});
+  const [lineNotes, setLineNotes] = useState({});
   const [tableId, setTableId] = useState('');
   const [guestCount, setGuestCount] = useState('1');
   const [warehouseId, setWarehouseId] = useState('');
@@ -65,9 +66,13 @@ export default function RestaurantServicePage() {
   const selectedNeedsWarehouse = Boolean(selected?.consumptions?.length);
   const selectedTickets = tickets.filter((ticket) => ticket.order === selectedId);
   const ticketsReady = selectedTickets.length > 0 && selectedTickets.every((ticket) => ticket.status === 'ready');
-  const cart = Object.entries(quantities).map(([id, qty]) => ({ ...availableMenu.find(({ item }) => item.id === id), menuItemId: id, qty: Number(qty) })).filter((line) => line.product && line.qty > 0);
+  const cart = Object.entries(quantities).map(([id, qty]) => ({ ...availableMenu.find(({ item }) => item.id === id), menuItemId: id, qty: Number(qty), note: String(lineNotes[id] || '').trim() })).filter((line) => line.product && line.qty > 0);
   const indicativeTotal = cart.reduce((total, line) => total + (Number(line.product.price) || 0) * line.qty, 0);
-  const setQuantity = (id, value) => setQuantities((current) => { const next = { ...current }; const qty = Math.max(0, Number(value) || 0); if (qty) next[id] = qty; else delete next[id]; return next; });
+  const setQuantity = (id, value) => {
+    const qty = Math.max(0, Number(value) || 0);
+    setQuantities((current) => { const next = { ...current }; if (qty) next[id] = qty; else delete next[id]; return next; });
+    if (!qty) setLineNotes((current) => { const next = { ...current }; delete next[id]; return next; });
+  };
   const recipeProducts = menuItems.map((item) => products.get(item.product)).filter((product) => product && product.active !== false);
   const ingredientProducts = [...products.values()].filter((product) => product.active !== false && product.kind !== 'service');
   const unitsFor = (productId) => {
@@ -97,9 +102,9 @@ export default function RestaurantServicePage() {
       const created = await api(dataPath('restaurant.table_order'), { method: 'POST', body: {
         table: tableId || undefined, warehouse: warehouseId || undefined,
         ...(tableId ? { guest_count: Number(guestCount) } : {}),
-        lines: cart.map(({ product, qty }) => ({ product: product.id, qty })),
+        lines: cart.map(({ product, qty, note }) => ({ product: product.id, qty, ...(note ? { note } : {}) })),
       } });
-      setQuantities({}); setTableId(''); setGuestCount('1'); await load(true); setSelectedId(created.id);
+      setQuantities({}); setLineNotes({}); setTableId(''); setGuestCount('1'); await load(true); setSelectedId(created.id);
       setNotice(`Đã tạo order ${String(created.id).slice(0, 8)}. Giá món do server lấy từ danh mục.`);
     } catch (reason) { setError(reason.message || 'Không tạo được order. Kiểm tra món, thực đơn và giá bán.'); }
     finally { setBusy(''); }
@@ -150,6 +155,7 @@ export default function RestaurantServicePage() {
           <div><strong>{recordLabel('master-data.product', product)}</strong><span className="small muted">{item.station === 'bar' ? 'Quầy pha chế' : 'Bếp'}</span></div>
           <strong className="num">{fmtMoney(product.price || 0)}</strong>
           <label className="field"><span>Số lượng</span><input className="input" type="number" min="0" step="1" value={quantities[item.id] || ''} onChange={(event) => setQuantity(item.id, event.target.value)} /></label>
+          {Number(quantities[item.id] || 0) > 0 && <label className="field"><span>Ghi chú cho bếp/quầy</span><textarea className="textarea" rows="2" maxLength="500" placeholder="Ví dụ: không hành, ít đá" value={lineNotes[item.id] || ''} onChange={(event) => setLineNotes((current) => ({ ...current, [item.id]: event.target.value }))} /></label>}
         </article>)}</div>
         <div className="restaurant-cart-total"><span>Tạm tính chưa gồm thuế</span><strong className="num">{fmtMoney(indicativeTotal)}</strong></div>
         {exceedsTableCapacity && <div className="alert warning" role="status">Bàn chỉ có {selectedTable.seats} chỗ; chọn bàn lớn hơn hoặc giảm số khách.</div>}
@@ -169,7 +175,7 @@ export default function RestaurantServicePage() {
       <section className="restaurant-order-detail card">{selected ? <>
       <header className="restaurant-order-card-head"><div><h2>{tables.find((table) => table.id === selected.table)?.name || 'Mang đi'}</h2><span className="small muted">{fmtDateTime(selected.created_at)}{selected.table ? ` · ${selected.guest_count || 1} khách` : ''}</span></div><span className={`badge ${selected.status === 'completed' ? 'success' : selected.status === 'cancelled' ? 'plain' : 'warning'}`}>{statusLabel(selected.status)}</span></header>
         {selected.cancellation_reason && <div className="small muted">Lý do hủy: {selected.cancellation_reason}</div>}
-        <ul className="restaurant-detail-lines">{(selected.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{line.product_name || products.get(line.product)?.name || 'Món'} × {line.qty}{Number(line.tax_rate) > 0 && <small className="small muted"> · Thuế {line.tax_rate}%</small>}</span><strong className="num">{fmtMoney(line.line_total ?? (Number(line.price || 0) * Number(line.qty || 0)))}</strong></li>)}</ul>
+        <ul className="restaurant-detail-lines">{(selected.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{line.product_name || products.get(line.product)?.name || 'Món'} × {line.qty}{Number(line.tax_rate) > 0 && <small className="small muted"> · Thuế {line.tax_rate}%</small>}{line.note && <small className="small muted"> · Ghi chú: {line.note}</small>}</span><strong className="num">{fmtMoney(line.line_total ?? (Number(line.price || 0) * Number(line.qty || 0)))}</strong></li>)}</ul>
         {Number(selected.tax_total) > 0 && <div className="restaurant-tax-total"><span>Thuế bán hàng</span><strong className="num">{fmtMoney(selected.tax_total)}</strong></div>}
         <div className="restaurant-cart-total"><span>Tổng đã gồm thuế</span><strong className="num">{fmtMoney(selected.total || 0)}</strong></div>
         {selectedTickets.length > 0 && <div className="restaurant-ticket-status"><h3>Tiến độ bếp</h3>{selectedTickets.map((ticket) => <div key={ticket.id}><span>{ticket.station === 'bar' ? 'Quầy pha chế' : 'Bếp'}</span><strong>{statusLabel(ticket.status)}</strong></div>)}</div>}

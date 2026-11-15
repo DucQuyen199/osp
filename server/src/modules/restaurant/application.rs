@@ -126,6 +126,23 @@ pub async fn prepare_order(
     document: &mut Map<String, Value>,
     refresh: bool,
 ) -> R<Vec<String>> {
+    if let Some(lines) = document.get_mut("lines").and_then(Value::as_array_mut) {
+        for line in lines {
+            if let Some(line) = line.as_object_mut() {
+                if let Some(note) = line
+                    .get("note")
+                    .and_then(Value::as_str)
+                    .map(|note| note.trim().to_owned())
+                {
+                    if note.is_empty() {
+                        line.remove("note");
+                    } else {
+                        line.insert("note".into(), Value::String(note));
+                    }
+                }
+            }
+        }
+    }
     if document
         .get("table")
         .and_then(Value::as_str)
