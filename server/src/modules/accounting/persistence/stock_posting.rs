@@ -29,13 +29,6 @@ pub async fn post_stock_movement(
         .get("source")
         .and_then(Value::as_str)
         .unwrap_or_default();
-    let Some(total_cost) = movement
-        .get("total_cost")
-        .and_then(money::decimal)
-        .filter(|value| *value > Decimal::ZERO)
-    else {
-        return Ok(false);
-    };
     let pre_invoice_purchase_return = if direction == "out"
         && matches!(source, "purchase_return" | "quality_return")
     {
@@ -94,6 +87,21 @@ pub async fn post_stock_movement(
             _ => return Ok(false),
         }
     };
+    let Some(total_cost) = movement.get("total_cost").and_then(money::decimal) else {
+        return Err(crate::error::ApiError::validation(
+            "accounting.journal_entry",
+            vec!["Supported stock movement requires a valid total cost before posting".into()],
+        ));
+    };
+    if total_cost < Decimal::ZERO {
+        return Err(crate::error::ApiError::validation(
+            "accounting.journal_entry",
+            vec!["Stock movement total cost cannot be negative".into()],
+        ));
+    }
+    if total_cost.is_zero() {
+        return Ok(false);
+    }
     let Some(movement_id) = movement
         .get("id")
         .and_then(Value::as_str)
