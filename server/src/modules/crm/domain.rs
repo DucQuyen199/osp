@@ -42,10 +42,26 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
             }) {
                 errors.push("Deal probability must be between 0 and 100".into());
             }
+            if let Some(stage) = document
+                .get("pipeline_stage")
+                .and_then(Value::as_str)
+                .filter(|stage| !stage.trim().is_empty())
+            {
+                if !valid_stage_code(stage) {
+                    errors.push("Mã giai đoạn phải dùng chữ thường, số và dấu gạch dưới".into());
+                }
+            }
             errors
         }
         "pipeline_stage" => {
             let mut errors = Vec::new();
+            if document
+                .get("stage")
+                .and_then(Value::as_str)
+                .is_none_or(|stage| !valid_stage_code(stage))
+            {
+                errors.push("Mã giai đoạn phải bắt đầu bằng chữ thường và chỉ dùng chữ thường, số, dấu gạch dưới".into());
+            }
             if document.get("probability").is_some_and(|value| {
                 !money::decimal(value).is_some_and(|probability| {
                     (Decimal::ZERO..=Decimal::ONE_HUNDRED).contains(&probability)
@@ -75,6 +91,19 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
         }
         _ => Vec::new(),
     }
+}
+
+fn valid_stage_code(stage: &str) -> bool {
+    let trimmed = stage.trim();
+    let mut chars = trimmed.chars();
+    stage == trimmed
+        && trimmed != "unclassified"
+        && trimmed.len() <= 48
+        && chars.next().is_some_and(|first| first.is_ascii_lowercase())
+        && chars.all(|character| {
+            character.is_ascii_lowercase() || character.is_ascii_digit() || character == '_'
+        })
+        && canonical_pipeline_stage(trimmed).is_none_or(|canonical| canonical == trimmed)
 }
 
 pub(super) fn canonical_pipeline_stage(value: &str) -> Option<&'static str> {

@@ -91,30 +91,36 @@ impl Kernel {
             )
             .await?;
 
-        let stage_order = [
-            "qualification",
-            "discovery",
-            "proposal",
-            "negotiation",
-            "unclassified",
+        let mut stage_order = vec![
+            "qualification".to_owned(),
+            "discovery".to_owned(),
+            "proposal".to_owned(),
+            "negotiation".to_owned(),
         ];
-        let mut stage_totals: BTreeMap<&str, (usize, Decimal, Decimal)> = stage_order
+        stage_order.extend(
+            stage_config
+                .keys()
+                .filter(|stage| super::domain::canonical_pipeline_stage(stage).is_none())
+                .cloned(),
+        );
+        stage_order.push("unclassified".to_owned());
+        let mut stage_totals: BTreeMap<String, (usize, Decimal, Decimal)> = stage_order
             .iter()
-            .map(|stage| (*stage, (0, Decimal::ZERO, Decimal::ZERO)))
+            .cloned()
+            .map(|stage| (stage, (0, Decimal::ZERO, Decimal::ZERO)))
             .collect();
         let mut amount_total = Decimal::ZERO;
         let mut weighted_total = Decimal::ZERO;
         for deal in &mut deals {
-            let stage = deal
+            let raw_stage = deal
                 .get("pipelineStage")
                 .and_then(Value::as_str)
-                .and_then(super::domain::canonical_pipeline_stage)
-                .or_else(|| {
-                    deal.get("legacyStage")
-                        .and_then(Value::as_str)
-                        .and_then(super::domain::canonical_pipeline_stage)
-                });
-            let stage_key = stage.unwrap_or("unclassified");
+                .or_else(|| deal.get("legacyStage").and_then(Value::as_str));
+            let stage = raw_stage.and_then(|value| {
+                super::domain::canonical_pipeline_stage(value)
+                    .or_else(|| stage_config.contains_key(value).then_some(value))
+            });
+            let stage_key = stage.unwrap_or("unclassified").to_owned();
             let amount = deal
                 .get("amount")
                 .and_then(money::decimal)
@@ -125,11 +131,14 @@ impl Kernel {
                 .and_then(money::decimal)
                 .filter(|probability| (Decimal::ZERO..=Decimal::ONE_HUNDRED).contains(probability))
                 .or_else(|| {
-                    stage.and_then(|stage| {
-                        stage_config.get(stage).map(|(_, probability)| *probability)
-                    })
+                    stage_config
+                        .get(&stage_key)
+                        .map(|(_, probability)| *probability)
                 })
-                .or_else(|| stage.map(super::domain::default_probability))
+                .or_else(|| {
+                    super::domain::canonical_pipeline_stage(&stage_key)
+                        .map(super::domain::default_probability)
+                })
                 .unwrap_or(Decimal::ZERO);
             let weighted = amount
                 .checked_mul(probability)
@@ -140,8 +149,9 @@ impl Kernel {
                 .ok_or_else(|| {
                     report_error("Weighted opportunity value exceeds the supported decimal range")
                 })?;
-            let stage_name = stage
-                .and_then(|stage| stage_config.get(stage).map(|(name, _)| name.as_str()))
+            let stage_name = stage_config
+                .get(&stage_key)
+                .map(|(name, _)| name.as_str())
                 .filter(|name| !name.trim().is_empty())
                 .map(str::to_owned);
             if let Some(object) = deal.as_object_mut() {
@@ -168,10 +178,10 @@ impl Kernel {
         }
         let mut stages = Vec::with_capacity(stage_order.len());
         for stage in stage_order {
-            let (count, amount, weighted) = stage_totals.get(stage).copied().unwrap_or_default();
+            let (count, amount, weighted) = stage_totals.get(&stage).copied().unwrap_or_default();
             stages.push(json!({
                 "stage": stage,
-                "name": stage_config.get(stage).map(|(name, _)| name.as_str()).filter(|name| !name.trim().is_empty()),
+                "name": stage_config.get(&stage).map(|(name, _)| name.as_str()).filter(|name| !name.trim().is_empty()),
                 "count": count,
                 "amount": json_decimal(amount, "stage amount")?,
                 "weightedAmount": json_decimal(weighted, "stage forecast")?,

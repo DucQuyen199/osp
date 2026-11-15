@@ -4,8 +4,6 @@ import { confirmDialog, textDialog, toast } from './lib/feedback.js';
 import { fmtMoney, statusLabel, fmtNumber } from './lib/i18n.js';
 import { can } from './lib/state.js';
 
-const STAGES = ['qualification', 'discovery', 'proposal', 'negotiation', 'unclassified'];
-
 export default function CrmPipelinePage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -117,8 +115,8 @@ export default function CrmPipelinePage() {
         <button ref={listTabRef} className="tab" id="crm-pipeline-list-tab" type="button" role="tab" aria-controls="crm-pipeline-list-panel" aria-selected={view === 'list'} tabIndex={view === 'list' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setView('list')}>Danh sách</button>
       </div>
       <div role="tabpanel" id="crm-pipeline-board-panel" aria-labelledby="crm-pipeline-board-tab" tabIndex={0} style={view === 'board' ? undefined : { display: 'none' }} className="crm-kanban" aria-label="Cơ hội theo giai đoạn bán hàng">
-        {STAGES.map((stageName) => {
-          const summary = report.stages.find((item) => item.stage === stageName);
+        {(report.stages || []).map((summary) => {
+          const stageName = summary.stage;
           const deals = report.deals.filter((deal) => deal.pipelineStage === stageName);
           return <section className="crm-kanban-column" key={stageName} aria-labelledby={`crm-stage-${stageName}`}>
             <header className="crm-kanban-head"><h2 id={`crm-stage-${stageName}`}>{summary?.name || statusLabel(stageName)}</h2><span>{deals.length} · {fmtMoney(summary?.amount || 0)}</span></header>
@@ -129,7 +127,7 @@ export default function CrmPipelinePage() {
               <span className="small muted">Dự báo: {fmtMoney(deal.weightedAmount)} · {deal.expectedClose || 'Chưa có ngày chốt'}</span>
               {can('crm.deal.update') && <label className="field"><span className="label">Chuyển giai đoạn</span><select className="select" value={deal.pipelineStage === 'unclassified' ? '' : deal.pipelineStage} disabled={loading} onChange={(event) => event.target.value && moveDeal(deal, event.target.value)}>
                 {deal.pipelineStage === 'unclassified' && <option value="">Chưa phân loại</option>}
-                {STAGES.filter((item) => item !== 'unclassified').map((item) => <option key={item} value={item}>{statusLabel(item)}</option>)}
+                {report.stages.filter((item) => item.stage !== 'unclassified').map((item) => <option key={item.stage} value={item.stage}>{item.name || statusLabel(item.stage)}</option>)}
               </select></label>}
               {outcomeButtons(deal)}
             </article>)}

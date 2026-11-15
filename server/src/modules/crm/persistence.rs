@@ -34,6 +34,56 @@ pub async fn validate_persistence(
             ]);
         }
     }
+    if entity == "pipeline_stage" && action == "removed" {
+        if let Some(stage) = document.get("stage").and_then(Value::as_str) {
+            let lock_key = format!("crm-pipeline-stage:{}:{stage}", tenant.id);
+            tx.query_opt(
+                "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                &[&lock_key],
+            )
+            .await?;
+            if tx
+                .query_opt(
+                    "SELECT id FROM crm__deal WHERE tenant_id = $1 AND (pipeline_stage = $2 OR lower(btrim(stage)) = $2) LIMIT 1 FOR UPDATE",
+                    &[&tenant.id, &stage],
+                )
+                .await?
+                .is_some()
+            {
+                return Ok(vec![
+                    "Không thể xóa giai đoạn đang được dùng bởi cơ hội bán hàng".into(),
+                ]);
+            }
+        }
+    }
+    if entity == "deal" && matches!(action, "created" | "updated") {
+        if let Some(stage) = document
+            .get("pipeline_stage")
+            .and_then(Value::as_str)
+            .filter(|stage| !stage.is_empty())
+        {
+            if super::domain::canonical_pipeline_stage(stage).is_none() {
+                let lock_key = format!("crm-pipeline-stage:{}:{stage}", tenant.id);
+                tx.query_opt(
+                    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                    &[&lock_key],
+                )
+                .await?;
+                if tx
+                    .query_opt(
+                        "SELECT id FROM crm__pipeline_stage WHERE tenant_id = $1 AND stage = $2 LIMIT 1 FOR SHARE",
+                        &[&tenant.id, &stage],
+                    )
+                    .await?
+                    .is_none()
+                {
+                    return Ok(vec![
+                        "Tạo cấu hình xác suất cho giai đoạn này trước khi gán cơ hội".into(),
+                    ]);
+                }
+            }
+        }
+    }
     if entity == "activity" {
         return validate_activity(tx, tenant, action, document).await;
     }

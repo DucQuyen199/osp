@@ -4,6 +4,7 @@
 
 ## [Unreleased]
 ### Added
+- CRM pipeline stages can now be configured per tenant with custom lowercase stage codes, names, and probabilities; custom stages appear in the board/report, and stages in use cannot be deleted.
 - CRM deals now capture sales lines, warehouse, price list, and shipping address; winning a deal requires a valid customer, warehouse, positive amount, and at least one line, then creates a reviewable draft sales order with those details.
 - Corrected the agricultural harvest pesticide-withdrawal error to display in Vietnamese with the product and allowed harvest date.
 - Added unique product barcodes and POS keyboard-scanner input: exact barcode or SKU plus Enter adds one item to the cart, while ambiguous matches are stopped instead of selecting the wrong product.

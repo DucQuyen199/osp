@@ -153,14 +153,9 @@
     },
     {
      "name": "pipeline_stage",
-     "type": "enum",
-     "required": false,
-     "options": [
-      "qualification",
-      "discovery",
-      "proposal",
-      "negotiation"
-     ]
+     "label": "Giai đoạn pipeline",
+     "type": "string",
+     "required": false
     },
     {
      "name": "probability",
@@ -223,18 +218,13 @@
   },
   {
    "name": "pipeline_stage",
-   "label": "Cấu hình xác suất pipeline",
+   "label": "Giai đoạn và xác suất pipeline",
    "fields": [
     {
      "name": "stage",
-     "type": "enum",
-     "required": true,
-     "options": [
-      "qualification",
-      "discovery",
-      "proposal",
-      "negotiation"
-     ]
+    "label": "Mã giai đoạn (chữ thường, số, dấu gạch dưới)",
+    "type": "string",
+    "required": true
     },
     {
      "name": "name",
