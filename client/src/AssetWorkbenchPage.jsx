@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { localDate, localMonth } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel } from './lib/i18n.js';
 import { can, loadAllResponse } from './lib/state.js';
@@ -8,14 +9,12 @@ const rows = (response) => Array.isArray(response?.items) ? response.items : [];
 const statuses = { draft: 'Bản nháp', active: 'Đang sử dụng', disposed: 'Đã thanh lý' };
 const methods = { straight_line: 'Đường thẳng', declining_balance: 'Số dư giảm dần' };
 const acquisitionMethods = { cash: 'Tiền mặt', bank: 'Ngân hàng', opening_balance: 'Số dư đầu kỳ' };
-const today = new Date();
-const dateValue = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+const currentMonth = localMonth();
 
 export default function AssetWorkbenchPage() {
   const [assets, setAssets] = useState([]);
   const [depreciations, setDepreciations] = useState([]);
-  const [form, setForm] = useState({ name: '', code: '', category: '', purchase_date: '', in_service_date: dateValue(today), cost: '', salvage_value: '0', useful_life_months: '60', depreciation_method: 'straight_line', declining_balance_factor: '2', acquisition_method: 'bank', opening_accumulated_depreciation: '0', location: '' });
+  const [form, setForm] = useState({ name: '', code: '', category: '', purchase_date: '', in_service_date: localDate(), cost: '', salvage_value: '0', useful_life_months: '60', depreciation_method: 'straight_line', declining_balance_factor: '2', acquisition_method: 'bank', opening_accumulated_depreciation: '0', location: '' });
   const [depreciationForm, setDepreciationForm] = useState({ asset: '', period: currentMonth });
   const [disposals, setDisposals] = useState({});
   const [filter, setFilter] = useState('all');

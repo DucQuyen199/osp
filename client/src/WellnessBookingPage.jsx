@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { localDate as businessDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel } from './lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
@@ -10,8 +11,9 @@ const localDateTime = (value) => {
   return Number.isNaN(date.getTime()) ? '' : new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 };
 const localDate = (value) => {
+  if (!value) return '';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '' : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  return Number.isNaN(date.getTime()) ? '' : businessDate(date);
 };
 const action = (row, verb) => api(dataPath('booking.booking', row.id, verb), { method: 'POST' });
 

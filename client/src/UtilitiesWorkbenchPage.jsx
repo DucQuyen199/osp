@@ -1,12 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { localMonth } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { statusLabel, fmtNumber } from './lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
-const currentPeriod = () => {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-};
+const currentPeriod = localMonth;
 const nextPeriod = (period) => {
   const [year, month] = String(period || '').split('-').map(Number);
   if (!year || !month) return currentPeriod();

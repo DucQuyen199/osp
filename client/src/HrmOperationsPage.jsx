@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { localDate } from './lib/dates.js';
+import { addCalendarDays, addCalendarMonths, localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtMoney, statusLabel } from './lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
@@ -29,9 +29,9 @@ const localDateTimeIso = (date, time) => {
   const offset = Math.abs(offsetMinutes);
   return `${date}T${time}:00${sign}${String(Math.floor(offset / 60)).padStart(2, '0')}:${String(offset % 60).padStart(2, '0')}`;
 };
-const nextLocalDate = (date) => { const [year, month, day] = date.split('-').map(Number); const value = new Date(year, month - 1, day + 1); return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`; };
-const addLocalDays = (date, days) => { const [year, month, day] = date.split('-').map(Number); const value = new Date(year, month - 1, day + days); return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`; };
-const nextMonthStart = (date) => { const [year, month] = date.split('-').map(Number); const value = new Date(year, month, 1); return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-01`; };
+const nextLocalDate = (date) => addCalendarDays(date, 1);
+const addLocalDays = addCalendarDays;
+const nextMonthStart = (date) => addCalendarMonths(`${date.slice(0, 7)}-01`, 1);
 const fmtTime = (value) => value ? new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : '--';
 async function listAllRows(entity, filters = {}) {
   const rows = [];

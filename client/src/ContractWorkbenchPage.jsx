@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { addCalendarDays, localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel } from './lib/i18n.js';
 import { app, can, loadAllResponse, loadRefs, recordLabel } from './lib/state.js';
@@ -9,13 +10,9 @@ const blankClause = { title: '', body: '' };
 const blankAmendment = { reference: '', effective_date: '', reason: '', title: '', terms: '', end_date: '', value: '' };
 const rows = (response) => Array.isArray(response?.items) ? response.items : [];
 const endingSoon = (contract) => {
-  if (contract.status !== 'active' || !contract.end_date || contract.end_date < localDate()) return false;
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  return new Date(`${contract.end_date}T00:00:00`).getTime() <= today.getTime() + 90 * 86400000;
-};
-const localDate = () => {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const today = localDate();
+  if (contract.status !== 'active' || !contract.end_date || contract.end_date < today) return false;
+  return contract.end_date <= addCalendarDays(today, 90);
 };
 
 export default function ContractWorkbenchPage() {

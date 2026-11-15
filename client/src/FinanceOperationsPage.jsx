@@ -1,18 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { localDate } from './lib/dates.js';
+import { addCalendarMonths, localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, statusLabel, fmtNumber } from './lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
 const today = localDate;
-const defaultFirstDueDate = () => {
-  const [year, month, day] = today().split('-').map(Number);
-  const nextMonth = new Date(year, month - 1, 1);
-  nextMonth.setMonth(nextMonth.getMonth() + 1);
-  const lastDay = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
-  nextMonth.setDate(Math.min(day, lastDay));
-  return today(nextMonth);
-};
+const defaultFirstDueDate = () => addCalendarMonths(today(), 1);
 const money = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 2 });
 const actions = async (qname, row, action) => api(dataPath(qname, row.id, action), { method: 'POST' });
 
