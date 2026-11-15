@@ -54,7 +54,7 @@ pub async fn handle_source_event(
         })?;
     let status: String = order.get(0);
     let order_lines: Value = order.get(1);
-    let mut ordered = std::collections::BTreeMap::<(Uuid, Decimal), Decimal>::new();
+    let mut ordered = std::collections::BTreeMap::<(Uuid, Decimal, Option<Uuid>), Decimal>::new();
     for line in order_lines.as_array().into_iter().flatten() {
         let (Some(product), Some(price), Some(qty)) = (
             line.get("product")
@@ -65,7 +65,13 @@ pub async fn handle_source_event(
         ) else {
             continue;
         };
-        let ordered_qty = ordered.entry((product, price)).or_insert(Decimal::ZERO);
+        let unit = line
+            .get("uom")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok());
+        let ordered_qty = ordered
+            .entry((product, price, unit))
+            .or_insert(Decimal::ZERO);
         *ordered_qty = ordered_qty.checked_add(qty).ok_or_else(|| {
             crate::error::ApiError::validation(
                 event_type,
@@ -88,7 +94,7 @@ pub async fn handle_source_event(
             vec!["Received receipt is missing from the purchase order history".into()],
         ));
     }
-    let mut received = std::collections::BTreeMap::<(Uuid, Decimal), Decimal>::new();
+    let mut received = std::collections::BTreeMap::<(Uuid, Decimal, Option<Uuid>), Decimal>::new();
     for row in receipts {
         let lines: Value = row.get(1);
         for line in lines.as_array().into_iter().flatten() {
@@ -101,7 +107,13 @@ pub async fn handle_source_event(
             ) else {
                 continue;
             };
-            let received_qty = received.entry((product, price)).or_insert(Decimal::ZERO);
+            let unit = line
+                .get("uom")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok());
+            let received_qty = received
+                .entry((product, price, unit))
+                .or_insert(Decimal::ZERO);
             *received_qty = received_qty.checked_add(qty).ok_or_else(|| {
                 crate::error::ApiError::validation(
                     event_type,
