@@ -720,8 +720,20 @@ impl Kernel {
         };
         let mut total = 0;
         for id in ids {
-            if let Ok(t) = self.tenant(&id).await {
-                total += self.run_jobs(&t).await.unwrap_or(0);
+            match self.tenant(&id).await {
+                Ok(tenant) => match self.run_jobs(&tenant).await {
+                    Ok(done) => total += done,
+                    Err(error) => tracing::warn!(
+                        tenant_id = %id,
+                        error = %error,
+                        "scheduled jobs failed for tenant"
+                    ),
+                },
+                Err(error) => tracing::warn!(
+                    tenant_id = %id,
+                    error = %error,
+                    "scheduled jobs could not load tenant"
+                ),
             }
         }
         Ok(total)
