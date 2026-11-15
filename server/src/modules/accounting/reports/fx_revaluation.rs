@@ -119,7 +119,17 @@ async fn fx_positions(
             FROM currency_positions cp JOIN master_data__currency c ON c.tenant_id = $1 AND c.id = cp.currency_id \
             LEFT JOIN LATERAL (SELECT r.rate, r.effective_date FROM master_data__currency_rate r WHERE r.tenant_id = $1 AND r.from_currency = c.id AND r.to_currency = (SELECT id FROM base_currency) AND r.effective_date <= $3 ORDER BY r.effective_date DESC, r.created_at DESC LIMIT 1) rate ON true \
             ORDER BY c.code, cp.side";
-    tx.query_json(sql, &[&tenant.id, &base_code, &as_of]).await
+    let sql = sql.replace("AT TIME ZONE 'UTC'", "AT TIME ZONE $4");
+    tx.query_json(
+        &sql,
+        &[
+            &tenant.id,
+            &base_code,
+            &as_of,
+            &tenant.business_timezone().to_string(),
+        ],
+    )
+    .await
 }
 impl Kernel {
     /// Preview open foreign-currency receivables and payables at a closing rate.

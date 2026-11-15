@@ -106,9 +106,15 @@ impl Kernel {
                 'total', COALESCE(sum(balance), 0) \
              ) FROM aged GROUP BY party_id, party_name ORDER BY party_name, party_id"
         );
+        let sql = sql.replace("AT TIME ZONE 'UTC'", "AT TIME ZONE $3");
         let mut conn = self.pool.get().await?;
         let tx = Tx::begin(&mut conn, &tenant.id, false).await?;
-        let parties = tx.query_json(&sql, &[&tenant.id, &as_of]).await?;
+        let parties = tx
+            .query_json(
+                &sql,
+                &[&tenant.id, &as_of, &tenant.business_timezone().to_string()],
+            )
+            .await?;
         let bucket_fields = [
             "notDue",
             "dueToday",
@@ -151,9 +157,7 @@ impl Kernel {
 
         let mut conn = self.pool.get().await?;
         let tx = Tx::begin(&mut conn, &tenant.id, false).await?;
-        let rows = tx
-            .query_json(
-                "WITH open_documents AS ( \
+        let sql = "WITH open_documents AS ( \
                    SELECT 'receivable'::text AS kind, i.id::text AS document_id, COALESCE(p.name, '') AS party, \
                           COALESCE(i.due_date, i.issue_date, (i.created_at AT TIME ZONE 'UTC')::date) AS due_date, \
                           GREATEST(COALESCE(i.base_total, i.total)::numeric \
@@ -193,8 +197,17 @@ impl Kernel {
                      'kind', kind, 'documentId', document_id, 'party', party, 'dueDate', due_date, \
                      'forecastDate', GREATEST(due_date, $2::date), 'amount', balance \
                    ) FROM open_documents WHERE balance > 0 AND due_date <= $3::date \
-                   ORDER BY GREATEST(due_date, $2::date), kind, party, document_id",
-                &[&tenant.id, &from, &to],
+                   ORDER BY GREATEST(due_date, $2::date), kind, party, document_id";
+        let sql = sql.replace("AT TIME ZONE 'UTC'", "AT TIME ZONE $4");
+        let rows = tx
+            .query_json(
+                &sql,
+                &[
+                    &tenant.id,
+                    &from,
+                    &to,
+                    &tenant.business_timezone().to_string(),
+                ],
             )
             .await?;
 
@@ -210,9 +223,7 @@ impl Kernel {
         }
         let mut commitments = Vec::new();
         if tenant.has_module("purchasing") {
-            commitments = tx
-                .query_json(
-                    "SELECT jsonb_build_object( \
+            let sql = "SELECT jsonb_build_object( \
                        'kind', 'purchase_commitment', 'documentId', po.id, 'party', COALESCE(p.name, ''), \
                        'dueDate', COALESCE(po.expected_date, (po.created_at AT TIME ZONE 'UTC')::date), \
                        'forecastDate', GREATEST(COALESCE(po.expected_date, (po.created_at AT TIME ZONE 'UTC')::date), $2::date), \
@@ -225,8 +236,17 @@ impl Kernel {
                        AND COALESCE(po.expected_date, (po.created_at AT TIME ZONE 'UTC')::date) <= $3::date \
                        AND NOT EXISTS (SELECT 1 FROM accounting__bill b WHERE b.tenant_id = po.tenant_id \
                          AND b.source = 'purchase_order' AND b.source_id = po.id::text AND b.status NOT IN ('draft', 'void')) \
-                     ORDER BY GREATEST(COALESCE(po.expected_date, (po.created_at AT TIME ZONE 'UTC')::date), $2::date), p.name, po.id",
-                    &[&tenant.id, &from, &to],
+                     ORDER BY GREATEST(COALESCE(po.expected_date, (po.created_at AT TIME ZONE 'UTC')::date), $2::date), p.name, po.id";
+            let sql = sql.replace("AT TIME ZONE 'UTC'", "AT TIME ZONE $4");
+            commitments = tx
+                .query_json(
+                    &sql,
+                    &[
+                        &tenant.id,
+                        &from,
+                        &to,
+                        &tenant.business_timezone().to_string(),
+                    ],
                 )
                 .await?;
         }

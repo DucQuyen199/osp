@@ -194,8 +194,17 @@ impl Kernel {
         }
         let mut conn = self.pool.get().await?;
         let tx = Tx::begin(&mut conn, &tenant.id, false).await?;
+        let sql = TAX_REGISTER_SQL.replace("AT TIME ZONE 'UTC'", "AT TIME ZONE $4");
         let rows = tx
-            .query(TAX_REGISTER_SQL, &[&tenant.id, &from, &to])
+            .query(
+                &sql,
+                &[
+                    &tenant.id,
+                    &from,
+                    &to,
+                    &tenant.business_timezone().to_string(),
+                ],
+            )
             .await?;
 
         let mut buckets = BTreeMap::<String, TaxBucket>::new();

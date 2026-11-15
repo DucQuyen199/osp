@@ -50,7 +50,7 @@ impl Kernel {
         let rows = tx
             .query_json(
                 "WITH posted_lines AS ( \
-                    SELECT a.id AS account_id, a.code, a.name, a.kind, COALESCE(j.posting_date, (j.created_at AT TIME ZONE 'UTC')::date) AS posting_date, \
+                    SELECT a.id AS account_id, a.code, a.name, a.kind, COALESCE(j.posting_date, (j.created_at AT TIME ZONE $4)::date) AS posting_date, \
                            COALESCE((line.value->>'debit')::numeric, 0) AS debit, \
                            COALESCE((line.value->>'credit')::numeric, 0) AS credit \
                     FROM accounting__journal_entry j \
@@ -58,7 +58,7 @@ impl Kernel {
                     JOIN accounting__account a ON a.tenant_id = j.tenant_id \
                       AND a.id = (line.value->>'account')::uuid \
                     WHERE j.tenant_id = $1 AND j.status IN ('posted', 'reversed') \
-                      AND ($3::date IS NULL OR COALESCE(j.posting_date, (j.created_at AT TIME ZONE 'UTC')::date) <= $3::date) \
+                      AND ($3::date IS NULL OR COALESCE(j.posting_date, (j.created_at AT TIME ZONE $4)::date) <= $3::date) \
                  ), grouped AS ( \
                     SELECT account_id, code, name, kind, \
                       COALESCE(SUM(debit) FILTER (WHERE $2::date IS NOT NULL AND posting_date < $2::date), 0) AS opening_debit_total, \
@@ -82,7 +82,7 @@ impl Kernel {
                     'closingDebit', GREATEST(opening_debit_total - opening_credit_total + period_debit - period_credit, 0), \
                     'closingCredit', GREATEST(opening_credit_total - opening_debit_total + period_credit - period_debit, 0) \
                  ) FROM all_accounts ORDER BY code, account_id",
-                &[&tenant.id, &from, &to],
+                &[&tenant.id, &from, &to, &tenant.business_timezone().to_string()],
             )
             .await?;
         Ok(json!({ "from": from, "to": to, "accounts": rows }))
@@ -124,7 +124,7 @@ impl Kernel {
         let rows = tx
             .query_json(
                 "WITH account_lines AS ( \
-                    SELECT j.id AS entry_id, j.created_at, COALESCE(j.posting_date, (j.created_at AT TIME ZONE 'UTC')::date) AS posting_date, j.memo, \
+                    SELECT j.id AS entry_id, j.created_at, COALESCE(j.posting_date, (j.created_at AT TIME ZONE $5)::date) AS posting_date, j.memo, \
                            line.ordinality AS line_number, \
                            COALESCE((line.value->>'debit')::numeric, 0) AS debit, \
                            COALESCE((line.value->>'credit')::numeric, 0) AS credit \
@@ -132,7 +132,7 @@ impl Kernel {
                     CROSS JOIN LATERAL jsonb_array_elements(j.lines) WITH ORDINALITY AS line(value, ordinality) \
                     WHERE j.tenant_id = $1 AND j.status IN ('posted', 'reversed') \
                       AND line.value->>'account' = $2::text \
-                      AND ($4::date IS NULL OR COALESCE(j.posting_date, (j.created_at AT TIME ZONE 'UTC')::date) <= $4::date) \
+                      AND ($4::date IS NULL OR COALESCE(j.posting_date, (j.created_at AT TIME ZONE $5)::date) <= $4::date) \
                  ), balances AS ( \
                     SELECT *, SUM(debit - credit) OVER (ORDER BY posting_date, created_at, entry_id, line_number) AS running_balance \
                     FROM account_lines \
@@ -142,7 +142,13 @@ impl Kernel {
                  ) FROM balances WHERE ($3::date IS NULL OR posting_date >= $3::date) \
                    AND ($4::date IS NULL OR posting_date <= $4::date) \
                  ORDER BY posting_date, created_at, entry_id, line_number",
-                &[&tenant.id, &account_id.to_string(), &from, &to],
+                &[
+                    &tenant.id,
+                    &account_id.to_string(),
+                    &from,
+                    &to,
+                    &tenant.business_timezone().to_string(),
+                ],
             )
             .await?;
         Ok(json!({ "accountId": account_id, "from": from, "to": to, "entries": rows }))

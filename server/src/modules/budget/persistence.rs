@@ -27,10 +27,10 @@ pub async fn refresh_actuals(tx: &Tx<'_>, tenant: &Tenant) -> R<()> {
               AND budget_account.kind IN ('expense', 'revenue')
               AND (line.value->>'department') IS NOT DISTINCT FROM bl.department::text
               AND b.status IN ('approved', 'closed')
-              AND ((b.period ~ '^[0-9]{4}$' AND to_char(COALESCE(j.posting_date, (j.created_at AT TIME ZONE 'UTC')::date), 'YYYY') = b.period)
-                OR (b.period ~ '^[0-9]{4}-[0-9]{2}$' AND to_char(COALESCE(j.posting_date, (j.created_at AT TIME ZONE 'UTC')::date), 'YYYY-MM') = b.period))
+              AND ((b.period ~ '^[0-9]{4}$' AND to_char(COALESCE(j.posting_date, (j.created_at AT TIME ZONE $2)::date), 'YYYY') = b.period)
+                OR (b.period ~ '^[0-9]{4}-[0-9]{2}$' AND to_char(COALESCE(j.posting_date, (j.created_at AT TIME ZONE $2)::date), 'YYYY-MM') = b.period))
         ), 0) WHERE bl.tenant_id = $1",
-        &[&tenant.id],
+        &[&tenant.id, &tenant.business_timezone().to_string()],
     )
     .await?;
     Ok(())

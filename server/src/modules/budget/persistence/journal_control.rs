@@ -141,15 +141,21 @@ pub(super) async fn validate_journal_posting(
                    WHERE j.tenant_id = bl.tenant_id AND j.status IN ('posted', 'reversed') \
                      AND entry.value->>'account' = bl.account::text \
                      AND (entry.value->>'department') IS NOT DISTINCT FROM bl.department::text \
-                     AND ((b.period ~ '^[0-9]{4}$' AND to_char(COALESCE(j.posting_date, (j.created_at AT TIME ZONE 'UTC')::date), 'YYYY') = b.period) \
-                       OR (b.period ~ '^[0-9]{4}-[0-9]{2}$' AND to_char(COALESCE(j.posting_date, (j.created_at AT TIME ZONE 'UTC')::date), 'YYYY-MM') = b.period)) \
+                     AND ((b.period ~ '^[0-9]{4}$' AND to_char(COALESCE(j.posting_date, (j.created_at AT TIME ZONE $5)::date), 'YYYY') = b.period) \
+                       OR (b.period ~ '^[0-9]{4}-[0-9]{2}$' AND to_char(COALESCE(j.posting_date, (j.created_at AT TIME ZONE $5)::date), 'YYYY-MM') = b.period)) \
                  ), 0)::text \
                  FROM budget__budget b \
                  JOIN budget__budget_line bl ON bl.tenant_id = b.tenant_id AND bl.budget = b.id \
                  WHERE b.tenant_id = $1 AND b.period = ANY($2) AND b.status IN ('approved', 'closed') \
                    AND bl.account = $3 AND bl.department IS NOT DISTINCT FROM $4 \
                  ORDER BY b.period FOR UPDATE OF b, bl",
-                &[&tenant.id, &periods, &account, &department],
+                &[
+                    &tenant.id,
+                    &periods,
+                    &account,
+                    &department,
+                    &tenant.business_timezone().to_string(),
+                ],
             )
             .await?;
         if rows.is_empty() {
