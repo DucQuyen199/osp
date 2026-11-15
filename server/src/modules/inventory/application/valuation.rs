@@ -354,7 +354,9 @@ pub(super) async fn fifo_cost_allocations(
 
     // Quality-held units are unavailable to ordinary issues. Reserve them from
     // the newest layer in each lot so FIFO continues to issue the oldest free stock.
-    if tenant.has_module("quality") && source != "quality_return" {
+    // A supplier return for failed QC consumes those reserved layers instead of
+    // taking cost from older, sellable inventory.
+    if tenant.has_module("quality") {
         let held_rows = tx
             .query(
                 "SELECT qi.lot::text, COALESCE(SUM(CASE WHEN qi.status = 'passed' THEN 0::numeric ELSE GREATEST(qi.qty::numeric - COALESCE(disp.qty, 0) - COALESCE(ret.qty, 0), 0::numeric) END), 0)::text FROM quality__inspection qi LEFT JOIN LATERAL (SELECT SUM(qd.qty::numeric) AS qty FROM quality__inspection_disposition qd WHERE qd.tenant_id = qi.tenant_id AND qd.inspection = qi.id AND qd.status = 'posted') disp ON TRUE LEFT JOIN LATERAL (SELECT SUM(qr.qty::numeric) AS qty FROM inventory__stock_move qr WHERE qr.tenant_id = qi.tenant_id AND qr.source = 'quality_return' AND qr.source_id = qi.id::text AND qr.product = qi.product AND qr.warehouse = qi.warehouse AND qr.lot IS NOT DISTINCT FROM qi.lot::text AND qr.direction = 'out') ret ON TRUE WHERE qi.tenant_id = $1 AND qi.product = $2 AND qi.warehouse IS NOT DISTINCT FROM $3 AND ($4::text IS NULL OR qi.lot::text = $4) AND qi.source IN ('purchase_order', 'purchase_receipt') GROUP BY qi.lot",
@@ -367,9 +369,15 @@ pub(super) async fn fifo_cost_allocations(
             let held_qty = decimal_column(&row, 1, "quality held quantity")?;
             held_by_lot.insert(held_lot, held_qty);
         }
+        let mut held_layers = Vec::new();
         for (held_lot, mut held_qty) in held_by_lot {
             for layer in open.iter_mut().rev().filter(|layer| layer.lot == held_lot) {
                 let reserve = held_qty.min(layer.remaining_qty);
+                if source == "quality_return" && reserve > Decimal::new(1, 6) {
+                    let mut held_layer = layer.clone();
+                    held_layer.remaining_qty = reserve;
+                    held_layers.push(held_layer);
+                }
                 layer.remaining_qty =
                     layer.remaining_qty.checked_sub(reserve).ok_or_else(|| {
                         crate::error::ApiError::validation(
@@ -393,6 +401,16 @@ pub(super) async fn fifo_cost_allocations(
                     vec!["Quality-held quantity exceeds its available FIFO receipt layers".into()],
                 ));
             }
+        }
+        if source == "quality_return" {
+            held_layers.sort_by(|left, right| {
+                right
+                    .received_at
+                    .cmp(&left.received_at)
+                    .then_with(|| right.origin_id.cmp(&left.origin_id))
+                    .then_with(|| right.id.cmp(&left.id))
+            });
+            open = held_layers;
         }
     }
 
