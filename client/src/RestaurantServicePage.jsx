@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from './lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel } from './lib/i18n.js';
-import { app, can, loadRefs, recordLabel } from './lib/state.js';
+import { app, can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 import { recordHref } from './lib/routes.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -39,12 +39,12 @@ export default function RestaurantServicePage() {
       const canReadTickets = can('restaurant.kitchen_ticket.read');
       const canReadInvoices = app.meta?.modules?.some((module) => module.id === 'accounting') && can('accounting.payment.read');
       const [tableResponse, menuResponse, recipeResponse, orderResponse, productMap, unitMap, warehouseMap, ticketResponse, invoiceResponse] = await Promise.all([
-        api(`${dataPath('restaurant.table')}?limit=1000`), api(`${dataPath('restaurant.menu_item')}?limit=1000`),
-        can('restaurant.recipe.read') ? api(`${dataPath('restaurant.recipe')}?limit=1000`) : Promise.resolve({ items: [] }),
-        api(`${dataPath('restaurant.table_order')}?limit=1000`), loadRefs('master-data.product'),
+        loadAllResponse('restaurant.table'), loadAllResponse('restaurant.menu_item'),
+        can('restaurant.recipe.read') ? loadAllResponse('restaurant.recipe') : Promise.resolve({ items: [] }),
+        loadAllResponse('restaurant.table_order'), loadRefs('master-data.product'),
         can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()), loadRefs('inventory.warehouse'),
-        canReadTickets ? api(`${dataPath('restaurant.kitchen_ticket')}?limit=1000`) : Promise.resolve({ items: [] }),
-        canReadInvoices ? api(`${dataPath('accounting.payment')}?limit=1000`) : Promise.resolve({ items: [] }),
+        canReadTickets ? loadAllResponse('restaurant.kitchen_ticket') : Promise.resolve({ items: [] }),
+        canReadInvoices ? loadAllResponse('accounting.payment') : Promise.resolve({ items: [] }),
       ]);
       const nextOrders = itemsOf(orderResponse).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
       setTables(itemsOf(tableResponse)); setMenuItems(itemsOf(menuResponse)); setRecipes(itemsOf(recipeResponse)); setOrders(nextOrders); setProducts(productMap); setUnits(unitMap); setWarehouses(warehouseMap); setTickets(itemsOf(ticketResponse)); setInvoices(itemsOf(invoiceResponse));

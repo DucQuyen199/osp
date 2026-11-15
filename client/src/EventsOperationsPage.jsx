@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from './lib/api.js';
 import { fmtDateTime, statusLabel } from './lib/i18n.js';
-import { can, loadRefs, recordLabel } from './lib/state.js';
+import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
 const localDateTime = (value) => {
   if (!value) return '';
@@ -32,7 +32,7 @@ export default function EventsOperationsPage() {
     setLoading(true); setError('');
     try {
       const [eventRes, ticketRes, partyMap, taxMap] = await Promise.all([
-        api(`${dataPath('events.event')}?limit=1000`), api(`${dataPath('events.ticket')}?limit=1000`),
+        loadAllResponse('events.event'), loadAllResponse('events.ticket'),
         loadRefs('master-data.party'), loadRefs('master-data.tax'),
       ]);
       const eventItems = eventRes.items || [];

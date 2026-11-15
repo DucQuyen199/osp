@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtMoney, statusLabel } from './lib/i18n.js';
-import { app, can, loadRefs, recordLabel } from './lib/state.js';
+import { app, can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 import { recordHref } from './lib/routes.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -42,7 +42,7 @@ export default function SalesReturnsWorkbenchPage() {
         logisticsEnabled && can('logistics.shipment.read') ? api(`${dataPath('logistics.shipment')}?limit=3000`) : Promise.resolve({ items: [] }),
         can('accounting.invoice.read') ? api(`${dataPath('accounting.invoice')}?limit=2000`) : Promise.resolve({ items: [] }),
         can('accounting.credit_note.read') ? api(`${dataPath('accounting.credit_note')}?limit=2000`) : Promise.resolve({ items: [] }),
-        workflowApproval && can('workflow-approval.approval_request.read') ? api(`${dataPath('workflow-approval.approval_request')}?limit=1000`) : Promise.resolve({ items: [] }),
+        workflowApproval && can('workflow-approval.approval_request.read') ? loadAllResponse('workflow-approval.approval_request') : Promise.resolve({ items: [] }),
       ]);
       const orderRows = itemsOf(orderRes).sort((a, b) => String(b.order_date || '').localeCompare(String(a.order_date || '')));
       const returnRows = itemsOf(returnRes).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));

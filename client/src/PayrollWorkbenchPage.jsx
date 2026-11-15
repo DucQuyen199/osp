@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { localMonth } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtMoney, statusLabel } from './lib/i18n.js';
-import { app, can, loadRefs, recordLabel } from './lib/state.js';
+import { app, can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 import { listHref } from './lib/routes.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -26,10 +26,10 @@ export default function PayrollWorkbenchPage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [runRes, slipRes, employeeMap, requestRes] = await Promise.all([
-        can('payroll.payroll_run.read') ? api(`${dataPath('payroll.payroll_run')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('payroll.payroll_run.read') ? loadAllResponse('payroll.payroll_run') : Promise.resolve({ items: [] }),
         can('payroll.payslip.read') ? api(`${dataPath('payroll.payslip')}?limit=2000`) : Promise.resolve({ items: [] }),
         can('hrm.employee.read') ? loadRefs('hrm.employee') : Promise.resolve(new Map()),
-        workflowApproval && can('workflow-approval.approval_request.read') ? api(`${dataPath('workflow-approval.approval_request')}?limit=1000`) : Promise.resolve({ items: [] }),
+        workflowApproval && can('workflow-approval.approval_request.read') ? loadAllResponse('workflow-approval.approval_request') : Promise.resolve({ items: [] }),
       ]);
       const runRows = itemsOf(runRes).sort((a, b) => String(b.period || '').localeCompare(String(a.period || '')) || String(b.created_at || '').localeCompare(String(a.created_at || '')));
       setRuns(runRows); setPayslips(itemsOf(slipRes)); setEmployees(employeeMap); setApprovalRequests(itemsOf(requestRes));

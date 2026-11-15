@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from './lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel } from './lib/i18n.js';
-import { can, loadRefs, recordLabel } from './lib/state.js';
+import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
 const localDateTime = (value) => {
   if (!value) return '';
@@ -37,11 +37,11 @@ export default function FieldServiceWorkbenchPage() {
       const showInvoices = can('accounting.invoice.read');
       const showTickets = can('helpdesk.ticket.read');
       const [orderResponse, partyMap, productMap, unitMap, warehouseMap, invoiceResponse, ticketResponse, employeeMap] = await Promise.all([
-        api(`${dataPath('field-service.work_order')}?limit=1000`), loadRefs('master-data.party'), loadRefs('master-data.product'),
+        loadAllResponse('field-service.work_order'), loadRefs('master-data.party'), loadRefs('master-data.product'),
         can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
         loadRefs('inventory.warehouse'),
-        showInvoices ? api(`${dataPath('accounting.invoice')}?limit=1000`) : Promise.resolve({ items: [] }),
-        showTickets ? api(`${dataPath('helpdesk.ticket')}?limit=1000`) : Promise.resolve({ items: [] }),
+        showInvoices ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
+        showTickets ? loadAllResponse('helpdesk.ticket') : Promise.resolve({ items: [] }),
         can('hrm.employee.read') ? loadRefs('hrm.employee') : Promise.resolve(new Map()),
       ]);
       const nextOrders = itemsOf(orderResponse).sort((a, b) => String(b.scheduled_at || b.created_at || '').localeCompare(String(a.scheduled_at || a.created_at || '')));

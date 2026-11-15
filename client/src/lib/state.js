@@ -92,6 +92,11 @@ export async function loadAll(qname, filters = {}) {
   return rows;
 }
 
+export async function loadAllResponse(qname, filters = {}) {
+  const items = await loadAll(qname, filters);
+  return { items, total: items.length };
+}
+
 export function loadRefs(qname) {
   if (!refCache.has(qname)) {
     refCache.set(qname, loadAll(qname).then((rows) => new Map(rows.map((row) => [row.id, row]))).catch(() => new Map()));

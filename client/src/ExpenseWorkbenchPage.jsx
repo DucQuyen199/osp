@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtMoney, statusLabel } from './lib/i18n.js';
-import { can, loadRefs, recordLabel, app } from './lib/state.js';
+import { can, loadRefs, recordLabel, app, loadAllResponse } from './lib/state.js';
 import { listHref, recordHref } from './lib/routes.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -30,7 +30,7 @@ export default function ExpenseWorkbenchPage() {
         can('hrm.employee.read') ? loadRefs('hrm.employee') : Promise.resolve(new Map()),
         can('accounting.account.read') ? loadRefs('accounting.account') : Promise.resolve(new Map()),
         can('accounting.payment.read') ? api(`${dataPath('accounting.payment')}?limit=2000`) : Promise.resolve({ items: [] }),
-        workflowApproval && can('workflow-approval.approval_request.read') ? api(`${dataPath('workflow-approval.approval_request')}?limit=1000`) : Promise.resolve({ items: [] }),
+        workflowApproval && can('workflow-approval.approval_request.read') ? loadAllResponse('workflow-approval.approval_request') : Promise.resolve({ items: [] }),
       ]);
       const claimRows = itemsOf(claimRes).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
       const expenseAccounts = [...accountMap.values()].filter((row) => row.kind === 'expense').sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')));

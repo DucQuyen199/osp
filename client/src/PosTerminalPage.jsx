@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtMoney, fmtDateTime, statusLabel } from './lib/i18n.js';
-import { app, can, loadRefs, recordLabel } from './lib/state.js';
+import { app, can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
 const readItems = (response) => Array.isArray(response?.items) ? response.items : [];
 const displayPrice = (product) => Number(product?.price) || 0;
@@ -48,9 +48,9 @@ export default function PosTerminalPage() {
       const [warehouseMap, branchMap, productMap, unitMap, partyMap, taxMap, accountMap, sessionResponse, orderResponse, movementResponse, prescriptionResponse] = await Promise.all([
         loadRefs('inventory.warehouse'), loadRefs('master-data.branch'),
         loadRefs('master-data.product'), can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()), loadRefs('master-data.party'), loadRefs('master-data.tax'),
-        loadRefs('accounting.account'), api(`${dataPath('pos.pos_session')}?limit=1000`),
-        api(`${dataPath('pos.pos_order')}?limit=1000`), api(`${dataPath('pos.cash_movement')}?limit=1000`),
-        pharmacyEnabled ? api(`${dataPath('pharmacy.prescription')}?limit=1000`) : Promise.resolve({ items: [] }),
+        loadRefs('accounting.account'), loadAllResponse('pos.pos_session'),
+        loadAllResponse('pos.pos_order'), loadAllResponse('pos.cash_movement'),
+        pharmacyEnabled ? loadAllResponse('pharmacy.prescription') : Promise.resolve({ items: [] }),
       ]);
       setWarehouses(warehouseMap);
       setBranches(branchMap);

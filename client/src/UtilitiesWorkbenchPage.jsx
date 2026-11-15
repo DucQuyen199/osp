@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from './lib/api.js';
 import { statusLabel } from './lib/i18n.js';
-import { can, loadRefs, recordLabel } from './lib/state.js';
+import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
 const currentPeriod = () => {
   const now = new Date();
@@ -32,10 +32,10 @@ export default function UtilitiesWorkbenchPage() {
     setLoading(true); setError('');
     try {
       const [meterRes, readingRes, partyMap, billRes, invoiceRes] = await Promise.all([
-        api(`${dataPath('utilities.meter')}?limit=1000`), api(`${dataPath('utilities.meter_reading')}?limit=1000`),
+        loadAllResponse('utilities.meter'), loadAllResponse('utilities.meter_reading'),
         loadRefs('master-data.party'),
-        can('utilities.utility_bill.read') ? api(`${dataPath('utilities.utility_bill')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('accounting.invoice.read') ? api(`${dataPath('accounting.invoice')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('utilities.utility_bill.read') ? loadAllResponse('utilities.utility_bill') : Promise.resolve({ items: [] }),
+        can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
       ]);
       const meterItems = meterRes.items || []; const readingItems = readingRes.items || [];
       setMeters(meterItems); setReadings(readingItems); setParties(partyMap);

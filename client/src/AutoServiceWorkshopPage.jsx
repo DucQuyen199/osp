@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from './lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel } from './lib/i18n.js';
-import { app, can, loadRefs, recordLabel } from './lib/state.js';
+import { app, can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 import { recordHref } from './lib/routes.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -36,9 +36,9 @@ export default function AutoServiceWorkshopPage() {
     try {
       const showInvoices = app.meta?.modules?.some((module) => module.id === 'accounting') && can('accounting.invoice.read');
       const [vehicleResponse, orderResponse, partyMap, productMap, unitMap, warehouseMap, invoiceResponse] = await Promise.all([
-        api(`${dataPath('auto-service.vehicle')}?limit=1000`), api(`${dataPath('auto-service.repair_order')}?limit=1000`),
+        loadAllResponse('auto-service.vehicle'), loadAllResponse('auto-service.repair_order'),
         loadRefs('master-data.party'), loadRefs('master-data.product'), can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()), loadRefs('inventory.warehouse'),
-        showInvoices ? api(`${dataPath('accounting.invoice')}?limit=1000`) : Promise.resolve({ items: [] }),
+        showInvoices ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
       ]);
       const nextVehicles = itemsOf(vehicleResponse).sort((a, b) => String(a.plate || '').localeCompare(String(b.plate || '')));
       const nextOrders = itemsOf(orderResponse).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));

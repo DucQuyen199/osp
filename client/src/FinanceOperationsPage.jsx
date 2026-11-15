@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, statusLabel } from './lib/i18n.js';
-import { can, loadRefs, recordLabel } from './lib/state.js';
+import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
 const today = localDate;
 const defaultFirstDueDate = () => {
@@ -41,12 +41,12 @@ export default function FinanceOperationsPage() {
     try {
       const [partyMap, accountRes, loanRes, repaymentRes, policyRes, claimRes, invoiceRes] = await Promise.all([
         loadRefs('master-data.party'),
-        can('accounting.account.read') ? api(`${dataPath('accounting.account')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('lending.loan.read') ? api(`${dataPath('lending.loan')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('lending.repayment.read') ? api(`${dataPath('lending.repayment')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('insurance.policy.read') ? api(`${dataPath('insurance.policy')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('insurance.claim.read') ? api(`${dataPath('insurance.claim')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('accounting.invoice.read') ? api(`${dataPath('accounting.invoice')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('accounting.account.read') ? loadAllResponse('accounting.account') : Promise.resolve({ items: [] }),
+        can('lending.loan.read') ? loadAllResponse('lending.loan') : Promise.resolve({ items: [] }),
+        can('lending.repayment.read') ? loadAllResponse('lending.repayment') : Promise.resolve({ items: [] }),
+        can('insurance.policy.read') ? loadAllResponse('insurance.policy') : Promise.resolve({ items: [] }),
+        can('insurance.claim.read') ? loadAllResponse('insurance.claim') : Promise.resolve({ items: [] }),
+        can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
       ]);
       setParties(partyMap); setAccounts(accountRes.items || []);
       setLoans((loanRes.items || []).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))));

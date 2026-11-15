@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtMoney, statusLabel } from './lib/i18n.js';
-import { app, can, loadRefs, recordLabel } from './lib/state.js';
+import { app, can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
@@ -57,20 +57,20 @@ export default function PurchasingWorkbenchPage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [orderRes, receiptRes, requisitionRes, supplierInvoiceRes, returnRes, supplierMap, productMap, unitMap, warehouseMap, taxRes, billRes, approvalRes, currencyMap, currencyRateRes] = await Promise.all([
-        can('purchasing.purchase_order.read') ? api(`${dataPath('purchasing.purchase_order')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('purchasing.purchase_receipt.read') ? api(`${dataPath('purchasing.purchase_receipt')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('purchasing.purchase_requisition.read') ? api(`${dataPath('purchasing.purchase_requisition')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('purchasing.supplier_invoice.read') ? api(`${dataPath('purchasing.supplier_invoice')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('purchasing.purchase_return.read') ? api(`${dataPath('purchasing.purchase_return')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('purchasing.purchase_order.read') ? loadAllResponse('purchasing.purchase_order') : Promise.resolve({ items: [] }),
+        can('purchasing.purchase_receipt.read') ? loadAllResponse('purchasing.purchase_receipt') : Promise.resolve({ items: [] }),
+        can('purchasing.purchase_requisition.read') ? loadAllResponse('purchasing.purchase_requisition') : Promise.resolve({ items: [] }),
+        can('purchasing.supplier_invoice.read') ? loadAllResponse('purchasing.supplier_invoice') : Promise.resolve({ items: [] }),
+        can('purchasing.purchase_return.read') ? loadAllResponse('purchasing.purchase_return') : Promise.resolve({ items: [] }),
         can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
         can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
         can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
         can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
-        can('master-data.tax.read') ? api(`${dataPath('master-data.tax')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('accounting.bill.read') ? api(`${dataPath('accounting.bill')}?limit=1000`) : Promise.resolve({ items: [] }),
-        workflowApproval && can('workflow-approval.approval_request.read') ? api(`${dataPath('workflow-approval.approval_request')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('master-data.tax.read') ? loadAllResponse('master-data.tax') : Promise.resolve({ items: [] }),
+        can('accounting.bill.read') ? loadAllResponse('accounting.bill') : Promise.resolve({ items: [] }),
+        workflowApproval && can('workflow-approval.approval_request.read') ? loadAllResponse('workflow-approval.approval_request') : Promise.resolve({ items: [] }),
         can('master-data.currency.read') ? loadRefs('master-data.currency') : Promise.resolve(new Map()),
-        can('master-data.currency_rate.read') ? api(`${dataPath('master-data.currency_rate')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('master-data.currency_rate.read') ? loadAllResponse('master-data.currency_rate') : Promise.resolve({ items: [] }),
       ]);
       const orderRows = itemsOf(orderRes).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
       const requisitionRows = itemsOf(requisitionRes).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));

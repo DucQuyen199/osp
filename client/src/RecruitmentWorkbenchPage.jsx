@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from './lib/api.js';
 import { statusLabel } from './lib/i18n.js';
-import { app, can, loadRefs, recordLabel } from './lib/state.js';
+import { app, can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
@@ -26,9 +26,9 @@ export default function RecruitmentWorkbenchPage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [jobRes, candidateRes, applicationRes, departmentMap, positionMap] = await Promise.all([
-        can('recruitment.job_opening.read') ? api(`${dataPath('recruitment.job_opening')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('recruitment.candidate.read') ? api(`${dataPath('recruitment.candidate')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('recruitment.application.read') ? api(`${dataPath('recruitment.application')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('recruitment.job_opening.read') ? loadAllResponse('recruitment.job_opening') : Promise.resolve({ items: [] }),
+        can('recruitment.candidate.read') ? loadAllResponse('recruitment.candidate') : Promise.resolve({ items: [] }),
+        can('recruitment.application.read') ? loadAllResponse('recruitment.application') : Promise.resolve({ items: [] }),
         can('hrm.department.read') ? loadRefs('hrm.department') : Promise.resolve(new Map()),
         can('hrm.position.read') ? loadRefs('hrm.position') : Promise.resolve(new Map()),
       ]);

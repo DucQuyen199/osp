@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtMoney, fmtNumber, statusLabel } from './lib/i18n.js';
-import { app, can, loadRefs, recordLabel } from './lib/state.js';
+import { app, can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 import { recordHref } from './lib/routes.js';
 
 const listItems = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -49,8 +49,8 @@ export default function AgricultureOperationsPage() {
     setLoading(true); setError(''); if (!preserveNotice) setNotice('');
     try {
       const [farmResponse, cycleResponse, harvestResponse, inputResponse, productMap, unitMap, warehouseMap, partyMap, lotMap] = await Promise.all([
-        api(`${dataPath('agriculture.farm')}?limit=1000`), api(`${dataPath('agriculture.crop_cycle')}?limit=1000`),
-        api(`${dataPath('agriculture.harvest')}?limit=1000`), api(`${dataPath('agriculture.input_application')}?limit=1000`),
+        loadAllResponse('agriculture.farm'), loadAllResponse('agriculture.crop_cycle'),
+        loadAllResponse('agriculture.harvest'), loadAllResponse('agriculture.input_application'),
         loadRefs('master-data.product'), can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()), loadRefs('inventory.warehouse'), loadRefs('master-data.party'), loadRefs('inventory.lot'),
       ]);
       const farmItems = listItems(farmResponse);

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from './lib/api.js';
 import { fmtMoney, statusLabel } from './lib/i18n.js';
-import { can, loadRefs, recordLabel } from './lib/state.js';
+import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
@@ -28,12 +28,12 @@ export default function CharityWorkbenchPage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [programRes, beneficiaryRes, donationRes, disbursementRes, partyMap, accountRes] = await Promise.all([
-        can('charity.program.read') ? api(`${dataPath('charity.program')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('charity.beneficiary.read') ? api(`${dataPath('charity.beneficiary')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('charity.donation.read') ? api(`${dataPath('charity.donation')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('charity.disbursement.read') ? api(`${dataPath('charity.disbursement')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('charity.program.read') ? loadAllResponse('charity.program') : Promise.resolve({ items: [] }),
+        can('charity.beneficiary.read') ? loadAllResponse('charity.beneficiary') : Promise.resolve({ items: [] }),
+        can('charity.donation.read') ? loadAllResponse('charity.donation') : Promise.resolve({ items: [] }),
+        can('charity.disbursement.read') ? loadAllResponse('charity.disbursement') : Promise.resolve({ items: [] }),
         can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('accounting.account.read') ? api(`${dataPath('accounting.account')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('accounting.account.read') ? loadAllResponse('accounting.account') : Promise.resolve({ items: [] }),
       ]);
       const programRows = itemsOf(programRes);
       const beneficiaryRows = itemsOf(beneficiaryRes);

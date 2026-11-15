@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtMoney, statusLabel } from './lib/i18n.js';
-import { can, loadRefs, recordLabel } from './lib/state.js';
+import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 import { listHref, recordHref } from './lib/routes.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -80,13 +80,13 @@ export default function HrmOperationsPage() {
         can('hrm.employee.read') ? api(`${dataPath('hrm.employee')}?limit=2000`) : Promise.resolve({ items: [] }),
         can('hrm.leave_request.read') ? api(`${dataPath('hrm.leave_request')}?limit=2000`) : Promise.resolve({ items: [] }),
         can('hrm.attendance.read') ? api(`${dataPath('hrm.attendance')}?limit=3000`) : Promise.resolve({ items: [] }),
-        can('hrm.salary_revision.read') ? api(`${dataPath('hrm.salary_revision')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('hrm.salary_revision.read') ? loadAllResponse('hrm.salary_revision') : Promise.resolve({ items: [] }),
         can('hrm.leave_allocation.read') ? api(`${dataPath('hrm.leave_allocation')}?limit=2000`) : Promise.resolve({ items: [] }),
         can('hrm.work_schedule_entry.read') ? listAllRows('hrm.work_schedule_entry', { work_date__gte: scheduleMonthStart, work_date__lt: scheduleMonthEnd, sort: 'work_date' }) : Promise.resolve({ items: [] }),
-        can('hrm.work_schedule_pattern.read') ? api(`${dataPath('hrm.work_schedule_pattern')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('hrm.work_schedule_pattern.read') ? loadAllResponse('hrm.work_schedule_pattern') : Promise.resolve({ items: [] }),
         can('hrm.department.read') ? loadRefs('hrm.department') : Promise.resolve(new Map()),
         can('hrm.position.read') ? loadRefs('hrm.position') : Promise.resolve(new Map()),
-        workflowApproval && can('workflow-approval.approval_request.read') ? api(`${dataPath('workflow-approval.approval_request')}?limit=1000`) : Promise.resolve({ items: [] }),
+        workflowApproval && can('workflow-approval.approval_request.read') ? loadAllResponse('workflow-approval.approval_request') : Promise.resolve({ items: [] }),
       ]);
       const employeeRows = itemsOf(employeeRes).sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi'));
       setEmployees(employeeRows); setEmployeeMap(new Map(employeeRows.map((row) => [row.id, row])));

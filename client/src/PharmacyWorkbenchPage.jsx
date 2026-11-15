@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDateTime, statusLabel } from './lib/i18n.js';
-import { can, loadRefs, recordLabel } from './lib/state.js';
+import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
 const today = localDate;
 const newLine = () => ({ product: '', uom: '', qty: '1', dosage: '' });
@@ -24,8 +24,8 @@ export default function PharmacyWorkbenchPage() {
     setLoading(true); setError('');
     try {
       const [productMap, partyMap, unitMap, rxResponse, orderResponse] = await Promise.all([
-        loadRefs('master-data.product'), loadRefs('master-data.party'), can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()), api(`${dataPath('pharmacy.prescription')}?limit=1000`),
-        can('pos.pos_order.read') ? api(`${dataPath('pos.pos_order')}?limit=1000`) : Promise.resolve({ items: [] }),
+        loadRefs('master-data.product'), loadRefs('master-data.party'), can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()), loadAllResponse('pharmacy.prescription'),
+        can('pos.pos_order.read') ? loadAllResponse('pos.pos_order') : Promise.resolve({ items: [] }),
       ]);
       setProducts([...productMap.values()].filter((p) => p.active !== false && p.requires_prescription === true).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi')));
       setUnits(unitMap);

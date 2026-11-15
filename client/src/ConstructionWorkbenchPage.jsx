@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtMoney, statusLabel } from './lib/i18n.js';
-import { can, loadRefs, recordLabel } from './lib/state.js';
+import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
 const today = localDate;
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -35,13 +35,13 @@ export default function ConstructionWorkbenchPage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [projectRes, siteRes, diaryRes, boqRes, subcontractRes, claimRes, billRes, partyMap] = await Promise.all([
-        can('project.project.read') ? api(`${dataPath('project.project')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('construction.site.read') ? api(`${dataPath('construction.site')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('construction.site_diary.read') ? api(`${dataPath('construction.site_diary')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('construction.boq.read') ? api(`${dataPath('construction.boq')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('construction.subcontract.read') ? api(`${dataPath('construction.subcontract')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('construction.progress_claim.read') ? api(`${dataPath('construction.progress_claim')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('accounting.bill.read') ? api(`${dataPath('accounting.bill')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('project.project.read') ? loadAllResponse('project.project') : Promise.resolve({ items: [] }),
+        can('construction.site.read') ? loadAllResponse('construction.site') : Promise.resolve({ items: [] }),
+        can('construction.site_diary.read') ? loadAllResponse('construction.site_diary') : Promise.resolve({ items: [] }),
+        can('construction.boq.read') ? loadAllResponse('construction.boq') : Promise.resolve({ items: [] }),
+        can('construction.subcontract.read') ? loadAllResponse('construction.subcontract') : Promise.resolve({ items: [] }),
+        can('construction.progress_claim.read') ? loadAllResponse('construction.progress_claim') : Promise.resolve({ items: [] }),
+        can('accounting.bill.read') ? loadAllResponse('accounting.bill') : Promise.resolve({ items: [] }),
         can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
       ]);
       const projectRows = itemsOf(projectRes);

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { localDate as formatLocalDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel } from './lib/i18n.js';
-import { can, loadRefs, recordLabel } from './lib/state.js';
+import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
 const localDateTime = (value) => {
   if (!value) return '';
@@ -38,15 +38,15 @@ export default function EducationWorkbenchPage() {
     setLoading(true); setError('');
     try {
       const [classRes, enrollmentRes, studentRes, partyMap, sessionRes, attendanceRes, gradeRes, feeRes, invoiceRes] = await Promise.all([
-        can('school.course_class.read') ? api(`${dataPath('school.course_class')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('school.class_enrollment.read') ? api(`${dataPath('school.class_enrollment')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('school.student.read') ? api(`${dataPath('school.student')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('school.course_class.read') ? loadAllResponse('school.course_class') : Promise.resolve({ items: [] }),
+        can('school.class_enrollment.read') ? loadAllResponse('school.class_enrollment') : Promise.resolve({ items: [] }),
+        can('school.student.read') ? loadAllResponse('school.student') : Promise.resolve({ items: [] }),
         can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('school.class_session.read') ? api(`${dataPath('school.class_session')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('school.attendance.read') ? api(`${dataPath('school.attendance')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('school.grade.read') ? api(`${dataPath('school.grade')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('school.fee.read') ? api(`${dataPath('school.fee')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('accounting.invoice.read') ? api(`${dataPath('accounting.invoice')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('school.class_session.read') ? loadAllResponse('school.class_session') : Promise.resolve({ items: [] }),
+        can('school.attendance.read') ? loadAllResponse('school.attendance') : Promise.resolve({ items: [] }),
+        can('school.grade.read') ? loadAllResponse('school.grade') : Promise.resolve({ items: [] }),
+        can('school.fee.read') ? loadAllResponse('school.fee') : Promise.resolve({ items: [] }),
+        can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
       ]);
       const classItems = classRes.items || []; const sessionItems = sessionRes.items || [];
       setClasses(classItems); setEnrollments(enrollmentRes.items || []); setStudents(new Map((studentRes.items || []).map((x) => [x.id, x])));

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel } from './lib/i18n.js';
-import { app, can, loadRefs, recordLabel } from './lib/state.js';
+import { app, can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 import { recordHref } from './lib/routes.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -46,12 +46,12 @@ export default function WholesaleSalesDeskPage() {
       const approvalEnabled = app.meta?.modules?.some((module) => module.id === 'workflow-approval') && can('workflow-approval.approval_request.read');
       const [partyMap, productMap, unitMap, warehouseMap, listResponse, quoteResponse, orderResponse, shipmentResponse, invoiceResponse, returnResponse, approvalResponse, creditResponse] = await Promise.all([
         loadRefs('master-data.party'), loadRefs('master-data.product'), loadRefs('master-data.uom'), loadRefs('inventory.warehouse'),
-        api(`${dataPath('sales.price_list')}?limit=1000`), api(`${dataPath('sales.quotation')}?limit=1000`), api(`${dataPath('sales.sales_order')}?limit=1000`),
-        logisticsEnabled ? api(`${dataPath('logistics.shipment')}?limit=1000`) : Promise.resolve({ items: [] }),
-        accountingEnabled ? api(`${dataPath('accounting.invoice')}?limit=1000`) : Promise.resolve({ items: [] }),
-        api(`${dataPath('sales.sales_return')}?limit=1000`),
-        approvalEnabled ? api(`${dataPath('workflow-approval.approval_request')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('accounting.credit_note.read') ? api(`${dataPath('accounting.credit_note')}?limit=1000`) : Promise.resolve({ items: [] }),
+        loadAllResponse('sales.price_list'), loadAllResponse('sales.quotation'), loadAllResponse('sales.sales_order'),
+        logisticsEnabled ? loadAllResponse('logistics.shipment') : Promise.resolve({ items: [] }),
+        accountingEnabled ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
+        loadAllResponse('sales.sales_return'),
+        approvalEnabled ? loadAllResponse('workflow-approval.approval_request') : Promise.resolve({ items: [] }),
+        can('accounting.credit_note.read') ? loadAllResponse('accounting.credit_note') : Promise.resolve({ items: [] }),
       ]);
       setParties(partyMap); setProducts(productMap); setUnits(unitMap); setWarehouses(warehouseMap);
       setPriceLists(itemsOf(listResponse));

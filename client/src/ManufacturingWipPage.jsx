@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { localDate } from './lib/dates.js';
 import { api, dataPath, tenantPath } from './lib/api.js';
 import { fmtMoney, statusLabel } from './lib/i18n.js';
-import { can, loadRefs } from './lib/state.js';
+import { can, loadRefs, loadAllResponse } from './lib/state.js';
 
 const today = localDate;
 const qty = (value) => Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 3 });
@@ -49,9 +49,9 @@ export default function ManufacturingWipPage() {
       if (asOf) params.set('asOf', asOf);
       const [reportData, bomResponse, orderResponse, inspectionResponse, centerMap, productMap, warehouseMap, unitMap, accountMap] = await Promise.all([
         api(`${tenantPath('/reports/manufacturing/wip')}?${params}`),
-        can('manufacturing.bom.read') ? api(`${dataPath('manufacturing.bom')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('manufacturing.production_order.read') ? api(`${dataPath('manufacturing.production_order')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('quality.inspection.read') ? api(`${dataPath('quality.inspection')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('manufacturing.bom.read') ? loadAllResponse('manufacturing.bom') : Promise.resolve({ items: [] }),
+        can('manufacturing.production_order.read') ? loadAllResponse('manufacturing.production_order') : Promise.resolve({ items: [] }),
+        can('quality.inspection.read') ? loadAllResponse('quality.inspection') : Promise.resolve({ items: [] }),
         can('manufacturing.work_center.read') ? loadRefs('manufacturing.work_center') : Promise.resolve(new Map()),
         can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
         can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtMoney, statusLabel } from './lib/i18n.js';
-import { can, loadRefs, recordLabel } from './lib/state.js';
+import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
 const today = localDate;
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -30,10 +30,10 @@ export default function SubscriptionWorkbenchPage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [planRes, subscriptionRes, cycleRes, invoiceRes, partyMap] = await Promise.all([
-        can('subscription.plan.read') ? api(`${dataPath('subscription.plan')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('subscription.subscription.read') ? api(`${dataPath('subscription.subscription')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('subscription.billing_cycle.read') ? api(`${dataPath('subscription.billing_cycle')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('accounting.invoice.read') ? api(`${dataPath('accounting.invoice')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('subscription.plan.read') ? loadAllResponse('subscription.plan') : Promise.resolve({ items: [] }),
+        can('subscription.subscription.read') ? loadAllResponse('subscription.subscription') : Promise.resolve({ items: [] }),
+        can('subscription.billing_cycle.read') ? loadAllResponse('subscription.billing_cycle') : Promise.resolve({ items: [] }),
+        can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
         can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
       ]);
       const planRows = itemsOf(planRes);

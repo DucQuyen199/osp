@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from './lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel } from './lib/i18n.js';
-import { app, can, loadRefs, recordLabel } from './lib/state.js';
+import { app, can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 import { recordHref } from './lib/routes.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -31,9 +31,9 @@ export default function EcommerceOrderDeskPage() {
       const logisticsEnabled = app.meta?.modules?.some((module) => module.id === 'logistics') && can('logistics.shipment.read');
       const [storefrontMap, partyMap, productMap, orderResponse, salesResponse, shipmentResponse, invoiceResponse] = await Promise.all([
         loadRefs('ecommerce.storefront'), loadRefs('master-data.party'), loadRefs('master-data.product'),
-        api(`${dataPath('ecommerce.web_order')}?limit=1000`), can('sales.sales_order.read') ? api(`${dataPath('sales.sales_order')}?limit=1000`) : Promise.resolve({ items: [] }),
-        logisticsEnabled ? api(`${dataPath('logistics.shipment')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('accounting.invoice.read') ? api(`${dataPath('accounting.invoice')}?limit=1000`) : Promise.resolve({ items: [] }),
+        loadAllResponse('ecommerce.web_order'), can('sales.sales_order.read') ? loadAllResponse('sales.sales_order') : Promise.resolve({ items: [] }),
+        logisticsEnabled ? loadAllResponse('logistics.shipment') : Promise.resolve({ items: [] }),
+        can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
       ]);
       setStorefronts(storefrontMap); setParties(partyMap); setProducts(productMap);
       setOrders(itemsOf(orderResponse).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))));

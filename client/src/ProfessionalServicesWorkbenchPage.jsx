@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtMoney, statusLabel } from './lib/i18n.js';
-import { can, loadRefs, recordLabel } from './lib/state.js';
+import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
 const today = localDate;
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -27,10 +27,10 @@ export default function ProfessionalServicesWorkbenchPage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [caseRes, noteRes, timeRes, invoiceRes, partyMap] = await Promise.all([
-        can('case-management.case.read') ? api(`${dataPath('case-management.case')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('case-management.case_note.read') ? api(`${dataPath('case-management.case_note')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('case-management.time_entry.read') ? api(`${dataPath('case-management.time_entry')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('accounting.invoice.read') ? api(`${dataPath('accounting.invoice')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('case-management.case.read') ? loadAllResponse('case-management.case') : Promise.resolve({ items: [] }),
+        can('case-management.case_note.read') ? loadAllResponse('case-management.case_note') : Promise.resolve({ items: [] }),
+        can('case-management.time_entry.read') ? loadAllResponse('case-management.time_entry') : Promise.resolve({ items: [] }),
+        can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
         can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
       ]);
       const caseRows = itemsOf(caseRes);

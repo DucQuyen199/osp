@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtMoney, statusLabel } from './lib/i18n.js';
-import { app, can, loadRefs, recordLabel } from './lib/state.js';
+import { app, can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
@@ -36,8 +36,8 @@ export default function MaintenanceWorkbenchPage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [planRes, requestRes, assetMap, productMap, unitMap, warehouseMap, technicianMap] = await Promise.all([
-        can('maintenance.maintenance_plan.read') ? api(`${dataPath('maintenance.maintenance_plan')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('maintenance.maintenance_request.read') ? api(`${dataPath('maintenance.maintenance_request')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('maintenance.maintenance_plan.read') ? loadAllResponse('maintenance.maintenance_plan') : Promise.resolve({ items: [] }),
+        can('maintenance.maintenance_request.read') ? loadAllResponse('maintenance.maintenance_request') : Promise.resolve({ items: [] }),
         can('asset.asset.read') ? loadRefs('asset.asset') : Promise.resolve(new Map()),
         can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
         can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel } from './lib/i18n.js';
-import { can, loadRefs, recordLabel } from './lib/state.js';
+import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
 const today = localDate;
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
@@ -30,13 +30,13 @@ export default function RealEstateWorkbenchPage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [propertyRes, reservationRes, viewingRes, leaseRes, cycleRes, partyMap, invoiceRes] = await Promise.all([
-        api(`${dataPath('real-estate.property')}?limit=1000`),
-        can('real-estate.reservation.read') ? api(`${dataPath('real-estate.reservation')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('real-estate.viewing.read') ? api(`${dataPath('real-estate.viewing')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('real-estate.lease.read') ? api(`${dataPath('real-estate.lease')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('real-estate.rent_cycle.read') ? api(`${dataPath('real-estate.rent_cycle')}?limit=1000`) : Promise.resolve({ items: [] }),
+        loadAllResponse('real-estate.property'),
+        can('real-estate.reservation.read') ? loadAllResponse('real-estate.reservation') : Promise.resolve({ items: [] }),
+        can('real-estate.viewing.read') ? loadAllResponse('real-estate.viewing') : Promise.resolve({ items: [] }),
+        can('real-estate.lease.read') ? loadAllResponse('real-estate.lease') : Promise.resolve({ items: [] }),
+        can('real-estate.rent_cycle.read') ? loadAllResponse('real-estate.rent_cycle') : Promise.resolve({ items: [] }),
         loadRefs('master-data.party'),
-        can('accounting.invoice.read') ? api(`${dataPath('accounting.invoice')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
       ]);
       const propertyRows = itemsOf(propertyRes);
       setProperties(propertyRows); setReservations(itemsOf(reservationRes)); setViewings(itemsOf(viewingRes));

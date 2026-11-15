@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { localDate } from './lib/dates.js';
 import { api, dataPath } from './lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel } from './lib/i18n.js';
-import { app, can, loadRefs, recordLabel } from './lib/state.js';
+import { app, can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 import { recordHref } from './lib/routes.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -43,9 +43,9 @@ export default function HotelFrontDeskPage() {
     try {
       const accountingEnabled = app.meta?.modules?.some((module) => module.id === 'accounting') && can('accounting.invoice.read');
       const [reservationResponse, partyMap, roomMap, roomTypeMap, chargeResponse, invoiceResponse] = await Promise.all([
-        api(`${dataPath('hotel.reservation')}?limit=1000`), loadRefs('master-data.party'),
-        loadRefs('hotel.room'), loadRefs('hotel.room_type'), api(`${dataPath('hotel.folio_charge')}?limit=1000`),
-        accountingEnabled ? api(`${dataPath('accounting.invoice')}?limit=1000`) : Promise.resolve({ items: [] }),
+        loadAllResponse('hotel.reservation'), loadRefs('master-data.party'),
+        loadRefs('hotel.room'), loadRefs('hotel.room_type'), loadAllResponse('hotel.folio_charge'),
+        accountingEnabled ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
       ]);
       const next = itemsOf(reservationResponse).sort((a, b) => String(a.check_in || '').localeCompare(String(b.check_in || '')) || String(a.created_at || '').localeCompare(String(b.created_at || '')));
       setReservations(next); setParties(partyMap); setRooms(roomMap); setRoomTypes(roomTypeMap);

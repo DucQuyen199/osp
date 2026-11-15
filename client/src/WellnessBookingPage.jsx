@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from './lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel } from './lib/i18n.js';
-import { can, loadRefs, recordLabel } from './lib/state.js';
+import { can, loadRefs, recordLabel, loadAllResponse } from './lib/state.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const localDateTime = (value) => {
@@ -34,11 +34,11 @@ export default function WellnessBookingPage({ healthcare = false }) {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [bookingRes, resourceRes, serviceRes, partyMap, invoiceRes] = await Promise.all([
-        can('booking.booking.read') ? api(`${dataPath('booking.booking')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('booking.resource.read') ? api(`${dataPath('booking.resource')}?limit=1000`) : Promise.resolve({ items: [] }),
-        can('booking.service.read') ? api(`${dataPath('booking.service')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('booking.booking.read') ? loadAllResponse('booking.booking') : Promise.resolve({ items: [] }),
+        can('booking.resource.read') ? loadAllResponse('booking.resource') : Promise.resolve({ items: [] }),
+        can('booking.service.read') ? loadAllResponse('booking.service') : Promise.resolve({ items: [] }),
         can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('accounting.invoice.read') ? api(`${dataPath('accounting.invoice')}?limit=1000`) : Promise.resolve({ items: [] }),
+        can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
       ]);
       const rows = itemsOf(bookingRes).sort((a, b) => String(a.starts_at || '').localeCompare(String(b.starts_at || '')));
       const resourceRows = itemsOf(resourceRes); const serviceRows = itemsOf(serviceRes);
