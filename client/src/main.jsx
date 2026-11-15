@@ -56,6 +56,7 @@ const EventsOperationsPage = lazy(() => import('./EventsOperationsPage.jsx'));
 const FieldServiceWorkbenchPage = lazy(() => import('./FieldServiceWorkbenchPage.jsx'));
 const RealEstateWorkbenchPage = lazy(() => import('./RealEstateWorkbenchPage.jsx'));
 const ConstructionWorkbenchPage = lazy(() => import('./ConstructionWorkbenchPage.jsx'));
+const ProjectWorkbenchPage = lazy(() => import('./ProjectWorkbenchPage.jsx'));
 const SubscriptionWorkbenchPage = lazy(() => import('./SubscriptionWorkbenchPage.jsx'));
 const CharityWorkbenchPage = lazy(() => import('./CharityWorkbenchPage.jsx'));
 const ProfessionalServicesWorkbenchPage = lazy(() => import('./ProfessionalServicesWorkbenchPage.jsx'));
@@ -96,6 +97,7 @@ function parseRoute(hash = location.hash) {
   if (a === 'field-service') return { name: 'field-service-workbench' };
   if (a === 'real-estate') return { name: 'real-estate-workbench' };
   if (a === 'construction') return { name: 'construction-workbench' };
+  if (a === 'projects') return { name: 'project-workbench' };
   if (a === 'subscriptions') return { name: 'subscription-workbench' };
   if (a === 'charity') return { name: 'charity-workbench' };
   if (a === 'cases') return { name: 'professional-services-workbench' };
@@ -211,6 +213,7 @@ function Sidebar({ meta, route, onNavigate, open }) {
     {meta.modules.some((module) => module.id === 'field-service') && can('field-service.work_order.read') && link('#/field-service', 'Điều phối hiện trường', route.name === 'field-service-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'real-estate') && can('real-estate.property.read') && link('#/real-estate', 'Sàn bất động sản', route.name === 'real-estate-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'construction') && (can('construction.boq.read') || can('construction.site.read')) && link('#/construction', 'Điều hành công trường', route.name === 'construction-workbench', 'list')}
+    {meta.modules.some((module) => module.id === 'project') && can('project.project.read') && link('#/projects', 'Quản lý dự án', route.name === 'project-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'subscription') && can('subscription.subscription.read') && link('#/subscriptions', 'Thuê bao và gia hạn', route.name === 'subscription-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'charity') && can('charity.program.read') && link('#/charity', 'Chương trình và quỹ', route.name === 'charity-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'case-management') && can('case-management.case.read') && link('#/cases', 'Hồ sơ dịch vụ', route.name === 'professional-services-workbench', 'list')}
@@ -431,6 +434,7 @@ function App() {
         : route.name === 'field-service-workbench' ? <FieldServiceWorkbenchPage />
         : route.name === 'real-estate-workbench' ? <RealEstateWorkbenchPage />
         : route.name === 'construction-workbench' ? <ConstructionWorkbenchPage />
+        : route.name === 'project-workbench' ? <ProjectWorkbenchPage />
         : route.name === 'subscription-workbench' ? <SubscriptionWorkbenchPage />
         : route.name === 'charity-workbench' ? <CharityWorkbenchPage />
         : route.name === 'professional-services-workbench' ? <ProfessionalServicesWorkbenchPage />

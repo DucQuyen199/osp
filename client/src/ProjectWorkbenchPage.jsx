@@ -1,0 +1,139 @@
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { localDate } from './lib/dates.js';
+import { api, dataPath } from './lib/api.js';
+import { fmtDate, fmtMoney, fmtNumber, statusLabel } from './lib/i18n.js';
+import { app, can, loadAllResponse, loadRefs, recordLabel } from './lib/state.js';
+
+const emptyProject = { name: '', party: '', budget: '' };
+const emptyTask = { title: '', assignee: '', due: '' };
+const emptyDependency = { predecessor: '', successor: '' };
+const emptyTimesheet = { task: '', employee: '', hours: '', date: localDate(), rate: '' };
+
+export default function ProjectWorkbenchPage() {
+  const [projects, setProjects] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [dependencies, setDependencies] = useState([]);
+  const [timesheets, setTimesheets] = useState([]);
+  const [parties, setParties] = useState(new Map());
+  const [projectId, setProjectId] = useState('');
+  const [projectForm, setProjectForm] = useState(emptyProject);
+  const [taskForm, setTaskForm] = useState(emptyTask);
+  const [dependencyForm, setDependencyForm] = useState(emptyDependency);
+  const [timesheetForm, setTimesheetForm] = useState({ ...emptyTimesheet, employee: app.user?.name || '' });
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const load = useCallback(async (quiet = false) => {
+    if (!quiet) { setLoading(true); setError(''); }
+    try {
+      const [projectRes, taskRes, dependencyRes, timesheetRes, partyMap] = await Promise.all([
+        can('project.project.read') ? loadAllResponse('project.project') : Promise.resolve({ items: [] }),
+        can('project.task.read') ? loadAllResponse('project.task') : Promise.resolve({ items: [] }),
+        can('project.task_dependency.read') ? loadAllResponse('project.task_dependency') : Promise.resolve({ items: [] }),
+        can('project.timesheet.read') ? loadAllResponse('project.timesheet') : Promise.resolve({ items: [] }),
+        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
+      ]);
+      const projectRows = projectRes.items || [];
+      setProjects(projectRows); setTasks(taskRes.items || []); setDependencies(dependencyRes.items || []); setTimesheets(timesheetRes.items || []); setParties(partyMap);
+      setProjectId((current) => projectRows.some((project) => project.id === current) ? current : projectRows[0]?.id || '');
+      setProjectForm((current) => ({ ...current, party: current.party || [...partyMap.keys()][0] || '' }));
+    } catch (reason) { setError(reason.message || 'Không tải được dữ liệu dự án.'); }
+    finally { if (!quiet) setLoading(false); }
+  }, []);
+
+  useEffect(() => { document.title = 'Quản lý dự án · OSP Suite'; load(); }, [load]);
+  const selectedProject = projects.find((project) => project.id === projectId);
+  const projectTasks = useMemo(() => tasks.filter((task) => task.project === projectId).sort((a, b) => String(a.due || '9999').localeCompare(String(b.due || '9999')) || String(a.title).localeCompare(String(b.title), 'vi')), [tasks, projectId]);
+  const taskById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
+  const projectDependencies = useMemo(() => dependencies.filter((dependency) => projectTasks.some((task) => task.id === dependency.predecessor)), [dependencies, projectTasks]);
+  const projectTimesheets = useMemo(() => timesheets.filter((entry) => entry.project === projectId).sort((a, b) => String(b.date).localeCompare(String(a.date))), [timesheets, projectId]);
+  const incompleteTasks = projectTasks.filter((task) => task.status !== 'done').length;
+  const pendingPredecessors = (task) => projectDependencies.filter((dependency) => dependency.successor === task.id).map((dependency) => taskById.get(dependency.predecessor)).filter((predecessor) => predecessor && predecessor.status !== 'done');
+
+  async function run(key, operation, success) {
+    setBusy(key); setError(''); setNotice('');
+    try { await operation(); await load(true); setNotice(success); }
+    catch (reason) { setError(reason.message || 'Không thể hoàn tất thao tác.'); await load(true); }
+    finally { setBusy(''); }
+  }
+
+  async function createProject(event) {
+    event.preventDefault();
+    await run('project', async () => {
+      const project = await api(dataPath('project.project'), { method: 'POST', body: { name: projectForm.name.trim(), ...(projectForm.party ? { party: projectForm.party } : {}), ...(projectForm.budget !== '' ? { budget: Number(projectForm.budget) } : {}), status: 'planned' } });
+      setProjectId(project.id); setProjectForm(emptyProject);
+    }, 'Đã tạo dự án ở trạng thái dự kiến.');
+  }
+
+  async function createTask(event) {
+    event.preventDefault(); if (!selectedProject) return;
+    await run('task', async () => {
+      await api(dataPath('project.task'), { method: 'POST', body: { project: selectedProject.id, title: taskForm.title.trim(), ...(taskForm.assignee.trim() ? { assignee: taskForm.assignee.trim() } : {}), ...(taskForm.due ? { due: taskForm.due } : {}), status: 'todo' } });
+      setTaskForm(emptyTask);
+    }, 'Đã thêm công việc vào dự án.');
+  }
+
+  async function changeStatus(entity, row, action, message) {
+    await run(`${row.id}:${action}`, () => api(dataPath(entity, row.id, action), { method: 'POST' }), message);
+  }
+
+  async function createDependency(event) {
+    event.preventDefault();
+    await run('dependency', async () => {
+      await api(dataPath('project.task_dependency'), { method: 'POST', body: dependencyForm });
+      setDependencyForm(emptyDependency);
+    }, 'Đã lưu quan hệ tiên quyết. Hệ thống sẽ chặn vòng lặp và chỉ cho hoàn tất sau khi công việc trước đã xong.');
+  }
+
+  async function removeDependency(dependency) {
+    await run(`dependency:${dependency.id}`, () => api(dataPath('project.task_dependency', dependency.id), { method: 'DELETE' }), 'Đã gỡ quan hệ phụ thuộc.');
+  }
+
+  async function createTimesheet(event) {
+    event.preventDefault(); if (!selectedProject) return;
+    await run('timesheet', async () => {
+      await api(dataPath('project.timesheet'), { method: 'POST', body: {
+        project: selectedProject.id, ...(timesheetForm.task ? { task: timesheetForm.task } : {}),
+        ...(timesheetForm.employee.trim() ? { employee: timesheetForm.employee.trim() } : {}),
+        hours: Number(timesheetForm.hours), date: timesheetForm.date,
+        ...(timesheetForm.rate !== '' ? { rate: Number(timesheetForm.rate) } : {}),
+      } });
+      setTimesheetForm({ ...emptyTimesheet, employee: app.user?.name || '' });
+    }, 'Đã ghi timesheet; thành tiền được máy chủ tính theo số giờ và đơn giá.');
+  }
+
+  const dependencyOptions = projectTasks.filter((task) => task.status !== 'done');
+  return <div className="page">
+    <div className="page-head"><div><h1>Quản lý dự án</h1><p className="sub">Lập dự án, theo dõi công việc theo quan hệ tiên quyết và ghi nhận giờ công theo dự án.</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>Làm mới</button></div>
+    {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {can('project.project.create') && <section className="card card-pad"><h2>Tạo dự án</h2><form className="form-grid" onSubmit={createProject}>
+      <label className="field"><span className="label">Tên dự án *</span><input className="input" required maxLength="160" value={projectForm.name} onChange={(event) => setProjectForm((current) => ({ ...current, name: event.target.value }))} /></label>
+      {can('master-data.party.read') && <label className="field"><span className="label">Khách hàng / đối tác</span><select className="select" value={projectForm.party} onChange={(event) => setProjectForm((current) => ({ ...current, party: event.target.value }))}><option value="">Không gắn đối tác</option>{[...parties.values()].map((party) => <option key={party.id} value={party.id}>{recordLabel('master-data.party', party)}</option>)}</select></label>}
+      <label className="field"><span className="label">Ngân sách</span><input className="input num" type="number" min="0" step="any" value={projectForm.budget} onChange={(event) => setProjectForm((current) => ({ ...current, budget: event.target.value }))} /></label>
+      <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={busy === 'project' || loading}>Tạo dự án</button></div>
+    </form></section>}
+    <section className="card card-pad" style={{ marginTop: 16 }}>
+      {!projects.length ? <div className="empty">Chưa có dự án. Tạo dự án ở trên để lập kế hoạch và ghi nhận giờ công.</div> : <>
+        <div className="form-grid"><label className="field"><span className="label">Dự án</span><select className="select" value={projectId} onChange={(event) => setProjectId(event.target.value)}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name} · {statusLabel(project.status)}</option>)}</select></label><div className="field"><span className="label">Ngân sách</span><strong>{fmtMoney(selectedProject?.budget || 0)}</strong></div><div className="field"><span className="label">Công việc hoàn tất</span><strong>{projectTasks.length - incompleteTasks}/{projectTasks.length}</strong></div><div className="field"><span className="label">Tổng giờ ghi nhận</span><strong>{fmtNumber(projectTimesheets.reduce((sum, entry) => sum + Number(entry.hours || 0), 0))}</strong></div></div>
+        {selectedProject?.status === 'planned' && can('project.project.started') && <button className="btn btn-primary btn-sm" style={{ marginTop: 12 }} disabled={Boolean(busy)} onClick={() => changeStatus('project.project', selectedProject, 'started', 'Đã khởi động dự án. Có thể bắt đầu công việc và ghi giờ.')}>Khởi động</button>}
+        {selectedProject?.status === 'active' && <div className="row wrap" style={{ marginTop: 12 }}>{can('project.project.completed') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy) || incompleteTasks > 0} title={incompleteTasks ? 'Hoàn tất các công việc còn mở trước.' : ''} onClick={() => changeStatus('project.project', selectedProject, 'completed', 'Đã hoàn tất dự án.')}>Hoàn tất dự án</button>}{can('project.project.cancelled') && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => changeStatus('project.project', selectedProject, 'cancelled', 'Đã hủy dự án.')}>Hủy dự án</button>}</div>}
+      </>}
+    </section>
+    {selectedProject && <>
+      <section className="card card-pad" style={{ marginTop: 16 }}><div className="row wrap"><div><h2>Công việc</h2><p className="small muted">Công việc có thể được lập trong dự án dự kiến; chỉ bắt đầu hoặc hoàn tất khi dự án đang hoạt động.</p></div><span className="grow"/></div>
+        {can('project.task.create') && ['planned', 'active'].includes(selectedProject.status) && <form className="form-grid" style={{ margin: '12px 0' }} onSubmit={createTask}><label className="field"><span className="label">Tên công việc *</span><input className="input" required maxLength="200" value={taskForm.title} onChange={(event) => setTaskForm((current) => ({ ...current, title: event.target.value }))} /></label><label className="field"><span className="label">Người phụ trách</span><input className="input" maxLength="160" value={taskForm.assignee} onChange={(event) => setTaskForm((current) => ({ ...current, assignee: event.target.value }))} /></label><label className="field"><span className="label">Hạn hoàn thành</span><input className="input" type="date" value={taskForm.due} onChange={(event) => setTaskForm((current) => ({ ...current, due: event.target.value }))} /></label><div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={busy === 'task'}>Thêm công việc</button></div></form>}
+        {!projectTasks.length ? <div className="empty">Dự án chưa có công việc.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Công việc</th><th>Người phụ trách</th><th>Hạn</th><th>Trạng thái / phụ thuộc</th><th>Thao tác</th></tr></thead><tbody>{projectTasks.map((task) => { const blockers = pendingPredecessors(task); return <tr key={task.id}><td>{task.title}</td><td>{task.assignee || '—'}</td><td>{task.due ? fmtDate(task.due) : '—'}</td><td>{statusLabel(task.status)}{blockers.length > 0 && <div className="small muted">Chờ: {blockers.map((item) => item.title).join(', ')}</div>}</td><td className="row wrap">{task.status === 'todo' && selectedProject.status === 'active' && can('project.task.started') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => changeStatus('project.task', task, 'started', 'Đã bắt đầu công việc.')}>Bắt đầu</button>}{task.status === 'doing' && can('project.task.done') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy) || blockers.length > 0} title={blockers.length ? 'Hoàn tất các công việc tiên quyết trước.' : ''} onClick={() => changeStatus('project.task', task, 'done', 'Đã hoàn tất công việc.')}>Hoàn tất</button>}</td></tr>; })}</tbody></table></div>}
+      </section>
+      {selectedProject.status === 'active' && can('project.task_dependency.read') && <section className="card card-pad" style={{ marginTop: 16 }}><h2>Quan hệ tiên quyết</h2><p className="small muted">Một công việc chỉ được hoàn tất sau khi các công việc tiên quyết đã xong. Quan hệ phải nằm trong cùng dự án và không tạo vòng lặp.</p>
+        {can('project.task_dependency.create') && dependencyOptions.length > 1 && <form className="form-grid" style={{ margin: '12px 0' }} onSubmit={createDependency}><label className="field"><span className="label">Công việc tiên quyết *</span><select className="select" required value={dependencyForm.predecessor} onChange={(event) => setDependencyForm((current) => ({ ...current, predecessor: event.target.value }))}><option value="">Chọn công việc trước</option>{dependencyOptions.filter((task) => task.id !== dependencyForm.successor).map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label><label className="field"><span className="label">Công việc kế tiếp *</span><select className="select" required value={dependencyForm.successor} onChange={(event) => setDependencyForm((current) => ({ ...current, successor: event.target.value }))}><option value="">Chọn công việc sau</option>{dependencyOptions.filter((task) => task.id !== dependencyForm.predecessor).map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label><div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={busy === 'dependency' || !dependencyForm.predecessor || !dependencyForm.successor}>Thêm quan hệ</button></div></form>}
+        {!projectDependencies.length ? <div className="empty">Chưa khai báo công việc tiên quyết.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Tiên quyết</th><th>Kế tiếp</th><th>Trạng thái</th><th/></tr></thead><tbody>{projectDependencies.map((dependency) => <tr key={dependency.id}><td>{taskById.get(dependency.predecessor)?.title || 'Công việc'}</td><td>{taskById.get(dependency.successor)?.title || 'Công việc'}</td><td>{statusLabel(taskById.get(dependency.predecessor)?.status)}</td><td>{can('project.task_dependency.delete') && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => removeDependency(dependency)}>Gỡ</button>}</td></tr>)}</tbody></table></div>}
+      </section>}
+      {selectedProject.status === 'active' && can('project.timesheet.read') && <section className="card card-pad" style={{ marginTop: 16 }}><h2>Timesheet</h2>
+        {can('project.timesheet.create') && <form className="form-grid" style={{ margin: '12px 0' }} onSubmit={createTimesheet}><label className="field"><span className="label">Công việc</span><select className="select" value={timesheetForm.task} onChange={(event) => setTimesheetForm((current) => ({ ...current, task: event.target.value }))}><option value="">Giờ công chung cho dự án</option>{projectTasks.filter((task) => task.status !== 'done').map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label><label className="field"><span className="label">Nhân viên</span><input className="input" maxLength="160" value={timesheetForm.employee} onChange={(event) => setTimesheetForm((current) => ({ ...current, employee: event.target.value }))} /></label><label className="field"><span className="label">Ngày *</span><input className="input" type="date" required max={localDate()} value={timesheetForm.date} onChange={(event) => setTimesheetForm((current) => ({ ...current, date: event.target.value }))} /></label><label className="field"><span className="label">Số giờ *</span><input className="input num" type="number" min="0.001" max="24" step="any" required value={timesheetForm.hours} onChange={(event) => setTimesheetForm((current) => ({ ...current, hours: event.target.value }))} /></label><label className="field"><span className="label">Đơn giá giờ công</span><input className="input num" type="number" min="0" step="any" value={timesheetForm.rate} onChange={(event) => setTimesheetForm((current) => ({ ...current, rate: event.target.value }))} /></label><div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={busy === 'timesheet'}>Ghi giờ công</button></div></form>}
+        {!projectTimesheets.length ? <div className="empty">Chưa ghi nhận giờ công.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Ngày</th><th>Nhân viên</th><th>Công việc</th><th>Số giờ</th><th>Thành tiền</th></tr></thead><tbody>{projectTimesheets.map((entry) => <tr key={entry.id}><td>{fmtDate(entry.date)}</td><td>{entry.employee || '—'}</td><td>{taskById.get(entry.task)?.title || 'Dự án chung'}</td><td>{fmtNumber(entry.hours)}</td><td>{fmtMoney(entry.amount || 0)}</td></tr>)}</tbody></table></div>}
+      </section>}
+    </>}
+  </div>;
+}
