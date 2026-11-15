@@ -92,7 +92,7 @@ Tổng: **50 module**, **199 loại dữ liệu**, **902 sự kiện**.
 |---|---|
 | `quotation` Báo giá | `draft` → **accepted** (sent→accepted), **expired** (sent→expired), **rejected** (sent→rejected), **sent** (draft/rejected→sent) |
 | `sales_order` Đơn bán hàng | `draft` → **cancelled** (draft/confirmed→cancelled), **confirmed** (draft→confirmed), **delivered** (confirmed/partially_delivered→delivered), **partially_delivered** (confirmed→partially_delivered) |
-| `sales_return` Phiếu trả hàng bán | `draft` → **approved** (submitted→approved), **cancelled** (draft/rejected→cancelled), **received** (approved→received), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
+| `sales_return` Phiếu trả hàng bán | `draft` → **approved** (submitted→approved), **cancelled** (draft/rejected/approved→cancelled), **received** (approved→received), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 | `price_list` Bảng giá | — |
 
 ### crm

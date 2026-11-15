@@ -140072,7 +140072,7 @@
             "bearer": []
           }
         ],
-        "summary": "Phiếu trả hàng bán: cancelled (draft|rejected → cancelled)",
+        "summary": "Phiếu trả hàng bán: cancelled (draft|rejected|approved → cancelled)",
         "tags": [
           "sales"
         ]
