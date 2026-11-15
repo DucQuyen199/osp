@@ -4,6 +4,7 @@
 
 ## [Unreleased]
 ### Added
+- Added school tuition billing batches that generate missing student charges atomically per class and period, retain already-created charges, and preserve each draft amount as a billing snapshot until invoice issuance.
 - Added optional HRM teacher assignments for school classes, immutable teacher snapshots on lesson sessions, and tenant-serialized overlap checks across classes; teacher termination is blocked while future sessions remain scheduled.
 - Added automatic immutable LMS completion certificates with learner/course snapshots, certificate-number lookup, and print-ready issuance records.
 - Added progressive utility tariffs with cumulative usage bands and fixed period charges; readings and bills retain immutable tariff snapshots and per-band charge breakdowns.

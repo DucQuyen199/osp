@@ -24,6 +24,9 @@ pub async fn validate_persistence(
         "attendance" => validate_attendance(tx, tenant, action, document).await,
         "grade" => validate_grade(tx, tenant, action, document).await,
         "fee" => validate_fee(tx, tenant, action, document).await,
+        "tuition_batch" if matches!(action, "created" | "generated") => {
+            validate_tuition_batch(tx, tenant, action, document).await
+        }
         _ => Ok(Vec::new()),
     }
 }
@@ -561,7 +564,9 @@ async fn validate_fee(
         if status == "dropped" {
             errors.push("Không thể phát sinh học phí từ ghi danh đã thôi học".into());
         }
-        if let Some(tuition) = tuition {
+        if action == "created"
+            && let Some(tuition) = tuition
+        {
             let amount = document
                 .get("amount")
                 .and_then(money::decimal)
@@ -582,6 +587,29 @@ async fn validate_fee(
         ).await?.is_some() {
             errors.push("Học phí cho kỳ này đã tồn tại ở ghi danh".into());
         }
+        if action == "updated"
+            && let Some(id) = id
+            && let Some(row) = tx
+                .query_opt(
+                    "SELECT amount::text FROM school__fee WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                    &[&tenant.id, &id],
+                )
+                .await?
+        {
+            let previous: String = row.get(0);
+            let previous = money::decimal_str(&previous).ok_or_else(|| {
+                ApiError::validation(
+                    "school.fee.amount",
+                    vec!["Stored school tuition is not a valid decimal amount".into()],
+                )
+            })?;
+            if document.get("amount").and_then(money::decimal) != Some(previous) {
+                errors.push(
+                    "Số tiền học phí đã lập phải được giữ làm snapshot; hãy tạo khoản điều chỉnh riêng"
+                        .into(),
+                );
+            }
+        }
     }
     if action == "paid" {
         let Some(id) = parse_id(document, "id") else {
@@ -595,6 +623,57 @@ async fn validate_fee(
         }
     }
     Ok(errors)
+}
+
+async fn validate_tuition_batch(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    action: &str,
+    document: &Value,
+) -> R<Vec<String>> {
+    let Some(class) = parse_id(document, "class") else {
+        return Ok(vec!["Đợt học phí cần lớp hợp lệ".into()]);
+    };
+    let Some(row) = tx
+        .query_opt(
+            "SELECT tuition::text FROM school__course_class WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+            &[&tenant.id, &class],
+        )
+        .await?
+    else {
+        return Ok(vec!["Lớp của đợt học phí không tồn tại trong doanh nghiệp".into()]);
+    };
+    if action == "created" {
+        return Ok(Vec::new());
+    }
+    let tuition: Option<String> = row.get(0);
+    if !tuition
+        .as_deref()
+        .and_then(money::decimal_str)
+        .is_some_and(|amount| amount > Decimal::ZERO)
+    {
+        return Ok(vec![
+            "Lớp cần cấu hình học phí lớn hơn 0 trước khi tạo đợt thu".into(),
+        ]);
+    }
+    let active: i64 = tx
+        .query_one_row(
+            "SELECT count(*) FROM school__class_enrollment WHERE tenant_id = $1 AND \"class\" = $2 AND status = 'active'",
+            &[&tenant.id, &class],
+        )
+        .await?
+        .get(0);
+    if active == 0 {
+        return Ok(vec![
+            "Lớp chưa có học viên đang ghi danh để lập học phí".into(),
+        ]);
+    }
+    if active > 10_000 {
+        return Ok(vec![
+            "Một đợt chỉ hỗ trợ tối đa 10.000 học viên để giữ giao dịch trong giới hạn".into(),
+        ]);
+    }
+    Ok(Vec::new())
 }
 
 fn parse_id(document: &Value, field: &str) -> Option<Uuid> {

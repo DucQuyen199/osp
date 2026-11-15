@@ -274,6 +274,25 @@
       },
       "computed": {},
       "constraints": []
+  },
+  {
+   "name": "tuition_batch",
+   "label": "Đợt tạo học phí",
+   "fields": [
+    { "name": "class", "type": "ref", "required": true, "ref": "school.course_class" },
+    { "name": "period", "type": "string", "required": true },
+    { "name": "due_date", "type": "date", "required": true },
+    { "name": "generated_count", "type": "number", "required": false, "system": true },
+    { "name": "skipped_count", "type": "number", "required": false, "system": true },
+    { "name": "status", "type": "enum", "required": false, "options": ["draft", "generated"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": { "generated": { "from": ["draft"], "to": "generated" } }
+   },
+   "computed": {},
+   "constraints": []
     }
   ],
   "rules": [],

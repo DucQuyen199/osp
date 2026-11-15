@@ -54,7 +54,7 @@ const STATUS = {
   released: 'Sẵn sàng trở lại',
   cycle_count: 'Kiểm kê định kỳ', damage: 'Hư hỏng', opening_balance: 'Tồn đầu kỳ', correction: 'Điều chỉnh',
   draft: 'Nháp', new: 'Mới', open: 'Mở', planned: 'Lên kế hoạch', pending: 'Chờ xử lý', cart: 'Giỏ hàng', requested: 'Đã yêu cầu', applied: 'Đã nộp', effective: 'Có hiệu lực', quoted: 'Đã báo giá',
-  created: 'Mới tạo', queued: 'Đang chờ', ordered: 'Đã chỉ định', submitted: 'Đã gửi', returned: 'Cần chỉnh sửa', acknowledged: 'Đã xác nhận', intake: 'Tiếp nhận', pledged: 'Cam kết', reserved: 'Đã giữ chỗ', recorded: 'Đã ghi nhận',
+  created: 'Mới tạo', generated: 'Đã lập', queued: 'Đang chờ', ordered: 'Đã chỉ định', submitted: 'Đã gửi', returned: 'Cần chỉnh sửa', acknowledged: 'Đã xác nhận', intake: 'Tiếp nhận', pledged: 'Cam kết', reserved: 'Đã giữ chỗ', recorded: 'Đã ghi nhận',
   due: 'Đến hạn', booked: 'Đã đặt', available: 'Còn trống', vacant: 'Trống', growing: 'Đang trồng', todo: 'Cần làm', active: 'Đang hoạt động', pause: 'Tạm dừng',
   contacted: 'Đã liên hệ', qualified: 'Đủ điều kiện', disqualified: 'Không đạt', converted: 'Đã chuyển đổi', won: 'Thắng', lost: 'Thua',
   qualification: 'Sơ tuyển', discovery: 'Tìm hiểu nhu cầu', proposal: 'Đề xuất / báo giá', negotiation: 'Thương lượng', unclassified: 'Chưa phân loại',

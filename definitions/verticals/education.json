@@ -62,6 +62,7 @@
     "name": "Thu học phí",
     "permissions": [
       "school.fee.*",
+      "school.tuition_batch.*",
       "school.student.read",
       "school.class_enrollment.read",
       "school.course_class.read",

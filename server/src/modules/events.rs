@@ -72,5 +72,22 @@ pub async fn dispatch_source_events(
             "outcome": "ok"
         }));
     }
+    if crate::modules::school::handle_source_event(
+        kernel,
+        tx,
+        tenant,
+        &event.ty,
+        &event.payload,
+        event.id,
+        event.depth,
+    )
+    .await?
+    {
+        handled.push(serde_json::json!({
+            "module": "school",
+            "rule": "tuition_batch_generates_missing_student_fees",
+            "outcome": "ok"
+        }));
+    }
     Ok(())
 }

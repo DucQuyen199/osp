@@ -23,6 +23,7 @@ export default function EducationWorkbenchPage() {
   const [attendance, setAttendance] = useState([]);
   const [grades, setGrades] = useState([]);
   const [fees, setFees] = useState([]);
+  const [tuitionBatches, setTuitionBatches] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [selectedId, setSelectedId] = useState('');
   const [enrollmentForm, setEnrollmentForm] = useState({ class: '', student: '' });
@@ -31,6 +32,7 @@ export default function EducationWorkbenchPage() {
   const [gradeTerm, setGradeTerm] = useState('');
   const [gradeSubject, setGradeSubject] = useState('');
   const [feeForm, setFeeForm] = useState({ student: '', enrollment: '', period: '', amount: '', due_date: '', note: '' });
+  const [tuitionBatchForm, setTuitionBatchForm] = useState({ class: '', period: '', due_date: localDate() });
   const [classForm, setClassForm] = useState({ name: '', subject: '', teacher: '', teacher_employee: '', start_date: '', capacity: '', tuition: '' });
   const [studentForm, setStudentForm] = useState({ name: '', student_code: '', dob: '', guardian: '', phone: '', email: '' });
   const [pendingStudentParty, setPendingStudentParty] = useState(null);
@@ -43,7 +45,7 @@ export default function EducationWorkbenchPage() {
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const [classRes, enrollmentRes, studentRes, partyMap, employeeMap, sessionRes, attendanceRes, gradeRes, feeRes, invoiceRes] = await Promise.all([
+      const [classRes, enrollmentRes, studentRes, partyMap, employeeMap, sessionRes, attendanceRes, gradeRes, feeRes, tuitionBatchRes, invoiceRes] = await Promise.all([
         can('school.course_class.read') ? loadAllResponse('school.course_class') : Promise.resolve({ items: [] }),
         can('school.class_enrollment.read') ? loadAllResponse('school.class_enrollment') : Promise.resolve({ items: [] }),
         can('school.student.read') ? loadAllResponse('school.student') : Promise.resolve({ items: [] }),
@@ -53,6 +55,7 @@ export default function EducationWorkbenchPage() {
         can('school.attendance.read') ? loadAllResponse('school.attendance') : Promise.resolve({ items: [] }),
         can('school.grade.read') ? loadAllResponse('school.grade') : Promise.resolve({ items: [] }),
         can('school.fee.read') ? loadAllResponse('school.fee') : Promise.resolve({ items: [] }),
+        can('school.tuition_batch.read') ? loadAllResponse('school.tuition_batch') : Promise.resolve({ items: [] }),
         can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
       ]);
       const classItems = classRes.items || []; const sessionItems = sessionRes.items || [];
@@ -60,13 +63,14 @@ export default function EducationWorkbenchPage() {
       setParties(partyMap); setEmployees(employeeMap); setSessions(sessionItems.sort((a, b) => String(b.starts_at).localeCompare(String(a.starts_at))));
       setAttendance(attendanceRes.items || []);
       setGrades(gradeRes.items || []);
-      setFees(feeRes.items || []); setInvoices(invoiceRes.items || []);
+      setFees(feeRes.items || []); setTuitionBatches(tuitionBatchRes.items || []); setInvoices(invoiceRes.items || []);
       setForm((current) => ({ ...current, class: current.class || classItems[0]?.id || '' }));
       setEnrollmentForm((current) => ({ ...current, class: current.class || classItems[0]?.id || '', student: current.student || studentRes.items?.[0]?.id || '' }));
       setEnrollmentClass((current) => current || classItems[0]?.id || '');
       setGradeClass((current) => current || classItems[0]?.id || '');
       setSelectedId((current) => current && sessionItems.some((x) => x.id === current) ? current : sessionItems[0]?.id || '');
       setFeeForm((current) => ({ ...current, student: current.student || studentRes.items?.[0]?.id || '' }));
+      setTuitionBatchForm((current) => ({ ...current, class: classItems.some((item) => item.id === current.class) ? current.class : classItems.find((item) => Number(item.tuition) > 0)?.id || '' }));
     } catch (reason) { setError(reason.message || 'Không tải được dữ liệu lớp học.'); }
     finally { setLoading(false); }
   }, []);
@@ -109,6 +113,25 @@ export default function EducationWorkbenchPage() {
       setNotice('Đã tạo khoản học phí nháp. Kiểm tra thông tin rồi phát hành để tạo hóa đơn kế toán.');
       setFeeForm((current) => ({ ...current, period: '', amount: '', note: '' })); await load();
     } catch (reason) { setError(reason.message || 'Không thể tạo khoản học phí.'); }
+    finally { setBusy(false); }
+  }
+
+  async function createTuitionBatch(event) {
+    event.preventDefault(); setBusy(true); setError(''); setNotice('');
+    try {
+      await api(dataPath('school.tuition_batch'), { method: 'POST', body: { ...tuitionBatchForm, period: tuitionBatchForm.period.trim(), status: 'draft' } });
+      setNotice('Đã tạo đợt học phí nháp. Rà soát rồi chạy để tạo các khoản thu còn thiếu.');
+      setTuitionBatchForm((current) => ({ ...current, period: '' })); await load();
+    } catch (reason) { setError(reason.message || 'Không thể tạo đợt học phí.'); }
+    finally { setBusy(false); }
+  }
+
+  async function generateTuitionBatch(batch) {
+    setBusy(batch.id); setError(''); setNotice('');
+    try {
+      await api(dataPath('school.tuition_batch', batch.id, 'generated'), { method: 'POST' });
+      setNotice('Đã tạo khoản học phí nháp cho các học viên đang ghi danh; khoản đã có được bỏ qua.'); await load();
+    } catch (reason) { setError(reason.message || 'Không thể chạy đợt học phí.'); await load(); }
     finally { setBusy(false); }
   }
 
@@ -281,6 +304,12 @@ export default function EducationWorkbenchPage() {
       {!gradeClass ? <div className="empty">Chọn lớp để mở sổ điểm.</div> : gradeRoster.length === 0 ? <div className="empty">Lớp chưa có học viên đang ghi danh.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Mã học viên</th><th>Học viên</th><th>Điểm (0–100)</th><th>Thao tác</th></tr></thead><tbody>{gradeRoster.map(({ enrollment, student }) => { const party = parties.get(student?.party); const grade = gradeMap.get(enrollment.id); return <GradeRow key={enrollment.id} enrollment={enrollment} student={student} party={party} grade={grade} busy={busy} canCreate={can('school.grade.create')} canUpdate={can('school.grade.update')} onSave={saveGrade} />; })}</tbody></table></div>}
     </section>}
     {can('school.fee.read') && <section className="card card-pad" style={{ marginTop: 20 }}><div className="row wrap"><div><h2>Sổ học phí</h2><p className="small muted">Học phí phát hành sẽ tạo hóa đơn phải thu. Khi hóa đơn được thanh toán đủ, trạng thái khoản học phí tự chuyển sang đã thu.</p></div><span className="grow"/><span className="badge warning">{fees.filter((fee) => fee.status === 'issued').length} chưa thu đủ</span></div>
+      {can('school.tuition_batch.create') && <section className="card card-pad" style={{ marginTop: 14 }}><h3>Lập đợt học phí theo lớp</h3><p className="small muted">Tạo khoản thu nháp cho toàn bộ học viên đang ghi danh. Học phí hiện tại của lớp được lưu thành số tiền từng khoản; có thể rà soát và phát hành hóa đơn riêng sau đó.</p><form className="form-grid" onSubmit={createTuitionBatch}>
+        <label className="field"><span className="label">Lớp *</span><select className="select" required value={tuitionBatchForm.class} onChange={(event) => setTuitionBatchForm((current) => ({ ...current, class: event.target.value }))}><option value="">Chọn lớp có học phí</option>{classes.filter((item) => Number(item.tuition) > 0).map((item) => <option key={item.id} value={item.id}>{item.name} · {fmtMoney(item.tuition)} · {enrollments.filter((row) => row.class === item.id && row.status === 'active').length} học viên</option>)}</select></label>
+        <label className="field"><span className="label">Kỳ học phí *</span><input className="input" required maxLength="80" value={tuitionBatchForm.period} onChange={(event) => setTuitionBatchForm((current) => ({ ...current, period: event.target.value }))} placeholder="Ví dụ: 2026-HK1 hoặc 2026-11" /></label>
+        <label className="field"><span className="label">Hạn thanh toán *</span><input className="input" required type="date" value={tuitionBatchForm.due_date} onChange={(event) => setTuitionBatchForm((current) => ({ ...current, due_date: event.target.value }))} /></label>
+        <div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={busy || loading || !tuitionBatchForm.class || !tuitionBatchForm.period.trim()}>Tạo đợt nháp</button></div>
+      </form>{can('school.tuition_batch.read') && <div className="stack-sm" style={{ marginTop: 12 }}>{tuitionBatches.length === 0 ? <div className="small muted">Chưa có đợt tạo học phí.</div> : [...tuitionBatches].sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))).map((batch) => <div className="row wrap card card-pad" key={batch.id}><div><strong>{classById.get(batch.class)?.name || 'Lớp'} · {batch.period}</strong><div className="small muted">Hạn {fmtDate(batch.due_date)}{batch.status === 'generated' ? ` · Tạo ${batch.generated_count || 0} khoản · Bỏ qua ${batch.skipped_count || 0} khoản đã có` : ' · Chưa chạy'}</div></div><span className="grow"/><span className={`badge ${batch.status === 'generated' ? 'success' : 'warning'}`}>{statusLabel(batch.status)}</span>{batch.status === 'draft' && can('school.tuition_batch.generated') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy) || loading} onClick={() => generateTuitionBatch(batch)}>Tạo khoản thu</button>}</div>)}</div>}</section>}
       {can('school.fee.create') && <form className="form-grid" style={{ margin: '14px 0 20px' }} onSubmit={createFee}>
         <label className="field"><span className="label">Ghi danh (tùy chọn)</span><select className="select" value={feeForm.enrollment} onChange={(event) => { const enrollment = enrollmentById.get(event.target.value); setFeeForm((current) => ({ ...current, enrollment: event.target.value, student: enrollment?.student || current.student })); }}><option value="">Khoản thu khác / chưa gắn lớp</option>{enrollments.filter((item) => item.status === 'active').map((item) => { const student = studentById.get(item.student); const party = parties.get(student?.party); const courseClass = classById.get(item.class); return <option key={item.id} value={item.id}>{party ? recordLabel('master-data.party', party) : student?.student_code || 'Học viên'} · {courseClass?.name || 'Lớp'}</option>; })}</select></label>
         {!feeForm.enrollment && <label className="field"><span className="label">Học viên *</span><select className="select" required value={feeForm.student} onChange={(event) => setFeeForm((current) => ({ ...current, student: event.target.value }))}><option value="">Chọn học viên</option>{[...students.values()].map((student) => <option key={student.id} value={student.id}>{parties.get(student.party) ? recordLabel('master-data.party', parties.get(student.party)) : student.student_code || 'Học viên'}</option>)}</select></label>}

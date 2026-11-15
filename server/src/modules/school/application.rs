@@ -2,10 +2,11 @@
 use crate::{
     db::Tx,
     error::{ApiError, R},
-    kernel::Tenant,
+    kernel::{Actor, Kernel, Opts, Tenant},
     money,
 };
-use serde_json::{Map, Value};
+use serde_json::{Map, Value, json};
+use std::collections::HashSet;
 use uuid::Uuid;
 
 pub async fn prepare_document(
@@ -23,8 +24,154 @@ pub async fn prepare_document(
             trim(document, &["period", "note"]);
             prepare_fee(tx, tenant, document).await
         }
+        "tuition_batch" => Ok(trim(document, &["period"])),
         _ => Ok(Vec::new()),
     }
+}
+
+pub async fn handle_source_event(
+    kernel: &Kernel,
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    event_type: &str,
+    document: &Value,
+    event_id: Uuid,
+    depth: u32,
+) -> R<bool> {
+    if !tenant.has_module("school") || event_type != "school.tuition_batch.generated" {
+        return Ok(false);
+    }
+    let Some(batch) = document
+        .get("id")
+        .and_then(Value::as_str)
+        .and_then(|value| Uuid::parse_str(value).ok())
+    else {
+        return Err(ApiError::validation(
+            event_type,
+            vec!["Đợt học phí cần mã hợp lệ".into()],
+        ));
+    };
+    let Some(class) = document
+        .get("class")
+        .and_then(Value::as_str)
+        .and_then(|value| Uuid::parse_str(value).ok())
+    else {
+        return Err(ApiError::validation(
+            event_type,
+            vec!["Đợt học phí cần lớp hợp lệ".into()],
+        ));
+    };
+    let period = document
+        .get("period")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|period| !period.is_empty())
+        .ok_or_else(|| ApiError::validation(event_type, vec!["Thiếu kỳ học phí".into()]))?;
+    let due_date = document
+        .get("due_date")
+        .and_then(Value::as_str)
+        .filter(|date| date.len() == 10)
+        .ok_or_else(|| ApiError::validation(event_type, vec!["Thiếu ngày đến hạn".into()]))?;
+    let Some(class_row) = tx
+        .query_opt(
+            "SELECT name, tuition::text FROM school__course_class WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+            &[&tenant.id, &class],
+        )
+        .await?
+    else {
+        return Err(ApiError::not_found("Lớp của đợt học phí không tồn tại"));
+    };
+    let class_name: String = class_row.get(0);
+    let tuition_text: Option<String> = class_row.get(1);
+    let tuition = tuition_text
+        .as_deref()
+        .and_then(money::decimal_str)
+        .filter(|amount| *amount > rust_decimal::Decimal::ZERO)
+        .ok_or_else(|| {
+            ApiError::validation(
+                event_type,
+                vec!["Lớp cần học phí lớn hơn 0 trước khi tạo đợt thu".into()],
+            )
+        })?;
+    let existing_rows = tx
+        .query(
+            "SELECT fee.enrollment FROM school__fee fee JOIN school__class_enrollment enrollment ON enrollment.tenant_id = fee.tenant_id AND enrollment.id = fee.enrollment WHERE fee.tenant_id = $1 AND enrollment.\"class\" = $2 AND lower(btrim(fee.period)) = lower($3)",
+            &[&tenant.id, &class, &period],
+        )
+        .await?;
+    let existing: HashSet<Uuid> = existing_rows
+        .iter()
+        .filter_map(|row| row.get::<_, Option<Uuid>>(0))
+        .collect();
+    let enrollment_rows = tx
+        .query(
+            "SELECT enrollment.id, enrollment.student, student.party FROM school__class_enrollment enrollment JOIN school__student student ON student.tenant_id = enrollment.tenant_id AND student.id = enrollment.student WHERE enrollment.tenant_id = $1 AND enrollment.\"class\" = $2 AND enrollment.status = 'active' ORDER BY enrollment.id FOR UPDATE OF enrollment",
+            &[&tenant.id, &class],
+        )
+        .await?;
+    let fee_entity = kernel.ent(tenant, "school.fee")?;
+    let mut generated = 0i64;
+    let mut skipped = 0i64;
+    for row in enrollment_rows {
+        let enrollment: Uuid = row.get(0);
+        if existing.contains(&enrollment) {
+            skipped += 1;
+            continue;
+        }
+        let student: Uuid = row.get(1);
+        let party: Uuid = row.get(2);
+        let mut fee = Map::new();
+        fee.insert("student".into(), json!(student));
+        fee.insert("party".into(), json!(party));
+        fee.insert("enrollment".into(), json!(enrollment));
+        fee.insert(
+            "amount".into(),
+            money::json_number(tuition).ok_or_else(|| {
+                ApiError::validation(event_type, vec!["Học phí vượt giới hạn số tiền".into()])
+            })?,
+        );
+        fee.insert("period".into(), json!(period));
+        fee.insert("due_date".into(), json!(due_date));
+        fee.insert(
+            "note".into(),
+            json!(format!("Học phí {} · {period}", class_name.trim())),
+        );
+        kernel
+            .create_in(
+                tx,
+                &Actor::System,
+                tenant,
+                &fee_entity,
+                fee,
+                &Opts {
+                    depth: Some(depth + 1),
+                    causation: Some(event_id),
+                    silent: false,
+                },
+            )
+            .await?;
+        generated += 1;
+    }
+    let batch_entity = kernel.ent(tenant, "school.tuition_batch")?;
+    kernel
+        .update_in(
+            tx,
+            &Actor::System,
+            tenant,
+            &batch_entity,
+            &batch.to_string(),
+            Map::from_iter([
+                ("generated_count".into(), json!(generated)),
+                ("skipped_count".into(), json!(skipped)),
+            ]),
+            &Opts {
+                depth: Some(depth + 1),
+                causation: Some(event_id),
+                silent: false,
+            },
+        )
+        .await?;
+    Ok(true)
 }
 
 async fn prepare_session_teacher(
@@ -109,18 +256,28 @@ async fn prepare_fee(
                 "Không thể lập học phí mới cho ghi danh đã thôi học".into(),
             ]);
         }
-        let Some(tuition) = tuition else {
-            return Ok(vec!["Lớp chưa cấu hình học phí".into()]);
-        };
         document.insert("student".into(), Value::String(student.to_string()));
         document.insert("party".into(), Value::String(party.to_string()));
+        let Some(tuition) = tuition else {
+            if document.get("id").is_some()
+                && document
+                    .get("amount")
+                    .and_then(money::decimal)
+                    .is_some_and(|amount| amount > rust_decimal::Decimal::ZERO)
+            {
+                return Ok(Vec::new());
+            }
+            return Ok(vec!["Lớp chưa cấu hình học phí".into()]);
+        };
         let amount = money::json_number(tuition).ok_or_else(|| {
             ApiError::validation(
                 "school.fee.amount",
                 vec!["Class tuition exceeds the supported decimal range".into()],
             )
         })?;
-        document.insert("amount".into(), amount);
+        if document.get("id").is_none() {
+            document.insert("amount".into(), amount);
+        }
         return Ok(Vec::new());
     }
 

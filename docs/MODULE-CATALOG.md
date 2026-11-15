@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **50 module**, **195 loại dữ liệu**, **876 sự kiện**.
+Tổng: **50 module**, **196 loại dữ liệu**, **880 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -558,6 +558,7 @@ Tổng: **50 module**, **195 loại dữ liệu**, **876 sự kiện**.
 | `attendance` Điểm danh | — |
 | `grade` Điểm | — |
 | `fee` Học phí | `draft` → **issued** (draft→issued), **paid** (issued→paid) |
+| `tuition_batch` Đợt tạo học phí | `draft` → **generated** (draft→generated) |
 
 ### utilities
 **Điện nước / Viễn thông** — Công tơ, chỉ số, hóa đơn tiêu thụ. Phát hành hóa đơn tự ghi sổ; thu tiền cập nhật ngược.

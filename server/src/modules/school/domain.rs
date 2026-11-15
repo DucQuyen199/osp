@@ -129,6 +129,24 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                 errors.push("Học phí gắn với lớp cần kỳ thu học phí".into());
             }
         }
+        "tuition_batch" => {
+            if document
+                .get("period")
+                .and_then(Value::as_str)
+                .is_none_or(|period| period.trim().is_empty() || period.chars().count() > 80)
+            {
+                errors.push("Đợt học phí cần kỳ thu từ 1 đến 80 ký tự".into());
+            }
+            if document
+                .get("due_date")
+                .and_then(Value::as_str)
+                .is_none_or(|date| {
+                    date.len() != 10 || NaiveDate::parse_from_str(date, "%Y-%m-%d").is_err()
+                })
+            {
+                errors.push("Đợt học phí cần ngày đến hạn hợp lệ".into());
+            }
+        }
         _ => {}
     }
     errors
@@ -185,6 +203,19 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
         "fee" if current.get("status").and_then(Value::as_str) != Some("draft") => {
             vec!["Học phí đã phát hành hoặc thanh toán không thể sửa".into()]
         }
+        "fee"
+            if current
+                .get("enrollment")
+                .is_some_and(|enrollment| !enrollment.is_null())
+                && ["enrollment", "student", "party", "period", "amount"]
+                    .iter()
+                    .any(|field| patch.get(*field).is_some()) =>
+        {
+            vec!["Thông tin học viên, kỳ và số tiền của học phí theo lớp không thể đổi; hãy tạo khoản điều chỉnh riêng".into()]
+        }
+        "tuition_batch" if current.get("status").and_then(Value::as_str) == Some("generated") => {
+            vec!["Đợt học phí đã chạy phải được giữ làm lịch sử".into()]
+        }
         _ => Vec::new(),
     }
 }
@@ -197,6 +228,9 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
         ("class_enrollment", _) => vec!["Ghi danh phải được giữ làm lịch sử đào tạo".into()],
         ("fee", Some("issued" | "paid")) => {
             vec!["Học phí đã phát hành không thể xóa khỏi lịch sử".into()]
+        }
+        ("tuition_batch", Some("generated")) => {
+            vec!["Đợt học phí đã chạy phải được giữ làm lịch sử".into()]
         }
         _ => Vec::new(),
     }
