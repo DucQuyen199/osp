@@ -15,8 +15,8 @@ pub(super) async fn validate(
 ) -> R<Vec<String>> {
     let lot = tx
         .query_opt(
-            "SELECT (expiry IS NULL OR expiry >= CURRENT_DATE), expiry IS NOT NULL FROM inventory__lot WHERE tenant_id = $1 AND id = $2 AND product = $3 FOR SHARE",
-            &[&tenant.id, &lot_id, &product_id],
+            "SELECT (expiry IS NULL OR expiry >= $4::date), expiry IS NOT NULL FROM inventory__lot WHERE tenant_id = $1 AND id = $2 AND product = $3 FOR SHARE",
+            &[&tenant.id, &lot_id, &product_id, &tenant.business_today()],
         )
         .await?;
     let Some(lot) = lot else {

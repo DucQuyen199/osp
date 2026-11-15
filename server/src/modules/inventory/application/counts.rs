@@ -81,11 +81,11 @@ pub async fn validate_expiry_writeoff_quality_holds(
                    LEFT JOIN LATERAL (SELECT SUM(qty::numeric) AS qty FROM quality__inspection_disposition WHERE tenant_id = qi.tenant_id AND inspection = qi.id AND status = 'posted') disposition ON true \
                    LEFT JOIN LATERAL (SELECT SUM(qty::numeric) AS qty FROM inventory__stock_move WHERE tenant_id = qi.tenant_id AND source = 'quality_return' AND source_id = qi.id::text AND direction = 'out') returned ON true \
                    WHERE qi.tenant_id = $1 AND qi.product = $2 AND qi.warehouse = $3 AND qi.lot = $4 \
-                     AND qi.source IN ('purchase_order', 'purchase_receipt') AND qi.status IN ('pending', 'failed') AND lot.expiry < CURRENT_DATE \
+                     AND qi.source IN ('purchase_order', 'purchase_receipt') AND qi.status IN ('pending', 'failed') AND lot.expiry < $5::date \
                    GROUP BY qi.lot \
                    HAVING SUM(GREATEST(qi.qty::numeric - COALESCE(disposition.qty, 0) - COALESCE(returned.qty, 0), 0::numeric)) > 0.000001 \
                  )",
-                &[&tenant.id, &product, &warehouse, &lot_id],
+                &[&tenant.id, &product, &warehouse, &lot_id, &tenant.business_today()],
             )
             .await?;
         if held.is_some_and(|row| row.get::<_, bool>(0)) {
@@ -164,11 +164,11 @@ pub async fn prepare_stock_count(
                        LEFT JOIN LATERAL (SELECT SUM(qty::numeric) AS qty FROM quality__inspection_disposition WHERE tenant_id = qi.tenant_id AND inspection = qi.id AND status = 'posted') disposition ON true \
                        LEFT JOIN LATERAL (SELECT SUM(qty::numeric) AS qty FROM inventory__stock_move WHERE tenant_id = qi.tenant_id AND source = 'quality_return' AND source_id = qi.id::text AND direction = 'out') returned ON true \
                        WHERE qi.tenant_id = $1 AND qi.product = $2 AND qi.warehouse = $3 AND qi.lot = $4 \
-                         AND qi.source IN ('purchase_order', 'purchase_receipt') AND qi.status IN ('pending', 'failed') AND lot.expiry < CURRENT_DATE \
+                         AND qi.source IN ('purchase_order', 'purchase_receipt') AND qi.status IN ('pending', 'failed') AND lot.expiry < $5::date \
                        GROUP BY qi.lot \
                        HAVING SUM(GREATEST(qi.qty::numeric - COALESCE(disposition.qty, 0) - COALESCE(returned.qty, 0), 0::numeric)) > 0.000001 \
                      )",
-                    &[&tenant.id, &product, &warehouse_id, &lot_id],
+                    &[&tenant.id, &product, &warehouse_id, &lot_id, &tenant.business_today()],
                 )
                 .await?;
             if held.is_some_and(|row| row.get::<_, bool>(0)) {

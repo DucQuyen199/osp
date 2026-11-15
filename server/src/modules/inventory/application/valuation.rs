@@ -83,8 +83,8 @@ pub(super) async fn allocate_fefo(
     .await?;
     let lots = tx
         .query(
-            "SELECT l.id, (l.expiry IS NULL OR l.expiry >= CURRENT_DATE), COALESCE(SUM(CASE WHEN sm.direction = 'in' THEN sm.qty::numeric ELSE -sm.qty::numeric END), 0)::text FROM inventory__lot l LEFT JOIN inventory__stock_move sm ON sm.tenant_id = l.tenant_id AND sm.product = l.product AND sm.warehouse = $3 AND sm.lot = l.id::text WHERE l.tenant_id = $1 AND l.product = $2 GROUP BY l.id, l.expiry ORDER BY l.expiry ASC NULLS LAST, l.id",
-            &[&tenant.id, &product, &warehouse],
+            "SELECT l.id, (l.expiry IS NULL OR l.expiry >= $4::date), COALESCE(SUM(CASE WHEN sm.direction = 'in' THEN sm.qty::numeric ELSE -sm.qty::numeric END), 0)::text FROM inventory__lot l LEFT JOIN inventory__stock_move sm ON sm.tenant_id = l.tenant_id AND sm.product = l.product AND sm.warehouse = $3 AND sm.lot = l.id::text WHERE l.tenant_id = $1 AND l.product = $2 GROUP BY l.id, l.expiry ORDER BY l.expiry ASC NULLS LAST, l.id",
+            &[&tenant.id, &product, &warehouse, &tenant.business_today()],
         )
         .await?;
     let quality_holds = if tenant.has_module("quality") {

@@ -55,8 +55,8 @@ async fn validate_lease_amendment(tx: &Tx<'_>, tenant: &Tenant, lease: &Value) -
     }
     let Some(row) = tx
         .query_opt(
-            "SELECT a.changes FROM contract__amendment a JOIN contract__contract c ON c.tenant_id = a.tenant_id AND c.id = a.contract WHERE a.tenant_id = $1 AND a.id = $2 AND a.status = 'effective' AND c.source = 'real_estate_lease' AND c.source_id = $3 AND a.effective_date <= CURRENT_DATE",
-            &[&tenant.id, &amendment_id, &lease_id.to_string()],
+            "SELECT a.changes FROM contract__amendment a JOIN contract__contract c ON c.tenant_id = a.tenant_id AND c.id = a.contract WHERE a.tenant_id = $1 AND a.id = $2 AND a.status = 'effective' AND c.source = 'real_estate_lease' AND c.source_id = $3 AND a.effective_date <= $4::date",
+            &[&tenant.id, &amendment_id, &lease_id.to_string(), &tenant.business_today()],
         )
         .await?
     else {
@@ -234,8 +234,8 @@ async fn validate_lease_termination(
         ]);
     };
     let pending = tx.query_opt(
-        "SELECT id FROM real_estate__lease WHERE tenant_id = $1 AND id = $2 AND next_rent_date IS NOT NULL AND next_rent_date <= end_date AND next_rent_date <= CURRENT_DATE LIMIT 1 FOR UPDATE",
-        &[&tenant.id, &id],
+        "SELECT id FROM real_estate__lease WHERE tenant_id = $1 AND id = $2 AND next_rent_date IS NOT NULL AND next_rent_date <= end_date AND next_rent_date <= $3::date LIMIT 1 FOR UPDATE",
+        &[&tenant.id, &id, &tenant.business_today()],
     ).await?.is_some();
     if pending {
         return Ok(vec![

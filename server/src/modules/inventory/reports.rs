@@ -132,7 +132,7 @@ async fn replenishment_rows(
          ), lot_positions AS ( \
            SELECT lot_balances.tenant_id, lot_balances.product, lot_balances.warehouse, \
              sum(GREATEST(lot_balances.qty - COALESCE(quality_holds.qty, 0), 0)) \
-               FILTER (WHERE lot_balances.expiry IS NULL OR lot_balances.expiry >= CURRENT_DATE) AS usable_qty, \
+               FILTER (WHERE lot_balances.expiry IS NULL OR lot_balances.expiry >= $3::date) AS usable_qty, \
              sum(GREATEST(lot_balances.qty, 0)) AS total_qty \
            FROM lot_balances \
            LEFT JOIN quality_holds ON quality_holds.tenant_id = lot_balances.tenant_id \
@@ -175,7 +175,7 @@ async fn replenishment_rows(
              + COALESCE(open_requisitions.qty, 0) - COALESCE(sales_demand.qty, 0) < rule.minimum_qty \
          ORDER BY product.name, warehouse.name, rule.id",
         ),
-        &[&tenant.id, &warehouse],
+        &[&tenant.id, &warehouse, &tenant.business_today()],
     )
     .await
 }
@@ -268,10 +268,10 @@ impl Kernel {
                      LEFT JOIN LATERAL (SELECT SUM(qty::numeric) AS qty FROM quality__inspection_disposition WHERE tenant_id = qi.tenant_id AND inspection = qi.id AND status = 'posted') disposition ON true \
                      LEFT JOIN LATERAL (SELECT SUM(qty::numeric) AS qty FROM inventory__stock_move WHERE tenant_id = qi.tenant_id AND source = 'quality_return' AND source_id = qi.id::text AND direction = 'out') returned ON true \
                      WHERE qi.tenant_id = $1 AND qi.warehouse = $2 AND qi.source IN ('purchase_order', 'purchase_receipt') \
-                       AND qi.status IN ('pending', 'failed') AND lot.expiry < CURRENT_DATE \
+                       AND qi.status IN ('pending', 'failed') AND lot.expiry < $3::date \
                      GROUP BY qi.lot \
                      HAVING SUM(GREATEST(qi.qty::numeric - COALESCE(disposition.qty, 0) - COALESCE(returned.qty, 0), 0::numeric)) > 0.000001",
-                    &[&tenant.id, &warehouse],
+                    &[&tenant.id, &warehouse, &tenant.business_today()],
                 )
                 .await?;
             if !held_lots.is_empty() {
@@ -290,11 +290,11 @@ impl Kernel {
                    'product', move.product, 'lot', lot.id, 'location', move.location, 'counted_qty', 0 \
                  ) FROM inventory__stock_move move \
                  JOIN inventory__lot lot ON lot.tenant_id = move.tenant_id AND lot.id::text = move.lot AND lot.product = move.product \
-                 WHERE move.tenant_id = $1 AND move.warehouse = $2 AND lot.expiry < CURRENT_DATE \
+                 WHERE move.tenant_id = $1 AND move.warehouse = $2 AND lot.expiry < $3::date \
                  GROUP BY move.product, lot.id, move.location \
                  HAVING SUM(CASE WHEN move.direction = 'in' THEN move.qty::numeric ELSE -move.qty::numeric END) > 0.000001 \
                  ORDER BY move.product, lot.id, move.location NULLS FIRST",
-                &[&tenant.id, &warehouse],
+                &[&tenant.id, &warehouse, &tenant.business_today()],
             )
             .await?;
         if lines.is_empty() {
@@ -355,7 +355,7 @@ impl Kernel {
         self.authorize(tenant, actor, "inventory.stock_move.read")?;
         let mut conn = self.pool.get().await?;
         let tx = Tx::begin(&mut conn, &tenant.id, false).await?;
-        let grouped = "SELECT lot.id AS lot_id, lot.code, lot.expiry, lot.expiry - CURRENT_DATE AS days_to_expiry, lot.expiry < CURRENT_DATE AS expired, \
+        let grouped = "SELECT lot.id AS lot_id, lot.code, lot.expiry, lot.expiry - $2::date AS days_to_expiry, lot.expiry < $2::date AS expired, \
              product.id AS product_id, product.sku, product.name AS product, product.uom AS unit, \
              warehouse.id AS warehouse_id, warehouse.name AS warehouse, \
              SUM(CASE WHEN move.direction = 'in' THEN move.qty::numeric ELSE -move.qty::numeric END) AS quantity, \
@@ -366,12 +366,13 @@ impl Kernel {
            JOIN inventory__stock_move move ON move.tenant_id = lot.tenant_id AND move.lot = lot.id::text \
            LEFT JOIN inventory__warehouse warehouse ON warehouse.tenant_id = move.tenant_id AND warehouse.id = move.warehouse \
            WHERE lot.tenant_id = $1 AND lot.expiry IS NOT NULL \
-             AND (lot.expiry < CURRENT_DATE OR ($2 > 0 AND lot.expiry <= CURRENT_DATE + $2)) \
+             AND (lot.expiry < $2::date OR ($3 > 0 AND lot.expiry <= $2::date + $3)) \
            GROUP BY lot.id, lot.code, lot.expiry, product.id, product.sku, product.name, product.uom, warehouse.id, warehouse.name \
            HAVING SUM(CASE WHEN move.direction = 'in' THEN move.qty::numeric ELSE -move.qty::numeric END) > 0.000001";
         let count_sql = format!("SELECT COUNT(*) AS count FROM ({grouped}) lot_balances");
+        let today = tenant.business_today();
         let count = tx
-            .query_json(&count_sql, &[&tenant.id, &days])
+            .query_json(&count_sql, &[&tenant.id, &today, &days])
             .await?
             .first()
             .and_then(|row| row.get("count"))
@@ -384,10 +385,13 @@ impl Kernel {
                'lotId', lot_id, 'code', code, 'expiry', expiry, 'daysToExpiry', days_to_expiry, 'expired', expired, \
                'productId', product_id, 'sku', sku, 'product', product, 'unit', unit, \
                'warehouseId', warehouse_id, 'warehouse', warehouse, 'quantity', quantity, 'value', value \
-             ) FROM ({grouped}) lot_balances ORDER BY expiry, product, warehouse NULLS FIRST, lot_id LIMIT $3 OFFSET $4"
+               ) FROM ({grouped}) lot_balances ORDER BY expiry, product, warehouse NULLS FIRST, lot_id LIMIT $4 OFFSET $5"
         );
         let items = tx
-            .query_json(&rows_sql, &[&tenant.id, &days, &limit_sql, &offset_sql])
+            .query_json(
+                &rows_sql,
+                &[&tenant.id, &today, &days, &limit_sql, &offset_sql],
+            )
             .await?;
         Ok(json!({
             "days": days,
@@ -426,11 +430,11 @@ impl Kernel {
                 "SELECT jsonb_build_object( \
                    'id', lot.id, 'code', lot.code, 'productId', product.id, \
                    'sku', product.sku, 'product', product.name, 'unit', product.uom, \
-                   'expiry', lot.expiry, 'expired', lot.expiry < CURRENT_DATE \
+                   'expiry', lot.expiry, 'expired', lot.expiry < $3::date \
                  ) FROM inventory__lot lot \
                  JOIN master_data__product product ON product.tenant_id = lot.tenant_id AND product.id = lot.product \
                  WHERE lot.tenant_id = $1 AND lot.id = $2",
-                &[&tenant.id, &lot_id],
+                &[&tenant.id, &lot_id, &tenant.business_today()],
             )
             .await?
             .into_iter()

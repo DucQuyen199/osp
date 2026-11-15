@@ -25,8 +25,8 @@ pub async fn handle_source_event(
         let amendment_id = source_id(event_type, document)?;
         let Some(row) = tx
             .query_opt(
-                "SELECT effective_date <= CURRENT_DATE FROM contract__amendment WHERE tenant_id = $1 AND id = $2 AND status = 'approved' FOR UPDATE",
-                &[&tenant.id, &amendment_id],
+                "SELECT effective_date <= $3::date FROM contract__amendment WHERE tenant_id = $1 AND id = $2 AND status = 'approved' FOR UPDATE",
+                &[&tenant.id, &amendment_id, &tenant.business_today()],
             )
             .await?
         else {

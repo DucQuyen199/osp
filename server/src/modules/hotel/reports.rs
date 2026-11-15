@@ -26,19 +26,19 @@ impl Kernel {
                    'roomTypeId', room_type.id, 'roomType', room_type.name, \
                    'dirtySince', room.updated_at, 'lastCheckout', previous.check_out, \
                    'nextArrival', next.check_in, \
-                   'priority', CASE WHEN next.check_in = CURRENT_DATE THEN 'today' ELSE 'normal' END \
+                   'priority', CASE WHEN next.check_in = $2::date THEN 'today' ELSE 'normal' END \
                  ) FROM hotel__room room \
                  JOIN hotel__room_type room_type ON room_type.tenant_id = room.tenant_id AND room_type.id = room.room_type \
                  LEFT JOIN LATERAL (SELECT reservation.check_out FROM hotel__reservation reservation \
                    WHERE reservation.tenant_id = room.tenant_id AND reservation.room = room.id AND reservation.status = 'checked_out' \
                    ORDER BY reservation.updated_at DESC, reservation.id DESC LIMIT 1) previous ON true \
                  LEFT JOIN LATERAL (SELECT reservation.check_in FROM hotel__reservation reservation \
-                   WHERE reservation.tenant_id = room.tenant_id AND reservation.room = room.id AND reservation.status = 'booked' AND reservation.check_in >= CURRENT_DATE \
+                   WHERE reservation.tenant_id = room.tenant_id AND reservation.room = room.id AND reservation.status = 'booked' AND reservation.check_in >= $2::date \
                    ORDER BY reservation.check_in, reservation.created_at, reservation.id LIMIT 1) next ON true \
                  WHERE room.tenant_id = $1 AND room.status = 'cleaning' \
-                 ORDER BY (next.check_in = CURRENT_DATE) DESC NULLS LAST, next.check_in NULLS LAST, room.floor, room.number, room.id \
+                 ORDER BY (next.check_in = $2::date) DESC NULLS LAST, next.check_in NULLS LAST, room.floor, room.number, room.id \
                  LIMIT 500",
-                &[&tenant.id],
+                &[&tenant.id, &tenant.business_today()],
             )
             .await?;
         let counts = tx
@@ -48,12 +48,12 @@ impl Kernel {
                    COUNT(*) FILTER (WHERE room.status = 'cleaning' AND EXISTS ( \
                      SELECT 1 FROM hotel__reservation reservation \
                      WHERE reservation.tenant_id = room.tenant_id AND reservation.room = room.id \
-                       AND reservation.status = 'booked' AND reservation.check_in = CURRENT_DATE \
+                       AND reservation.status = 'booked' AND reservation.check_in = $2::date \
                    )), \
                    COUNT(*) FILTER (WHERE room.status = 'vacant'), \
                    COUNT(*) FILTER (WHERE room.status = 'occupied') \
                  FROM hotel__room room WHERE room.tenant_id = $1",
-                &[&tenant.id],
+                &[&tenant.id, &tenant.business_today()],
             )
             .await?;
         let cleaning_count: i64 = counts.get(0);
