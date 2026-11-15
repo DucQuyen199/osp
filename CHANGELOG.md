@@ -4,6 +4,7 @@
 
 ## [Unreleased]
 ### Added
+- CRM deals now capture sales lines, warehouse, price list, and shipping address; winning a deal requires a valid customer, warehouse, positive amount, and at least one line, then creates a reviewable draft sales order with those details.
 - Corrected the agricultural harvest pesticide-withdrawal error to display in Vietnamese with the product and allowed harvest date.
 - Added unique product barcodes and POS keyboard-scanner input: exact barcode or SKU plus Enter adds one item to the cart, while ambiguous matches are stopped instead of selecting the wrong product.
 - Added annual medical and education tax deduction claims with receipt evidence fields, separate reviewer approval, duplicate receipt checks, configurable tax policy caps, and annual payroll summaries; this records employer evidence and does not calculate an individual's full annual tax settlement.

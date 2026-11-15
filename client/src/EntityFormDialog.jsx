@@ -22,7 +22,7 @@ function toLocalInput(value) {
 }
 
 function FieldLines({ qname, value, onChange, priceList, salesOrder, purchaseOrder, inspection }) {
-  const discountEnabled = qname.startsWith('sales.');
+  const discountEnabled = qname.startsWith('sales.') || qname === 'crm.deal';
   const lotEnabled = ['purchasing.purchase_order', 'purchasing.purchase_receipt', 'purchasing.purchase_return'].includes(qname);
   const [products, setProducts] = useState(new Map());
   const [taxes, setTaxes] = useState(new Map());

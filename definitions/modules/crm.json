@@ -116,6 +116,32 @@
      "ref": "master-data.party"
     },
     {
+     "name": "warehouse",
+     "label": "Kho xuất hàng",
+     "type": "ref",
+     "required": false,
+     "ref": "inventory.warehouse"
+    },
+    {
+     "name": "price_list",
+     "label": "Bảng giá",
+     "type": "ref",
+     "required": false,
+     "ref": "sales.price_list"
+    },
+    {
+     "name": "shipping_address",
+     "label": "Địa chỉ giao hàng",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "lines",
+     "label": "Dòng hàng dự kiến",
+     "type": "json",
+     "required": false
+    },
+    {
      "name": "amount",
      "type": "money",
      "required": false

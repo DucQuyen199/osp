@@ -73,7 +73,7 @@ export default function CrmPipelinePage() {
     const confirmed = await confirmDialog({
       title: won ? 'Xác nhận thắng cơ hội?' : 'Xác nhận thua cơ hội?',
       message: won
-        ? 'Cơ hội sẽ được khóa lịch sử và hệ thống tự tạo đơn bán hàng theo khách hàng, giá trị cơ hội.'
+        ? 'Cơ hội sẽ được khóa lịch sử và hệ thống tạo đơn bán nháp theo khách hàng, dòng hàng, kho và giá trị để bạn rà soát trước khi xác nhận.'
         : 'Cơ hội sẽ được đóng và chuyển khỏi pipeline đang mở.',
       confirmLabel: won ? 'Thắng · tạo đơn bán' : 'Đóng cơ hội thua',
       danger: !won,

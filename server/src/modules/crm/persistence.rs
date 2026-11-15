@@ -75,6 +75,31 @@ pub async fn validate_persistence(
                 "Deal customer was not found or is not a customer".into(),
             ]);
         }
+        let warehouse = parse_uuid(document, "warehouse");
+        if let Some(warehouse) = warehouse {
+            if tx
+                .query_opt(
+                    "SELECT id FROM inventory__warehouse WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                    &[&tenant.id, &warehouse],
+                )
+                .await?
+                .is_none()
+            {
+                return Ok(vec!["Kho xuất hàng không thuộc doanh nghiệp này".into()]);
+            }
+        }
+        if let Some(price_list) = parse_uuid(document, "price_list") {
+            if tx
+                .query_opt(
+                    "SELECT id FROM sales__price_list WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                    &[&tenant.id, &price_list],
+                )
+                .await?
+                .is_none()
+            {
+                return Ok(vec!["Bảng giá không thuộc doanh nghiệp này".into()]);
+            }
+        }
     }
     Ok(Vec::new())
 }

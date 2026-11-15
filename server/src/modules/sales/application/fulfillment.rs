@@ -166,6 +166,9 @@ pub async fn handle_source_event(
             match event_type {
                 "crm.deal.won" => {
                     put("party", "party");
+                    for field in ["warehouse", "price_list", "shipping_address", "lines"] {
+                        put(field, field);
+                    }
                     put("total", "amount");
                     data.insert("source".into(), json!("crm_deal"));
                 }

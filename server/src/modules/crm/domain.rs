@@ -118,17 +118,34 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
             }
         }
         ("deal", "won") => {
-            if !amount(document).is_some_and(|amount| amount > Decimal::ZERO)
-                || document
-                    .get("party")
-                    .and_then(Value::as_str)
-                    .and_then(|id| Uuid::parse_str(id).ok())
-                    .is_none()
-            {
-                vec!["A won deal requires a customer and a positive amount".into()]
-            } else {
-                Vec::new()
+            let mut errors = Vec::new();
+            if !amount(document).is_some_and(|amount| amount > Decimal::ZERO) {
+                errors.push("Cơ hội thắng cần có giá trị lớn hơn 0".into());
             }
+            if document
+                .get("party")
+                .and_then(Value::as_str)
+                .and_then(|id| Uuid::parse_str(id).ok())
+                .is_none()
+            {
+                errors.push("Cơ hội thắng cần khách hàng hợp lệ".into());
+            }
+            if document
+                .get("warehouse")
+                .and_then(Value::as_str)
+                .and_then(|id| Uuid::parse_str(id).ok())
+                .is_none()
+            {
+                errors.push("Chọn kho xuất hàng trước khi thắng cơ hội".into());
+            }
+            if document
+                .get("lines")
+                .and_then(Value::as_array)
+                .is_none_or(Vec::is_empty)
+            {
+                errors.push("Thêm ít nhất một dòng hàng trước khi thắng cơ hội".into());
+            }
+            errors
         }
         ("deal", "lost") => {
             let reason = document
