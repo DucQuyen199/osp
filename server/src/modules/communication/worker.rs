@@ -89,8 +89,12 @@ pub async fn run_once(kernel: &Kernel) -> R<u32> {
     };
     let mut processed = 0_u32;
     for tenant_id in tenant_ids {
-        let Ok(tenant) = kernel.tenant(&tenant_id).await else {
-            continue;
+        let tenant = match kernel.tenant(&tenant_id).await {
+            Ok(tenant) => tenant,
+            Err(error) => {
+                tracing::warn!(tenant_id = %tenant_id, error = %error, "communication worker could not load tenant");
+                continue;
+            }
         };
         if tenant.suspended {
             continue;

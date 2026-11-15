@@ -172,8 +172,10 @@ impl Kernel {
                 }
             }
         }
-        self.audit_raw_ro(t, actor, "export", "tenant").await;
+        drop(tx);
+        drop(conn);
         let users: Vec<Value> = self.list_users(t).await?.into_iter().map(|u| json!({ "id": u.id, "name": u.name, "email": u.email, "roles": u.roles, "disabled": u.disabled })).collect();
+        self.audit_raw_ro(t, actor, "export", "tenant").await?;
         Ok(json!({
             "format": "osp-export/1",
             "exportedAt": chrono::Utc::now().to_rfc3339(),
@@ -182,18 +184,19 @@ impl Kernel {
         }))
     }
 
-    pub(crate) async fn audit_raw_ro(&self, t: &Tenant, actor: &Actor, action: &str, target: &str) {
-        if let Ok(mut conn) = self.pool.get().await {
-            if let Ok(tx) = Tx::begin(&mut conn, &t.id, true).await {
-                if self
-                    .audit_raw(&tx, &t.id, actor.user_id(), action, Some(target), None)
-                    .await
-                    .is_ok()
-                {
-                    let _ = tx.commit().await;
-                }
-            }
-        }
+    pub(crate) async fn audit_raw_ro(
+        &self,
+        t: &Tenant,
+        actor: &Actor,
+        action: &str,
+        target: &str,
+    ) -> R<()> {
+        let mut conn = self.pool.get().await?;
+        let tx = Tx::begin(&mut conn, &t.id, true).await?;
+        self.audit_raw(&tx, &t.id, actor.user_id(), action, Some(target), None)
+            .await?;
+        tx.commit().await?;
+        Ok(())
     }
 
     pub async fn export_csv(&self, actor: &Actor, t: &Tenant, qname: &str) -> R<String> {
@@ -229,7 +232,7 @@ impl Kernel {
         }
         drop(tx);
         drop(conn);
-        self.audit_raw_ro(t, actor, "export", qname).await;
+        self.audit_raw_ro(t, actor, "export", qname).await?;
         let fields: Vec<&FieldDef> = ent.fields().collect();
         Ok(to_csv(&fields, &rows))
     }

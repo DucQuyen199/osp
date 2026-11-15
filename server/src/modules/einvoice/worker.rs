@@ -46,8 +46,12 @@ pub async fn run_once_with_provider(kernel: &Kernel, provider: &dyn EInvoiceProv
     };
     let mut processed = 0;
     for tenant_id in tenant_ids {
-        let Ok(tenant) = kernel.tenant(&tenant_id).await else {
-            continue;
+        let tenant = match kernel.tenant(&tenant_id).await {
+            Ok(tenant) => tenant,
+            Err(error) => {
+                tracing::warn!(tenant_id = %tenant_id, error = %error, "e-invoice worker could not load tenant");
+                continue;
+            }
         };
         if tenant.suspended || !tenant.has_module("einvoice") {
             continue;

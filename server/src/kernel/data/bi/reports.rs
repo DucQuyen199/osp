@@ -189,7 +189,7 @@ impl Kernel {
             crate::kernel::io::to_csv(&fields, &rows)
         };
         self.audit_raw_ro(t, actor, "export", &format!("bi.report:{report_id}"))
-            .await;
+            .await?;
         Ok(csv)
     }
 }

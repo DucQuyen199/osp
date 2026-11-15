@@ -144,7 +144,7 @@ impl Kernel {
         ent: &Ent,
         rec: &Obj,
         msg: &str,
-    ) -> String {
+    ) -> R<String> {
         let mut out = msg.to_string();
         for f in ent.fields() {
             let plain = format!("{{{}}}", f.name);
@@ -160,7 +160,7 @@ impl Kernel {
                             "SELECT to_jsonb(r) FROM {} r WHERE tenant_id = $1 AND id = $2",
                             crate::schema::quote(&def.table())
                         );
-                        if let Ok(Some(row)) = tx.query_opt(&sql, &[&t.id, &uid]).await {
+                        if let Some(row) = tx.query_opt(&sql, &[&t.id, &uid]).await? {
                             let v: Value = row.get(0);
                             text = ["name", "title", "sku", "code", "number"]
                                 .iter()
@@ -181,7 +181,7 @@ impl Kernel {
                 out = out.replace(&plain, &val);
             }
         }
-        out
+        Ok(out)
     }
 
     pub(super) async fn check_constraints(
@@ -207,7 +207,7 @@ impl Kernel {
                         .and_then(money::decimal)
                         .is_some_and(|x| x < *value)
                     {
-                        let m = self.format_message(tx, t, ent, rec, message).await;
+                        let m = self.format_message(tx, t, ent, rec, message).await?;
                         return Err(ApiError::new(422, "CONSTRAINT", m));
                     }
                 }

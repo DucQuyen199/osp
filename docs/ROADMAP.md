@@ -16,7 +16,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Persistence thanh toán kế toán giữ facade và chia kiểm tra hóa đơn, hoàn tiền, nguồn thanh toán và tài khoản mặc định thành module Rust chuyên trách; số liệu tiếp tục dùng Decimal và transaction của kernel.
 - Handler tồn kho tách riêng điều chuyển/kiểm kê và biến động từ sự kiện nguồn; khâu chuẩn bị tách tracked-lines khỏi định giá stock-move. Facade Rust giữ hợp đồng gọi hiện tại cho event composition root.
 - Webhook outbox được ghi cùng transaction phát event; worker Rust claim có lease, gửi HTTPS có kiểm tra SSRF và HMAC, retry có giới hạn, dead-letter cùng API quản trị retry/đóng delivery.
-- Nhật ký audit được RLS `FORCE` theo tenant; trigger PostgreSQL chặn cập nhật, xóa trực tiếp và `TRUNCATE` trong luồng DB thông thường.
+- Nhật ký audit được RLS `FORCE` theo tenant; trigger PostgreSQL chặn cập nhật, xóa trực tiếp và `TRUNCATE` trong luồng DB thông thường. Xuất toàn tenant, CSV và báo cáo BI chỉ trả dữ liệu sau khi audit export đã commit; lỗi ghi audit làm request xuất thất bại.
 - RBAC, Argon2id, phiên và API token, rate limiting, OpenAPI 3.1.
 - MFA TOTP tùy chọn theo tài khoản, bí mật được mã hóa AES-256-GCM bằng khóa triển khai, mã khôi phục dùng một lần, chống phát lại mã, giới hạn thử, quản trị viên đặt lại MFA với lý do kiểm toán và người dùng tự xem/thu hồi phiên trình duyệt khác.
 - React/Vite, giao diện quản trị, timeline liên module, responsive; design system và rà axe-core.
@@ -29,7 +29,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Các ngày mặc định, kiểm tra nghiệp vụ theo ngày và tác vụ đến hạn trong kế toán, ngân hàng, mua hàng, nhân sự, nông nghiệp, lưu trú, bảo trì, thuê bao và các ngành khác dùng ngày lịch địa phương của tenant thay vì ngày hệ điều hành/cơ sở dữ liệu; thời điểm vẫn lưu theo UTC.
 - Các kiểm tra tồn kho hết hạn/FEFO, báo cáo lô và gợi ý mua hàng, bảng housekeeping, hiệu lực phụ lục hợp đồng và chốt tiền thuê cũng dùng ngày nghiệp vụ tenant; không còn predicate `CURRENT_DATE` trong mã Rust của server.
 - Kiểm tra kỳ kế toán và báo cáo WIP sản xuất quy đổi dấu thời gian cũ theo múi giờ tenant khi chứng từ thiếu ngày hạch toán; ngày đến hạn khoản vay cũ được backfill theo múi giờ tenant.
-- Scheduler tiếp tục xử lý tenant khác khi một tenant lỗi và ghi log riêng lỗi tải tenant/chạy job thay vì âm thầm bỏ qua; vẫn cần phân phối worker cho tải lớn.
+- Scheduler, worker hóa đơn điện tử và email ghi log lỗi tải tenant thay vì âm thầm bỏ qua; scheduler tiếp tục xử lý tenant khác khi một tenant lỗi. Vẫn cần phân phối worker cho tải lớn.
 - Luồng logistics hỗ trợ xác nhận số lượng thực nhận theo từng dòng và lưu lý do giao thiếu; tồn kho, tiến độ đơn bán, quyền trả hàng và lượng còn có thể giao tiếp đều tính theo số thực nhận.
 - Bàn bán buôn cho phép lập thêm vận đơn theo số lượng còn lại, tính cả chuyến nháp/đang giao và số đã giao thực tế; phần giao thất bại hoặc giao thiếu được giải phóng để giao lại.
 - Lịch hẹn ở trạng thái yêu cầu tính lại giờ kết thúc và giá mặc định khi đổi dịch vụ hoặc giờ bắt đầu; khung giờ mới tiếp tục qua kiểm tra khóa tài nguyên và trùng lịch.
