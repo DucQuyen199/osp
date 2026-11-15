@@ -342,7 +342,14 @@ pub async fn validate_persistence(
             subscription::validate_persistence(tx, tenant, entity, action, document).await
         }
         "utilities" => utilities::validate_persistence(tx, tenant, entity, action, document).await,
-        "pos" => pos::validate_persistence(tx, tenant, entity, action, document).await,
+        "pos" => {
+            let mut errors =
+                pos::validate_persistence(tx, tenant, entity, action, document).await?;
+            errors.extend(
+                pharmacy::validate_persistence(tx, tenant, entity, action, document).await?,
+            );
+            Ok(errors)
+        }
         "pharmacy" => pharmacy::validate_persistence(tx, tenant, entity, action, document).await,
         "project" => project::validate_persistence(tx, tenant, entity, action, document).await,
         "quality" => quality::validate_persistence(tx, tenant, entity, action, document).await,
