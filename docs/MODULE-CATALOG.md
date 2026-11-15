@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **50 module**, **198 loại dữ liệu**, **892 sự kiện**.
+Tổng: **50 module**, **199 loại dữ liệu**, **898 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -19,8 +19,8 @@ Tổng: **50 module**, **198 loại dữ liệu**, **892 sự kiện**.
 | [`budget`](#budget) — Ngân sách | Tài chính | `accounting`, `hrm` |
 | [`case-management`](#case-management) — Quản lý hồ sơ vụ việc | Module chuyên ngành | `master-data`, `accounting` |
 | [`charity`](#charity) — Từ thiện / Phi lợi nhuận | Module chuyên ngành | `master-data`, `accounting` |
-| [`clinic`](#clinic) — Phòng khám / Y tế | Module chuyên ngành | `master-data`, `inventory`, `accounting` |
-| [`project`](#project) — Quản lý dự án | Vận hành | `master-data` |
+| [`clinic`](#clinic) — Phòng khám / Y tế | Module chuyên ngành | `master-data`, `inventory`, `accounting`, `booking` |
+| [`project`](#project) — Quản lý dự án | Vận hành | `master-data`, `hrm` |
 | [`construction`](#construction) — Xây dựng | Module chuyên ngành | `project`, `accounting` |
 | [`contract`](#contract) — Hợp đồng | Vận hành | `master-data` |
 | [`sales`](#sales) — Bán hàng | Bán hàng & khách hàng | `master-data`, `inventory`, `accounting` |
@@ -30,7 +30,7 @@ Tổng: **50 module**, **198 loại dữ liệu**, **892 sự kiện**.
 | [`einvoice`](#einvoice) — Hóa đơn điện tử | Tài chính | `accounting` |
 | [`events`](#events) — Sự kiện & bán vé | Module chuyên ngành | `master-data`, `accounting` |
 | [`expense`](#expense) — Chi phí nhân viên | Tài chính | `hrm`, `accounting` |
-| [`helpdesk`](#helpdesk) — Chăm sóc khách hàng | Bán hàng & khách hàng | `master-data` |
+| [`helpdesk`](#helpdesk) — Chăm sóc khách hàng | Bán hàng & khách hàng | `master-data`, `hrm` |
 | [`field-service`](#field-service) — Dịch vụ hiện trường | Bán hàng & khách hàng | `master-data`, `inventory`, `accounting`, `helpdesk`, `hrm` |
 | [`hotel`](#hotel) — Khách sạn / Lưu trú | Module chuyên ngành | `master-data`, `accounting` |
 | [`insurance`](#insurance) — Bảo hiểm | Module chuyên ngành | `master-data`, `accounting` |
@@ -102,7 +102,7 @@ Tổng: **50 module**, **198 loại dữ liệu**, **892 sự kiện**.
 |---|---|
 | `lead` Lead | `new` → **contacted** (new→contacted), **converted** (qualified→converted), **disqualified** (new/contacted/qualified→disqualified), **qualified** (new/contacted→qualified) |
 | `deal` Cơ hội | `open` → **lost** (open→lost), **won** (open→won) |
-| `pipeline_stage` Cấu hình xác suất pipeline | — |
+| `pipeline_stage` Giai đoạn và xác suất pipeline | — |
 | `activity` Hoạt động | — |
 
 ### ecommerce
@@ -333,6 +333,7 @@ Tổng: **50 module**, **198 loại dữ liệu**, **892 sự kiện**.
 | `payroll_run` Bảng lương | `draft` → **approved** (submitted→approved), **calculated** (draft→draft), **cancelled** (draft/rejected→cancelled), **paid** (approved→paid), **rejected** (submitted→rejected), **submitted** (draft→submitted) |
 | `tax_policy` Chính sách thuế lương | `draft` → **approved** (draft→approved) |
 | `contribution_policy` Chính sách đóng góp payroll | `draft` → **approved** (draft→approved) |
+| `tax_deduction` Hồ sơ giảm trừ thuế theo năm | `draft` → **approved** (submitted→approved), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 | `payroll_adjustment` Khoản cộng/trừ lương | `draft` → **approved** (submitted→approved), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 | `overtime_entry` Giờ làm thêm | `draft` → **approved** (submitted→approved), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 | `contribution_remittance` Thanh toán khoản đóng payroll | `draft` → **approved** (submitted→approved), **cancelled** (draft/rejected/approved→cancelled), **paid** (approved→paid), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |

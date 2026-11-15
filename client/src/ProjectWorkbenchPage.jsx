@@ -5,7 +5,7 @@ import { fmtDate, fmtMoney, fmtNumber, statusLabel } from './lib/i18n.js';
 import { app, can, loadAllResponse, loadRefs, recordLabel } from './lib/state.js';
 
 const emptyProject = { name: '', party: '', budget: '' };
-const emptyTask = { title: '', assignee: '', due: '' };
+const emptyTask = { title: '', assignee: '', assignee_employee: '', due: '' };
 const emptyDependency = { predecessor: '', successor: '' };
 const emptyTimesheet = { task: '', employee: '', hours: '', date: localDate(), rate: '' };
 
@@ -15,6 +15,8 @@ export default function ProjectWorkbenchPage() {
   const [dependencies, setDependencies] = useState([]);
   const [timesheets, setTimesheets] = useState([]);
   const [parties, setParties] = useState(new Map());
+  const [employees, setEmployees] = useState(new Map());
+  const [taskAssignmentForms, setTaskAssignmentForms] = useState({});
   const [projectId, setProjectId] = useState('');
   const [projectForm, setProjectForm] = useState(emptyProject);
   const [taskForm, setTaskForm] = useState(emptyTask);
@@ -28,15 +30,17 @@ export default function ProjectWorkbenchPage() {
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
-      const [projectRes, taskRes, dependencyRes, timesheetRes, partyMap] = await Promise.all([
+      const [projectRes, taskRes, dependencyRes, timesheetRes, partyMap, employeeMap] = await Promise.all([
         can('project.project.read') ? loadAllResponse('project.project') : Promise.resolve({ items: [] }),
         can('project.task.read') ? loadAllResponse('project.task') : Promise.resolve({ items: [] }),
         can('project.task_dependency.read') ? loadAllResponse('project.task_dependency') : Promise.resolve({ items: [] }),
         can('project.timesheet.read') ? loadAllResponse('project.timesheet') : Promise.resolve({ items: [] }),
         can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
+        can('hrm.employee.read') ? loadRefs('hrm.employee') : Promise.resolve(new Map()),
       ]);
       const projectRows = projectRes.items || [];
       setProjects(projectRows); setTasks(taskRes.items || []); setDependencies(dependencyRes.items || []); setTimesheets(timesheetRes.items || []); setParties(partyMap);
+      setEmployees(employeeMap);
       setProjectId((current) => projectRows.some((project) => project.id === current) ? current : projectRows[0]?.id || '');
       setProjectForm((current) => ({ ...current, party: current.party || [...partyMap.keys()][0] || '' }));
     } catch (reason) { setError(reason.message || 'Không tải được dữ liệu dự án.'); }
@@ -72,9 +76,30 @@ export default function ProjectWorkbenchPage() {
   async function createTask(event) {
     event.preventDefault(); if (!selectedProject) return;
     await run('task', async () => {
-      await api(dataPath('project.task'), { method: 'POST', body: { project: selectedProject.id, title: taskForm.title.trim(), ...(taskForm.assignee.trim() ? { assignee: taskForm.assignee.trim() } : {}), ...(taskForm.due ? { due: taskForm.due } : {}), status: 'todo' } });
+      const employee = employees.get(taskForm.assignee_employee);
+      await api(dataPath('project.task'), { method: 'POST', body: { project: selectedProject.id, title: taskForm.title.trim(), ...(employee ? { assignee: employee.name, assignee_employee: employee.id } : taskForm.assignee.trim() ? { assignee: taskForm.assignee.trim() } : {}), ...(taskForm.due ? { due: taskForm.due } : {}), status: 'todo' } });
       setTaskForm(emptyTask);
     }, 'Đã thêm công việc vào dự án.');
+  }
+
+  function taskAssignment(task) {
+    return taskAssignmentForms[task.id] || {
+      employee: task.assignee_employee || '',
+      assignee: task.assignee || '',
+    };
+  }
+
+  async function saveTaskAssignment(event, task) {
+    event.preventDefault();
+    const assignment = taskAssignment(task);
+    const employee = employees.get(assignment.employee);
+    await run(`${task.id}:assignment`, async () => {
+      await api(dataPath('project.task', task.id), { method: 'PATCH', body: {
+        assignee_employee: employee?.id || null,
+        assignee: employee?.name || assignment.assignee.trim(),
+      } });
+      setTaskAssignmentForms((current) => { const next = { ...current }; delete next[task.id]; return next; });
+    }, 'Đã cập nhật người phụ trách công việc.');
   }
 
   async function changeStatus(entity, row, action, message) {
@@ -107,6 +132,7 @@ export default function ProjectWorkbenchPage() {
   }
 
   const dependencyOptions = projectTasks.filter((task) => task.status !== 'done');
+  const activeEmployees = [...employees.values()].filter((employee) => employee.status === 'active');
   return <div className="page">
     <div className="page-head"><div><h1>Quản lý dự án</h1><p className="sub">Lập dự án, theo dõi công việc theo quan hệ tiên quyết và ghi nhận giờ công theo dự án.</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>Làm mới</button></div>
     {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
@@ -125,8 +151,8 @@ export default function ProjectWorkbenchPage() {
     </section>
     {selectedProject && <>
       <section className="card card-pad" style={{ marginTop: 16 }}><div className="row wrap"><div><h2>Công việc</h2><p className="small muted">Công việc có thể được lập trong dự án dự kiến; chỉ bắt đầu hoặc hoàn tất khi dự án đang hoạt động.</p></div><span className="grow"/></div>
-        {can('project.task.create') && ['planned', 'active'].includes(selectedProject.status) && <form className="form-grid" style={{ margin: '12px 0' }} onSubmit={createTask}><label className="field"><span className="label">Tên công việc *</span><input className="input" required maxLength="200" value={taskForm.title} onChange={(event) => setTaskForm((current) => ({ ...current, title: event.target.value }))} /></label><label className="field"><span className="label">Người phụ trách</span><input className="input" maxLength="160" value={taskForm.assignee} onChange={(event) => setTaskForm((current) => ({ ...current, assignee: event.target.value }))} /></label><label className="field"><span className="label">Hạn hoàn thành</span><input className="input" type="date" value={taskForm.due} onChange={(event) => setTaskForm((current) => ({ ...current, due: event.target.value }))} /></label><div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={busy === 'task'}>Thêm công việc</button></div></form>}
-        {!projectTasks.length ? <div className="empty">Dự án chưa có công việc.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Công việc</th><th>Người phụ trách</th><th>Hạn</th><th>Trạng thái / phụ thuộc</th><th>Thao tác</th></tr></thead><tbody>{projectTasks.map((task) => { const blockers = pendingPredecessors(task); return <tr key={task.id}><td>{task.title}</td><td>{task.assignee || '—'}</td><td>{task.due ? fmtDate(task.due) : '—'}</td><td>{statusLabel(task.status)}{blockers.length > 0 && <div className="small muted">Chờ: {blockers.map((item) => item.title).join(', ')}</div>}</td><td className="row wrap">{task.status === 'todo' && selectedProject.status === 'active' && can('project.task.started') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => changeStatus('project.task', task, 'started', 'Đã bắt đầu công việc.')}>Bắt đầu</button>}{task.status === 'doing' && can('project.task.done') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy) || blockers.length > 0} title={blockers.length ? 'Hoàn tất các công việc tiên quyết trước.' : ''} onClick={() => changeStatus('project.task', task, 'done', 'Đã hoàn tất công việc.')}>Hoàn tất</button>}</td></tr>; })}</tbody></table></div>}
+        {can('project.task.create') && ['planned', 'active'].includes(selectedProject.status) && <form className="form-grid" style={{ margin: '12px 0' }} onSubmit={createTask}><label className="field"><span className="label">Tên công việc *</span><input className="input" required maxLength="200" value={taskForm.title} onChange={(event) => setTaskForm((current) => ({ ...current, title: event.target.value }))} /></label>{can('hrm.employee.read') && <label className="field"><span className="label">Nhân viên phụ trách</span><select className="select" value={taskForm.assignee_employee} onChange={(event) => setTaskForm((current) => ({ ...current, assignee_employee: event.target.value, assignee: employees.get(event.target.value)?.name || '' }))}><option value="">Người phụ trách ngoài</option>{activeEmployees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select></label>}<label className="field"><span className="label">Người phụ trách ngoài</span><input className="input" maxLength="160" readOnly={Boolean(taskForm.assignee_employee)} value={taskForm.assignee} onChange={(event) => setTaskForm((current) => ({ ...current, assignee: event.target.value }))} /></label><label className="field"><span className="label">Hạn hoàn thành</span><input className="input" type="date" value={taskForm.due} onChange={(event) => setTaskForm((current) => ({ ...current, due: event.target.value }))} /></label><div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={busy === 'task'}>Thêm công việc</button></div></form>}
+        {!projectTasks.length ? <div className="empty">Dự án chưa có công việc.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Công việc</th><th>Người phụ trách</th><th>Hạn</th><th>Trạng thái / phụ thuộc</th><th>Thao tác</th></tr></thead><tbody>{projectTasks.map((task) => { const blockers = pendingPredecessors(task); const assignment = taskAssignment(task); return <tr key={task.id}><td>{task.title}</td><td>{task.status !== 'done' && can('project.task.update') && ['planned', 'active'].includes(selectedProject.status) && (!task.assignee_employee || can('hrm.employee.read')) ? <form className="stack-sm" onSubmit={(event) => saveTaskAssignment(event, task)}>{can('hrm.employee.read') && <select className="select" aria-label={`Nhân viên phụ trách ${task.title}`} value={assignment.employee} onChange={(event) => { const employee = employees.get(event.target.value); setTaskAssignmentForms((current) => ({ ...current, [task.id]: { employee: event.target.value, assignee: employee?.name || '' } })); }}><option value="">Người phụ trách ngoài</option>{assignment.employee && !employees.has(assignment.employee) && <option value={assignment.employee}>Nhân viên {assignment.employee.slice(0, 8)} · không còn trong danh mục</option>}{activeEmployees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select>}<div className="row wrap"><input className="input" aria-label={`Người phụ trách ngoài ${task.title}`} maxLength="160" readOnly={Boolean(assignment.employee)} value={assignment.assignee} onChange={(event) => setTaskAssignmentForms((current) => ({ ...current, [task.id]: { ...assignment, assignee: event.target.value } }))} /><button className="btn btn-ghost btn-sm" disabled={Boolean(busy) || (assignment.employee === (task.assignee_employee || '') && assignment.assignee === (task.assignee || ''))}>Lưu</button></div></form> : <span>{task.assignee || '—'}</span>}</td><td>{task.due ? fmtDate(task.due) : '—'}</td><td>{statusLabel(task.status)}{blockers.length > 0 && <div className="small muted">Chờ: {blockers.map((item) => item.title).join(', ')}</div>}</td><td className="row wrap">{task.status === 'todo' && selectedProject.status === 'active' && can('project.task.started') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => changeStatus('project.task', task, 'started', 'Đã bắt đầu công việc.')}>Bắt đầu</button>}{task.status === 'doing' && can('project.task.done') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy) || blockers.length > 0} title={blockers.length ? 'Hoàn tất các công việc tiên quyết trước.' : ''} onClick={() => changeStatus('project.task', task, 'done', 'Đã hoàn tất công việc.')}>Hoàn tất</button>}</td></tr>; })}</tbody></table></div>}
       </section>
       {selectedProject.status === 'active' && can('project.task_dependency.read') && <section className="card card-pad" style={{ marginTop: 16 }}><h2>Quan hệ tiên quyết</h2><p className="small muted">Một công việc chỉ được hoàn tất sau khi các công việc tiên quyết đã xong. Quan hệ phải nằm trong cùng dự án và không tạo vòng lặp.</p>
         {can('project.task_dependency.create') && dependencyOptions.length > 1 && <form className="form-grid" style={{ margin: '12px 0' }} onSubmit={createDependency}><label className="field"><span className="label">Công việc tiên quyết *</span><select className="select" required value={dependencyForm.predecessor} onChange={(event) => setDependencyForm((current) => ({ ...current, predecessor: event.target.value }))}><option value="">Chọn công việc trước</option>{dependencyOptions.filter((task) => task.id !== dependencyForm.successor).map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label><label className="field"><span className="label">Công việc kế tiếp *</span><select className="select" required value={dependencyForm.successor} onChange={(event) => setDependencyForm((current) => ({ ...current, successor: event.target.value }))}><option value="">Chọn công việc sau</option>{dependencyOptions.filter((task) => task.id !== dependencyForm.predecessor).map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label><div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={busy === 'dependency' || !dependencyForm.predecessor || !dependencyForm.successor}>Thêm quan hệ</button></div></form>}

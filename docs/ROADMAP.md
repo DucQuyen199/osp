@@ -44,6 +44,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Phòng khám hoàn tất lượt khám cùng thông tin bác sĩ, chẩn đoán, phí và hóa đơn phải thu; kết quả xét nghiệm lưu cùng trạng thái hoàn tất.
 - Báo cáo SLA Helpdesk chỉ dừng thời gian phản hồi đầu tiên khi có sự kiện phản hồi gửi khách hàng; sự kiện giải quyết ticket không bị tính thay cho phản hồi.
 - Ticket Helpdesk có thể gắn người phụ trách với hồ sơ nhân viên đang làm việc; máy chủ kiểm tra tenant và trạng thái khi phân công/phản hồi, đồng thời vẫn hỗ trợ nhà thầu ngoài.
+- Công việc dự án có thể giao cho nhân viên nội bộ bằng hồ sơ HRM; máy chủ kiểm tra cùng tenant và chỉ cho gán nhân viên đang làm việc, đồng thời giữ hỗ trợ người phụ trách ngoài.
 - Hóa đơn điện tử lưu lý do hủy cùng giao dịch chuyển sang chờ provider xử lý hủy.
 - POS ghi nhận tiền thực đếm và chốt ca trong cùng giao dịch sau khi kiểm tra đơn/phiếu quỹ nháp và tính chênh lệch tiền.
 - Bảo trì lưu kết quả sửa chữa và cặp giờ công/đơn giá đầy đủ cùng lần hoàn tất, xuất vật tư và cập nhật lịch định kỳ.

@@ -5,7 +5,8 @@
  "category": "operations",
  "version": "0.2.0",
  "depends": [
-  "master-data"
+  "master-data",
+  "hrm"
  ],
  "core": false,
  "entities": [
@@ -88,6 +89,13 @@
      "name": "assignee",
      "type": "string",
      "required": false
+    },
+    {
+     "name": "assignee_employee",
+     "label": "Nhân viên phụ trách",
+     "type": "ref",
+     "required": false,
+     "ref": "hrm.employee"
     },
     {
      "name": "due",

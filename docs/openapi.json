@@ -3527,6 +3527,12 @@
       "clinic_encounter": {
         "description": "Lượt khám",
         "properties": {
+          "appointment": {
+            "description": "Tham chiếu tới booking.booking",
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
           "complaint": {
             "type": "string"
           },
@@ -3579,6 +3585,12 @@
         "additionalProperties": false,
         "description": "Lượt khám (dữ liệu gửi lên)",
         "properties": {
+          "appointment": {
+            "description": "Tham chiếu tới booking.booking",
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
           "complaint": {
             "type": "string"
           },
@@ -4917,6 +4929,9 @@
             "format": "uuid",
             "type": "string"
           },
+          "lines": {
+            "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
+          },
           "lost_reason": {
             "type": "string"
           },
@@ -4929,16 +4944,18 @@
             "type": "string"
           },
           "pipeline_stage": {
-            "enum": [
-              "qualification",
-              "discovery",
-              "proposal",
-              "negotiation"
-            ],
+            "type": "string"
+          },
+          "price_list": {
+            "description": "Tham chiếu tới sales.price_list",
+            "format": "uuid",
             "type": "string"
           },
           "probability": {
             "type": "number"
+          },
+          "shipping_address": {
+            "type": "string"
           },
           "stage": {
             "type": "string"
@@ -4958,6 +4975,11 @@
           "updatedAt": {
             "format": "date-time",
             "readOnly": true,
+            "type": "string"
+          },
+          "warehouse": {
+            "description": "Tham chiếu tới inventory.warehouse",
+            "format": "uuid",
             "type": "string"
           }
         },
@@ -4979,6 +5001,9 @@
             "format": "uuid",
             "type": "string"
           },
+          "lines": {
+            "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
+          },
           "lost_reason": {
             "type": "string"
           },
@@ -4991,21 +5016,28 @@
             "type": "string"
           },
           "pipeline_stage": {
-            "enum": [
-              "qualification",
-              "discovery",
-              "proposal",
-              "negotiation"
-            ],
+            "type": "string"
+          },
+          "price_list": {
+            "description": "Tham chiếu tới sales.price_list",
+            "format": "uuid",
             "type": "string"
           },
           "probability": {
             "type": "number"
           },
+          "shipping_address": {
+            "type": "string"
+          },
           "stage": {
             "type": "string"
           },
           "title": {
+            "type": "string"
+          },
+          "warehouse": {
+            "description": "Tham chiếu tới inventory.warehouse",
+            "format": "uuid",
             "type": "string"
           }
         },
@@ -5106,7 +5138,7 @@
         "type": "object"
       },
       "crm_pipeline_stage": {
-        "description": "Cấu hình xác suất pipeline",
+        "description": "Giai đoạn và xác suất pipeline",
         "properties": {
           "createdAt": {
             "format": "date-time",
@@ -5125,12 +5157,6 @@
             "type": "number"
           },
           "stage": {
-            "enum": [
-              "qualification",
-              "discovery",
-              "proposal",
-              "negotiation"
-            ],
             "type": "string"
           },
           "updatedAt": {
@@ -5143,7 +5169,7 @@
       },
       "crm_pipeline_stageInput": {
         "additionalProperties": false,
-        "description": "Cấu hình xác suất pipeline (dữ liệu gửi lên)",
+        "description": "Giai đoạn và xác suất pipeline (dữ liệu gửi lên)",
         "properties": {
           "name": {
             "type": "string"
@@ -5152,12 +5178,6 @@
             "type": "number"
           },
           "stage": {
-            "enum": [
-              "qualification",
-              "discovery",
-              "proposal",
-              "negotiation"
-            ],
             "type": "string"
           }
         },
@@ -5890,6 +5910,10 @@
             "readOnly": true,
             "type": "number"
           },
+          "ticket_code": {
+            "readOnly": true,
+            "type": "string"
+          },
           "updatedAt": {
             "format": "date-time",
             "readOnly": true,
@@ -5949,6 +5973,10 @@
           "tax_rate": {
             "readOnly": true,
             "type": "number"
+          },
+          "ticket_code": {
+            "readOnly": true,
+            "type": "string"
           }
         },
         "required": [
@@ -6356,6 +6384,11 @@
           "assignee": {
             "type": "string"
           },
+          "assignee_employee": {
+            "description": "Tham chiếu tới hrm.employee",
+            "format": "uuid",
+            "type": "string"
+          },
           "channel": {
             "type": "string"
           },
@@ -6420,6 +6453,11 @@
         "description": "Ticket (dữ liệu gửi lên)",
         "properties": {
           "assignee": {
+            "type": "string"
+          },
+          "assignee_employee": {
+            "description": "Tham chiếu tới hrm.employee",
+            "format": "uuid",
             "type": "string"
           },
           "channel": {
@@ -11322,6 +11360,9 @@
           "active": {
             "type": "boolean"
           },
+          "barcode": {
+            "type": "string"
+          },
           "category": {
             "description": "Tham chiếu tới master-data.product_category",
             "format": "uuid",
@@ -11396,6 +11437,9 @@
         "properties": {
           "active": {
             "type": "boolean"
+          },
+          "barcode": {
+            "type": "string"
           },
           "category": {
             "description": "Tham chiếu tới master-data.product_category",
@@ -12515,9 +12559,199 @@
         ],
         "type": "object"
       },
+      "payroll_tax_deduction": {
+        "description": "Hồ sơ giảm trừ thuế theo năm",
+        "properties": {
+          "amount": {
+            "type": "number"
+          },
+          "approved_amount": {
+            "type": "number"
+          },
+          "beneficiary_name": {
+            "type": "string"
+          },
+          "beneficiary_type": {
+            "enum": [
+              "self",
+              "dependent"
+            ],
+            "type": "string"
+          },
+          "category": {
+            "enum": [
+              "medical",
+              "education"
+            ],
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "eligible_expense": {
+            "type": "boolean"
+          },
+          "employee": {
+            "description": "Tham chiếu tới hrm.employee",
+            "format": "uuid",
+            "type": "string"
+          },
+          "expense_date": {
+            "format": "date",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "medical_statement_available": {
+            "type": "boolean"
+          },
+          "provider_domestic": {
+            "type": "boolean"
+          },
+          "provider_name": {
+            "type": "string"
+          },
+          "receipt_date": {
+            "format": "date",
+            "type": "string"
+          },
+          "receipt_number": {
+            "type": "string"
+          },
+          "reimbursed_amount": {
+            "type": "number"
+          },
+          "review_note": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "submitted",
+              "approved",
+              "rejected"
+            ],
+            "readOnly": true,
+            "type": "string"
+          },
+          "supporting_reference": {
+            "type": "string"
+          },
+          "tax_year": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "payroll_tax_deductionInput": {
+        "additionalProperties": false,
+        "description": "Hồ sơ giảm trừ thuế theo năm (dữ liệu gửi lên)",
+        "properties": {
+          "amount": {
+            "type": "number"
+          },
+          "approved_amount": {
+            "type": "number"
+          },
+          "beneficiary_name": {
+            "type": "string"
+          },
+          "beneficiary_type": {
+            "enum": [
+              "self",
+              "dependent"
+            ],
+            "type": "string"
+          },
+          "category": {
+            "enum": [
+              "medical",
+              "education"
+            ],
+            "type": "string"
+          },
+          "eligible_expense": {
+            "type": "boolean"
+          },
+          "employee": {
+            "description": "Tham chiếu tới hrm.employee",
+            "format": "uuid",
+            "type": "string"
+          },
+          "expense_date": {
+            "format": "date",
+            "type": "string"
+          },
+          "medical_statement_available": {
+            "type": "boolean"
+          },
+          "provider_domestic": {
+            "type": "boolean"
+          },
+          "provider_name": {
+            "type": "string"
+          },
+          "receipt_date": {
+            "format": "date",
+            "type": "string"
+          },
+          "receipt_number": {
+            "type": "string"
+          },
+          "reimbursed_amount": {
+            "type": "number"
+          },
+          "review_note": {
+            "type": "string"
+          },
+          "supporting_reference": {
+            "type": "string"
+          },
+          "tax_year": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "employee",
+          "tax_year",
+          "category",
+          "expense_date",
+          "beneficiary_type",
+          "beneficiary_name",
+          "provider_name",
+          "provider_domestic",
+          "amount",
+          "reimbursed_amount",
+          "receipt_number",
+          "receipt_date",
+          "medical_statement_available",
+          "eligible_expense",
+          "supporting_reference"
+        ],
+        "type": "object"
+      },
       "payroll_tax_policy": {
         "description": "Chính sách thuế lương",
         "properties": {
+          "annual_deductions_require_resident": {
+            "type": "boolean"
+          },
+          "annual_education_deduction_cap": {
+            "type": "number"
+          },
+          "annual_medical_deduction_cap": {
+            "type": "number"
+          },
           "createdAt": {
             "format": "date-time",
             "readOnly": true,
@@ -12579,6 +12813,15 @@
         "additionalProperties": false,
         "description": "Chính sách thuế lương (dữ liệu gửi lên)",
         "properties": {
+          "annual_deductions_require_resident": {
+            "type": "boolean"
+          },
+          "annual_education_deduction_cap": {
+            "type": "number"
+          },
+          "annual_medical_deduction_cap": {
+            "type": "number"
+          },
           "dependent_allowance": {
             "type": "number"
           },
@@ -13350,6 +13593,11 @@
           "assignee": {
             "type": "string"
           },
+          "assignee_employee": {
+            "description": "Tham chiếu tới hrm.employee",
+            "format": "uuid",
+            "type": "string"
+          },
           "createdAt": {
             "format": "date-time",
             "readOnly": true,
@@ -13394,6 +13642,11 @@
         "description": "Công việc (dữ liệu gửi lên)",
         "properties": {
           "assignee": {
+            "type": "string"
+          },
+          "assignee_employee": {
+            "description": "Tham chiếu tới hrm.employee",
+            "format": "uuid",
             "type": "string"
           },
           "due": {
@@ -54970,7 +55223,7 @@
             "bearer": []
           }
         ],
-        "summary": "Danh sách Cấu hình xác suất pipeline",
+        "summary": "Danh sách Giai đoạn và xác suất pipeline",
         "tags": [
           "crm"
         ]
@@ -55053,7 +55306,7 @@
             "bearer": []
           }
         ],
-        "summary": "Tạo Cấu hình xác suất pipeline",
+        "summary": "Tạo Giai đoạn và xác suất pipeline",
         "tags": [
           "crm"
         ]
@@ -55130,7 +55383,7 @@
             "bearer": []
           }
         ],
-        "summary": "Xóa Cấu hình xác suất pipeline",
+        "summary": "Xóa Giai đoạn và xác suất pipeline",
         "tags": [
           "crm"
         ]
@@ -55202,7 +55455,7 @@
             "bearer": []
           }
         ],
-        "summary": "Xem Cấu hình xác suất pipeline",
+        "summary": "Xem Giai đoạn và xác suất pipeline",
         "tags": [
           "crm"
         ]
@@ -55294,7 +55547,7 @@
             "bearer": []
           }
         ],
-        "summary": "Sửa Cấu hình xác suất pipeline",
+        "summary": "Sửa Giai đoạn và xác suất pipeline",
         "tags": [
           "crm"
         ]
@@ -110504,6 +110757,856 @@
           }
         ],
         "summary": "Sửa Phiếu lương",
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/payroll/tax_deduction": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Tìm văn bản trong các trường chuỗi",
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dir",
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Lọc bằng nhau theo bất kỳ trường nào, ví dụ ?status=draft",
+            "in": "query",
+            "name": "<field>",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "$ref": "#/components/schemas/payroll_tax_deduction"
+                      },
+                      "type": "array"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Danh sách Hồ sơ giảm trừ thuế theo năm",
+        "tags": [
+          "payroll"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/payroll_tax_deductionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/payroll_tax_deduction"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Dữ liệu không hợp lệ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tạo Hồ sơ giảm trừ thuế theo năm",
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/payroll/tax_deduction/bulk/{action}": {
+      "post": {
+        "description": "Thực hiện cùng một chuyển trạng thái cho 1–100 bản ghi trong một giao dịch. Nếu một bản ghi lỗi, toàn bộ lô được hoàn tác.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "action",
+            "required": true,
+            "schema": {
+              "enum": [
+                "approved",
+                "rejected",
+                "submitted"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "ids": {
+                    "items": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "maxItems": 100,
+                    "minItems": 1,
+                    "type": "array",
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "ids"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "action": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "items": {
+                      "items": {
+                        "$ref": "#/components/schemas/payroll_tax_deduction"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "count",
+                    "items"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Ít nhất một bản ghi không ở trạng thái cho phép"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Danh sách ID hoặc dữ liệu không hợp lệ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Chuyển trạng thái hàng loạt: Hồ sơ giảm trừ thuế theo năm",
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/payroll/tax_deduction/{id}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Đã xóa"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Đang được tham chiếu"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Xóa Hồ sơ giảm trừ thuế theo năm",
+        "tags": [
+          "payroll"
+        ]
+      },
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/payroll_tax_deduction"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Xem Hồ sơ giảm trừ thuế theo năm",
+        "tags": [
+          "payroll"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/payroll_tax_deductionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/payroll_tax_deduction"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Dữ liệu không hợp lệ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sửa Hồ sơ giảm trừ thuế theo năm",
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/payroll/tax_deduction/{id}/approved": {
+      "post": {
+        "description": "Phát sự kiện `payroll.tax_deduction.approved` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/payroll_tax_deduction"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Hồ sơ giảm trừ thuế theo năm: approved (submitted → approved)",
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/payroll/tax_deduction/{id}/rejected": {
+      "post": {
+        "description": "Phát sự kiện `payroll.tax_deduction.rejected` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/payroll_tax_deduction"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Hồ sơ giảm trừ thuế theo năm: rejected (submitted → rejected)",
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/payroll/tax_deduction/{id}/submitted": {
+      "post": {
+        "description": "Phát sự kiện `payroll.tax_deduction.submitted` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/payroll_tax_deduction"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Hồ sơ giảm trừ thuế theo năm: submitted (draft|rejected → submitted)",
         "tags": [
           "payroll"
         ]
