@@ -77,7 +77,7 @@ export default function EducationWorkbenchPage() {
     .map((enrollment) => ({ enrollment, student: students.get(enrollment.student) }))
     .sort((a, b) => studentName(a.student, parties).localeCompare(studentName(b.student, parties), 'vi')), [enrollments, parties, selected, students]);
   const marks = useMemo(() => new Map(attendance.filter((item) => item.session === selectedId).map((item) => [item.enrollment, item])), [attendance, selectedId]);
-  const gradeRoster = useMemo(() => enrollments.filter((item) => item.class === gradeClass && item.status === 'active')
+  const gradeRoster = useMemo(() => enrollments.filter((item) => item.class === gradeClass && ['active', 'completed'].includes(item.status))
     .map((enrollment) => ({ enrollment, student: students.get(enrollment.student) }))
     .sort((a, b) => studentName(a.student, parties).localeCompare(studentName(b.student, parties), 'vi')), [enrollments, gradeClass, parties, students]);
   const gradeMap = useMemo(() => new Map(grades.filter((grade) => grade.term?.trim().toLocaleLowerCase() === gradeTerm.trim().toLocaleLowerCase()
@@ -299,7 +299,7 @@ export default function EducationWorkbenchPage() {
         <label className="field"><span className="label">Học kỳ *</span><input className="input" required value={gradeTerm} onChange={(event) => setGradeTerm(event.target.value)} placeholder="Ví dụ: 2026-2027 / HK1" /></label>
         <label className="field"><span className="label">Môn học *</span><input className="input" required value={gradeSubject} onChange={(event) => setGradeSubject(event.target.value)} placeholder="Ví dụ: Toán" /></label>
       </div>
-      {!gradeClass ? <div className="empty">Chọn lớp để mở sổ điểm.</div> : gradeRoster.length === 0 ? <div className="empty">Lớp chưa có học viên đang ghi danh.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Mã học viên</th><th>Học viên</th><th>Điểm (0–100)</th><th>Thao tác</th></tr></thead><tbody>{gradeRoster.map(({ enrollment, student }) => { const party = parties.get(student?.party); const grade = gradeMap.get(enrollment.id); return <GradeRow key={enrollment.id} enrollment={enrollment} student={student} party={party} grade={grade} busy={busy} canCreate={can('school.grade.create')} canUpdate={can('school.grade.update')} onSave={saveGrade} />; })}</tbody></table></div>}
+      {!gradeClass ? <div className="empty">Chọn lớp để mở sổ điểm.</div> : gradeRoster.length === 0 ? <div className="empty">Lớp chưa có học viên đang hoặc đã hoàn thành ghi danh.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Mã học viên</th><th>Học viên</th><th>Trạng thái ghi danh</th><th>Điểm (0–100)</th><th>Thao tác</th></tr></thead><tbody>{gradeRoster.map(({ enrollment, student }) => { const party = parties.get(student?.party); const grade = gradeMap.get(enrollment.id); return <GradeRow key={enrollment.id} enrollment={enrollment} student={student} party={party} grade={grade} busy={busy} canCreate={can('school.grade.create')} canUpdate={can('school.grade.update')} onSave={saveGrade} />; })}</tbody></table></div>}
     </section>}
     {can('school.fee.read') && <section className="card card-pad" style={{ marginTop: 20 }}><div className="row wrap"><div><h2>Sổ học phí</h2><p className="small muted">Học phí phát hành sẽ tạo hóa đơn phải thu. Khi hóa đơn được thanh toán đủ, trạng thái khoản học phí tự chuyển sang đã thu.</p></div><span className="grow"/><span className="badge warning">{fees.filter((fee) => fee.status === 'issued').length} chưa thu đủ</span></div>
       {can('school.tuition_batch.create') && <section className="card card-pad" style={{ marginTop: 14 }}><h3>Lập đợt học phí theo lớp</h3><p className="small muted">Tạo khoản thu nháp cho toàn bộ học viên đang ghi danh. Học phí hiện tại của lớp được lưu thành số tiền từng khoản; có thể rà soát và phát hành hóa đơn riêng sau đó.</p><form className="form-grid" onSubmit={createTuitionBatch}>
@@ -325,8 +325,8 @@ export default function EducationWorkbenchPage() {
 function GradeRow({ enrollment, student, party, grade, busy, canCreate, canUpdate, onSave }) {
   const [score, setScore] = useState(grade?.score == null ? '' : String(grade.score));
   useEffect(() => setScore(grade?.score == null ? '' : String(grade.score)), [grade?.id, grade?.score]);
-  const allowed = grade ? canUpdate : canCreate;
-  return <tr><td>{student?.student_code || '—'}</td><td>{party ? recordLabel('master-data.party', party) : 'Học viên'}</td><td><input className="input num" aria-label={`Điểm ${student?.student_code || ''}`} type="number" min="0" max="100" step="any" value={score} disabled={!allowed} onChange={(event) => setScore(event.target.value)} /></td><td><button className="btn btn-primary btn-sm" type="button" disabled={busy || !allowed || !score.trim()} onClick={() => onSave(enrollment.id, score)}>{grade ? 'Cập nhật điểm' : 'Lưu điểm'}</button></td></tr>;
+  const allowed = enrollment.status === 'active' && (grade ? canUpdate : canCreate);
+  return <tr><td>{student?.student_code || '—'}</td><td>{party ? recordLabel('master-data.party', party) : 'Học viên'}</td><td>{statusLabel(enrollment.status)}</td><td><input className="input num" aria-label={`Điểm ${student?.student_code || ''}`} type="number" min="0" max="100" step="any" value={score} disabled={!allowed} onChange={(event) => setScore(event.target.value)} /></td><td>{allowed ? <button className="btn btn-primary btn-sm" type="button" disabled={busy || !score.trim()} onClick={() => onSave(enrollment.id, score)}>{grade ? 'Cập nhật điểm' : 'Lưu điểm'}</button> : grade ? <span className="small muted">Chỉ xem</span> : <span className="small muted">Không thể nhập điểm</span>}</td></tr>;
 }
 
 function studentName(student, parties) {
