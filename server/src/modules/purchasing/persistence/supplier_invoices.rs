@@ -43,13 +43,14 @@ fn add_lines(
             .get("product")
             .and_then(Value::as_str)
             .and_then(|value| Uuid::parse_str(value).ok());
-        let price = line
-            .get(if supplier_invoice {
-                "po_price"
-            } else {
-                "price"
-            })
-            .and_then(money::decimal);
+        // Supplier invoices and returns must be grouped against the PO price,
+        // while receipts carry that price in `price` and have no `po_price`.
+        let price = if supplier_invoice {
+            line.get("po_price")
+        } else {
+            line.get("po_price").or_else(|| line.get("price"))
+        }
+        .and_then(money::decimal);
         let invoice_price = line.get("price").and_then(money::decimal);
         let tax_rate = line
             .get("tax_rate")
