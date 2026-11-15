@@ -94,12 +94,29 @@ pub(super) async fn validate_posted_document(
                 let invoice_total = amount(document, "base_total")
                     .or_else(|| amount(document, "total"))
                     .unwrap_or(Decimal::ZERO);
-                let projected = outstanding
+                let source_order_id = (document.get("source").and_then(Value::as_str)
+                    == Some("sales_order"))
+                .then(|| document.get("source_id").and_then(Value::as_str))
+                .flatten()
+                .map(str::to_owned);
+                let invoice_total_text = invoice_total.normalize().to_string();
+                let unbilled_orders = tx
+                    .query_opt(
+                        "SELECT COALESCE(SUM(GREATEST(COALESCE(s.total, 0) - COALESCE((SELECT SUM(COALESCE(i.base_total, i.total)) FROM accounting__invoice i WHERE i.tenant_id = s.tenant_id AND i.source = 'sales_order' AND i.source_id = s.id::text AND i.status NOT IN ('draft', 'void')), 0) - CASE WHEN s.id::text = $3 THEN $4::numeric ELSE 0::numeric END, 0)), 0)::text FROM sales__sales_order s WHERE s.tenant_id = $1 AND s.party = $2 AND s.status IN ('confirmed', 'partially_delivered', 'delivered')",
+                        &[&tenant.id, &party_id, &source_order_id, &invoice_total_text],
+                    )
+                    .await?
+                    .ok_or_else(amount_overflow)?;
+                let unbilled_orders = database_amount(&unbilled_orders, 0)?;
+                let exposure_before_invoice = outstanding
+                    .checked_add(unbilled_orders)
+                    .ok_or_else(amount_overflow)?;
+                let projected = exposure_before_invoice
                     .checked_add(invoice_total)
                     .ok_or_else(amount_overflow)?;
                 if projected > amount_limit(credit_limit)? {
                     errors.push(format!(
-                        "Ghi sổ hóa đơn vượt hạn mức tín dụng: công nợ hiện tại {outstanding:.2}, hóa đơn mới {invoice_total:.2}, hạn mức {credit_limit:.2}"
+                        "Ghi sổ hóa đơn vượt hạn mức tín dụng: công nợ hiện tại {outstanding:.2}, đơn bán chưa lập hóa đơn {unbilled_orders:.2}, hóa đơn mới {invoice_total:.2}, hạn mức {credit_limit:.2}"
                     ));
                 }
             }
