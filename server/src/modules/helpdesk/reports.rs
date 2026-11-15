@@ -40,7 +40,7 @@ impl Kernel {
                    LEFT JOIN helpdesk__sla_policy p ON p.tenant_id = t.tenant_id AND p.id = t.sla_policy \
                    LEFT JOIN LATERAL (SELECT min(e.at) AS at FROM osp_events e \
                      WHERE e.tenant_id = t.tenant_id AND e.record_id = t.id::text \
-                       AND e.type IN ('helpdesk.ticket.responded', 'helpdesk.ticket.resolved')) response ON true \
+                       AND e.type = 'helpdesk.ticket.responded') response ON true \
                    LEFT JOIN LATERAL (SELECT max(e.at) AS at FROM osp_events e \
                      WHERE e.tenant_id = t.tenant_id AND e.record_id = t.id::text \
                        AND e.type = 'helpdesk.ticket.resolved') resolution ON true \
