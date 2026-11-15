@@ -497,7 +497,7 @@ pub(super) async fn handle_event(
             }
             if matches!(
                 event.get("source").and_then(Value::as_str),
-                Some("ticket" | "pos_order")
+                Some("ticket" | "pos_order" | "table_order")
             ) {
                 let tax = event
                     .get("base_tax_amount")
@@ -512,7 +512,7 @@ pub(super) async fn handle_event(
                 {
                     return Err(crate::error::ApiError::validation(
                         "accounting.payment",
-                        vec!["Ticket tax must be between zero and the ticket payment".into()],
+                        vec!["Sale tax must be between zero and the payment amount".into()],
                     ));
                 }
                 if tax > amount_tolerance() {
@@ -520,7 +520,7 @@ pub(super) async fn handle_event(
                     let taxable_base = base_amount.checked_sub(tax).ok_or_else(|| {
                         crate::error::ApiError::validation(
                             "accounting.payment",
-                            vec!["Ticket net amount exceeds the supported decimal range".into()],
+                            vec!["Sale net amount exceeds the supported decimal range".into()],
                         )
                     })?;
                     lines[1] = journal_line_decimal(credit, Decimal::ZERO, taxable_base)?;
