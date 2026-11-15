@@ -4,7 +4,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 
 ## Đã có
 
-- 50 module, 194 loại dữ liệu, 873 sự kiện, 22 gói ngành; nghiệp vụ liên module chạy trong Rust bounded contexts.
+- 50 module, 199 loại dữ liệu, 898 sự kiện, 22 gói ngành; nghiệp vụ liên module chạy trong Rust bounded contexts.
 - Điện/nước/khí/viễn thông hỗ trợ biểu giá lũy tiến theo ngưỡng lũy kế, phí cố định mỗi kỳ và snapshot chi tiết từng bậc trên lịch sử chỉ số/hóa đơn.
 - LMS tự phát hành chứng chỉ bất biến khi học viên hoàn thành đủ bài bắt buộc; lưu snapshot người học/khóa học, tra cứu theo số và in từ workbench.
 - Trường học liên kết lớp với hồ sơ giáo viên HRM tùy chọn, chặn xếp trùng giờ giữa các lớp và không cho chấm dứt nhân viên còn buổi dạy tương lai; buổi học lưu snapshot giáo viên.
@@ -30,6 +30,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Luồng logistics hỗ trợ xác nhận số lượng thực nhận theo từng dòng và lưu lý do giao thiếu; tồn kho, tiến độ đơn bán, quyền trả hàng và lượng còn có thể giao tiếp đều tính theo số thực nhận.
 - Bàn bán buôn cho phép lập thêm vận đơn theo số lượng còn lại, tính cả chuyến nháp/đang giao và số đã giao thực tế; phần giao thất bại hoặc giao thiếu được giải phóng để giao lại.
 - Lịch hẹn ở trạng thái yêu cầu tính lại giờ kết thúc và giá mặc định khi đổi dịch vụ hoặc giờ bắt đầu; khung giờ mới tiếp tục qua kiểm tra khóa tài nguyên và trùng lịch.
+- Lịch hẹn khám chỉ nhận hồ sơ bệnh nhân đã đăng ký; giao diện lọc theo bệnh nhân và máy chủ kiểm tra tenant, nên không thể gắn lịch khám vào người liên hệ bất kỳ.
 - Lễ tân khách sạn có thể gia hạn ngày trả cho khách đang lưu trú; máy chủ khóa thông tin khách/phòng/giá, kiểm tra chồng lịch và sức chứa, rồi tính lại số đêm cùng folio theo giá đã chốt.
 - Xưởng sửa chữa lưu trạng thái khách từ chối báo giá kèm lý do; lệnh được giữ làm lịch sử nhưng không còn khóa xe, xuất phụ tùng hay lập hóa đơn.
 - Sổ học phí liên kết ghi danh với khoản thu; phát hành tạo hóa đơn kế toán có đúng hạn thanh toán và thanh toán đủ tự đồng bộ trạng thái học phí.
@@ -40,6 +41,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Hồ sơ cho vay chốt ngày đến hạn kỳ đầu theo hợp đồng trước khi duyệt; lịch niên kim bắt đầu đúng ngày này và giữ ngày trong tháng cho các kỳ sau, đồng thời khoản vay cũ chưa có ngày vẫn dùng được quy tắc lịch trước đây.
 - Đối soát ngân hàng lưu liên kết payment/bút toán khớp thủ công và lý do bỏ qua cùng lần đổi trạng thái của dòng sao kê.
 - Phòng khám hoàn tất lượt khám cùng thông tin bác sĩ, chẩn đoán, phí và hóa đơn phải thu; kết quả xét nghiệm lưu cùng trạng thái hoàn tất.
+- Báo cáo SLA Helpdesk chỉ dừng thời gian phản hồi đầu tiên khi có sự kiện phản hồi gửi khách hàng; sự kiện giải quyết ticket không bị tính thay cho phản hồi.
 - Hóa đơn điện tử lưu lý do hủy cùng giao dịch chuyển sang chờ provider xử lý hủy.
 - POS ghi nhận tiền thực đếm và chốt ca trong cùng giao dịch sau khi kiểm tra đơn/phiếu quỹ nháp và tính chênh lệch tiền.
 - Bảo trì lưu kết quả sửa chữa và cặp giờ công/đơn giá đầy đủ cùng lần hoàn tất, xuất vật tư và cập nhật lịch định kỳ.
