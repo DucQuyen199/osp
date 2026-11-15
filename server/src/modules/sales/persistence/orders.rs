@@ -130,17 +130,40 @@ pub(super) async fn validate(
                 .map(|row| decimal_column(row, 0, "outstanding credit"))
                 .transpose()?
                 .unwrap_or(Decimal::ZERO);
+            let order_id = document
+                .get("id")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+                .unwrap_or_default();
+            let unbilled_orders_row = tx
+                .query_opt(
+                    "SELECT COALESCE(SUM(GREATEST(COALESCE(s.total, 0) - COALESCE((SELECT SUM(COALESCE(i.base_total, i.total)) FROM accounting__invoice i WHERE i.tenant_id = s.tenant_id AND i.source = 'sales_order' AND i.source_id = s.id::text AND i.status NOT IN ('draft', 'void')), 0), 0)), 0)::text FROM sales__sales_order s WHERE s.tenant_id = $1 AND s.party = $2 AND s.id <> $3 AND s.status IN ('confirmed', 'partially_delivered', 'delivered')",
+                    &[&tenant.id, &party_id, &order_id],
+                )
+                .await?;
+            let unbilled_orders = unbilled_orders_row
+                .as_ref()
+                .map(|row| decimal_column(row, 0, "unbilled sales order exposure"))
+                .transpose()?
+                .unwrap_or(Decimal::ZERO);
+            let exposure_before_order =
+                outstanding.checked_add(unbilled_orders).ok_or_else(|| {
+                    crate::error::ApiError::validation(
+                        "sales.credit_limit",
+                        vec!["Customer credit exposure exceeds the supported decimal range".into()],
+                    )
+                })?;
             let order_total = document
                 .get("total")
                 .and_then(money::decimal)
                 .unwrap_or(Decimal::ZERO);
-            if outstanding
+            if exposure_before_order
                 .checked_add(order_total)
                 .zip(credit_limit.checked_add(Decimal::new(5, 3)))
                 .is_none_or(|(exposure, maximum)| exposure > maximum)
             {
                 return Ok(vec![format!(
-                    "Sales order exceeds the customer credit limit: current exposure {outstanding}, new order {order_total}, limit {credit_limit}"
+                    "Sales order exceeds the customer credit limit: current exposure {exposure_before_order}, new order {order_total}, limit {credit_limit}"
                 )]);
             }
         }
