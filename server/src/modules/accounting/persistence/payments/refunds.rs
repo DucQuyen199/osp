@@ -13,21 +13,27 @@ pub(super) async fn validate(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> 
             .get("source_id")
             .and_then(Value::as_str)
             .and_then(|value| Uuid::parse_str(value).ok());
-        let transaction = if let Some(source_id) = source_id {
+        let provider_refund = if let Some(source_id) = source_id {
             tx.query_opt(
-                        "SELECT amount::text, party, invoice, bill FROM payments__payment_txn WHERE tenant_id = $1 AND id = $2 AND status = 'refunded' FOR UPDATE",
+                        "SELECT refund.amount::text, payment.amount::text, payment.party, payment.invoice, payment.bill FROM payments__payment_refund refund JOIN payments__payment_txn payment ON payment.tenant_id = refund.tenant_id AND payment.id = refund.payment_txn WHERE refund.tenant_id = $1 AND refund.id = $2 AND refund.status = 'succeeded' AND payment.status IN ('succeeded', 'partially_refunded', 'refunded') FOR UPDATE OF refund, payment",
                         &[&tenant.id, &source_id],
                     ).await?
         } else {
             None
         };
-        let matches_source = if let Some(row) = transaction {
-            let original_amount = database_amount(&row, 0)?;
-            let party: Uuid = row.get(1);
-            let invoice: Option<Uuid> = row.get(2);
-            let bill: Option<Uuid> = row.get(3);
-            amount(document, "amount")
-                .is_some_and(|refund_amount| refund_matches(original_amount, refund_amount))
+        let matches_source = if let Some(row) = provider_refund {
+            let provider_refund_amount = database_amount(&row, 0)?;
+            let original_amount = database_amount(&row, 1)?;
+            let party: Uuid = row.get(2);
+            let invoice: Option<Uuid> = row.get(3);
+            let bill: Option<Uuid> = row.get(4);
+            provider_refund_amount > Decimal::ZERO
+                && original_amount > Decimal::ZERO
+                && provider_refund_amount <= original_amount
+                && amount(document, "amount").is_some_and(|accounting_amount| {
+                    accounting_amount < Decimal::ZERO
+                        && refund_matches(provider_refund_amount, accounting_amount.abs())
+                })
                 && document
                     .get("party")
                     .and_then(Value::as_str)
@@ -55,14 +61,18 @@ pub(super) async fn validate(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> 
         if let Some(source_id) = source_id {
             let original = tx
                         .query_opt(
-                            "SELECT amount::text FROM accounting__payment WHERE tenant_id = $1 AND source = 'payments' AND source_id = $2 FOR UPDATE",
-                            &[&tenant.id, &source_id.to_string()],
+                            "SELECT original.amount::text FROM payments__payment_refund refund JOIN payments__payment_txn txn ON txn.tenant_id = refund.tenant_id AND txn.id = refund.payment_txn JOIN accounting__payment original ON original.tenant_id = txn.tenant_id AND original.source = 'payments' AND original.source_id = txn.id::text WHERE refund.tenant_id = $1 AND refund.id = $2 AND refund.status = 'succeeded' FOR UPDATE OF refund, txn, original",
+                            &[&tenant.id, &source_id],
                         )
                         .await?;
             let matches_original = if let Some(row) = original {
                 let original_amount = database_amount(&row, 0)?;
-                amount(document, "amount")
-                    .is_some_and(|refund_amount| refund_matches(original_amount, refund_amount))
+                amount(document, "amount").is_some_and(|refund_amount| {
+                    refund_amount < Decimal::ZERO
+                        && original_amount
+                            .checked_add(amount_tolerance())
+                            .is_some_and(|limit| refund_amount.abs() <= limit)
+                })
             } else {
                 false
             };
