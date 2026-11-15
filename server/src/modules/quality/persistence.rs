@@ -383,8 +383,20 @@ pub async fn validate_persistence(
                     .map(|row| decimal_column(&row, 0, "released quantity"))
                     .transpose()?
                     .unwrap_or(Decimal::ZERO);
+                let inspection_id = id(document, "id").unwrap_or_default();
+                let returned = tx
+                    .query_opt(
+                        "SELECT COALESCE(SUM(qty::numeric), 0)::text FROM inventory__stock_move WHERE tenant_id = $1 AND source = 'quality_return' AND source_id = $2 AND direction = 'out'",
+                        &[&tenant.id, &inspection_id.to_string()],
+                    )
+                    .await?;
+                let returned = returned
+                    .map(|row| decimal_column(&row, 0, "returned quantity"))
+                    .transpose()?
+                    .unwrap_or(Decimal::ZERO);
                 let remaining_qty = qty
                     .checked_sub(released)
+                    .and_then(|remaining| remaining.checked_sub(returned))
                     .unwrap_or(Decimal::ZERO)
                     .max(Decimal::ZERO);
                 let lock_key = format!("inventory.stock:{}:{}:{}", tenant.id, product, warehouse);
@@ -420,7 +432,7 @@ pub async fn validate_persistence(
                         .unwrap_or(Decimal::ZERO);
                     if lot_held
                         .checked_add(Decimal::new(1, 6))
-                        .is_none_or(|available| available < qty)
+                        .is_none_or(|available| available < remaining_qty)
                     {
                         errors.push("Không còn đủ số lượng lô đang chờ QC để giải phóng".into());
                     }
@@ -497,8 +509,20 @@ pub async fn validate_persistence(
                     .map(|row| decimal_column(&row, 0, "released quantity"))
                     .transpose()?
                     .unwrap_or(Decimal::ZERO);
+                let inspection_id = id(document, "id").unwrap_or_default();
+                let returned = tx
+                    .query_opt(
+                        "SELECT COALESCE(SUM(qty::numeric), 0)::text FROM inventory__stock_move WHERE tenant_id = $1 AND source = 'quality_return' AND source_id = $2 AND direction = 'out'",
+                        &[&tenant.id, &inspection_id.to_string()],
+                    )
+                    .await?;
+                let returned = returned
+                    .map(|row| decimal_column(&row, 0, "returned quantity"))
+                    .transpose()?
+                    .unwrap_or(Decimal::ZERO);
                 let remaining_qty = qty
                     .checked_sub(released)
+                    .and_then(|remaining| remaining.checked_sub(returned))
                     .unwrap_or(Decimal::ZERO)
                     .max(Decimal::ZERO);
                 let lock_key = format!("inventory.stock:{}:{}:{}", tenant.id, product, warehouse);
@@ -531,7 +555,7 @@ pub async fn validate_persistence(
                         .unwrap_or(Decimal::ZERO);
                     if lot_held
                         .checked_add(Decimal::new(1, 6))
-                        .is_none_or(|available| available < qty)
+                        .is_none_or(|available| available < remaining_qty)
                     {
                         errors.push("Không còn đủ số lượng lô đang chờ QC để giải phóng".into());
                     }

@@ -471,8 +471,19 @@ pub async fn handle_source_event(
                 .map(|row| decimal_column(&row, 0, "released quantity"))
                 .transpose()?
                 .unwrap_or(Decimal::ZERO);
+            let returned = tx
+                .query_opt(
+                    "SELECT COALESCE(SUM(qty::numeric), 0)::text FROM inventory__stock_move WHERE tenant_id = $1 AND source = 'quality_return' AND source_id = $2 AND direction = 'out'",
+                    &[&tenant.id, &inspection_id.to_string()],
+                )
+                .await?;
+            let returned = returned
+                .map(|row| decimal_column(&row, 0, "returned quantity"))
+                .transpose()?
+                .unwrap_or(Decimal::ZERO);
             let remaining_qty = qty
                 .checked_sub(released)
+                .and_then(|remaining| remaining.checked_sub(returned))
                 .unwrap_or(Decimal::ZERO)
                 .max(Decimal::ZERO);
             let lock_key = format!("inventory.stock:{}:{}:{}", tenant.id, product, warehouse);
