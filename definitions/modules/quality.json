@@ -36,6 +36,11 @@
      "required": false
     },
     {
+     "name": "conditional_acceptance",
+     "type": "string",
+     "required": false
+    },
+    {
      "name": "qty",
      "type": "number",
      "required": true

@@ -110,6 +110,29 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                 errors.push("Lý do loại bỏ cần ít nhất 5 ký tự".into());
             }
         }
+        "conditional_acceptance" => {
+            if !document
+                .get("qty")
+                .and_then(decimal)
+                .is_some_and(|qty| qty > Decimal::ZERO)
+            {
+                errors.push("Số lượng chấp nhận có điều kiện phải lớn hơn 0".into());
+            }
+            if document
+                .get("condition")
+                .and_then(Value::as_str)
+                .is_none_or(|value| value.trim().len() < 5)
+            {
+                errors.push("Điều kiện chấp nhận cần ít nhất 5 ký tự".into());
+            }
+            if document
+                .get("justification")
+                .and_then(Value::as_str)
+                .is_none_or(|value| value.trim().len() < 5)
+            {
+                errors.push("Căn cứ chấp nhận cần ít nhất 5 ký tự".into());
+            }
+        }
         "work_center" => {
             if document
                 .get("capacity_per_day")
@@ -128,6 +151,17 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<String> {
+    if entity == "conditional_acceptance"
+        && !matches!(
+            current.get("status").and_then(Value::as_str),
+            Some("draft" | "rejected")
+        )
+        && ["inspection", "qty", "condition", "justification"]
+            .iter()
+            .any(|field| patch.get(*field).is_some())
+    {
+        return vec!["Submitted or approved conditional acceptances are immutable".into()];
+    }
     if entity == "rework_order"
         && current.get("status").and_then(Value::as_str) != Some("planned")
         && ["production_order", "inspection", "qty", "reason"]
@@ -177,6 +211,17 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
 }
 
 pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
+    if entity == "conditional_acceptance"
+        && !matches!(
+            document.get("status").and_then(Value::as_str),
+            Some("draft" | "rejected" | "cancelled")
+        )
+    {
+        return vec![
+            "Submitted or approved conditional acceptances must remain in the quality history"
+                .into(),
+        ];
+    }
     if entity == "production_disposition"
         && document.get("status").and_then(Value::as_str) != Some("draft")
     {

@@ -110,6 +110,120 @@ async fn validate_work_center_schedule(
     Ok(Vec::new())
 }
 
+async fn validate_conditional_acceptance(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    action: &str,
+    document: &Value,
+) -> R<Vec<String>> {
+    if !matches!(
+        action,
+        "created" | "updated" | "submitted" | "approved" | "rejected"
+    ) {
+        return Ok(Vec::new());
+    }
+    let (Some(acceptance_id), Some(inspection_id), Some(qty)) = (
+        id(document, "id"),
+        id(document, "inspection"),
+        document.get("qty").and_then(money::decimal),
+    ) else {
+        return Ok(vec![
+            "Đề nghị chấp nhận có điều kiện cần phiếu QC và số lượng hợp lệ".into(),
+        ]);
+    };
+    if qty <= Decimal::ZERO {
+        return Ok(vec![
+            "Số lượng chấp nhận có điều kiện phải lớn hơn 0".into(),
+        ]);
+    }
+    let inspection = tx.query_opt(
+        "SELECT qty::text, status, source, source_id, product, warehouse, rework_order FROM quality__inspection WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+        &[&tenant.id, &inspection_id],
+    ).await?;
+    let Some(inspection) = inspection else {
+        return Ok(vec!["Không tìm thấy phiếu QC trong doanh nghiệp".into()]);
+    };
+    let inspection_qty = decimal_column(&inspection, 0, "failed inspection quantity")?;
+    let source: String = inspection.get(2);
+    let order_id = inspection.get::<_, String>(3).parse::<Uuid>().ok();
+    let Some(order_id) = order_id else {
+        return Ok(vec!["Phiếu QC không liên kết lệnh sản xuất hợp lệ".into()]);
+    };
+    let order = tx.query_opt(
+        "SELECT product, warehouse, status, COALESCE(good_qty, qty)::text FROM manufacturing__production_order WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+        &[&tenant.id, &order_id],
+    ).await?;
+    let Some(order) = order else {
+        return Ok(vec![
+            "Không tìm thấy lệnh sản xuất trong doanh nghiệp".into(),
+        ]);
+    };
+    let mut errors = Vec::new();
+    if !matches!(source.as_str(), "production_order" | "production_rework")
+        || inspection.get::<_, String>(1) != "failed"
+        || inspection.get::<_, Uuid>(4) != order.get::<_, Uuid>(0)
+        || inspection.get::<_, Uuid>(5) != order.get::<_, Uuid>(1)
+        || order.get::<_, String>(2) != "done"
+        || decimal_column(&order, 3, "accepted production quantity")? <= Decimal::ZERO
+    {
+        errors.push("Chỉ phiếu QC không đạt của lệnh sản xuất đã hoàn tất mới được đề nghị chấp nhận có điều kiện".into());
+    }
+    if source == "production_rework" {
+        let rework_id = inspection
+            .get::<_, Option<String>>(6)
+            .and_then(|value| Uuid::parse_str(&value).ok());
+        let linked = if let Some(rework_id) = rework_id {
+            tx.query_opt(
+                "SELECT id FROM manufacturing__rework_order WHERE tenant_id = $1 AND id = $2 AND production_order = $3 AND status = 'done' FOR SHARE",
+                &[&tenant.id, &rework_id, &order_id],
+            ).await?.is_some()
+        } else {
+            false
+        };
+        if !linked {
+            errors.push("Phiếu QC sửa hàng phải liên kết một lệnh sửa đã hoàn tất".into());
+        }
+    }
+    if action == "submitted" && !tenant.has_module("workflow-approval") {
+        errors.push("Cần bật module Phê duyệt để gửi đề nghị chấp nhận có điều kiện".into());
+    }
+    if matches!(action, "approved" | "rejected") {
+        let expected = if action == "approved" {
+            "approved"
+        } else {
+            "rejected"
+        };
+        let decision = tx.query_opt(
+            "SELECT 1 FROM workflow_approval__approval_request WHERE tenant_id = $1 AND entity = 'manufacturing.conditional_acceptance' AND record_id = $2 AND status = $3 LIMIT 1",
+            &[&tenant.id, &acceptance_id.to_string(), &expected],
+        ).await?.is_some();
+        if !decision {
+            errors.push(
+                "Đề nghị chỉ được chấp thuận hoặc từ chối qua yêu cầu phê duyệt chung".into(),
+            );
+        }
+    }
+    let accounted = tx.query_one_row(
+        "SELECT (COALESCE((SELECT SUM(qty::numeric) FROM manufacturing__rework_order WHERE tenant_id = $1 AND inspection = $2 AND status <> 'cancelled'), 0) + COALESCE((SELECT SUM(qty::numeric) FROM manufacturing__production_disposition WHERE tenant_id = $1 AND inspection = $2 AND status IN ('draft', 'posted')), 0) + COALESCE((SELECT SUM(qty::numeric) FROM manufacturing__conditional_acceptance WHERE tenant_id = $1 AND inspection = $2 AND status IN ('draft', 'submitted', 'approved') AND id <> $3), 0))::text",
+        &[&tenant.id, &inspection_id, &acceptance_id],
+    ).await?;
+    let accounted_qty = decimal_column(
+        &accounted,
+        0,
+        "already reworked, discarded, or conditionally accepted quantity",
+    )?;
+    if accounted_qty
+        .checked_add(qty)
+        .is_none_or(|total| total > inspection_qty + Decimal::new(1, 6))
+    {
+        errors.push(format!(
+            "Tổng lượng sửa, loại bỏ và chấp nhận có điều kiện vượt lượng QC lỗi còn lại ({})",
+            (inspection_qty - accounted_qty).max(Decimal::ZERO)
+        ));
+    }
+    Ok(errors)
+}
+
 async fn validate_work_center_update(
     tx: &Tx<'_>,
     tenant: &Tenant,
@@ -145,6 +259,9 @@ pub async fn validate_persistence(
     document: &Value,
 ) -> R<Vec<String>> {
     let mut errors = Vec::new();
+    if entity == "conditional_acceptance" {
+        return validate_conditional_acceptance(tx, tenant, action, document).await;
+    }
     match (entity, action) {
         ("production_disposition", "created" | "posted") => {
             let (Some(disposition_id), Some(inspection_id), Some(qty), Some(account_id)) = (
@@ -199,7 +316,7 @@ pub async fn validate_persistence(
                 errors.push("Chỉ được loại bỏ lượng lỗi trên phiếu QC của lệnh sản xuất đã hoàn tất".into());
             }
             let accounted = tx.query_one_row(
-                "SELECT (COALESCE((SELECT SUM(qty::numeric) FROM manufacturing__rework_order WHERE tenant_id = $1 AND inspection = $2 AND status <> 'cancelled'), 0) + COALESCE((SELECT SUM(qty::numeric) FROM manufacturing__production_disposition WHERE tenant_id = $1 AND inspection = $2 AND status IN ('draft', 'posted') AND id <> $3), 0))::text",
+                "SELECT (COALESCE((SELECT SUM(qty::numeric) FROM manufacturing__rework_order WHERE tenant_id = $1 AND inspection = $2 AND status <> 'cancelled'), 0) + COALESCE((SELECT SUM(qty::numeric) FROM manufacturing__production_disposition WHERE tenant_id = $1 AND inspection = $2 AND status IN ('draft', 'posted') AND id <> $3), 0) + COALESCE((SELECT SUM(qty::numeric) FROM manufacturing__conditional_acceptance WHERE tenant_id = $1 AND inspection = $2 AND status IN ('draft', 'submitted', 'approved')), 0))::text",
                 &[&tenant.id, &inspection_id, &disposition_id],
             ).await?;
             let accounted_qty = decimal_column(&accounted, 0, "previously reworked or discarded quantity")?;
@@ -275,7 +392,7 @@ pub async fn validate_persistence(
                 errors.push("Rework must reference a failed inspection for an eligible quantity of its completed production order".into());
             }
             let committed = tx.query_one_row(
-                "SELECT (COALESCE((SELECT SUM(qty::numeric) FROM manufacturing__rework_order WHERE tenant_id = $1 AND inspection = $2 AND status <> 'cancelled' AND id <> $3), 0) + COALESCE((SELECT SUM(qty::numeric) FROM manufacturing__production_disposition WHERE tenant_id = $1 AND inspection = $2 AND status IN ('draft', 'posted')), 0))::text",
+                "SELECT (COALESCE((SELECT SUM(qty::numeric) FROM manufacturing__rework_order WHERE tenant_id = $1 AND inspection = $2 AND status <> 'cancelled' AND id <> $3), 0) + COALESCE((SELECT SUM(qty::numeric) FROM manufacturing__production_disposition WHERE tenant_id = $1 AND inspection = $2 AND status IN ('draft', 'posted')), 0) + COALESCE((SELECT SUM(qty::numeric) FROM manufacturing__conditional_acceptance WHERE tenant_id = $1 AND inspection = $2 AND status IN ('draft', 'submitted', 'approved')), 0))::text",
                 &[&tenant.id, &inspection_id, &rework_id],
             ).await?;
             let committed_qty = decimal_column(&committed, 0, "reserved rework and discarded quantity")?;

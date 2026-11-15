@@ -193,6 +193,7 @@ pub fn table_for(entity: &str) -> Option<&'static str> {
         "purchasing.purchase_requisition" => Some("purchasing__purchase_requisition"),
         "payroll.payroll_run" => Some("payroll__payroll_run"),
         "inventory.stock_count" => Some("inventory__stock_count"),
+        "manufacturing.conditional_acceptance" => Some("manufacturing__conditional_acceptance"),
         "sales.sales_return" => Some("sales__sales_return"),
         "purchasing.purchase_return" => Some("purchasing__purchase_return"),
         "expense.expense_claim" => Some("expense__expense_claim"),

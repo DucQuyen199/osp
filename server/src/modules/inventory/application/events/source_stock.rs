@@ -64,6 +64,11 @@ pub async fn handle_source_stock_event(
         {
             (None, "in", "production_rework", false)
         }
+        "quality.inspection.passed"
+            if document.get("source").and_then(Value::as_str) == Some("production_concession") =>
+        {
+            (None, "in", "production_concession", false)
+        }
         "manufacturing.production_order.started" => {
             (Some("$bom"), "out", "production_order_bom", true)
         }
@@ -425,6 +430,11 @@ pub async fn handle_source_stock_event(
             move_data.insert("direction".into(), json!(line_direction));
             move_data.insert("source".into(), json!(source));
             move_data.insert("source_id".into(), line_source_id.clone());
+            if source == "production_concession"
+                && let Some(acceptance_id) = allocation.get("conditional_acceptance")
+            {
+                move_data.insert("conditional_acceptance".into(), acceptance_id.clone());
+            }
             kernel
                 .create_in(tx, &Actor::System, tenant, &entity, move_data, &opts)
                 .await?;

@@ -64,6 +64,36 @@ pub(super) async fn resolve_unit_cost(
                     }
                 }
             }
+            "production_concession" => {
+                if let (Some(order_id), Some(acceptance_id)) = (
+                    source_id,
+                    document
+                        .get("conditional_acceptance")
+                        .and_then(Value::as_str)
+                        .and_then(|value| Uuid::parse_str(value).ok()),
+                ) {
+                    if let Some(row) = tx.query_opt(
+                        "WITH RECURSIVE repair_chain AS ( \
+                           SELECT ro.id, ro.inspection, ro.production_order, ro.qty::numeric AS qty \
+                           FROM manufacturing__conditional_acceptance ca \
+                           JOIN quality__inspection failed ON failed.tenant_id = ca.tenant_id AND failed.id = ca.inspection \
+                           JOIN manufacturing__rework_order ro ON ro.tenant_id = failed.tenant_id AND ro.id::text = failed.rework_order \
+                           WHERE ca.tenant_id = $1 AND ca.id = $2 \
+                           UNION ALL \
+                           SELECT prior.id, prior.inspection, prior.production_order, prior.qty::numeric \
+                           FROM repair_chain child \
+                           JOIN quality__inspection inspected ON inspected.tenant_id = $1 AND inspected.id = child.inspection \
+                           JOIN manufacturing__rework_order prior ON prior.tenant_id = $1 AND prior.id::text = inspected.rework_order AND prior.production_order = child.production_order \
+                         ) \
+                         SELECT (COALESCE((SELECT SUM(sm.total_cost::numeric) FROM inventory__stock_move sm WHERE sm.tenant_id = $1 AND sm.source = 'production_order_bom' AND sm.source_id = po.id::text AND sm.direction = 'out'), 0) / NULLIF(CASE WHEN po.scrap_cost_method = 'expense' THEN po.qty ELSE COALESCE(po.good_qty, po.qty) END::numeric, 0) + COALESCE((SELECT SUM(cost.amount / NULLIF(chain.qty, 0)) FROM repair_chain chain LEFT JOIN LATERAL (SELECT COALESCE(SUM(sm.total_cost::numeric), 0) AS amount FROM inventory__stock_move sm WHERE sm.tenant_id = $1 AND sm.source = 'production_order_bom' AND sm.source_id = chain.id::text AND sm.direction = 'out') cost ON TRUE), 0))::text \
+                         FROM manufacturing__production_order po WHERE po.tenant_id = $1 AND po.id = $3",
+                        &[&tenant.id, &acceptance_id, &order_id],
+                    ).await? {
+                        unit_cost = optional_decimal_column(&row, 0, "conditionally accepted production unit cost")?
+                            .unwrap_or(standard_cost);
+                    }
+                }
+            }
             "purchase_order_qc" => {
                 if let Some(cost) = document.get("unit_cost").and_then(money::decimal) {
                     unit_cost = cost;

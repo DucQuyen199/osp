@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **50 module**, **197 loại dữ liệu**, **885 sự kiện**.
+Tổng: **50 module**, **198 loại dữ liệu**, **892 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -41,7 +41,8 @@ Tổng: **50 module**, **197 loại dữ liệu**, **885 sự kiện**.
 | [`loyalty`](#loyalty) — Khách hàng thân thiết | Bán hàng & khách hàng | `master-data` |
 | [`maintenance`](#maintenance) — Bảo trì | Chuỗi cung ứng | `asset`, `inventory` |
 | [`quality`](#quality) — Quản lý chất lượng | Chuỗi cung ứng | `master-data`, `inventory` |
-| [`manufacturing`](#manufacturing) — Sản xuất | Chuỗi cung ứng | `master-data`, `inventory`, `quality`, `accounting` |
+| [`workflow-approval`](#workflow-approval) — Phê duyệt | Nền tảng dùng chung | — |
+| [`manufacturing`](#manufacturing) — Sản xuất | Chuỗi cung ứng | `master-data`, `inventory`, `quality`, `accounting`, `workflow-approval` |
 | [`marketing`](#marketing) — Marketing | Bán hàng & khách hàng | `master-data`, `crm`, `accounting` |
 | [`payments`](#payments) — Cổng thanh toán | Tài chính | `master-data`, `accounting` |
 | [`payroll`](#payroll) — Tính lương | Nhân sự | `hrm`, `accounting` |
@@ -55,7 +56,6 @@ Tổng: **50 module**, **197 loại dữ liệu**, **885 sự kiện**.
 | [`school`](#school) — Trường học / Trung tâm đào tạo | Module chuyên ngành | `master-data`, `accounting`, `hrm` |
 | [`subscription`](#subscription) — Gói thuê bao & thu phí định kỳ | Bán hàng & khách hàng | `master-data`, `accounting` |
 | [`utilities`](#utilities) — Điện nước / Viễn thông | Module chuyên ngành | `master-data`, `accounting` |
-| [`workflow-approval`](#workflow-approval) — Phê duyệt | Nền tảng dùng chung | — |
 
 ## Lõi
 
@@ -215,7 +215,7 @@ Tổng: **50 module**, **197 loại dữ liệu**, **885 sự kiện**.
 | `nonconformance` Sự không phù hợp | `open` → **closed** (open→closed) |
 
 ### manufacturing
-**Sản xuất** — Định mức BOM, lệnh sản xuất theo trung tâm máy và công suất ngày. Bắt đầu lệnh xuất nguyên liệu vào WIP; QC đạt sẽ nhập thành phẩm vào kho. Cho phép sửa hoặc loại bỏ một phần lượng lỗi, tạo phiếu QC riêng cho lượng sửa và hạch toán chi phí loại bỏ từ WIP sang chi phí.
+**Sản xuất** — Định mức BOM, lệnh sản xuất theo trung tâm máy và công suất ngày. Bắt đầu lệnh xuất nguyên liệu vào WIP; QC đạt sẽ nhập thành phẩm vào kho. Hỗ trợ sửa, loại bỏ hoặc đề nghị chấp nhận có điều kiện một phần lượng lỗi; hàng concession chỉ nhập kho sau phê duyệt độc lập.
 
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
@@ -223,6 +223,7 @@ Tổng: **50 module**, **197 loại dữ liệu**, **885 sự kiện**.
 | `production_order` Lệnh sản xuất | `planned` → **cancelled** (planned/in_progress→cancelled), **done** (in_progress→done), **started** (planned→in_progress) |
 | `rework_order` Lệnh sửa hàng lỗi | `planned` → **cancelled** (planned→cancelled), **done** (in_progress→done), **started** (planned→in_progress) |
 | `production_disposition` Xử lý hàng thành phẩm QC lỗi | `draft` → **cancelled** (draft→cancelled), **posted** (draft→posted) |
+| `conditional_acceptance` Chấp nhận có điều kiện thành phẩm | `draft` → **approved** (submitted→approved), **cancelled** (draft/rejected→cancelled), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 | `work_center` Trung tâm sản xuất | — |
 
 ### purchasing

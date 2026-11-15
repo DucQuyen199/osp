@@ -131,6 +131,11 @@
      "name": "source_id",
      "type": "string",
      "required": false
+    },
+    {
+     "name": "conditional_acceptance",
+     "type": "string",
+     "required": false
     }
    ],
    "states": null,

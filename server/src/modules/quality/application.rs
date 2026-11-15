@@ -133,6 +133,87 @@ pub async fn handle_source_event(
                 .await?;
             Ok(true)
         }
+        "manufacturing.conditional_acceptance.approved" => {
+            let acceptance_id = id(document, "id").ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    event_type,
+                    vec!["Approved conditional acceptance requires a valid id".into()],
+                )
+            })?;
+            let inspection_id = id(document, "inspection").ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    event_type,
+                    vec!["Conditional acceptance requires its failed quality inspection".into()],
+                )
+            })?;
+            let inspection = tx.query_opt(
+                "SELECT source, source_id, product, warehouse, lot, rework_order FROM quality__inspection WHERE tenant_id = $1 AND id = $2 AND status = 'failed' FOR UPDATE",
+                &[&tenant.id, &inspection_id],
+            ).await?.ok_or_else(|| crate::error::ApiError::validation(
+                event_type,
+                vec!["Conditional acceptance source inspection is no longer failed".into()],
+            ))?;
+            let source: String = inspection.get(0);
+            let source_id: String = inspection.get(1);
+            let order_id = Uuid::parse_str(&source_id).map_err(|_| {
+                crate::error::ApiError::validation(
+                    event_type,
+                    vec!["Conditional acceptance source order is invalid".into()],
+                )
+            })?;
+            let qty = document.get("qty").cloned().ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    event_type,
+                    vec!["Conditional acceptance quantity is missing".into()],
+                )
+            })?;
+            let mut data = Map::from_iter([
+                ("product".into(), json!(inspection.get::<_, Uuid>(2))),
+                ("source".into(), json!("production_concession")),
+                ("source_id".into(), json!(order_id)),
+                ("qty".into(), qty),
+                ("warehouse".into(), json!(inspection.get::<_, Uuid>(3))),
+                ("conditional_acceptance".into(), json!(acceptance_id)),
+                (
+                    "note".into(),
+                    json!(
+                        document
+                            .get("condition")
+                            .and_then(Value::as_str)
+                            .unwrap_or_default()
+                    ),
+                ),
+            ]);
+            if let Some(lot) = inspection.get::<_, Option<Uuid>>(4) {
+                data.insert("lot".into(), json!(lot));
+            }
+            if source == "production_rework"
+                && let Some(rework_order) = inspection.get::<_, Option<Uuid>>(5)
+            {
+                data.insert("rework_order".into(), json!(rework_order));
+            }
+            let entity = kernel.ent(tenant, "quality.inspection")?;
+            let accepted = kernel
+                .create_in(tx, &Actor::System, tenant, &entity, data, &opts)
+                .await?;
+            let accepted_id = accepted.get("id").and_then(Value::as_str).ok_or_else(|| {
+                crate::error::ApiError::internal(
+                    "Conditional acceptance quality inspection has no id",
+                )
+            })?;
+            kernel
+                .act_in(
+                    tx,
+                    &Actor::System,
+                    tenant,
+                    &entity,
+                    accepted_id,
+                    "passed",
+                    &opts,
+                )
+                .await?;
+            Ok(true)
+        }
         "quality.inspection_disposition.posted" => {
             let inspection_id = id(document, "inspection").ok_or_else(|| {
                 crate::error::ApiError::validation(
@@ -491,10 +572,13 @@ pub async fn handle_source_event(
                     &[&tenant.id, &inspection_id],
                 )
                 .await?;
-            if document.get("source").and_then(Value::as_str) == Some("production_rework") {
+            if matches!(
+                document.get("source").and_then(Value::as_str),
+                Some("production_rework" | "production_concession")
+            ) {
                 if let Some(order_id) = id(document, "source_id") {
                     let accepted = tx.query_opt(
-                        "SELECT COALESCE(po.good_qty, po.qty)::text, COALESCE(SUM(qi.qty::numeric) FILTER (WHERE qi.source = 'production_rework' AND qi.status = 'passed'), 0)::text, COALESCE((SELECT SUM(pd.qty::numeric) FROM manufacturing__production_disposition pd JOIN quality__inspection inspected ON inspected.tenant_id = pd.tenant_id AND inspected.id = pd.inspection WHERE pd.tenant_id = po.tenant_id AND inspected.source_id = po.id::text AND inspected.source IN ('production_order', 'production_rework') AND pd.status = 'posted'), 0)::text FROM manufacturing__production_order po LEFT JOIN quality__inspection qi ON qi.tenant_id = po.tenant_id AND qi.source_id = po.id::text WHERE po.tenant_id = $1 AND po.id = $2 GROUP BY po.id, po.good_qty, po.qty",
+                        "SELECT COALESCE(po.good_qty, po.qty)::text, COALESCE(SUM(qi.qty::numeric) FILTER (WHERE qi.source IN ('production_rework', 'production_concession') AND qi.status = 'passed'), 0)::text, COALESCE((SELECT SUM(pd.qty::numeric) FROM manufacturing__production_disposition pd JOIN quality__inspection inspected ON inspected.tenant_id = pd.tenant_id AND inspected.id = pd.inspection WHERE pd.tenant_id = po.tenant_id AND inspected.source_id = po.id::text AND inspected.source IN ('production_order', 'production_rework') AND pd.status = 'posted'), 0)::text FROM manufacturing__production_order po LEFT JOIN quality__inspection qi ON qi.tenant_id = po.tenant_id AND qi.source_id = po.id::text WHERE po.tenant_id = $1 AND po.id = $2 GROUP BY po.id, po.good_qty, po.qty",
                         &[&tenant.id, &order_id],
                     ).await?;
                     if let Some(accepted) = accepted {
@@ -575,7 +659,7 @@ pub async fn handle_source_event(
             if let Some(order) = order {
                 let good_qty = decimal_column(&order, 0, "accepted production quantity")?;
                 let received = tx.query_one_row(
-                    "SELECT COALESCE(SUM(sm.qty::numeric), 0)::text FROM inventory__stock_move sm LEFT JOIN manufacturing__rework_order ro ON ro.tenant_id = sm.tenant_id AND ro.id::text = sm.source_id WHERE sm.tenant_id = $1 AND sm.direction = 'in' AND ((sm.source = 'production_order' AND sm.source_id = $2) OR (sm.source = 'production_rework' AND ro.production_order::text = $2))",
+                    "SELECT COALESCE(SUM(sm.qty::numeric), 0)::text FROM inventory__stock_move sm LEFT JOIN manufacturing__rework_order ro ON ro.tenant_id = sm.tenant_id AND ro.id::text = sm.source_id WHERE sm.tenant_id = $1 AND sm.direction = 'in' AND ((sm.source IN ('production_order', 'production_concession') AND sm.source_id = $2) OR (sm.source = 'production_rework' AND ro.production_order::text = $2))",
                     &[&tenant.id, &order_id.to_string()],
                 ).await?;
                 let received_qty = decimal_column(&received, 0, "received production quantity")?;
@@ -588,7 +672,10 @@ pub async fn handle_source_event(
                     money::within_tolerance(total, good_qty, Decimal::new(1, 6))
                 });
             }
-            if !matches!(source.as_str(), "production_order" | "production_rework") {
+            if !matches!(
+                source.as_str(),
+                "production_order" | "production_rework" | "production_concession"
+            ) {
                 return Ok(false);
             }
             if scrapped_qty

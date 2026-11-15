@@ -22,6 +22,7 @@ export default function ManufacturingWipPage() {
   const [productionOrders, setProductionOrders] = useState([]);
   const [reworkOrders, setReworkOrders] = useState([]);
   const [productionDispositions, setProductionDispositions] = useState([]);
+  const [conditionalAcceptances, setConditionalAcceptances] = useState([]);
   const [inspections, setInspections] = useState([]);
   const [workCenters, setWorkCenters] = useState(new Map());
   const [products, setProducts] = useState(new Map());
@@ -43,6 +44,10 @@ export default function ManufacturingWipPage() {
   const [dispositionQty, setDispositionQty] = useState('');
   const [dispositionNote, setDispositionNote] = useState('');
   const [dispositionAccount, setDispositionAccount] = useState('');
+  const [acceptanceInspection, setAcceptanceInspection] = useState('');
+  const [acceptanceQty, setAcceptanceQty] = useState('');
+  const [acceptanceCondition, setAcceptanceCondition] = useState('');
+  const [acceptanceJustification, setAcceptanceJustification] = useState('');
   const [outputLot, setOutputLot] = useState('');
   const [outputExpiry, setOutputExpiry] = useState('');
   const [scrapMethod, setScrapMethod] = useState('absorb');
@@ -57,13 +62,14 @@ export default function ManufacturingWipPage() {
     try {
       const params = new URLSearchParams();
       if (asOf) params.set('asOf', asOf);
-      const [reportData, bomResponse, orderResponse, reworkResponse, inspectionResponse, dispositionResponse, centerMap, productMap, warehouseMap, unitMap, accountMap] = await Promise.all([
+      const [reportData, bomResponse, orderResponse, reworkResponse, inspectionResponse, dispositionResponse, acceptanceResponse, centerMap, productMap, warehouseMap, unitMap, accountMap] = await Promise.all([
         api(`${tenantPath('/reports/manufacturing/wip')}?${params}`),
         can('manufacturing.bom.read') ? loadAllResponse('manufacturing.bom') : Promise.resolve({ items: [] }),
         can('manufacturing.production_order.read') ? loadAllResponse('manufacturing.production_order') : Promise.resolve({ items: [] }),
         can('manufacturing.rework_order.read') ? loadAllResponse('manufacturing.rework_order') : Promise.resolve({ items: [] }),
         can('quality.inspection.read') ? loadAllResponse('quality.inspection') : Promise.resolve({ items: [] }),
         can('manufacturing.production_disposition.read') ? loadAllResponse('manufacturing.production_disposition') : Promise.resolve({ items: [] }),
+        can('manufacturing.conditional_acceptance.read') ? loadAllResponse('manufacturing.conditional_acceptance') : Promise.resolve({ items: [] }),
         can('manufacturing.work_center.read') ? loadRefs('manufacturing.work_center') : Promise.resolve(new Map()),
         can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
         can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
@@ -75,6 +81,7 @@ export default function ManufacturingWipPage() {
       setProductionOrders(Array.isArray(orderResponse.items) ? orderResponse.items : []);
       setReworkOrders(Array.isArray(reworkResponse.items) ? reworkResponse.items : []);
       setProductionDispositions(Array.isArray(dispositionResponse.items) ? dispositionResponse.items : []);
+      setConditionalAcceptances(Array.isArray(acceptanceResponse.items) ? acceptanceResponse.items : []);
       setInspections(Array.isArray(inspectionResponse.items) ? inspectionResponse.items : []);
       setWorkCenters(centerMap); setProducts(productMap); setWarehouses(warehouseMap); setUnits(unitMap); setAccounts(accountMap);
     } catch (reason) {
@@ -96,6 +103,7 @@ export default function ManufacturingWipPage() {
   const alreadyAccountedReworkQty = (inspectionId) => (
     reworkOrders.filter((order) => order.inspection === inspectionId && order.status !== 'cancelled').reduce((total, order) => total + Number(order.qty || 0), 0)
     + productionDispositions.filter((row) => row.inspection === inspectionId && ['draft', 'posted'].includes(row.status)).reduce((total, row) => total + Number(row.qty || 0), 0)
+    + conditionalAcceptances.filter((row) => row.inspection === inspectionId && ['draft', 'submitted', 'approved'].includes(row.status)).reduce((total, row) => total + Number(row.qty || 0), 0)
   );
   const remainingFailedQty = (inspection) => Math.max(0, Number(inspection?.qty || 0) - alreadyAccountedReworkQty(inspection?.id));
   const resetBom = () => { setEditingBom(''); setBomProduct(''); setBomOutputQty('1'); setComponents([{ product: '', qty: '1', uom: '' }]); };
@@ -201,6 +209,36 @@ export default function ManufacturingWipPage() {
     finally { setBusy(''); }
   };
 
+  const submitConditionalAcceptance = async (event) => {
+    event.preventDefault();
+    const inspection = inspections.find((row) => row.id === acceptanceInspection);
+    if (!inspection) return;
+    setBusy('conditional-acceptance'); setError(''); setNotice('');
+    try {
+      const created = await api(dataPath('manufacturing.conditional_acceptance'), { method: 'POST', body: {
+        inspection: inspection.id,
+        qty: Number(acceptanceQty),
+        condition: acceptanceCondition.trim(),
+        justification: acceptanceJustification.trim(),
+      } });
+      await api(dataPath('manufacturing.conditional_acceptance', created.id, 'submitted'), { method: 'POST' });
+      setAcceptanceInspection(''); setAcceptanceQty(''); setAcceptanceCondition(''); setAcceptanceJustification('');
+      setNotice('Đã gửi đề nghị chấp nhận có điều kiện. Hàng vẫn bị giữ cho đến khi người có thẩm quyền phê duyệt.');
+      await load();
+    } catch (reason) { await load(); setError(reason.message || 'Không gửi được đề nghị chấp nhận có điều kiện.'); }
+    finally { setBusy(''); }
+  };
+
+  const operateConditionalAcceptance = async (row, action) => {
+    setBusy(`${row.id}:${action}`); setError(''); setNotice('');
+    try {
+      await api(dataPath('manufacturing.conditional_acceptance', row.id, action), { method: 'POST' });
+      setNotice(action === 'submitted' ? 'Đã gửi lại đề nghị vào hàng chờ phê duyệt.' : 'Đã hủy đề nghị chấp nhận có điều kiện.');
+      await load();
+    } catch (reason) { setError(reason.message || 'Không cập nhật được đề nghị chấp nhận có điều kiện.'); }
+    finally { setBusy(''); }
+  };
+
   const operateProductionDisposition = async (row, action) => {
     setBusy(`${row.id}:${action}`); setError('');
     try {
@@ -264,6 +302,18 @@ export default function ManufacturingWipPage() {
       {can('quality.inspection.read') && <div className="manufacturing-orders"><h3>Kiểm tra thành phẩm</h3>{inspections.filter((inspection) => ['production_order', 'production_rework'].includes(inspection.source) && inspection.status === 'pending').map((inspection) => <article className="manufacturing-order-card" key={inspection.id}><div className="manufacturing-order-summary"><strong>{products.get(inspection.product)?.name || inspection.product}</strong><span className="small muted">Lệnh {String(inspection.source_id).slice(0, 8)} · Số lượng {qty(inspection.qty)} {baseUnitName(inspection.product)}{inspection.lot ? ` · Lô ${inspection.lot}` : ''}</span></div>{can('quality.inspection.failed') && can('quality.inspection.update') && <label className="field"><span>Mô tả lỗi nếu không đạt</span><input className="input" minLength="5" maxLength="500" value={qcNotes[inspection.id] || ''} onChange={(event) => setQcNotes((rows) => ({ ...rows, [inspection.id]: event.target.value }))} /></label>}{can('quality.inspection.passed') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => decideInspection(inspection, 'passed')}>Đạt, nhập kho</button>}{can('quality.inspection.failed') && can('quality.inspection.update') && <button className="btn btn-ghost btn-sm" type="button" disabled={Boolean(busy) || (qcNotes[inspection.id] || '').trim().length < 5} onClick={() => decideInspection(inspection, 'failed')}>Không đạt, lập NCR</button>}</article>)}{!inspections.some((inspection) => ['production_order', 'production_rework'].includes(inspection.source) && inspection.status === 'pending') && <p className="small muted">Không có lô thành phẩm chờ kiểm tra.</p>}</div>}
     </section>
       {can('manufacturing.rework_order.read') && <div className="manufacturing-orders"><h3>Sửa hàng không đạt</h3>{can('manufacturing.rework_order.create') && <form className="manufacturing-form" onSubmit={createReworkOrder}><label className="field"><span>Phiếu QC trượt *</span><select className="select" required value={reworkInspection} onChange={(event) => { const nextId = event.target.value; const selected = inspections.find((row) => row.id === nextId); const alreadyAssigned = alreadyAccountedReworkQty(nextId); setReworkInspection(nextId); setReworkQty(selected ? String(Math.max(0, Number(selected.qty || 0) - alreadyAssigned)) : ''); }}><option value="">Chọn phiếu QC</option>{inspections.filter((inspection) => ['production_order', 'production_rework'].includes(inspection.source) && inspection.status === 'failed' && Number(inspection.qty || 0) - alreadyAccountedReworkQty(inspection.id) > 0.000001).map((inspection) => { const remaining = Math.max(0, Number(inspection.qty || 0) - alreadyAccountedReworkQty(inspection.id)); return <option key={inspection.id} value={inspection.id}>{products.get(inspection.product)?.name || inspection.product} · còn {qty(remaining)} {baseUnitName(inspection.product)} · lệnh {String(inspection.source_id).slice(0, 8)}</option>; })}</select></label>{reworkInspection && <><label className="field"><span>Số lượng sửa *</span><input className="input num" type="number" min="0.000001" max={remainingFailedQty(inspections.find((row) => row.id === reworkInspection))} step="any" required value={reworkQty} onChange={(event) => setReworkQty(event.target.value)} /></label><p className="small muted">Sau khi sửa, đúng số lượng này sẽ được kiểm tra lại riêng; phần còn lỗi vẫn được giữ trong phiếu QC ban đầu.</p></>}<label className="field"><span>Lý do sửa *</span><input className="input" minLength={5} maxLength={500} required value={reworkReason} onChange={(event) => setReworkReason(event.target.value)} /></label><button className="btn btn-primary btn-sm" type="submit" disabled={busy === 'rework' || !reworkInspection || !Number(reworkQty) || reworkReason.trim().length < 5}>{busy === 'rework' ? 'Đang tạo…' : 'Tạo lệnh sửa'}</button></form>}{reworkOrders.map((order) => { const inspection = inspections.find((row) => row.id === order.inspection); return <article className="manufacturing-order-card" key={order.id}><div className="manufacturing-order-summary"><strong>{products.get(inspection?.product)?.name || 'Lô sửa hàng'}</strong><span className="badge">{statusLabel(order.status)}</span><span className="small muted">Lệnh {String(order.production_order).slice(0, 8)} · Số lượng {qty(order.qty)} · {order.reason}</span></div>{order.status === 'planned' && can('manufacturing.rework_order.started') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateRework(order, 'started')}>Bắt đầu, xuất vật tư</button>}{order.status === 'in_progress' && can('manufacturing.rework_order.done') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateRework(order, 'done')}>Hoàn tất, gửi QC kiểm tra lại</button>}{order.status === 'planned' && can('manufacturing.rework_order.cancelled') && <button className="btn btn-ghost btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateRework(order, 'cancelled')}>Hủy lệnh sửa</button>}</article>; })}{!reworkOrders.length && <p className="small muted">Chưa có lệnh sửa hàng.</p>}</div>}
+    {can('manufacturing.conditional_acceptance.read') && <section className="card card-pad">
+      <h3>Chấp nhận có điều kiện</h3>
+      <p className="small muted">Dùng khi có căn cứ cho phép dùng một phần sản phẩm chưa đạt chuẩn thông thường. Phải ghi điều kiện kiểm soát và lý do; chỉ người được giao quyền trong quy tắc phê duyệt mới có thể duyệt. Hàng vẫn bị giữ cho đến khi duyệt.</p>
+      {can('manufacturing.conditional_acceptance.create') && can('manufacturing.conditional_acceptance.submitted') && <form className="manufacturing-form" onSubmit={submitConditionalAcceptance}>
+        <label className="field"><span>Phiếu QC trượt *</span><select className="select" required value={acceptanceInspection} onChange={(event) => { const nextId = event.target.value; const selected = inspections.find((row) => row.id === nextId); setAcceptanceInspection(nextId); setAcceptanceQty(selected ? String(remainingFailedQty(selected)) : ''); }}><option value="">Chọn phiếu QC</option>{inspections.filter((inspection) => ['production_order', 'production_rework'].includes(inspection.source) && inspection.status === 'failed' && remainingFailedQty(inspection) > 0.000001).map((inspection) => <option key={inspection.id} value={inspection.id}>{products.get(inspection.product)?.name || inspection.product} · còn {qty(remainingFailedQty(inspection))} {baseUnitName(inspection.product)} · lệnh {String(inspection.source_id).slice(0, 8)}</option>)}</select></label>
+        {acceptanceInspection && <label className="field"><span>Số lượng đề nghị *</span><input className="input num" type="number" min="0.000001" max={remainingFailedQty(inspections.find((row) => row.id === acceptanceInspection))} step="any" required value={acceptanceQty} onChange={(event) => setAcceptanceQty(event.target.value)} /></label>}
+        <label className="field"><span>Điều kiện sử dụng / kiểm soát sau chấp nhận *</span><textarea className="input" rows="2" minLength="5" maxLength="2000" required value={acceptanceCondition} onChange={(event) => setAcceptanceCondition(event.target.value)} placeholder="Ví dụ: giới hạn sử dụng, kiểm tra bổ sung hoặc thông báo cho khách hàng" /></label>
+        <label className="field"><span>Căn cứ đề nghị *</span><textarea className="input" rows="2" minLength="5" maxLength="2000" required value={acceptanceJustification} onChange={(event) => setAcceptanceJustification(event.target.value)} placeholder="Ghi kết quả đánh giá rủi ro và căn cứ kỹ thuật" /></label>
+        <button className="btn btn-primary btn-sm" type="submit" disabled={Boolean(busy) || !acceptanceInspection || !(Number(acceptanceQty) > 0) || acceptanceCondition.trim().length < 5 || acceptanceJustification.trim().length < 5}>{busy === 'conditional-acceptance' ? 'Đang gửi…' : 'Gửi phê duyệt'}</button>
+      </form>}
+      <div className="stack-sm" style={{ marginTop: 16 }}>{conditionalAcceptances.map((row) => { const inspection = inspections.find((item) => item.id === row.inspection); return <article className="manufacturing-order-card" key={row.id}><div className="manufacturing-order-summary"><strong>{products.get(inspection?.product)?.name || 'Thành phẩm QC lỗi'}</strong><span className={`badge ${row.status === 'approved' ? 'success' : row.status === 'rejected' ? 'danger' : 'warning'}`}>{statusLabel(row.status)}</span><span className="small muted">Lệnh {String(inspection?.source_id || '').slice(0, 8)} · {qty(row.qty)} {baseUnitName(inspection?.product)} · {row.condition}</span><span className="small muted">Căn cứ: {row.justification}</span></div>{row.status === 'submitted' && <a className="btn btn-ghost btn-sm" href="#/approvals">Mở hàng chờ phê duyệt</a>}{row.status === 'rejected' && can('manufacturing.conditional_acceptance.submitted') && <button className="btn btn-secondary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateConditionalAcceptance(row, 'submitted')}>Gửi duyệt lại</button>}{['draft', 'rejected'].includes(row.status) && can('manufacturing.conditional_acceptance.cancelled') && <button className="btn btn-ghost btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateConditionalAcceptance(row, 'cancelled')}>Hủy đề nghị</button>}</article>; })}{!conditionalAcceptances.length && <p className="small muted">Chưa có đề nghị chấp nhận có điều kiện.</p>}</div>
+    </section>}
     {can('manufacturing.production_disposition.read') && <section className="card card-pad">
       <h3>Loại bỏ thành phẩm QC lỗi</h3>
       {can('manufacturing.production_disposition.create') && <form className="manufacturing-form" onSubmit={createProductionDisposition}>

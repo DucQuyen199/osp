@@ -90,6 +90,7 @@ pub async fn prepare_stock_move(
         "purchase_order"
             | "quality_return"
             | "production_order"
+            | "production_concession"
             | "production_order_bom"
             | "maintenance"
             | "stock_transfer_out"

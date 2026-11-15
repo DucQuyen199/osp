@@ -1,14 +1,15 @@
 {
  "id": "manufacturing",
  "name": "Sản xuất",
- "description": "Định mức BOM, lệnh sản xuất theo trung tâm máy và công suất ngày. Bắt đầu lệnh xuất nguyên liệu vào WIP; QC đạt sẽ nhập thành phẩm vào kho. Cho phép sửa hoặc loại bỏ một phần lượng lỗi, tạo phiếu QC riêng cho lượng sửa và hạch toán chi phí loại bỏ từ WIP sang chi phí.",
+ "description": "Định mức BOM, lệnh sản xuất theo trung tâm máy và công suất ngày. Bắt đầu lệnh xuất nguyên liệu vào WIP; QC đạt sẽ nhập thành phẩm vào kho. Hỗ trợ sửa, loại bỏ hoặc đề nghị chấp nhận có điều kiện một phần lượng lỗi; hàng concession chỉ nhập kho sau phê duyệt độc lập.",
  "category": "supply",
  "version": "0.5.0",
  "depends": [
   "master-data",
   "inventory",
   "quality",
-  "accounting"
+  "accounting",
+  "workflow-approval"
  ],
  "core": false,
  "entities": [
@@ -193,6 +194,29 @@
     "actions": {
      "posted": { "from": ["draft"], "to": "posted" },
      "cancelled": { "from": ["draft"], "to": "cancelled" }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "conditional_acceptance",
+   "label": "Chấp nhận có điều kiện thành phẩm",
+   "fields": [
+    { "name": "inspection", "type": "ref", "required": true, "ref": "quality.inspection" },
+    { "name": "qty", "type": "number", "required": true },
+    { "name": "condition", "type": "text", "required": true },
+    { "name": "justification", "type": "text", "required": true },
+    { "name": "status", "type": "enum", "required": false, "options": ["draft", "submitted", "approved", "rejected", "cancelled"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": {
+     "submitted": { "from": ["draft", "rejected"], "to": "submitted" },
+     "approved": { "from": ["submitted"], "to": "approved" },
+     "rejected": { "from": ["submitted"], "to": "rejected" },
+     "cancelled": { "from": ["draft", "rejected"], "to": "cancelled" }
     }
    },
    "computed": {},

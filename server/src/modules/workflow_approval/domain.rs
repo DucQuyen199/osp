@@ -102,6 +102,12 @@ pub fn request_for_event(event_type: &str, event: &Value) -> Option<Map<String, 
         "inventory.stock_count.submitted" => {
             ("inventory.stock_count", "Duyệt phiếu kiểm kê", None, None)
         }
+        "manufacturing.conditional_acceptance.submitted" => (
+            "manufacturing.conditional_acceptance",
+            "Duyệt chấp nhận có điều kiện thành phẩm",
+            None,
+            None,
+        ),
         "sales.sales_return.submitted" => (
             "sales.sales_return",
             "Duyệt phiếu trả hàng bán",
@@ -173,6 +179,7 @@ pub fn decision_for_event(event_type: &str, event: &Value) -> Option<(&'static s
         "purchasing.purchase_requisition" => "purchasing.purchase_requisition",
         "payroll.payroll_run" => "payroll.payroll_run",
         "inventory.stock_count" => "inventory.stock_count",
+        "manufacturing.conditional_acceptance" => "manufacturing.conditional_acceptance",
         "sales.sales_return" => "sales.sales_return",
         "purchasing.purchase_return" => "purchasing.purchase_return",
         "expense.expense_claim" => "expense.expense_claim",

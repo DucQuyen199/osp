@@ -36,7 +36,7 @@ Spa, salon, thẩm mỹ, phòng gym, yoga, trung tâm thể thao.
 ## Xây dựng - Nội thất (`construction`)
 Nhà thầu, thi công, thiết kế - nội thất.
 
-- **Module (19):** `master-data`, `hrm`, `accounting`, `inventory`, `asset`, `communication`, `bi`, `project`, `construction`, `contract`, `document`, `einvoice`, `expense`, `maintenance`, `quality`, `payroll`, `purchasing`, `recruitment`, `workflow-approval`
+- **Module (19):** `master-data`, `hrm`, `accounting`, `inventory`, `asset`, `communication`, `bi`, `project`, `construction`, `contract`, `document`, `einvoice`, `expense`, `maintenance`, `quality`, `workflow-approval`, `payroll`, `purchasing`, `recruitment`
 - **Thuật ngữ:** `master-data.party` = Chủ đầu tư/Khách hàng; `master-data.product` = Vật tư xây dựng; `project.project` = Công trình
 - **Trường mở rộng:** `master-data.product`: norm_code, brand
 - **Vai trò riêng:** Qu?n l? kh?a s? k? to?n, Kế toán duyệt thu chi, Nhân viên thu chi điều chỉnh, Nh?n vi?n ??i so?t ng?n h?ng, Dự toán, Qu?n l? duy?t v? chi ph?, Chuy?n vi?n ?? ngh? chi, Qu?n l? tuy?n d?ng, Qu?n l? nh?n s?, Chuy?n vi?n nh?n s?, Quản lý duyệt kiểm kê, Nhân viên kiểm kê kho, Qu?n l? b?o tr?, K? thu?t vi?n b?o tr?, Qu?n l? ph? duy?t v? chi l??ng, Chuy?n vi?n ti?n l??ng, Qu?n l? ch?nh s?ch l??ng v? kho?n n?p, Qu?n l? ph? duy?t mua h?ng, Nh?n vi?n mua h?ng, Quản lý dự án, Chuy?n vi?n tuy?n d?ng, Chỉ huy công trường
@@ -72,7 +72,7 @@ Tổ chức sự kiện, hội nghị, rạp/phòng trà, agency truyền thông
 ## Tài chính - Bảo hiểm (`finance`)
 Công ty tài chính tiêu dùng, tín dụng vi mô, đại lý bảo hiểm.
 
-- **Module (17):** `master-data`, `hrm`, `accounting`, `inventory`, `communication`, `bi`, `contract`, `sales`, `crm`, `document`, `einvoice`, `expense`, `insurance`, `lending`, `payroll`, `recruitment`, `workflow-approval`
+- **Module (17):** `master-data`, `hrm`, `accounting`, `inventory`, `communication`, `bi`, `contract`, `sales`, `crm`, `document`, `einvoice`, `expense`, `insurance`, `lending`, `workflow-approval`, `payroll`, `recruitment`
 - **Thuật ngữ:** `crm.deal` = Hồ sơ vay/BH; `master-data.party` = Khách hàng vay/Người mua BH; `master-data.product` = Sản phẩm tài chính
 - **Trường mở rộng:** `master-data.party`: national_id, monthly_income, credit_score
 - **Vai trò riêng:** Qu?n l? kh?a s? k? to?n, Kế toán duyệt thu chi, Nhân viên thu chi điều chỉnh, Nh?n vi?n ??i so?t ng?n h?ng, Giải ngân / Chi trả, Qu?n l? duy?t v? chi ph?, Chuy?n vi?n ?? ngh? chi, Qu?n l? tuy?n d?ng, Qu?n l? nh?n s?, Chuy?n vi?n nh?n s?, Tư vấn bảo hiểm, Cán bộ tín dụng / Thu nợ, Qu?n l? ph? duy?t v? chi l??ng, Chuy?n vi?n ti?n l??ng, Qu?n l? ch?nh s?ch l??ng v? kho?n n?p, Chuy?n vi?n tuy?n d?ng, Thẩm định
@@ -126,16 +126,16 @@ Công ty vận tải, giao nhận, kho vận, chuyển phát.
 ## Sản xuất (`manufacturing`)
 Nhà máy, xưởng sản xuất, gia công, lắp ráp.
 
-- **Module (18):** `master-data`, `hrm`, `accounting`, `inventory`, `asset`, `communication`, `bi`, `sales`, `crm`, `einvoice`, `expense`, `maintenance`, `quality`, `manufacturing`, `payroll`, `purchasing`, `recruitment`, `workflow-approval`
+- **Module (18):** `master-data`, `hrm`, `accounting`, `inventory`, `asset`, `communication`, `bi`, `sales`, `crm`, `einvoice`, `expense`, `maintenance`, `quality`, `workflow-approval`, `manufacturing`, `payroll`, `purchasing`, `recruitment`
 - **Thuật ngữ:** `master-data.party` = Khách hàng; `master-data.product` = Vật tư/Thành phẩm
 - **Trường mở rộng:** `master-data.product`: drawing_no, spec, shelf_life_days
-- **Vai trò riêng:** Qu?n l? kh?a s? k? to?n, Kế toán duyệt thu chi, Nhân viên thu chi điều chỉnh, Nh?n vi?n ??i so?t ng?n h?ng, Qu?n l? duy?t v? chi ph?, Chuy?n vi?n ?? ngh? chi, Qu?n l? tuy?n d?ng, Qu?n l? nh?n s?, Chuy?n vi?n nh?n s?, Quản lý duyệt kiểm kê, Nhân viên kiểm kê kho, Qu?n l? b?o tr?, K? thu?t vi?n b?o tr?, Qu?n l? ph? duy?t v? chi l??ng, Chuy?n vi?n ti?n l??ng, Qu?n l? ch?nh s?ch l??ng v? kho?n n?p, Kế hoạch sản xuất, Qu?n l? ph? duy?t mua h?ng, Nh?n vi?n mua h?ng, QC, Chuy?n vi?n tuy?n d?ng, Quản lý duyệt trả hàng, Nhân viên xử lý trả hàng, Kỹ thuật bảo trì
+- **Vai trò riêng:** Qu?n l? kh?a s? k? to?n, Kế toán duyệt thu chi, Nhân viên thu chi điều chỉnh, Nh?n vi?n ??i so?t ng?n h?ng, Qu?n l? duy?t v? chi ph?, Chuy?n vi?n ?? ngh? chi, Qu?n l? tuy?n d?ng, Qu?n l? nh?n s?, Chuy?n vi?n nh?n s?, Quản lý duyệt kiểm kê, Nhân viên kiểm kê kho, Qu?n l? b?o tr?, K? thu?t vi?n b?o tr?, Qu?n l? ph? duy?t v? chi l??ng, Chuy?n vi?n ti?n l??ng, Qu?n l? ch?nh s?ch l??ng v? kho?n n?p, Kế hoạch sản xuất, Qu?n l? ph? duy?t mua h?ng, Nh?n vi?n mua h?ng, QC, Người phê duyệt chấp nhận có điều kiện, Chuy?n vi?n tuy?n d?ng, Quản lý duyệt trả hàng, Nhân viên xử lý trả hàng, Kỹ thuật bảo trì
 - **KPI:** OEE; Tỷ lệ phế phẩm; Tiến độ lệnh sản xuất; Giá thành đơn vị
 
 ## Tổ chức phi lợi nhuận - Cơ quan công (`ngo-government`)
 NGO, quỹ từ thiện, hiệp hội, đơn vị hành chính sự nghiệp.
 
-- **Module (15):** `master-data`, `hrm`, `accounting`, `communication`, `bi`, `budget`, `case-management`, `charity`, `project`, `document`, `einvoice`, `expense`, `payroll`, `recruitment`, `workflow-approval`
+- **Module (15):** `master-data`, `hrm`, `accounting`, `communication`, `bi`, `budget`, `case-management`, `charity`, `project`, `document`, `einvoice`, `expense`, `workflow-approval`, `payroll`, `recruitment`
 - **Thuật ngữ:** `case-management.case` = Hồ sơ; `charity.beneficiary` = Người thụ hưởng; `master-data.party` = Nhà tài trợ/Đối tượng; `master-data.product` = Hạng mục
 - **Trường mở rộng:** `master-data.party`: national_id, ward
 - **Vai trò riêng:** Qu?n l? kh?a s? k? to?n, Kế toán duyệt thu chi, Nhân viên thu chi điều chỉnh, Nh?n vi?n ??i so?t ng?n h?ng, Qu?n l? duy?t v? chi ph?, Chuy?n vi?n ?? ngh? chi, Cán bộ tài chính, Qu?n l? tuy?n d?ng, Qu?n l? nh?n s?, Chuy?n vi?n nh?n s?, Qu?n l? ph? duy?t v? chi l??ng, Chuy?n vi?n ti?n l??ng, Qu?n l? ch?nh s?ch l??ng v? kho?n n?p, Cán bộ chương trình, Chuy?n vi?n tuy?n d?ng
@@ -198,7 +198,7 @@ Nhà cung cấp internet, truyền hình, nước sạch, điện, tiện ích.
 ## Bán buôn - Phân phối (`wholesale`)
 Nhà phân phối, đại lý, bán sỉ, FMCG.
 
-- **Module (17):** `master-data`, `hrm`, `accounting`, `inventory`, `communication`, `bi`, `contract`, `sales`, `crm`, `einvoice`, `expense`, `logistics`, `quality`, `payroll`, `purchasing`, `recruitment`, `workflow-approval`
+- **Module (17):** `master-data`, `hrm`, `accounting`, `inventory`, `communication`, `bi`, `contract`, `sales`, `crm`, `einvoice`, `expense`, `logistics`, `quality`, `workflow-approval`, `payroll`, `purchasing`, `recruitment`
 - **Thuật ngữ:** `master-data.party` = Khách hàng/Đại lý; `master-data.product` = Mặt hàng
 - **Trường mở rộng:** `master-data.party`: credit_limit, payment_term_days, sales_region
 - **Vai trò riêng:** Qu?n l? kh?a s? k? to?n, Kế toán duyệt thu chi, Nhân viên thu chi điều chỉnh, Nh?n vi?n ??i so?t ng?n h?ng, Điều phối giao hàng, Qu?n l? duy?t v? chi ph?, Chuy?n vi?n ?? ngh? chi, Qu?n l? tuy?n d?ng, Qu?n l? nh?n s?, Chuy?n vi?n nh?n s?, Quản lý duyệt kiểm kê, Nhân viên kiểm kê kho, Qu?n l? ph? duy?t v? chi l??ng, Chuy?n vi?n ti?n l??ng, Qu?n l? ch?nh s?ch l??ng v? kho?n n?p, Qu?n l? ph? duy?t mua h?ng, Nh?n vi?n mua h?ng, Chuy?n vi?n tuy?n d?ng, Trưởng kinh doanh, Quản lý duyệt trả hàng, Nhân viên xử lý trả hàng

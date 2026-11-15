@@ -75,7 +75,13 @@ pub async fn validate_persistence(
     if matches!(action, "created" | "passed")
         && matches!(
             source,
-            Some("production_order" | "production_rework" | "purchase_order" | "purchase_receipt")
+            Some(
+                "production_order"
+                    | "production_rework"
+                    | "production_concession"
+                    | "purchase_order"
+                    | "purchase_receipt"
+            )
         )
     {
         let (Some(order_id), Some(product)) = (source_id, product) else {
@@ -87,7 +93,100 @@ pub async fn validate_persistence(
         else {
             return Ok(vec!["Phiếu QC cần số lượng và kho hợp lệ".into()]);
         };
-        if source == Some("production_rework") {
+        if source == Some("production_concession") {
+            let Some(acceptance_id) = id(document, "conditional_acceptance") else {
+                errors.push(
+                    "Phiếu QC concession cần tham chiếu đề nghị chấp nhận có điều kiện".into(),
+                );
+                return Ok(errors);
+            };
+            let acceptance = tx.query_opt(
+                "SELECT ca.inspection, ca.qty::text, ca.status, qi.source, qi.rework_order, qi.product, qi.warehouse, qi.lot, po.product, COALESCE(po.good_qty, po.qty)::text, po.warehouse, po.status, po.output_lot_code, COALESCE(product.lot_tracked, false), qi.source_id FROM manufacturing__conditional_acceptance ca JOIN quality__inspection qi ON qi.tenant_id = ca.tenant_id AND qi.id = ca.inspection JOIN manufacturing__production_order po ON po.tenant_id = qi.tenant_id AND po.id::text = qi.source_id JOIN master_data__product product ON product.tenant_id = po.tenant_id AND product.id = po.product WHERE ca.tenant_id = $1 AND ca.id = $2 AND ca.status = 'approved' FOR SHARE OF ca, qi, po",
+                &[&tenant.id, &acceptance_id],
+            ).await?;
+            let Some(acceptance) = acceptance else {
+                errors.push("Chỉ đề nghị được phê duyệt mới có thể tạo phiếu QC concession".into());
+                return Ok(errors);
+            };
+            let original_inspection: Uuid = acceptance.get(0);
+            let acceptance_qty = decimal_column(&acceptance, 1, "conditional acceptance quantity")?;
+            let original_source: String = acceptance.get(3);
+            let original_product: Uuid = acceptance.get(5);
+            let original_warehouse: Uuid = acceptance.get(6);
+            let original_lot: Option<Uuid> = acceptance.get(7);
+            let valid = acceptance.get::<_, String>(2) == "approved"
+                && matches!(
+                    original_source.as_str(),
+                    "production_order" | "production_rework"
+                )
+                && acceptance_qty > Decimal::ZERO
+                && money::within_tolerance(qty, acceptance_qty, Decimal::new(1, 6))
+                && product == original_product
+                && warehouse == original_warehouse
+                && id(document, "source_id")
+                    .is_some_and(|id| id.to_string() == order_id.to_string())
+                && id(document, "lot") == original_lot
+                && acceptance.get::<_, Uuid>(8) == product
+                && acceptance.get::<_, Uuid>(10) == warehouse
+                && acceptance.get::<_, String>(11) == "done";
+            if acceptance.get::<_, String>(14) != order_id.to_string() {
+                errors.push("Phiếu QC concession phải thuộc đúng lệnh của đề nghị đã duyệt".into());
+            }
+            if !valid {
+                errors.push("Phiếu QC concession phải khớp lệnh, sản phẩm, số lượng, kho và lô của đề nghị đã duyệt".into());
+            }
+            if original_source == "production_rework" {
+                let expected_rework: Option<String> = acceptance.get(4);
+                if document.get("rework_order").and_then(Value::as_str)
+                    != expected_rework.as_deref()
+                {
+                    errors.push("QC concession sửa hàng phải giữ liên kết lệnh sửa ban đầu".into());
+                }
+            }
+            if acceptance.get::<_, bool>(13) {
+                let expected_code: Option<String> = acceptance.get(12);
+                let lot_matches = if let (Some(lot), Some(expected_code)) =
+                    (id(document, "lot"), expected_code)
+                {
+                    tx.query_opt(
+                        "SELECT 1 FROM inventory__lot WHERE tenant_id = $1 AND id = $2 AND product = $3 AND code = $4 FOR SHARE",
+                        &[&tenant.id, &lot, &product, &expected_code],
+                    ).await?.is_some()
+                } else {
+                    false
+                };
+                if !lot_matches {
+                    errors.push("QC concession phải giữ đúng lô đầu ra của lệnh sản xuất".into());
+                }
+            }
+            if action == "passed" {
+                let lock_key = format!("inventory.stock:{}:{}:{}", tenant.id, product, warehouse);
+                tx.query_opt(
+                    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                    &[&lock_key],
+                )
+                .await?;
+                let received = tx.query_one_row(
+                    "SELECT COALESCE(SUM(sm.qty::numeric), 0)::text FROM inventory__stock_move sm LEFT JOIN manufacturing__rework_order ro ON ro.tenant_id = sm.tenant_id AND ro.id::text = sm.source_id WHERE sm.tenant_id = $1 AND sm.direction = 'in' AND ((sm.source = 'production_order' AND sm.source_id = $2) OR (sm.source = 'production_concession' AND sm.source_id = $2) OR (sm.source = 'production_rework' AND ro.production_order::text = $2))",
+                    &[&tenant.id, &order_id.to_string()],
+                ).await?;
+                let received_qty =
+                    decimal_column(&received, 0, "already received production quantity")?;
+                let accepted_qty = decimal_column(&acceptance, 9, "accepted production quantity")?;
+                if received_qty
+                    .checked_add(qty)
+                    .is_none_or(|total| total > accepted_qty + Decimal::new(1, 6))
+                {
+                    errors.push(
+                        "QC concession vượt quá tổng số lượng thành phẩm đạt còn có thể nhập kho"
+                            .into(),
+                    );
+                }
+                if original_inspection == id(document, "id").unwrap_or_default() {
+                    errors.push("Phiếu QC concession không thể trùng phiếu QC lỗi gốc".into());
+                }
+            }
+        } else if source == Some("production_rework") {
             let rework_id = document
                 .get("rework_order")
                 .and_then(Value::as_str)
@@ -138,7 +237,7 @@ pub async fn validate_persistence(
                 )
                 .await?;
                 let received = tx.query_one_row(
-                    "SELECT COALESCE(SUM(sm.qty::numeric), 0)::text FROM inventory__stock_move sm LEFT JOIN manufacturing__rework_order ro ON ro.tenant_id = sm.tenant_id AND ro.id::text = sm.source_id WHERE sm.tenant_id = $1 AND sm.direction = 'in' AND ((sm.source = 'production_order' AND sm.source_id = $2) OR (sm.source = 'production_rework' AND ro.production_order::text = $2))",
+                    "SELECT COALESCE(SUM(sm.qty::numeric), 0)::text FROM inventory__stock_move sm LEFT JOIN manufacturing__rework_order ro ON ro.tenant_id = sm.tenant_id AND ro.id::text = sm.source_id WHERE sm.tenant_id = $1 AND sm.direction = 'in' AND ((sm.source IN ('production_order', 'production_concession') AND sm.source_id = $2) OR (sm.source = 'production_rework' AND ro.production_order::text = $2))",
                     &[&tenant.id, &order_id.to_string()],
                 ).await?;
                 let received_qty =
