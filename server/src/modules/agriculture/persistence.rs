@@ -268,7 +268,7 @@ async fn validate_harvest(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<V
         let allowed_on: String = row.get(0);
         let product_name: String = row.get(1);
         errors.push(format!(
-            "Ургац хураах боломжгүй: {product_name} бүтээгдэхүүний шүршилтийн хүлээлгийн хугацаа {allowed_on}-нд дуусна"
+            "Chưa thể thu hoạch: thời gian cách ly sau khi phun {product_name} kết thúc vào ngày {allowed_on}"
         ));
     }
     if tx
