@@ -1,5 +1,52 @@
 use super::*;
 
+pub(super) async fn handle_void(
+    kernel: &Kernel,
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    event_type: &str,
+    event: &Value,
+    event_id: Uuid,
+    depth: u32,
+) -> R<Option<bool>> {
+    let invoice_id = event
+        .get("id")
+        .and_then(Value::as_str)
+        .and_then(|value| Uuid::parse_str(value).ok())
+        .ok_or_else(|| {
+            crate::error::ApiError::validation(
+                event_type,
+                vec!["Hóa đơn bị hủy cần mã hợp lệ".into()],
+            )
+        })?;
+    let journals = tx
+        .query(
+            "SELECT id FROM accounting__journal_entry WHERE tenant_id = $1 AND source = 'invoice' AND source_id = $2 AND status = 'posted' ORDER BY created_at, id FOR UPDATE",
+            &[&tenant.id, &invoice_id.to_string()],
+        )
+        .await?;
+    let entity = kernel.ent(tenant, "accounting.journal_entry")?;
+    for journal in journals {
+        let journal_id: Uuid = journal.get(0);
+        kernel
+            .act_in(
+                tx,
+                &Actor::System,
+                tenant,
+                &entity,
+                &journal_id.to_string(),
+                "reversed",
+                &Opts {
+                    depth: Some(depth + 1),
+                    causation: Some(event_id),
+                    silent: false,
+                },
+            )
+            .await?;
+    }
+    Ok(Some(true))
+}
+
 pub(super) async fn handle(
     kernel: &Kernel,
     tx: &Tx<'_>,

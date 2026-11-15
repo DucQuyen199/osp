@@ -56,6 +56,9 @@ pub(super) async fn handle_event(
         "accounting.invoice.posted" => {
             invoice::handle(kernel, tx, tenant, event_type, event, event_id, depth).await
         }
+        "accounting.invoice.void" => {
+            invoice::handle_void(kernel, tx, tenant, event_type, event, event_id, depth).await
+        }
         "accounting.bill.posted" => {
             bill::handle(kernel, tx, tenant, event_type, event, event_id, depth).await
         }

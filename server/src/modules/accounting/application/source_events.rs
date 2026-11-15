@@ -17,6 +17,44 @@ pub async fn handle_source_document_event(
     event_id: Uuid,
     depth: u32,
 ) -> R<bool> {
+    if event_type == "sales.sales_order.cancelled" {
+        let order_id = event
+            .get("id")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+            .ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    event_type,
+                    vec!["Đơn bán bị hủy cần mã đơn hợp lệ".into()],
+                )
+            })?;
+        let invoices = tx
+            .query(
+                "SELECT id FROM accounting__invoice WHERE tenant_id = $1 AND source = 'sales_order' AND source_id = $2 AND status <> 'void' ORDER BY created_at, id FOR UPDATE",
+                &[&tenant.id, &order_id.to_string()],
+            )
+            .await?;
+        let entity = kernel.ent(tenant, "accounting.invoice")?;
+        for invoice in invoices {
+            let invoice_id: Uuid = invoice.get(0);
+            kernel
+                .act_in(
+                    tx,
+                    &Actor::System,
+                    tenant,
+                    &entity,
+                    &invoice_id.to_string(),
+                    "void",
+                    &Opts {
+                        depth: Some(depth + 1),
+                        causation: Some(event_id),
+                        silent: false,
+                    },
+                )
+                .await?;
+        }
+        return Ok(true);
+    }
     if event_type == "sales.sales_order.confirmed"
         && tenant.has_module("logistics")
         && event
