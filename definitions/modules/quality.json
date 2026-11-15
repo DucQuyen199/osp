@@ -1,7 +1,7 @@
 {
  "id": "quality",
  "name": "Quản lý chất lượng",
- "description": "Kiểm tra chất lượng đầu vào/thành phẩm, ghi nhận sự không phù hợp.",
+ "description": "Kiểm tra chất lượng đầu vào/thành phẩm, giữ lịch sử kết quả và xử lý phần lượng lỗi được sửa theo từng lần kiểm tra lại.",
  "category": "supply",
  "version": "0.1.0",
  "depends": [
@@ -29,6 +29,11 @@
      "name": "source_id",
      "type": "string",
      "required": true
+    },
+    {
+     "name": "rework_order",
+     "type": "string",
+     "required": false
     },
     {
      "name": "qty",

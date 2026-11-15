@@ -35,14 +35,17 @@ async fn wip_subledger_balance(tx: &Tx<'_>, tenant: &Tenant, as_of: NaiveDate) -
     let row = tx
         .query_one_row(
             "WITH production_costs AS ( \
-               SELECT source_id, \
-                 COALESCE(sum(total_cost) FILTER (WHERE source = 'production_order_bom' AND direction = 'out'), 0)::numeric AS material_cost, \
-                 COALESCE(sum(total_cost) FILTER (WHERE source = 'production_order' AND direction = 'in'), 0)::numeric AS finished_cost \
-               FROM inventory__stock_move \
-               WHERE tenant_id = $1 AND source IN ('production_order_bom', 'production_order') \
-                 AND (created_at AT TIME ZONE 'UTC')::date <= $2::date \
-               GROUP BY source_id \
-             ) SELECT COALESCE(SUM(cost.material_cost - cost.finished_cost - CASE WHEN po.status = 'done' AND po.scrap_cost_method = 'expense' THEN cost.material_cost * COALESCE(po.scrap_qty, 0)::numeric / NULLIF(po.qty, 0)::numeric ELSE 0 END), 0)::text \
+               SELECT po.id::text AS source_id, \
+                 COALESCE(sum(sm.total_cost) FILTER (WHERE sm.source = 'production_order_bom' AND sm.direction = 'out' AND sm.source_id = po.id::text), 0)::numeric AS base_material_cost, \
+                 COALESCE(sum(sm.total_cost) FILTER (WHERE sm.source = 'production_order_bom' AND sm.direction = 'out' AND sm.source_id <> po.id::text), 0)::numeric AS rework_material_cost, \
+                 COALESCE(sum(sm.total_cost) FILTER (WHERE sm.source IN ('production_order', 'production_rework') AND sm.direction = 'in'), 0)::numeric AS finished_cost \
+               FROM manufacturing__production_order po \
+               LEFT JOIN inventory__stock_move sm ON sm.tenant_id = po.tenant_id AND (sm.created_at AT TIME ZONE 'UTC')::date <= $2::date AND ( \
+                 (sm.source = 'production_order_bom' AND (sm.source_id = po.id::text OR EXISTS (SELECT 1 FROM manufacturing__rework_order ro WHERE ro.tenant_id = po.tenant_id AND ro.id::text = sm.source_id AND ro.production_order = po.id))) OR \
+                 (sm.source = 'production_order' AND sm.source_id = po.id::text) OR \
+                 (sm.source = 'production_rework' AND EXISTS (SELECT 1 FROM manufacturing__rework_order ro WHERE ro.tenant_id = po.tenant_id AND ro.id::text = sm.source_id AND ro.production_order = po.id)) \
+               ) WHERE po.tenant_id = $1 GROUP BY po.id \
+             ) SELECT COALESCE(SUM(cost.base_material_cost + cost.rework_material_cost - cost.finished_cost - CASE WHEN po.status = 'done' AND po.scrap_cost_method = 'expense' THEN cost.base_material_cost * COALESCE(po.scrap_qty, 0)::numeric / NULLIF(po.qty, 0)::numeric ELSE 0 END), 0)::text \
                FROM manufacturing__production_order po \
                JOIN production_costs cost ON cost.source_id = po.id::text \
                WHERE po.tenant_id = $1 AND po.status IN ('in_progress', 'done')",
@@ -97,22 +100,25 @@ impl Kernel {
         let orders = tx
             .query_json(
                 "WITH production_costs AS ( \
-                   SELECT source_id, \
-                     COALESCE(sum(total_cost) FILTER (WHERE source = 'production_order_bom' AND direction = 'out'), 0)::numeric AS material_cost, \
-                     COALESCE(sum(total_cost) FILTER (WHERE source = 'production_order' AND direction = 'in'), 0)::numeric AS finished_cost \
-                   FROM inventory__stock_move \
-                   WHERE tenant_id = $1 AND source IN ('production_order_bom', 'production_order') \
-                     AND (created_at AT TIME ZONE 'UTC')::date <= $2::date \
-                   GROUP BY source_id \
+               SELECT po.id::text AS source_id, \
+                 COALESCE(sum(sm.total_cost) FILTER (WHERE sm.source = 'production_order_bom' AND sm.direction = 'out' AND sm.source_id = po.id::text), 0)::numeric AS base_material_cost, \
+                 COALESCE(sum(sm.total_cost) FILTER (WHERE sm.source = 'production_order_bom' AND sm.direction = 'out' AND sm.source_id <> po.id::text), 0)::numeric AS rework_material_cost, \
+                 COALESCE(sum(sm.total_cost) FILTER (WHERE sm.source IN ('production_order', 'production_rework') AND sm.direction = 'in'), 0)::numeric AS finished_cost \
+               FROM manufacturing__production_order po \
+               LEFT JOIN inventory__stock_move sm ON sm.tenant_id = po.tenant_id AND (sm.created_at AT TIME ZONE 'UTC')::date <= $2::date AND ( \
+                 (sm.source = 'production_order_bom' AND (sm.source_id = po.id::text OR EXISTS (SELECT 1 FROM manufacturing__rework_order ro WHERE ro.tenant_id = po.tenant_id AND ro.id::text = sm.source_id AND ro.production_order = po.id))) OR \
+                 (sm.source = 'production_order' AND sm.source_id = po.id::text) OR \
+                 (sm.source = 'production_rework' AND EXISTS (SELECT 1 FROM manufacturing__rework_order ro WHERE ro.tenant_id = po.tenant_id AND ro.id::text = sm.source_id AND ro.production_order = po.id)) \
+               ) WHERE po.tenant_id = $1 GROUP BY po.id \
                  ) SELECT jsonb_build_object( \
                    'id', po.id, 'productId', product.id, 'product', product.name, \
                    'warehouseId', po.warehouse, 'plannedQty', po.qty, 'goodQty', po.good_qty, \
                    'scrapQty', po.scrap_qty, 'scrapReason', po.scrap_reason, 'status', po.status, \
                    'qualityStatus', inspection.status, \
-                   'materialCost', COALESCE(cost.material_cost, 0), \
+                   'materialCost', COALESCE(cost.base_material_cost, 0) + COALESCE(cost.rework_material_cost, 0), \
                    'finishedCost', COALESCE(cost.finished_cost, 0), \
-                   'scrapExpense', CASE WHEN po.status = 'done' AND po.scrap_cost_method = 'expense' THEN COALESCE(cost.material_cost, 0) * COALESCE(po.scrap_qty, 0)::numeric / NULLIF(po.qty, 0)::numeric ELSE 0 END, \
-                   'wipValue', COALESCE(cost.material_cost, 0) - COALESCE(cost.finished_cost, 0) - CASE WHEN po.status = 'done' AND po.scrap_cost_method = 'expense' THEN COALESCE(cost.material_cost, 0) * COALESCE(po.scrap_qty, 0)::numeric / NULLIF(po.qty, 0)::numeric ELSE 0 END \
+                   'scrapExpense', CASE WHEN po.status = 'done' AND po.scrap_cost_method = 'expense' THEN COALESCE(cost.base_material_cost, 0) * COALESCE(po.scrap_qty, 0)::numeric / NULLIF(po.qty, 0)::numeric ELSE 0 END, \
+                   'wipValue', COALESCE(cost.base_material_cost, 0) + COALESCE(cost.rework_material_cost, 0) - COALESCE(cost.finished_cost, 0) - CASE WHEN po.status = 'done' AND po.scrap_cost_method = 'expense' THEN COALESCE(cost.base_material_cost, 0) * COALESCE(po.scrap_qty, 0)::numeric / NULLIF(po.qty, 0)::numeric ELSE 0 END \
                  ) FROM manufacturing__production_order po \
                  JOIN master_data__product product ON product.tenant_id = po.tenant_id AND product.id = po.product \
                  LEFT JOIN production_costs cost ON cost.source_id = po.id::text \
@@ -122,7 +128,7 @@ impl Kernel {
                    ORDER BY qi.created_at DESC, qi.id DESC LIMIT 1 \
                  ) inspection ON true \
                  WHERE po.tenant_id = $1 AND po.status IN ('in_progress', 'done') \
-                   AND abs(COALESCE(cost.material_cost, 0) - COALESCE(cost.finished_cost, 0) - CASE WHEN po.status = 'done' AND po.scrap_cost_method = 'expense' THEN COALESCE(cost.material_cost, 0) * COALESCE(po.scrap_qty, 0)::numeric / NULLIF(po.qty, 0)::numeric ELSE 0 END) > 0.005 \
+                   AND abs(COALESCE(cost.base_material_cost, 0) + COALESCE(cost.rework_material_cost, 0) - COALESCE(cost.finished_cost, 0) - CASE WHEN po.status = 'done' AND po.scrap_cost_method = 'expense' THEN COALESCE(cost.base_material_cost, 0) * COALESCE(po.scrap_qty, 0)::numeric / NULLIF(po.qty, 0)::numeric ELSE 0 END) > 0.005 \
                  ORDER BY po.updated_at, po.id",
                 &[&tenant.id, &as_of],
             )

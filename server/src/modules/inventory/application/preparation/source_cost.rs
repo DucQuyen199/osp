@@ -30,6 +30,40 @@ pub(super) async fn resolve_unit_cost(
                     }
                 }
             }
+            "production_rework" => {
+                if let Some(rework_id) = source_id {
+                    if let Some(row) = tx.query_opt(
+                        "WITH RECURSIVE repair_chain AS ( \
+                           SELECT ro.id, ro.inspection, ro.production_order, ro.qty::numeric AS qty \
+                           FROM manufacturing__rework_order ro WHERE ro.tenant_id = $1 AND ro.id = $2 \
+                           UNION ALL \
+                           SELECT prior.id, prior.inspection, prior.production_order, prior.qty::numeric \
+                           FROM repair_chain child \
+                           JOIN quality__inspection inspected ON inspected.tenant_id = $1 AND inspected.id = child.inspection \
+                           JOIN manufacturing__rework_order prior ON prior.tenant_id = $1 AND prior.id::text = inspected.rework_order AND prior.production_order = child.production_order \
+                         ), order_context AS ( \
+                           SELECT po.id, po.scrap_cost_method, po.qty, COALESCE(po.good_qty, po.qty) AS good_qty \
+                           FROM manufacturing__production_order po \
+                           JOIN repair_chain current_repair ON current_repair.production_order = po.id \
+                           WHERE po.tenant_id = $1 AND current_repair.id = $2 \
+                         ), base_cost AS ( \
+                           SELECT COALESCE(SUM(sm.total_cost::numeric), 0) AS amount \
+                           FROM order_context po \
+                           LEFT JOIN inventory__stock_move sm ON sm.tenant_id = $1 AND sm.source = 'production_order_bom' AND sm.source_id = po.id::text AND sm.direction = 'out' \
+                         ), repair_cost AS ( \
+                           SELECT COALESCE(SUM(cost.amount / NULLIF(chain.qty, 0)), 0) AS amount \
+                           FROM repair_chain chain \
+                           LEFT JOIN LATERAL (SELECT COALESCE(SUM(sm.total_cost::numeric), 0) AS amount FROM inventory__stock_move sm WHERE sm.tenant_id = $1 AND sm.source = 'production_order_bom' AND sm.source_id = chain.id::text AND sm.direction = 'out') cost ON TRUE \
+                         ) \
+                         SELECT (base_cost.amount / NULLIF(CASE WHEN po.scrap_cost_method = 'expense' THEN po.qty ELSE po.good_qty END::numeric, 0) + repair_cost.amount)::text \
+                         FROM order_context po CROSS JOIN base_cost CROSS JOIN repair_cost",
+                        &[&tenant.id, &rework_id],
+                    ).await? {
+                        unit_cost = optional_decimal_column(&row, 0, "reworked production unit cost")?
+                            .unwrap_or(standard_cost);
+                    }
+                }
+            }
             "purchase_order_qc" => {
                 if let Some(cost) = document.get("unit_cost").and_then(money::decimal) {
                     unit_cost = cost;

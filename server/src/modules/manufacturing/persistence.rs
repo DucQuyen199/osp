@@ -146,7 +146,7 @@ pub async fn validate_persistence(
 ) -> R<Vec<String>> {
     let mut errors = Vec::new();
     match (entity, action) {
-        ("rework_order", "started" | "done") => {
+        ("rework_order", "created" | "started" | "done") => {
             let (Some(rework_id), Some(order_id), Some(inspection_id)) = (
                 id(document, "id"),
                 id(document, "production_order"),
@@ -158,7 +158,7 @@ pub async fn validate_persistence(
                 return Ok(vec!["Rework requires a positive quantity".into()]);
             };
             let inspection = tx.query_opt(
-                "SELECT qi.qty::text, qi.status, qi.source, qi.source_id, po.status, po.product, qi.product, po.warehouse, qi.warehouse, COALESCE(po.good_qty, po.qty)::text FROM quality__inspection qi JOIN manufacturing__production_order po ON po.tenant_id = qi.tenant_id AND po.id = $3 WHERE qi.tenant_id = $1 AND qi.id = $2 FOR UPDATE OF qi, po",
+                "SELECT qi.qty::text, qi.status, qi.source, qi.source_id, po.status, po.product, qi.product, po.warehouse, qi.warehouse, COALESCE(po.good_qty, po.qty)::text, qi.rework_order, qi.lot, po.output_lot_code FROM quality__inspection qi JOIN manufacturing__production_order po ON po.tenant_id = qi.tenant_id AND po.id = $3 WHERE qi.tenant_id = $1 AND qi.id = $2 FOR UPDATE OF qi, po",
                 &[&tenant.id, &inspection_id, &order_id],
             ).await?;
             let Some(inspection) = inspection else {
@@ -166,24 +166,54 @@ pub async fn validate_persistence(
             };
             let inspection_qty = decimal_column(&inspection, 0, "inspection quantity")?;
             let accepted_qty = decimal_column(&inspection, 9, "accepted production quantity")?;
+            let source = inspection.get::<_, String>(2);
+            let prior_rework_id: Option<String> = inspection.get(10);
+            let rework_source_valid = if source == "production_rework" {
+                inspection.get::<_, String>(3) == order_id.to_string()
+                    && prior_rework_id
+                        .as_deref()
+                        .is_some_and(|prior_id| Uuid::parse_str(prior_id).is_ok())
+                    && tx.query_opt(
+                    "SELECT id FROM manufacturing__rework_order WHERE tenant_id = $1 AND id = $2 AND production_order = $3 AND status = 'done' FOR SHARE",
+                    &[&tenant.id, &prior_rework_id.and_then(|value| Uuid::parse_str(&value).ok()).unwrap_or_default(), &order_id],
+                ).await?.is_some()
+            } else {
+                source == "production_order"
+                    && inspection.get::<_, String>(3) == order_id.to_string()
+            };
+            let lot_matches = if let Some(expected_code) = inspection.get::<_, Option<String>>(12) {
+                let lot_id: Option<Uuid> = inspection.get(11);
+                if let Some(lot_id) = lot_id {
+                    tx.query_opt(
+                        "SELECT 1 FROM inventory__lot WHERE tenant_id = $1 AND id = $2 AND product = $3 AND code = $4 FOR SHARE",
+                        &[&tenant.id, &lot_id, &inspection.get::<_, Uuid>(5), &expected_code],
+                    ).await?.is_some()
+                } else {
+                    false
+                }
+            } else {
+                true
+            };
             let valid = inspection.get::<_, String>(1) == "failed"
-                && inspection.get::<_, String>(2) == "production_order"
-                && inspection.get::<_, String>(3) == order_id.to_string()
+                && rework_source_valid
                 && inspection.get::<_, String>(4) == "done"
                 && inspection.get::<_, Uuid>(5) == inspection.get::<_, Uuid>(6)
                 && inspection.get::<_, Uuid>(7) == inspection.get::<_, Uuid>(8)
-                && money::within_tolerance(qty, inspection_qty, Decimal::new(1, 6))
-                && money::within_tolerance(qty, accepted_qty, Decimal::new(1, 6));
+                && lot_matches
+                && qty <= inspection_qty.checked_add(Decimal::new(1, 6)).unwrap_or(inspection_qty)
+                && accepted_qty > Decimal::ZERO;
             if !valid {
-                errors.push("Rework must match the full quantity of a failed finished-goods inspection for its completed production order".into());
+                errors.push("Rework must reference a failed inspection for an eligible quantity of its completed production order".into());
             }
-            if action == "started"
-                && tx.query_opt(
-                    "SELECT id FROM manufacturing__rework_order WHERE tenant_id = $1 AND inspection = $2 AND status = 'in_progress' AND id <> $3 LIMIT 1",
-                    &[&tenant.id, &inspection_id, &rework_id],
-                ).await?.is_some()
-            {
-                errors.push("Another rework order is already active for this failed inspection".into());
+            let committed = tx.query_opt(
+                "SELECT COALESCE(SUM(qty::numeric), 0)::text FROM manufacturing__rework_order WHERE tenant_id = $1 AND inspection = $2 AND status <> 'cancelled' AND id <> $3",
+                &[&tenant.id, &inspection_id, &rework_id],
+            ).await?;
+            if let Some(committed) = committed {
+                let committed_qty = decimal_column(&committed, 0, "reserved rework quantity")?;
+                if committed_qty.checked_add(qty).is_none_or(|total| total > inspection_qty.checked_add(Decimal::new(1, 6)).unwrap_or(inspection_qty)) {
+                    errors.push(format!("Rework quantity exceeds the remaining failed quantity ({})", (inspection_qty - committed_qty).max(Decimal::ZERO)));
+                }
             }
         }
         ("work_center", "updated") => {

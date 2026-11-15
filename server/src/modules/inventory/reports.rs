@@ -458,7 +458,7 @@ impl Kernel {
                    'warehouseId', warehouse.id, 'warehouse', warehouse.name, \
                    'locationId', location.id, 'locationCode', location.code, 'location', location.name, \
                    'source', sm.source, 'sourceId', sm.source_id, \
-                   'sourceEntity', CASE sm.source \
+                   'sourceEntity', CASE WHEN sm.source = 'production_order_bom' AND EXISTS (SELECT 1 FROM manufacturing__rework_order ro WHERE ro.tenant_id = sm.tenant_id AND ro.id::text = sm.source_id) THEN 'manufacturing.rework_order' ELSE CASE sm.source \
                      WHEN 'sales_order' THEN 'sales.sales_order' \
                      WHEN 'sales_return' THEN 'sales.sales_return' \
                      WHEN 'purchase_receipt' THEN 'purchasing.purchase_receipt' \
@@ -471,6 +471,7 @@ impl Kernel {
                      WHEN 'stock_count' THEN 'inventory.stock_count' \
                      WHEN 'production_order' THEN 'manufacturing.production_order' \
                      WHEN 'production_order_bom' THEN 'manufacturing.production_order' \
+                     WHEN 'production_rework' THEN 'manufacturing.rework_order' \
                      WHEN 'harvest' THEN 'agriculture.harvest' \
                      WHEN 'input_application' THEN 'agriculture.input_application' \
                      WHEN 'work_order' THEN 'field-service.work_order' \
@@ -478,7 +479,7 @@ impl Kernel {
                      WHEN 'repair_order' THEN 'auto-service.repair_order' \
                      WHEN 'prescription' THEN 'clinic.prescription' \
                      WHEN 'maintenance' THEN 'maintenance.maintenance_request' \
-                     ELSE NULL END \
+                     ELSE NULL END END \
                  ) FROM inventory__stock_move sm \
                  LEFT JOIN inventory__warehouse warehouse ON warehouse.tenant_id = sm.tenant_id AND warehouse.id = sm.warehouse \
                  LEFT JOIN inventory__warehouse_location location ON location.tenant_id = sm.tenant_id AND location.id = sm.location \

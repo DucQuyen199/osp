@@ -70,17 +70,66 @@ pub async fn handle_source_event(
                     vec!["Completed rework requires its quality-inspection id".into()],
                 )
             })?;
+            let production_order_id = id(document, "production_order").ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    event_type,
+                    vec!["Completed rework requires its production-order id".into()],
+                )
+            })?;
+            let rework_order_id = id(document, "id").ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    event_type,
+                    vec!["Completed rework requires its rework-order id".into()],
+                )
+            })?;
+            let rework = tx
+                .query_opt(
+                    "SELECT qi.product, qi.warehouse, qi.lot, qi.unit_cost::text FROM quality__inspection qi WHERE qi.tenant_id = $1 AND qi.id = $2 FOR SHARE",
+                    &[&tenant.id, &inspection_id],
+                )
+                .await?
+                .ok_or_else(|| {
+                    crate::error::ApiError::validation(
+                        event_type,
+                        vec!["Rework source inspection was not found".into()],
+                    )
+                })?;
+            let qty = document
+                .get("qty")
+                .cloned()
+                .filter(|value| money::decimal(value).is_some_and(|qty| qty > Decimal::ZERO))
+                .ok_or_else(|| {
+                    crate::error::ApiError::validation(
+                        event_type,
+                        vec!["Completed rework requires a positive quantity".into()],
+                    )
+                })?;
+            let mut data = Map::from_iter([
+                ("product".into(), json!(rework.get::<_, Uuid>(0))),
+                ("source".into(), json!("production_rework")),
+                ("source_id".into(), json!(production_order_id)),
+                ("qty".into(), qty),
+                ("warehouse".into(), json!(rework.get::<_, Uuid>(1))),
+                ("rework_order".into(), json!(rework_order_id)),
+            ]);
+            if let Some(lot) = rework.get::<_, Option<Uuid>>(2) {
+                data.insert("lot".into(), json!(lot));
+            }
+            let unit_cost = optional_decimal_column(&rework, 3, "rework inspection unit cost")?;
+            if unit_cost > Decimal::ZERO {
+                data.insert(
+                    "unit_cost".into(),
+                    money::json_number(unit_cost).ok_or_else(|| {
+                        crate::error::ApiError::validation(
+                            event_type,
+                            vec!["Rework unit cost exceeds the supported decimal range".into()],
+                        )
+                    })?,
+                );
+            }
             let entity = kernel.ent(tenant, "quality.inspection")?;
             kernel
-                .act_in(
-                    tx,
-                    &Actor::System,
-                    tenant,
-                    &entity,
-                    &inspection_id.to_string(),
-                    "retest",
-                    &opts,
-                )
+                .create_in(tx, &Actor::System, tenant, &entity, data, &opts)
                 .await?;
             Ok(true)
         }
@@ -436,12 +485,33 @@ pub async fn handle_source_event(
                 )
             })?;
             let entity = kernel.ent(tenant, "quality.nonconformance")?;
-            let open = tx
+            let mut open = tx
                 .query(
                     "SELECT id FROM quality__nonconformance WHERE tenant_id = $1 AND inspection = $2 AND status = 'open' ORDER BY created_at, id FOR UPDATE",
                     &[&tenant.id, &inspection_id],
                 )
                 .await?;
+            if document.get("source").and_then(Value::as_str) == Some("production_rework") {
+                if let Some(order_id) = id(document, "source_id") {
+                    let accepted = tx.query_opt(
+                        "SELECT COALESCE(po.good_qty, po.qty)::text, COALESCE(SUM(qi.qty::numeric) FILTER (WHERE qi.source = 'production_rework' AND qi.status = 'passed'), 0)::text FROM manufacturing__production_order po LEFT JOIN quality__inspection qi ON qi.tenant_id = po.tenant_id AND qi.source_id = po.id::text WHERE po.tenant_id = $1 AND po.id = $2 GROUP BY po.id, po.good_qty, po.qty",
+                        &[&tenant.id, &order_id],
+                    ).await?;
+                    if let Some(accepted) = accepted {
+                        let planned_good =
+                            decimal_column(&accepted, 0, "accepted production quantity")?;
+                        let reworked_good = decimal_column(&accepted, 1, "passed rework quantity")?;
+                        if money::within_tolerance(reworked_good, planned_good, Decimal::new(1, 6))
+                        {
+                            let initial = tx.query(
+                                "SELECT nc.id FROM quality__nonconformance nc JOIN quality__inspection qi ON qi.tenant_id = nc.tenant_id AND qi.id = nc.inspection WHERE nc.tenant_id = $1 AND qi.source = 'production_order' AND qi.source_id = $2 AND nc.status = 'open' ORDER BY nc.created_at, nc.id FOR UPDATE OF nc",
+                                &[&tenant.id, &order_id.to_string()],
+                            ).await?;
+                            open.extend(initial);
+                        }
+                    }
+                }
+            }
             for row in open {
                 let nonconformance_id: Uuid = row.get(0);
                 kernel

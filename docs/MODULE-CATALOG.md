@@ -206,7 +206,7 @@ Tổng: **50 module**, **196 loại dữ liệu**, **880 sự kiện**.
 | `maintenance_technician` Kỹ thuật viên bảo trì | — |
 
 ### quality
-**Quản lý chất lượng** — Kiểm tra chất lượng đầu vào/thành phẩm, ghi nhận sự không phù hợp.
+**Quản lý chất lượng** — Kiểm tra chất lượng đầu vào/thành phẩm, giữ lịch sử kết quả và xử lý phần lượng lỗi được sửa theo từng lần kiểm tra lại.
 
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
@@ -215,7 +215,7 @@ Tổng: **50 module**, **196 loại dữ liệu**, **880 sự kiện**.
 | `nonconformance` Sự không phù hợp | `open` → **closed** (open→closed) |
 
 ### manufacturing
-**Sản xuất** — Định mức BOM, lệnh sản xuất theo trung tâm máy và công suất ngày. Bắt đầu lệnh xuất nguyên liệu vào WIP; QC đạt sẽ nhập thành phẩm vào kho. Hàng lỗi có thể được sửa theo lệnh rework, bổ sung chi phí vào WIP gốc và kiểm tra lại.
+**Sản xuất** — Định mức BOM, lệnh sản xuất theo trung tâm máy và công suất ngày. Bắt đầu lệnh xuất nguyên liệu vào WIP; QC đạt sẽ nhập thành phẩm vào kho. Cho phép sửa một phần lượng lỗi; mỗi lệnh sửa bổ sung chi phí vào WIP gốc và tạo phiếu QC riêng cho đúng số lượng sau sửa.
 
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|

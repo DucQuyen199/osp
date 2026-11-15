@@ -1,7 +1,7 @@
 {
  "id": "manufacturing",
  "name": "Sản xuất",
- "description": "Định mức BOM, lệnh sản xuất theo trung tâm máy và công suất ngày. Bắt đầu lệnh xuất nguyên liệu vào WIP; QC đạt sẽ nhập thành phẩm vào kho. Hàng lỗi có thể được sửa theo lệnh rework, bổ sung chi phí vào WIP gốc và kiểm tra lại.",
+ "description": "Định mức BOM, lệnh sản xuất theo trung tâm máy và công suất ngày. Bắt đầu lệnh xuất nguyên liệu vào WIP; QC đạt sẽ nhập thành phẩm vào kho. Cho phép sửa một phần lượng lỗi; mỗi lệnh sửa bổ sung chi phí vào WIP gốc và tạo phiếu QC riêng cho đúng số lượng sau sửa.",
  "category": "supply",
  "version": "0.4.0",
  "depends": [

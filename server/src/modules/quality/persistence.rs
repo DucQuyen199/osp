@@ -75,7 +75,7 @@ pub async fn validate_persistence(
     if matches!(action, "created" | "passed")
         && matches!(
             source,
-            Some("production_order" | "purchase_order" | "purchase_receipt")
+            Some("production_order" | "production_rework" | "purchase_order" | "purchase_receipt")
         )
     {
         let (Some(order_id), Some(product)) = (source_id, product) else {
@@ -87,7 +87,75 @@ pub async fn validate_persistence(
         else {
             return Ok(vec!["Phiếu QC cần số lượng và kho hợp lệ".into()]);
         };
-        if source == Some("production_order") {
+        if source == Some("production_rework") {
+            let rework_id = document
+                .get("rework_order")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok());
+            let Some(rework_id) = rework_id else {
+                errors.push("Phiếu QC sửa hàng cần mã lệnh sửa hợp lệ".into());
+                return Ok(errors);
+            };
+            let Some(order) = tx.query_opt(
+                    "SELECT ro.qty::text, ro.status, ro.production_order, po.product, po.warehouse, COALESCE(po.good_qty, po.qty)::text, po.output_lot_code, COALESCE(product.lot_tracked, false) FROM manufacturing__rework_order ro JOIN manufacturing__production_order po ON po.tenant_id = ro.tenant_id AND po.id = ro.production_order JOIN master_data__product product ON product.tenant_id = po.tenant_id AND product.id = po.product WHERE ro.tenant_id = $1 AND ro.id = $2 AND po.id = $3 FOR UPDATE OF ro, po",
+                    &[&tenant.id, &rework_id, &order_id],
+                ).await? else {
+                errors.push("Phiếu QC sửa hàng cần liên kết lệnh sửa và lệnh sản xuất hợp lệ".into());
+                return Ok(errors);
+            };
+            let rework_qty = decimal_column(&order, 0, "rework quantity")?;
+            let valid = order.get::<_, String>(1) == "done"
+                && order.get::<_, Uuid>(2) == order_id
+                && order.get::<_, Uuid>(3) == product
+                && order.get::<_, Uuid>(4) == warehouse
+                && money::within_tolerance(rework_qty, qty, Decimal::new(1, 6));
+            if !valid {
+                errors.push(
+                    "Phiếu QC sửa hàng phải khớp số lượng, sản phẩm, kho và lệnh sửa đã hoàn tất"
+                        .into(),
+                );
+            }
+            if order.get::<_, bool>(7) {
+                let expected_code: Option<String> = order.get(6);
+                let lot = id(document, "lot");
+                let lot_matches = if let (Some(lot), Some(expected_code)) = (lot, expected_code) {
+                    tx.query_opt(
+                        "SELECT 1 FROM inventory__lot WHERE tenant_id = $1 AND id = $2 AND product = $3 AND code = $4 FOR SHARE",
+                        &[&tenant.id, &lot, &product, &expected_code],
+                    ).await?.is_some()
+                } else {
+                    false
+                };
+                if !lot_matches {
+                    errors.push("QC sửa hàng phải giữ đúng lô đầu ra của lệnh sản xuất".into());
+                }
+            }
+            if action == "passed" {
+                let lock_key = format!("inventory.stock:{}:{}:{}", tenant.id, product, warehouse);
+                tx.query_opt(
+                    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                    &[&lock_key],
+                )
+                .await?;
+                let received = tx.query_one_row(
+                    "SELECT COALESCE(SUM(sm.qty::numeric), 0)::text FROM inventory__stock_move sm LEFT JOIN manufacturing__rework_order ro ON ro.tenant_id = sm.tenant_id AND ro.id::text = sm.source_id WHERE sm.tenant_id = $1 AND sm.direction = 'in' AND ((sm.source = 'production_order' AND sm.source_id = $2) OR (sm.source = 'production_rework' AND ro.production_order::text = $2))",
+                    &[&tenant.id, &order_id.to_string()],
+                ).await?;
+                let received_qty =
+                    decimal_column(&received, 0, "already received production quantity")?;
+                let accepted_qty = decimal_column(&order, 5, "accepted production quantity")?;
+                if received_qty.checked_add(qty).is_none_or(|total| {
+                    total
+                        > accepted_qty
+                            .checked_add(Decimal::new(1, 6))
+                            .unwrap_or(accepted_qty)
+                }) {
+                    errors.push(
+                        "QC duyệt vượt quá tổng số lượng thành phẩm đạt của lệnh sản xuất".into(),
+                    );
+                }
+            }
+        } else if source == Some("production_order") {
             let order = tx.query_opt(
                 "SELECT po.product, COALESCE(po.good_qty, po.qty)::text, po.warehouse, po.status, COALESCE(product.lot_tracked, false), po.output_lot_code FROM manufacturing__production_order po JOIN master_data__product product ON product.tenant_id = po.tenant_id AND product.id = po.product WHERE po.tenant_id = $1 AND po.id = $2 FOR UPDATE OF po",
                 &[&tenant.id, &order_id],

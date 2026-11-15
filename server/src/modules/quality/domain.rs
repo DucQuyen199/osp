@@ -39,7 +39,7 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
     let mut errors = Vec::new();
     let traceable_source = matches!(
         document.get("source").and_then(Value::as_str),
-        Some("production_order" | "purchase_order")
+        Some("production_order" | "production_rework" | "purchase_order")
     );
     if traceable_source
         && !number(document, "qty").is_some_and(|qty| qty > Decimal::ZERO)
@@ -77,6 +77,7 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
         "product",
         "source",
         "source_id",
+        "rework_order",
         "qty",
         "warehouse",
         "lot",

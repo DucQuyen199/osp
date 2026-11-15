@@ -59,6 +59,11 @@ pub async fn handle_source_stock_event(
         {
             (None, "in", "production_order", false)
         }
+        "quality.inspection.passed"
+            if document.get("source").and_then(Value::as_str) == Some("production_rework") =>
+        {
+            (None, "in", "production_rework", false)
+        }
         "manufacturing.production_order.started" => {
             (Some("$bom"), "out", "production_order_bom", true)
         }
@@ -77,10 +82,19 @@ pub async fn handle_source_stock_event(
     })?;
     let mut warehouse = document.get("warehouse").cloned();
     let movement_source_id = if event_type == "manufacturing.rework_order.started" {
-        document.get("production_order").cloned().ok_or_else(|| {
+        document.get("id").cloned().ok_or_else(|| {
             crate::error::ApiError::validation(
                 event_type,
-                vec!["Rework order requires its source production-order id".into()],
+                vec!["Rework order requires its id for material-cost traceability".into()],
+            )
+        })?
+    } else if event_type == "quality.inspection.passed"
+        && document.get("source").and_then(Value::as_str) == Some("production_rework")
+    {
+        document.get("rework_order").cloned().ok_or_else(|| {
+            crate::error::ApiError::validation(
+                event_type,
+                vec!["Rework inspection requires its rework-order id".into()],
             )
         })?
     } else if event_type == "quality.inspection.passed" {

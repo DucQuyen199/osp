@@ -85,7 +85,7 @@ pub async fn post_stock_movement(
             ("in", "sales_return" | "pos_order_refund") => ("156", "632"),
             ("in", "purchase_receipt") => ("156", "GRNI"),
             ("out", "production_order_bom") => ("154", "156"),
-            ("in", "production_order") => ("156", "154"),
+            ("in", "production_order" | "production_rework") => ("156", "154"),
             ("in", "stock_count") => ("156", "642"),
             ("out", "stock_count") => ("642", "156"),
             ("out", "purchase_return" | "quality_return") => return Ok(false),

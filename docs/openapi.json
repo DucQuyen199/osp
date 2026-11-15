@@ -14213,6 +14213,9 @@
           "qty": {
             "type": "number"
           },
+          "rework_order": {
+            "type": "string"
+          },
           "source": {
             "type": "string"
           },
@@ -14263,6 +14266,9 @@
           },
           "qty": {
             "type": "number"
+          },
+          "rework_order": {
+            "type": "string"
           },
           "source": {
             "type": "string"
