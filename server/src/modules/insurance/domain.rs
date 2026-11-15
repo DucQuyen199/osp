@@ -133,6 +133,9 @@ pub fn validate_action_at(
                     "Cần khai báo ngày bắt đầu và kết thúc trước khi kích hoạt hợp đồng".into(),
                 ];
             }
+            if date(document, "end_date").is_some_and(|end| end < today) {
+                return vec!["Không thể kích hoạt hợp đồng đã quá ngày kết thúc bảo hiểm".into()];
+            }
             if !positive(document, "premium") || !positive(document, "coverage_limit") {
                 return vec![
                     "Hợp đồng cần có phí và hạn mức bảo hiểm hợp lệ trước khi kích hoạt".into(),
