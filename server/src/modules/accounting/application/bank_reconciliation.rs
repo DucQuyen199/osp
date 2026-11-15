@@ -211,7 +211,9 @@ pub async fn prepare_match(
     let candidates = tx
         .query(
             "SELECT j.id FROM accounting__journal_entry j \
-             JOIN accounting__account bank ON bank.tenant_id = j.tenant_id AND bank.code = '112' \
+             JOIN accounting__bank_statement_line target ON target.tenant_id = j.tenant_id AND target.id = $4 \
+             JOIN accounting__bank_statement statement ON statement.tenant_id = target.tenant_id AND statement.id = target.statement AND statement.status = 'draft' \
+             JOIN accounting__account bank ON bank.tenant_id = statement.tenant_id AND bank.id = statement.account \
              WHERE j.tenant_id = $1 AND j.status = 'posted' AND j.posting_date = $2 \
                AND abs(COALESCE((SELECT sum(COALESCE((line->>'debit')::numeric, 0) - COALESCE((line->>'credit')::numeric, 0)) \
                  FROM jsonb_array_elements(COALESCE(j.lines, '[]'::jsonb)) line \

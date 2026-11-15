@@ -26,6 +26,7 @@ const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { meth
 const bankNet = (entry, accountId) => (entry.lines || []).filter((line) => line.account === accountId)
   .reduce((sum, line) => sum + money(line.debit) - money(line.credit), 0);
 const sameAmount = (left, right) => Math.abs(money(left) - money(right)) <= .005;
+const isBankAccount = (account) => /^112\d*$/.test(String(account?.code || '')) && account.kind === 'asset';
 
 export default function BankReconciliationWorkbenchPage() {
   const [statements, setStatements] = useState([]);
@@ -64,7 +65,7 @@ export default function BankReconciliationWorkbenchPage() {
       setAccounts(accountMap); setCurrencies(currencyMap); setParties(partyMap);
       setStatementId((id) => statementRows.some((row) => row.id === id) ? id : statementRows.find((row) => row.status === 'draft')?.id || statementRows[0]?.id || '');
       const baseCurrency = [...currencyMap.values()].find((currency) => String(currency.code).toUpperCase() === String(app.meta?.settings?.baseCurrency || 'VND').toUpperCase());
-      setStatementForm((form) => ({ ...form, account: form.account || [...accountMap.values()].find((account) => account.code === '112')?.id || '', currency: form.currency || baseCurrency?.id || '' }));
+      setStatementForm((form) => ({ ...form, account: form.account || [...accountMap.values()].find((account) => account.code === '112')?.id || [...accountMap.values()].find(isBankAccount)?.id || '', currency: form.currency || baseCurrency?.id || '' }));
     } catch (reason) { setError(reason.message || 'Không tải được dữ liệu đối soát ngân hàng.'); }
     finally { if (!quiet) setLoading(false); }
   }, []);
@@ -83,7 +84,7 @@ export default function BankReconciliationWorkbenchPage() {
 
   const selected = statements.find((row) => row.id === statementId);
   const selectedLines = useMemo(() => [...allLines].sort((a, b) => String(a.transaction_date || '').localeCompare(String(b.transaction_date || '')) || String(a.reference || '').localeCompare(String(b.reference || ''))), [allLines]);
-  const bankAccount = useMemo(() => [...accounts.values()].find((account) => account.code === '112'), [accounts]);
+  const bankAccount = useMemo(() => accounts.get(selected?.account) || [...accounts.values()].find((account) => account.code === '112'), [accounts, selected?.account]);
   const baseCurrency = useMemo(() => [...currencies.values()].find((currency) => String(currency.code).toUpperCase() === String(app.meta?.settings?.baseCurrency || 'VND').toUpperCase()), [currencies]);
   const matchedPaymentIds = useMemo(() => new Set(allLines.filter((line) => line.status === 'matched' && line.payment).map((line) => line.payment)), [allLines]);
   const matchedJournalIds = useMemo(() => new Set(allLines.filter((line) => line.status === 'matched' && line.journal_entry).map((line) => line.journal_entry)), [allLines]);
@@ -229,7 +230,7 @@ export default function BankReconciliationWorkbenchPage() {
     {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
 
     {can('accounting.bank_statement.create') && <section className="card card-pad"><h2>Mở sao kê ngân hàng</h2><form className="form-grid" onSubmit={createStatement}>
-      <label className="field"><span className="label">Tài khoản ngân hàng *</span><select className="select" required value={statementForm.account} onChange={(event) => setStatementForm((form) => ({ ...form, account: event.target.value }))}><option value="">Chọn TK 112</option>{[...accounts.values()].filter((account) => account.code === '112').map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}</select></label>
+      <label className="field"><span className="label">Tài khoản ngân hàng *</span><select className="select" required value={statementForm.account} onChange={(event) => setStatementForm((form) => ({ ...form, account: event.target.value }))}><option value="">Chọn tài khoản nhóm 112</option>{[...accounts.values()].filter(isBankAccount).map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}</select></label>
       <label className="field"><span className="label">Đồng tiền sao kê *</span><select className="select" required value={statementForm.currency} onChange={(event) => setStatementForm((form) => ({ ...form, currency: event.target.value }))}><option value="">Chọn đồng tiền</option>{[...currencies.values()].map((currency) => <option key={currency.id} value={currency.id}>{currency.code} · {currency.name}</option>)}</select></label>
       <label className="field"><span className="label">Số sao kê *</span><input className="input" required value={statementForm.statement_number} onChange={(event) => setStatementForm((form) => ({ ...form, statement_number: event.target.value }))}/></label>
       <label className="field"><span className="label">Từ ngày *</span><input className="input" required type="date" value={statementForm.start_date} onChange={(event) => setStatementForm((form) => ({ ...form, start_date: event.target.value }))}/></label>

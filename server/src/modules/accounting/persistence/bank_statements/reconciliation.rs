@@ -75,7 +75,7 @@ pub(super) async fn validate(
                    SELECT 1 FROM accounting__payment p \
                    JOIN accounting__journal_entry j ON j.tenant_id = p.tenant_id \
                      AND j.source = 'payment' AND j.source_id = p.id::text AND j.status = 'posted' \
-                   JOIN accounting__account a ON a.tenant_id = p.tenant_id AND a.code = '112' \
+                   JOIN accounting__account a ON a.tenant_id = p.tenant_id AND a.id = s.account \
                    WHERE p.tenant_id = b.tenant_id AND p.id = b.payment \
                      AND p.method IN ('transfer', 'bank') \
                      AND abs(p.amount::numeric - b.amount::numeric) <= 0.005 \
@@ -87,7 +87,7 @@ pub(super) async fn validate(
                        THEN COALESCE(b.base_amount, b.amount)::numeric ELSE -COALESCE(b.base_amount, b.amount)::numeric END) <= 0.005 \
                  ) OR EXISTS ( \
                    SELECT 1 FROM accounting__journal_entry j \
-                   JOIN accounting__account a ON a.tenant_id = j.tenant_id AND a.code = '112' \
+                   JOIN accounting__account a ON a.tenant_id = j.tenant_id AND a.id = s.account \
                    WHERE j.tenant_id = b.tenant_id AND j.id = b.journal_entry AND j.status = 'posted' \
                      AND abs(COALESCE((SELECT sum(COALESCE((l->>'debit')::numeric, 0) - COALESCE((l->>'credit')::numeric, 0)) \
                        FROM jsonb_array_elements(COALESCE(j.lines, '[]'::jsonb)) l \

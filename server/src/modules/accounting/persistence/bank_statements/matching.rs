@@ -5,6 +5,7 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use super::super::{database_amount, database_optional_amount, decimal_amount};
+use super::is_bank_account_code;
 
 fn amount_tolerance() -> Decimal {
     Decimal::new(5, 3)
@@ -57,37 +58,45 @@ pub(super) async fn validate(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> 
     };
     let statement_row = tx
         .query_opt(
-            "SELECT status, currency FROM accounting__bank_statement WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+            "SELECT status, currency, account FROM accounting__bank_statement WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
             &[&tenant.id, &statement],
         )
         .await?;
-    let statement_currency = match statement_row {
+    let (statement_currency, bank_account) = match statement_row {
         Some(row) => {
             if row.get::<_, String>(0) != "draft" {
                 errors.push("Chỉ được khớp dòng trong sao kê nháp".into());
             }
-            row.get::<_, Option<Uuid>>(1).unwrap_or(base_currency_id)
+            (
+                row.get::<_, Option<Uuid>>(1).unwrap_or(base_currency_id),
+                row.get::<_, Option<Uuid>>(2),
+            )
         }
         None => {
             errors.push("Không tìm thấy sao kê trong tenant này".into());
-            base_currency_id
+            (base_currency_id, None)
         }
     };
+    let Some(bank_account) = bank_account else {
+        errors.push("Sao kê chưa gắn tài khoản ngân hàng hợp lệ".into());
+        return Ok(errors);
+    };
+    let account_row = tx
+        .query_opt(
+            "SELECT code, kind FROM accounting__account WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+            &[&tenant.id, &bank_account],
+        )
+        .await?;
+    if !account_row.is_some_and(|row| {
+        is_bank_account_code(&row.get::<_, String>(0)) && row.get::<_, String>(1) == "asset"
+    }) {
+        errors.push("Tài khoản gắn với sao kê không còn là tài khoản ngân hàng hợp lệ".into());
+        return Ok(errors);
+    }
     let direction = document
         .get("direction")
         .and_then(Value::as_str)
         .unwrap_or_default();
-    let bank_account = tx
-        .query_opt(
-            "SELECT id FROM accounting__account WHERE tenant_id = $1 AND code = '112'",
-            &[&tenant.id],
-        )
-        .await?
-        .map(|row| row.get::<_, Uuid>(0));
-    let Some(bank_account) = bank_account else {
-        errors.push("Doanh nghiệp chưa có tài khoản ngân hàng 112".into());
-        return Ok(errors);
-    };
     let line_amount = decimal_amount(document, "amount").unwrap_or(Decimal::ZERO);
     let line_base_amount = decimal_amount(document, "base_amount").unwrap_or(line_amount);
     if statement_currency != base_currency_id && decimal_amount(document, "base_amount").is_none() {

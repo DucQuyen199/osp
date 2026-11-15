@@ -1,9 +1,11 @@
 //! Bank statement creation, period coverage, currency and retention checks.
 use crate::{db::Tx, error::R, kernel::Tenant};
+use chrono::NaiveDate;
 use serde_json::Value;
 use uuid::Uuid;
 
 use super::super::{date, lock_period_calendar, overlaps_closed_period};
+use super::is_bank_account_code;
 
 pub(super) async fn validate(
     tx: &Tx<'_>,
@@ -37,12 +39,15 @@ pub(super) async fn validate(
             .await?;
             let account_row = tx
                 .query_opt(
-                    "SELECT code FROM accounting__account WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                    "SELECT code, kind FROM accounting__account WHERE tenant_id = $1 AND id = $2 FOR SHARE",
                     &[&tenant.id, &account],
                 )
                 .await?;
-            if !account_row.is_some_and(|row| row.get::<_, String>(0) == "112") {
-                errors.push("Sao kê chỉ được gắn với tài khoản tiền gửi ngân hàng 112".into());
+            if !account_row.is_some_and(|row| {
+                is_bank_account_code(&row.get::<_, String>(0))
+                    && row.get::<_, String>(1) == "asset"
+            }) {
+                errors.push("Sao kê cần tài khoản tài sản thuộc nhóm tiền gửi ngân hàng 112".into());
             }
             let id = document
                 .get("id")
@@ -92,12 +97,16 @@ pub(super) async fn validate(
             if action == "updated" {
                 if let Some(existing) = tx
                     .query_opt(
-                        "SELECT currency FROM accounting__bank_statement WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                        "SELECT status, account, currency, start_date, end_date FROM accounting__bank_statement WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
                         &[&tenant.id, &id],
                     )
                     .await?
                 {
-                    let existing_currency: Option<Uuid> = existing.get(0);
+                    let existing_status: String = existing.get(0);
+                    let existing_account: Uuid = existing.get(1);
+                    let existing_currency: Option<Uuid> = existing.get(2);
+                    let existing_start: NaiveDate = existing.get(3);
+                    let existing_end: NaiveDate = existing.get(4);
                     let has_lines = tx
                         .query_opt(
                             "SELECT 1 FROM accounting__bank_statement_line WHERE tenant_id = $1 AND statement = $2 LIMIT 1",
@@ -105,10 +114,17 @@ pub(super) async fn validate(
                         )
                         .await?
                         .is_some();
-                    if has_lines && existing_currency.unwrap_or(base_currency_id) != currency_id {
+                    if existing_status != "draft" {
+                        errors.push("Chỉ được sửa sao kê nháp".into());
+                    }
+                    if has_lines
+                        && (existing_account != account
+                            || existing_currency.unwrap_or(base_currency_id) != currency_id
+                            || existing_start != start
+                            || existing_end != end)
+                    {
                         errors.push(
-                            "Không thể đổi đồng tiền khi sao kê đã có dòng; hãy tạo sao kê mới"
-                                .into(),
+                            "Không thể đổi tài khoản, đồng tiền hoặc kỳ ngày khi sao kê đã có dòng; hãy tạo sao kê mới".into(),
                         );
                     }
                 }

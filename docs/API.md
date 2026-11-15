@@ -104,7 +104,7 @@ Quy tắc:
 - Trường **tính tự động** (ví dụ `total` từ `lines`) được máy chủ tính lại mỗi lần ghi.
 - `id`, `createdAt`, `updatedAt` do hệ thống quản lý.
 - Mỗi thao tác ghi là **một giao dịch**, bao gồm mọi bước tự động nó kích hoạt. Một luật tích hợp lỗi chỉ hoàn tác phần của chính nó và được ghi vào nhật ký sự kiện; thao tác gốc vẫn thành công.
-- Với `accounting.bank_statement_line`, action `matched` yêu cầu đúng một trong `payment` hoặc `journal_entry`; bút toán phải đã ghi sổ và phát sinh ròng TK 112 phải khớp chiều/số tiền sao kê. Một bút toán chỉ được đối soát một lần trong tenant.
+- Với `accounting.bank_statement_line`, action `matched` yêu cầu đúng một trong `payment` hoặc `journal_entry`; bút toán phải đã ghi sổ và phát sinh ròng trên đúng tài khoản ngân hàng đã gắn với sao kê phải khớp chiều/số tiền cơ sở. Tài khoản ngân hàng có mã bắt đầu bằng `112` (bao gồm tài khoản chi tiết như `1121`); sau khi thêm dòng, không thể đổi tài khoản, tiền tệ hoặc kỳ ngày của sao kê. Một bút toán chỉ được đối soát một lần trong tenant.
 
 ### Ví dụ
 ```bash

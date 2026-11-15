@@ -8,6 +8,11 @@ mod statements;
 use crate::{db::Tx, error::R, kernel::Tenant};
 use serde_json::Value;
 
+pub(super) fn is_bank_account_code(code: &str) -> bool {
+    code.strip_prefix("112")
+        .is_some_and(|suffix| suffix.bytes().all(|byte| byte.is_ascii_digit()))
+}
+
 pub async fn validate_persistence(
     tx: &Tx<'_>,
     tenant: &Tenant,
