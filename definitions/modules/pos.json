@@ -159,6 +159,17 @@
      ]
     },
     {
+     "name": "cash_received",
+     "type": "money",
+     "required": false
+    },
+    {
+     "name": "change_due",
+     "type": "money",
+     "required": false,
+     "system": true
+    },
+    {
      "name": "refund_reason",
      "type": "string",
      "required": false

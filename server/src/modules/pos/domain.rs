@@ -45,6 +45,12 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
     if entity != "pos_order" {
         return Vec::new();
     }
+    if document
+        .get("cash_received")
+        .is_some_and(|amount| !decimal(amount).is_some_and(|value| value >= Decimal::ZERO))
+    {
+        return vec!["Số tiền khách đưa phải là số không âm hợp lệ".into()];
+    }
     let Some(lines) = document.get("lines").and_then(Value::as_array) else {
         return vec!["Đơn POS cần danh sách dòng hàng".into()];
     };
@@ -100,6 +106,8 @@ pub fn validate_update(current: &Value, patch: &Value) -> Vec<String> {
         "method",
         "voucher_code",
         "voucher_discount",
+        "cash_received",
+        "change_due",
         "refund_reason",
     ];
     if protected.iter().any(|field| patch.get(*field).is_some()) {
@@ -191,6 +199,14 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
             Some("cash" | "card" | "transfer" | "ewallet")
         ) {
             return vec!["Đơn POS cần phương thức thanh toán hợp lệ trước khi hoàn tất".into()];
+        }
+        if document.get("method").and_then(Value::as_str) == Some("cash")
+            && !document
+                .get("cash_received")
+                .and_then(decimal)
+                .is_some_and(|received| received >= total)
+        {
+            return vec!["Số tiền khách đưa phải bằng hoặc lớn hơn tổng thanh toán trước khi hoàn tất đơn tiền mặt".into()];
         }
     }
     if entity == "pos_order" && action == "refunded" {

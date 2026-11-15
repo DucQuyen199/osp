@@ -28,6 +28,8 @@ export default function PosTerminalPage() {
   const [partyId, setPartyId] = useState('');
   const [voucherCode, setVoucherCode] = useState('');
   const [method, setMethod] = useState('cash');
+  const [cashReceived, setCashReceived] = useState('');
+  const [pendingCashReceived, setPendingCashReceived] = useState({});
   const [cashDirection, setCashDirection] = useState('cash_out');
   const [cashAmount, setCashAmount] = useState('');
   const [cashAccount, setCashAccount] = useState('');
@@ -159,6 +161,7 @@ export default function PosTerminalPage() {
         session: activeSession.id, warehouse: activeSession.warehouse,
         ...(activeSession.branch ? { branch: activeSession.branch } : {}),
         ...(partyId ? { party: partyId } : {}), ...(prescriptionId ? { prescription: prescriptionId } : {}), ...(voucherCode.trim() ? { voucher_code: voucherCode.trim() } : {}), method,
+        ...(method === 'cash' ? { cash_received: Number(cashReceived) } : {}),
         lines: cart.map(({ product, uom, qty }) => ({ product: product.id, uom: uom || undefined, qty, price: priceFor(product, uom) })),
       } });
       setQuantities({}); setSelectedUnits({}); setPartyId(''); setPrescriptionId(''); setVoucherCode('');
@@ -173,6 +176,7 @@ export default function PosTerminalPage() {
         setNotice(`Đã lưu đơn chờ thanh toán ${String(created.id).slice(0, 8)}. Mở mục đơn chờ bên dưới để hoàn tất hoặc xóa đơn.`);
         setError(completionError);
       } else {
+        setCashReceived('');
         setNotice(`Đã thanh toán ${fmtMoney(Number(created.total) || total)}.`);
       }
     } catch (reason) {
@@ -183,7 +187,17 @@ export default function PosTerminalPage() {
   const completeOrder = async (order) => {
     setBusy(true); setError(''); setNotice('');
     try {
+      if (order.method === 'cash') {
+        const received = Number(pendingCashReceived[order.id] ?? order.cash_received);
+        if (!Number.isFinite(received) || received < Number(order.total || 0)) {
+          throw new Error('Nhập số tiền khách đưa bằng hoặc lớn hơn tổng đơn tiền mặt.');
+        }
+        if (received !== Number(order.cash_received)) {
+          await api(dataPath('pos.pos_order', order.id), { method: 'PATCH', body: { cash_received: received } });
+        }
+      }
       await api(dataPath('pos.pos_order', order.id, 'completed'), { method: 'POST' });
+      setPendingCashReceived((current) => { const next = { ...current }; delete next[order.id]; return next; });
       setNotice(`Đã hoàn tất đơn ${String(order.id).slice(0, 8)}.`);
       await load(true);
     } catch (reason) { setError(reason.message || 'Không hoàn tất được đơn. Kiểm tra lại tồn kho và thử lại.'); }
@@ -290,9 +304,10 @@ export default function PosTerminalPage() {
           {loyaltyEnabled && <label className="field"><span className="label">Mã voucher thành viên</span><input className="input" maxLength="80" autoCapitalize="characters" value={voucherCode} onChange={(event) => setVoucherCode(event.target.value.toUpperCase())}/><span className="small muted">Cần chọn khách hàng đã đăng ký thành viên; mã chỉ được sử dụng một lần.</span></label>}
           {pharmacyEnabled && <label className="field"><span className="label">Đơn thuốc {rxRequired ? '*' : '(nếu có)'}</span><select className="select" required={rxRequired} value={prescriptionId} onChange={(event) => { const id = event.target.value; setPrescriptionId(id); const rx = prescriptions.find((item) => item.id === id); if (rx?.party) setPartyId(rx.party); }}><option value="">Chọn đơn còn thuốc được kê</option>{prescriptions.filter((item) => !item.valid_until || item.valid_until >= localDate()).map((item) => <option key={item.id} value={item.id}>{item.prescription_no} · {item.status === 'partially_dispensed' ? 'cấp một phần' : 'đã xác minh'} · hết hạn {item.valid_until}</option>)}</select>{rxRequired && <small className="muted">Thuốc kê đơn chỉ được bán theo đơn còn hạn, đúng khách hàng; số lượng bán cộng dồn không vượt số lượng kê.</small>}</label>}
           <label className="field"><span className="label">Thanh toán</span><select className="select" value={method} onChange={(event) => setMethod(event.target.value)}><option value="cash">Tiền mặt</option><option value="card">Thẻ</option><option value="transfer">Chuyển khoản</option><option value="ewallet">Ví điện tử</option></select></label>
+          {method === 'cash' && <label className="field"><span className="label">Khách đưa</span><input className="input num" required type="number" min={total} step="0.01" value={cashReceived} onChange={(event) => setCashReceived(event.target.value)} placeholder="Nhập số tiền nhận" /></label>}
           <div className="pos-total"><span>Tạm tính</span><span>Tiền hàng <strong className="num">{fmtMoney(subtotal)}</strong></span><span>Thuế ước tính <strong className="num">{fmtMoney(estimatedTax)}</strong></span><strong className="num">{fmtMoney(total)}</strong><small>Thuế và số tiền chính thức do máy chủ tính theo danh mục khi tạo đơn.</small></div>
-          <button className="btn btn-primary pos-checkout" type="button" disabled={busy || !cart.length || !can('pos.pos_order.create')} onClick={checkout}>{busy ? 'Đang xử lý…' : `Tạo đơn & thanh toán · ${fmtMoney(total)}`}</button>
-          {sessionOrders.length > 0 && <section className="pos-pending"><h3>Đơn chờ xử lý ({sessionOrders.length})</h3>{sessionOrders.map((order) => <div className="pos-pending-item" key={order.id}><div><strong>{fmtMoney(order.total || 0)}</strong><div className="small muted">{fmtDateTime(order.created_at)} · {statusLabel(order.status)}</div></div><button className="btn btn-primary btn-sm" type="button" disabled={busy || !can('pos.pos_order.completed')} onClick={() => completeOrder(order)}>Hoàn tất</button><button className="btn btn-ghost btn-sm" type="button" disabled={busy || !can('pos.pos_order.delete')} onClick={() => removeOrder(order)}>Hủy</button></div>)}</section>}
+          <button className="btn btn-primary pos-checkout" type="button" disabled={busy || !cart.length || !can('pos.pos_order.create') || (method === 'cash' && (!cashReceived || !Number.isFinite(Number(cashReceived)) || Number(cashReceived) < total))} onClick={checkout}>{busy ? 'Đang xử lý…' : `Tạo đơn & thanh toán · ${fmtMoney(total)}`}</button>
+          {sessionOrders.length > 0 && <section className="pos-pending"><h3>Đơn chờ xử lý ({sessionOrders.length})</h3>{sessionOrders.map((order) => <div className="pos-pending-item" key={order.id}><div><strong>{fmtMoney(order.total || 0)}</strong><div className="small muted">{fmtDateTime(order.created_at)} · {statusLabel(order.status)}</div>{order.method === 'cash' && <label className="field"><span className="label">Khách đưa</span><input className="input num" type="number" min={Number(order.total || 0)} step="0.01" value={pendingCashReceived[order.id] ?? (order.cash_received ?? '')} onChange={(event) => setPendingCashReceived((current) => ({ ...current, [order.id]: event.target.value }))} aria-label={`Tiền khách đưa cho đơn ${String(order.id).slice(0, 8)}`} /></label>}</div><button className="btn btn-primary btn-sm" type="button" disabled={busy || !can('pos.pos_order.completed')} onClick={() => completeOrder(order)}>Hoàn tất</button><button className="btn btn-ghost btn-sm" type="button" disabled={busy || !can('pos.pos_order.delete')} onClick={() => removeOrder(order)}>Hủy</button></div>)}</section>}
           <section className="pos-pending"><h3>Giao dịch gần đây</h3>{recentTransactions.length ? recentTransactions.map((order) => <div className="pos-pending-item" key={order.id}><div className="grow"><strong>{fmtMoney(order.total || 0)} · {parties.get(order.party)?.name || 'Khách lẻ'}</strong><div className="small muted">{fmtDateTime(order.created_at)} · {order.method === 'cash' ? 'Tiền mặt' : order.method === 'card' ? 'Thẻ' : order.method === 'transfer' ? 'Chuyển khoản' : order.method === 'ewallet' ? 'Ví điện tử' : '—'} · {statusLabel(order.status)}</div><div className="small muted">{(order.lines || []).map((line, index) => `${line.product_name || products.get(line.product)?.name || 'Mặt hàng'} × ${line.qty}${line.uom_name ? ` ${line.uom_name}` : ''}`).join(' · ')}</div>{order.refund_reason && <div className="small muted">Lý do hoàn: {order.refund_reason}</div>}</div><button className="btn btn-ghost btn-sm" type="button" onClick={() => setPrintingOrderId(order.id)}>In biên nhận</button>{order.status === 'completed' && can('pos.pos_order.refunded') && can('pos.pos_order.update') && <button className="btn btn-ghost btn-sm" type="button" disabled={busy} onClick={() => refundOrder(order)}>Hoàn toàn bộ</button>}</div>) : <div className="empty">Chưa có giao dịch hoàn tất trong danh sách gần đây.</div>}</section>
           <details className="pos-cash-panel"><summary>Thu / chi quỹ tiền mặt</summary><form className="pos-cash-form" onSubmit={createCashMovement}>
             <label className="field"><span className="label">Loại giao dịch</span><select className="select" value={cashDirection} onChange={(event) => setCashDirection(event.target.value)}><option value="cash_out">Chi tiền</option><option value="cash_in">Nộp tiền vào quỹ</option></select></label>
@@ -328,6 +343,7 @@ export default function PosTerminalPage() {
       <div className="pos-receipt-total"><span>Thuế</span><span>{fmtMoney(printingOrder.tax_total || 0)}</span></div>
       <div className="pos-receipt-total pos-receipt-grand"><strong>Tổng cộng</strong><strong>{fmtMoney(printingOrder.total || 0)}</strong></div>
       <div>Thanh toán: {printingOrder.method === 'cash' ? 'Tiền mặt' : printingOrder.method === 'card' ? 'Thẻ' : printingOrder.method === 'transfer' ? 'Chuyển khoản' : printingOrder.method === 'ewallet' ? 'Ví điện tử' : '—'}</div>
+      {printingOrder.method === 'cash' && <><div>Khách đưa: {fmtMoney(printingOrder.cash_received || 0)}</div><div>Tiền thối: {fmtMoney(printingOrder.change_due || 0)}</div></>}
       {printingOrder.refund_reason && <div>Lý do hoàn: {printingOrder.refund_reason}</div>}
       <footer>Cảm ơn quý khách!</footer>
     </article>}

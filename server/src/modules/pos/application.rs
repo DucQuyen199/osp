@@ -319,7 +319,35 @@ pub async fn prepare_document(
         errors.push("POS order totals cannot be represented".into());
         return Ok(errors);
     };
-    document.insert("total".into(), total);
+    document.insert("total".into(), total.clone());
     document.insert("tax_total".into(), tax_total);
+    if document.get("method").and_then(Value::as_str) == Some("cash") {
+        if let Some(received) = document.get("cash_received").and_then(money::decimal) {
+            let received = money::round_money(received);
+            if let Some(received_json) = money::json_number(received) {
+                document.insert("cash_received".into(), received_json);
+            } else {
+                errors.push("POS cash received cannot be serialized".into());
+            }
+            match received.checked_sub(money::decimal(&total).unwrap_or_default()) {
+                Some(change) if change >= Decimal::ZERO => {
+                    if let Some(change) = money::json_number(money::round_money(change)) {
+                        document.insert("change_due".into(), change);
+                    } else {
+                        errors.push("POS change due cannot be serialized".into());
+                    }
+                }
+                Some(_) => {
+                    document.remove("change_due");
+                }
+                None => errors.push("POS change due exceeds the supported amount".into()),
+            }
+        } else {
+            document.remove("change_due");
+        }
+    } else {
+        document.remove("cash_received");
+        document.insert("change_due".into(), json!(0));
+    }
     Ok(errors)
 }

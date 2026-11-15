@@ -52,7 +52,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Nhật ký thuốc bảo vệ thực vật lưu snapshot số ngày cách ly trước thu hoạch; không cho ghi lần phun khi sản phẩm chưa có thời gian cách ly được khai báo rõ (0 ngày vẫn hợp lệ theo nhãn), và máy chủ chặn nhập kho thu hoạch trước hạn hoặc khi hồ sơ thuốc cũ chưa xác minh được.
 - Báo cáo mùa vụ tính chi phí phân bón/thuốc/giống theo giá trị xuất kho đã định giá và chi phí trên hecta; chỉ hiện khi người dùng có quyền xem stock move, không tính nước/nhân công chưa ghi nhận chi phí kho.
 - Hóa đơn điện tử lưu lý do hủy cùng giao dịch chuyển sang chờ provider xử lý hủy.
-- POS ghi nhận tiền thực đếm và chốt ca trong cùng giao dịch sau khi kiểm tra đơn/phiếu quỹ nháp và tính chênh lệch tiền.
+- POS ghi nhận số tiền khách đưa, tự tính/in tiền thối và chặn hoàn tất giao dịch tiền mặt khi nhận thiếu; tiền thực đếm và chốt ca dùng cùng giao dịch sau khi kiểm tra đơn/phiếu quỹ nháp và tính chênh lệch tiền.
 - Bảo trì lưu kết quả sửa chữa và cặp giờ công/đơn giá đầy đủ cùng lần hoàn tất, xuất vật tư và cập nhật lịch định kỳ.
 - Bảo trì có danh mục kỹ thuật viên nội bộ/nhà thầu, chuyên môn và liên hệ; lệnh mở có thể được phân công và chỉ gán kỹ thuật viên còn hoạt động thuộc tenant.
 - Mua hàng lưu lý do tranh chấp hóa đơn nhà cung cấp và ghi chú xử lý cùng lần chuyển trạng thái, tránh tạo công nợ khi hóa đơn đang tranh chấp.
