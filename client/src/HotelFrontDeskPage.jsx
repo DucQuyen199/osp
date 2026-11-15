@@ -62,7 +62,15 @@ export default function HotelFrontDeskPage() {
   const selectedCharges = useMemo(() => charges.filter((item) => item.reservation === selectedId), [charges, selectedId]);
   const selectedInvoice = invoices.find((item) => item.source === 'reservation' && item.source_id === selectedId);
   const visible = reservations.filter((item) => filter === 'all' || item.status === filter || (filter === 'arrivals' && item.check_in === today() && item.status === 'booked') || (filter === 'departures' && item.check_out === today() && item.status === 'checked_in'));
-  const availableRooms = [...rooms.values()].filter((room) => room.room_type === (selected?.room_type || roomType) && room.status === 'vacant');
+  const availableRooms = [...rooms.values()].filter((room) => {
+    if (room.room_type !== (selected?.room_type || roomType) || room.status !== 'vacant') return false;
+    if (!selected?.check_in || !selected?.check_out) return true;
+    return !reservations.some((reservation) => reservation.id !== selected.id
+      && reservation.room === room.id
+      && ['booked', 'checked_in'].includes(reservation.status)
+      && reservation.check_in < selected.check_out
+      && reservation.check_out > selected.check_in);
+  });
   const arrivalsToday = reservations.filter((item) => item.status === 'booked' && item.check_in === today()).length;
   const departuresToday = reservations.filter((item) => item.status === 'checked_in' && item.check_out === today()).length;
   const occupiedRooms = [...rooms.values()].filter((room) => room.status === 'occupied').length;
