@@ -26,6 +26,9 @@ pub struct CancellationResult {
 }
 
 /// Adapter boundary for vendors such as VNPT, Viettel, or MISA.
+/// Adapters should use `EINVOICE_PROVIDER_UNAVAILABLE` or
+/// `EINVOICE_PROVIDER_TEMPORARY` for transport, rate-limit, and server errors
+/// so the worker can retry them safely with the request idempotency key.
 pub trait EInvoiceProvider: Send + Sync {
     fn code(&self) -> &str;
 

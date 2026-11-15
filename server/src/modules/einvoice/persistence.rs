@@ -14,7 +14,15 @@ pub async fn validate_persistence(
         return Ok(Vec::new());
     }
     let mut errors = Vec::new();
-    if matches!(action, "created" | "issued" | "retry") {
+    if matches!(
+        action,
+        "created"
+            | "issued"
+            | "retry"
+            | "retry_due"
+            | "retry_cancellation"
+            | "retry_cancellation_due"
+    ) {
         let invoice_id = document
             .get("invoice")
             .and_then(Value::as_str)

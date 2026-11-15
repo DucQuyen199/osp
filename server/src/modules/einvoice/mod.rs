@@ -12,3 +12,26 @@ pub use provider::{
     IssueResult,
 };
 pub use worker::{run_once, run_once_with_provider};
+
+pub(crate) fn scheduled_jobs() -> Vec<crate::defs::JobSpec> {
+    vec![
+        crate::modules::scheduled_job_with_filter(
+            "retry-transient-invoice-issue",
+            "Thử lại phát hành hóa đơn điện tử có thể phục hồi",
+            "einvoice",
+            serde_json::json!({ "status": "failed", "operation": "issue" }),
+            "retry_at",
+            "lte",
+            "retry_due",
+        ),
+        crate::modules::scheduled_job_with_filter(
+            "retry-transient-invoice-cancellation",
+            "Thử lại yêu cầu hủy hóa đơn điện tử có thể phục hồi",
+            "einvoice",
+            serde_json::json!({ "status": "failed", "operation": "cancel" }),
+            "retry_at",
+            "lte",
+            "retry_cancellation_due",
+        ),
+    ]
+}

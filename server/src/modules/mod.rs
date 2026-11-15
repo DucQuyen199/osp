@@ -65,11 +65,31 @@ pub(crate) fn scheduled_job(
     due_op: &str,
     action: &str,
 ) -> crate::defs::JobSpec {
+    scheduled_job_with_filter(
+        id,
+        label,
+        entity,
+        serde_json::json!({ "status": status }),
+        due_field,
+        due_op,
+        action,
+    )
+}
+
+pub(crate) fn scheduled_job_with_filter(
+    id: &str,
+    label: &str,
+    entity: &str,
+    filter: serde_json::Value,
+    due_field: &str,
+    due_op: &str,
+    action: &str,
+) -> crate::defs::JobSpec {
     crate::defs::JobSpec {
         id: id.into(),
         label: label.into(),
         entity: entity.into(),
-        where_: Some(serde_json::json!({ "status": status })),
+        where_: Some(filter),
         due: crate::defs::JobDue {
             field: due_field.into(),
             op: due_op.into(),
@@ -85,6 +105,7 @@ pub(crate) fn scheduled_jobs(module: &str) -> Vec<crate::defs::JobSpec> {
         "booking" => booking::scheduled_jobs(),
         "contract" => contract::scheduled_jobs(),
         "events" => event_management::scheduled_jobs(),
+        "einvoice" => einvoice::scheduled_jobs(),
         "insurance" => insurance::scheduled_jobs(),
         "lending" => lending::scheduled_jobs(),
         "maintenance" => maintenance::scheduled_jobs(),

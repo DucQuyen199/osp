@@ -18,7 +18,13 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
         return Vec::new();
     }
     let mut errors = Vec::new();
-    for field in ["invoice", "request_payload", "attempts", "attempt_history"] {
+    for field in [
+        "invoice",
+        "request_payload",
+        "attempts",
+        "attempt_history",
+        "retry_at",
+    ] {
         if patch.get(field).is_some() {
             errors.push(format!("{field} is maintained by the e-invoice workflow"));
         }
@@ -91,6 +97,37 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
                 errors.push("Record the provider error before marking an e-invoice failed".into());
             }
         }
+        "retry" | "retry_due" => {
+            if document
+                .get("operation")
+                .and_then(Value::as_str)
+                .unwrap_or("issue")
+                != "issue"
+            {
+                errors.push("Only an invoice issuance request can use this retry action".into());
+            }
+            if action == "retry_due" && !retry_is_due(document) {
+                errors.push("The e-invoice retry is not due yet".into());
+            }
+        }
+        "retry_cancellation" | "retry_cancellation_due" => {
+            if document.get("operation").and_then(Value::as_str) != Some("cancel") {
+                errors
+                    .push("Only an invoice cancellation request can use this retry action".into());
+            }
+            for field in ["provider_reference", "cancellation_reason"] {
+                if document
+                    .get(field)
+                    .and_then(Value::as_str)
+                    .is_none_or(|value| value.trim().is_empty())
+                {
+                    errors.push(format!("{field} is required to retry cancellation"));
+                }
+            }
+            if action == "retry_cancellation_due" && !retry_is_due(document) {
+                errors.push("The e-invoice cancellation retry is not due yet".into());
+            }
+        }
         "cancelled" => {
             if document
                 .get("cancellation_reason")
@@ -125,6 +162,14 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
     errors
 }
 
+fn retry_is_due(document: &Value) -> bool {
+    document
+        .get("retry_at")
+        .and_then(Value::as_str)
+        .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
+        .is_some_and(|retry_at| retry_at <= chrono::Utc::now())
+}
+
 pub fn validate_remove(entity: &str) -> Vec<String> {
     if entity == "einvoice" {
         vec!["E-invoice requests are retained as issuance and cancellation audit evidence".into()]
@@ -134,7 +179,17 @@ pub fn validate_remove(entity: &str) -> Vec<String> {
 }
 
 pub fn prepare_action(entity: &str, action: &str, document: &mut Map<String, Value>) {
-    if entity != "einvoice" || !matches!(action, "cancel_requested" | "failed" | "retry") {
+    if entity != "einvoice"
+        || !matches!(
+            action,
+            "cancel_requested"
+                | "failed"
+                | "retry"
+                | "retry_due"
+                | "retry_cancellation"
+                | "retry_cancellation_due"
+        )
+    {
         return;
     }
     let attempts = document
@@ -144,6 +199,7 @@ pub fn prepare_action(entity: &str, action: &str, document: &mut Map<String, Val
     if action == "cancel_requested" {
         document.insert("operation".into(), Value::String("cancel".into()));
         document.remove("provider_error");
+        document.insert("retry_at".into(), Value::Null);
     } else if action == "failed" {
         if let Some(error) = document
             .get("provider_error")
@@ -168,5 +224,9 @@ pub fn prepare_action(entity: &str, action: &str, document: &mut Map<String, Val
         }
     } else {
         document.remove("provider_error");
+        document.insert("retry_at".into(), Value::Null);
+        if matches!(action, "retry" | "retry_cancellation") {
+            document.insert("attempts".into(), Value::from(0));
+        }
     }
 }

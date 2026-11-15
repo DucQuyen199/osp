@@ -122,14 +122,15 @@ export default function EInvoiceWorkbenchPage() {
       <div className="row wrap" style={{ marginBottom: 12 }}><h2>Hàng đợi phát hành</h2><span className="grow"/><input className="input" style={{ maxWidth: 340 }} aria-label="Tìm hóa đơn điện tử" placeholder="Tìm số hóa đơn, provider, lỗi…" value={search} onChange={(event) => setSearch(event.target.value)}/></div>
       {loading ? <div className="skeleton" data-h="row"/> : !visibleRows.length ? <div className="empty">{rows.length ? 'Không có yêu cầu phù hợp bộ lọc.' : 'Chưa có yêu cầu. Hệ thống tạo yêu cầu sau khi hóa đơn kế toán được ghi sổ.'}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Hóa đơn điện tử</th><th>Hóa đơn kế toán</th><th>Provider</th><th>Trạng thái</th><th>Lần thử / cập nhật</th><th>Thao tác</th></tr></thead><tbody>{visibleRows.map((row) => {
         const invoice = invoices.get(row.invoice);
+        const retryAction = row.operation === 'cancel' ? 'retry_cancellation' : 'retry';
         return <tr key={row.id} onClick={() => setSelectedId(row.id)} style={{ cursor: 'pointer', background: selectedId === row.id ? 'var(--surface-2)' : undefined }}>
           <td><strong>{row.number || row.serial || `Yêu cầu ${String(row.id).slice(0, 8)}`}</strong><div className="small muted">{row.lookup_code ? `Mã tra cứu ${row.lookup_code}` : row.provider_reference || 'Chưa có mã từ nhà cung cấp'}</div></td>
           <td>{invoice ? <a href={recordHref('accounting.invoice', invoice.id)} onClick={(event) => event.stopPropagation()}>{invoice.number || String(invoice.id).slice(0, 8)}</a> : <span className="small muted">{row.invoice ? `#${String(row.invoice).slice(0, 8)}` : '—'}</span>}{invoice?.party && <div className="small muted">Đối tác #{String(invoice.party).slice(0, 8)}</div>}</td>
           <td>{row.provider || 'Chưa cấu hình'}{row.serial && <div className="small muted">Ký hiệu {row.serial}</div>}</td>
-          <td><span className={`badge ${statusTone(row.status)}`}>{statusLabel(row.status)}</span>{row.provider_error && <div className="small error-text" title={row.provider_error}>{String(row.provider_error).slice(0, 90)}</div>}</td>
+          <td><span className={`badge ${statusTone(row.status)}`}>{statusLabel(row.status)}</span>{row.retry_at && <div className="small muted">Tự thử lại {formatDateTime(row.retry_at)}</div>}{row.provider_error && <div className="small error-text" title={row.provider_error}>{String(row.provider_error).slice(0, 90)}</div>}</td>
           <td>{Number(row.attempts || 0)} lần<div className="small muted">{formatDateTime(timestamp(row))}</div></td>
           <td onClick={(event) => event.stopPropagation()}><div className="row wrap">
-            {row.status === 'failed' && can('einvoice.einvoice.retry') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => run(row, 'retry', 'Đã đưa yêu cầu vào hàng đợi thử lại.')}>Thử lại</button>}
+            {row.status === 'failed' && can(`einvoice.einvoice.${retryAction}`) && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => run(row, retryAction, 'Đã đưa yêu cầu vào hàng đợi thử lại.')}>Thử lại</button>}
             {row.status === 'issued' && can('einvoice.einvoice.cancel_requested') && can('einvoice.einvoice.update') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => { setSelectedId(row.id); setReason(row.cancellation_reason || ''); document.getElementById('einvoice-cancellation-reason')?.focus(); }}>Yêu cầu hủy</button>}
             <button className="btn btn-ghost btn-sm" type="button" onClick={() => setSelectedId(row.id)}>Chi tiết</button>
           </div></td>
@@ -145,6 +146,7 @@ export default function EInvoiceWorkbenchPage() {
         <div><span className="label">Mã tra cứu</span><p>{selected.lookup_code || '—'}</p></div>
         <div><span className="label">Số lần gọi provider</span><p>{Number(selected.attempts || 0)}</p></div>
         <div><span className="label">Cập nhật gần nhất</span><p>{formatDateTime(timestamp(selected))}</p></div>
+        {selected.retry_at && <div><span className="label">Lần thử tự động tiếp theo</span><p>{formatDateTime(selected.retry_at)}</p></div>}
         {selected.provider_error && <div className="full"><span className="label">Lỗi gần nhất</span><div className="alert danger">{selected.provider_error}</div></div>}
         {selected.cancellation_reason && <div className="full"><span className="label">Lý do hủy</span><p>{selected.cancellation_reason}</p></div>}
       </div>

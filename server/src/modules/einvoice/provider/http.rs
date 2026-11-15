@@ -92,6 +92,9 @@ impl HttpEInvoiceProvider {
             )
         })?;
         let status = response.status();
+        if !status.is_success() {
+            return Err(provider_status_error(status));
+        }
         if response
             .content_length()
             .is_some_and(|length| length > MAX_RESPONSE_BYTES as u64)
@@ -107,7 +110,7 @@ impl HttpEInvoiceProvider {
         while let Some(chunk) = response.chunk().await.map_err(|_| {
             ApiError::new(
                 502,
-                "EINVOICE_PROVIDER_RESPONSE",
+                "EINVOICE_PROVIDER_UNAVAILABLE",
                 "Cannot read provider response",
             )
         })? {
@@ -119,9 +122,6 @@ impl HttpEInvoiceProvider {
                 ));
             }
             bytes.extend_from_slice(&chunk);
-        }
-        if !status.is_success() {
-            return Err(provider_status_error(status));
         }
         let parsed: Value = serde_json::from_slice(&bytes).map_err(|_| {
             ApiError::new(
@@ -223,10 +223,18 @@ impl EInvoiceProvider for HttpEInvoiceProvider {
 }
 
 fn provider_status_error(status: StatusCode) -> crate::error::ApiError {
-    let status_code = if status.is_server_error() { 502 } else { 422 };
+    let retryable = status.is_server_error()
+        || matches!(
+            status,
+            StatusCode::REQUEST_TIMEOUT | StatusCode::TOO_EARLY | StatusCode::TOO_MANY_REQUESTS
+        );
     ApiError::new(
-        status_code,
-        "EINVOICE_PROVIDER_REJECTED",
+        if retryable { 502 } else { 422 },
+        if retryable {
+            "EINVOICE_PROVIDER_TEMPORARY"
+        } else {
+            "EINVOICE_PROVIDER_REJECTED"
+        },
         format!(
             "E-invoice provider rejected request (HTTP {})",
             status.as_u16()

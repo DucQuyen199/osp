@@ -14,6 +14,7 @@ const BATCH_SIZE: i64 = 10;
 const LEASE_SECONDS: i64 = 180;
 const DEFAULT_PROVIDER_CONCURRENCY: usize = 2;
 const MAX_PROVIDER_CONCURRENCY: usize = 16;
+const MAX_AUTOMATIC_ATTEMPTS: i64 = 8;
 
 struct Job {
     tenant_id: String,
@@ -23,6 +24,7 @@ struct Job {
     request_payload: Value,
     provider_reference: Option<String>,
     cancellation_reason: Option<String>,
+    attempts: i64,
 }
 
 /// Process one bounded batch from every tenant with e-invoice enabled.
@@ -145,7 +147,7 @@ async fn claim(kernel: &Kernel, tenant: &Tenant, limit: i64) -> R<Vec<Job>> {
              UPDATE einvoice__einvoice e \
              SET attempts = COALESCE(e.attempts, 0) + 1, lease_until = now() + ($3 * interval '1 second'), lease_token = $4, updated_at = now() \
              FROM ready WHERE e.tenant_id = $1 AND e.id = ready.id \
-             RETURNING e.id, e.operation, e.request_payload, e.provider_reference, e.cancellation_reason",
+             RETURNING e.id, e.operation, e.request_payload, e.provider_reference, e.cancellation_reason, e.attempts::bigint",
             &[&tenant.id, &limit, &LEASE_SECONDS, &lease_token],
         )
         .await?;
@@ -162,6 +164,7 @@ async fn claim(kernel: &Kernel, tenant: &Tenant, limit: i64) -> R<Vec<Job>> {
             request_payload: row.get::<_, Option<Value>>(2).unwrap_or(Value::Null),
             provider_reference: row.get(3),
             cancellation_reason: row.get(4),
+            attempts: row.get(5),
         })
         .collect())
 }
@@ -217,18 +220,46 @@ async fn process(
         )),
     };
     match result {
-        Ok((action, patch)) => finish(kernel, tenant, job, action, patch).await,
+        Ok((action, mut patch)) => {
+            patch.insert("retry_at".into(), Value::Null);
+            finish(kernel, tenant, job, action, patch).await
+        }
         Err(error) => {
             let mut patch = Map::new();
             patch.insert(
                 "provider_error".into(),
                 Value::String(format!("{}: {}", error.code, error.message)),
             );
+            let retry_at =
+                if is_transient_provider_error(&error) && job.attempts < MAX_AUTOMATIC_ATTEMPTS {
+                    let delay = retry_delay_seconds(job.attempts);
+                    let next = chrono::Utc::now()
+                        .checked_add_signed(chrono::Duration::seconds(delay))
+                        .ok_or_else(|| {
+                            ApiError::internal("E-invoice retry time exceeds supported date range")
+                        })?;
+                    Some(Value::String(next.to_rfc3339()))
+                } else {
+                    None
+                };
+            patch.insert("retry_at".into(), retry_at.unwrap_or(Value::Null));
             patch.insert("lease_until".into(), Value::Null);
             patch.insert("lease_token".into(), Value::Null);
             finish(kernel, tenant, job, "failed", patch).await
         }
     }
+}
+
+fn is_transient_provider_error(error: &ApiError) -> bool {
+    matches!(
+        error.code.as_str(),
+        "EINVOICE_PROVIDER_UNAVAILABLE" | "EINVOICE_PROVIDER_TEMPORARY"
+    )
+}
+
+fn retry_delay_seconds(attempts: i64) -> i64 {
+    let exponent = attempts.saturating_sub(1).clamp(0, 9) as u32;
+    (60_i64 * 2_i64.pow(exponent)).min(6 * 60 * 60)
 }
 
 async fn finish(

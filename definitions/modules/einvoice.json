@@ -114,6 +114,12 @@
      "system": true
     },
     {
+     "name": "retry_at",
+     "type": "datetime",
+     "required": false,
+     "system": true
+    },
+    {
      "name": "status",
      "type": "enum",
      "required": false,
@@ -155,11 +161,29 @@
       ],
       "to": "failed"
      },
+     "retry_due": {
+      "from": [
+       "failed"
+      ],
+      "to": "pending"
+     },
+     "retry_cancellation_due": {
+      "from": [
+       "failed"
+      ],
+      "to": "cancellation_pending"
+     },
      "retry": {
       "from": [
        "failed"
       ],
       "to": "pending"
+     },
+     "retry_cancellation": {
+      "from": [
+       "failed"
+      ],
+      "to": "cancellation_pending"
      }
     }
    },
