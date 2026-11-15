@@ -8,6 +8,98 @@ use rust_decimal::Decimal;
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
+type PurchaseLineKey = (Uuid, Decimal, Option<Uuid>);
+
+fn accumulate_lines(
+    quantities: &mut std::collections::BTreeMap<PurchaseLineKey, Decimal>,
+    lines: &Value,
+    source: &str,
+    event_type: &str,
+) -> R<()> {
+    let Some(lines) = lines.as_array() else {
+        return Err(crate::error::ApiError::validation(
+            event_type,
+            vec![format!(
+                "{source} lines are invalid; received quantities cannot be verified"
+            )],
+        ));
+    };
+    if lines.is_empty() {
+        return Err(crate::error::ApiError::validation(
+            event_type,
+            vec![format!(
+                "{source} has no lines; received quantities cannot be verified"
+            )],
+        ));
+    }
+    for (index, line) in lines.iter().enumerate() {
+        let Some(product) = line
+            .get("product")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+        else {
+            return Err(crate::error::ApiError::validation(
+                event_type,
+                vec![format!(
+                    "{source} line {} has an invalid product",
+                    index + 1
+                )],
+            ));
+        };
+        let Some(price) = line.get("price").and_then(money::decimal) else {
+            return Err(crate::error::ApiError::validation(
+                event_type,
+                vec![format!("{source} line {} has an invalid price", index + 1)],
+            ));
+        };
+        let Some(qty) = line.get("qty").and_then(money::decimal) else {
+            return Err(crate::error::ApiError::validation(
+                event_type,
+                vec![format!(
+                    "{source} line {} has an invalid quantity",
+                    index + 1
+                )],
+            ));
+        };
+        if price < Decimal::ZERO || qty <= Decimal::ZERO {
+            return Err(crate::error::ApiError::validation(
+                event_type,
+                vec![format!(
+                    "{source} line {} has a negative price or nonpositive quantity",
+                    index + 1
+                )],
+            ));
+        }
+        let unit = match line.get("uom") {
+            Some(Value::String(value)) => Some(Uuid::parse_str(value).map_err(|_| {
+                crate::error::ApiError::validation(
+                    event_type,
+                    vec![format!("{source} line {} has an invalid unit", index + 1)],
+                )
+            })?),
+            Some(value) if !value.is_null() => {
+                return Err(crate::error::ApiError::validation(
+                    event_type,
+                    vec![format!("{source} line {} has an invalid unit", index + 1)],
+                ));
+            }
+            _ => None,
+        };
+        let total = quantities
+            .entry((product, price, unit))
+            .or_insert(Decimal::ZERO);
+        *total = total.checked_add(qty).ok_or_else(|| {
+            crate::error::ApiError::validation(
+                event_type,
+                vec![format!(
+                    "{source} quantities exceed the supported decimal range"
+                )],
+            )
+        })?;
+    }
+    Ok(())
+}
+
 pub async fn handle_source_event(
     kernel: &Kernel,
     tx: &Tx<'_>,
@@ -54,31 +146,8 @@ pub async fn handle_source_event(
         })?;
     let status: String = order.get(0);
     let order_lines: Value = order.get(1);
-    let mut ordered = std::collections::BTreeMap::<(Uuid, Decimal, Option<Uuid>), Decimal>::new();
-    for line in order_lines.as_array().into_iter().flatten() {
-        let (Some(product), Some(price), Some(qty)) = (
-            line.get("product")
-                .and_then(Value::as_str)
-                .and_then(|value| Uuid::parse_str(value).ok()),
-            line.get("price").and_then(money::decimal),
-            line.get("qty").and_then(money::decimal),
-        ) else {
-            continue;
-        };
-        let unit = line
-            .get("uom")
-            .and_then(Value::as_str)
-            .and_then(|value| Uuid::parse_str(value).ok());
-        let ordered_qty = ordered
-            .entry((product, price, unit))
-            .or_insert(Decimal::ZERO);
-        *ordered_qty = ordered_qty.checked_add(qty).ok_or_else(|| {
-            crate::error::ApiError::validation(
-                event_type,
-                vec!["Purchase order quantity exceeds the supported decimal range".into()],
-            )
-        })?;
-    }
+    let mut ordered = std::collections::BTreeMap::<PurchaseLineKey, Decimal>::new();
+    accumulate_lines(&mut ordered, &order_lines, "Purchase order", event_type)?;
     let receipts = tx
         .query(
             "SELECT id, lines FROM purchasing__purchase_receipt WHERE tenant_id = $1 AND purchase_order = $2 AND status = 'received'",
@@ -94,33 +163,15 @@ pub async fn handle_source_event(
             vec!["Received receipt is missing from the purchase order history".into()],
         ));
     }
-    let mut received = std::collections::BTreeMap::<(Uuid, Decimal, Option<Uuid>), Decimal>::new();
+    let mut received = std::collections::BTreeMap::<PurchaseLineKey, Decimal>::new();
     for row in receipts {
         let lines: Value = row.get(1);
-        for line in lines.as_array().into_iter().flatten() {
-            let (Some(product), Some(price), Some(qty)) = (
-                line.get("product")
-                    .and_then(Value::as_str)
-                    .and_then(|value| Uuid::parse_str(value).ok()),
-                line.get("price").and_then(money::decimal),
-                line.get("qty").and_then(money::decimal),
-            ) else {
-                continue;
-            };
-            let unit = line
-                .get("uom")
-                .and_then(Value::as_str)
-                .and_then(|value| Uuid::parse_str(value).ok());
-            let received_qty = received
-                .entry((product, price, unit))
-                .or_insert(Decimal::ZERO);
-            *received_qty = received_qty.checked_add(qty).ok_or_else(|| {
-                crate::error::ApiError::validation(
-                    event_type,
-                    vec!["Received purchase quantity exceeds the supported decimal range".into()],
-                )
-            })?;
-        }
+        accumulate_lines(
+            &mut received,
+            &lines,
+            "Received purchase receipt",
+            event_type,
+        )?;
     }
     let complete = !ordered.is_empty()
         && ordered.iter().all(|(key, quantity)| {
