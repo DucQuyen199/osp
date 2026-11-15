@@ -24,7 +24,7 @@ pub async fn validate_persistence(
             };
             let row = tx
                 .query_opt(
-                    "SELECT status, next_due, current_date FROM maintenance__maintenance_plan WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                    "SELECT status, next_due FROM maintenance__maintenance_plan WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
                     &[&tenant.id, &plan_id],
                 )
                 .await?;
@@ -35,7 +35,7 @@ pub async fn validate_persistence(
             };
             let status: String = row.get(0);
             let next_due: Option<chrono::NaiveDate> = row.get(1);
-            let today: chrono::NaiveDate = row.get(2);
+            let today = tenant.business_today();
             if status != "active" || !next_due.is_some_and(|due| due <= today) {
                 errors.push("Chỉ chạy kế hoạch bảo trì đang hoạt động và đã đến hạn".into());
             }

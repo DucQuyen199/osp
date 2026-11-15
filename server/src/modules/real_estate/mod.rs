@@ -15,7 +15,7 @@ pub(crate) fn scheduled_jobs() -> Vec<crate::defs::JobSpec> {
             "lease",
             "active",
             "next_rent_date",
-            "lt",
+            "lte",
             "rent_due",
         ),
         crate::modules::scheduled_job(

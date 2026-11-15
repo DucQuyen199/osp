@@ -48,7 +48,7 @@ pub async fn handle_source_event(
             let title: String = row.get(1);
             let due: Option<NaiveDate> = row.get(2);
             let status: String = row.get(3);
-            let today: NaiveDate = tx.query_one_row("SELECT current_date", &[]).await?.get(0);
+            let today: NaiveDate = tenant.business_today();
             if status != "active" {
                 return Err(ApiError::validation(
                     event_type,
@@ -110,7 +110,7 @@ pub async fn handle_source_event(
                 .ok_or_else(|| {
                     ApiError::validation(event_type, vec!["Chu kỳ bảo trì không hợp lệ".into()])
                 })?;
-            let today: NaiveDate = tx.query_one_row("SELECT current_date", &[]).await?.get(0);
+            let today: NaiveDate = tenant.business_today();
             let interval_days = Duration::try_days(interval).ok_or_else(|| {
                 ApiError::validation(event_type, vec!["Chu kỳ bảo trì vượt giới hạn ngày".into()])
             })?;

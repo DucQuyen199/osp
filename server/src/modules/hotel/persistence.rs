@@ -387,10 +387,11 @@ pub async fn validate_persistence(
         else {
             return Ok(vec!["Assign a room before checking in".into()]);
         };
+        let business_today = tenant.business_today();
         let row = tx
             .query_opt(
-                "SELECT room.status, reservation.check_in <= current_date AND reservation.check_out > current_date FROM hotel__room room CROSS JOIN hotel__reservation reservation WHERE room.tenant_id = $1 AND room.id = $2 AND reservation.tenant_id = $1 AND reservation.id = $3 FOR UPDATE OF room",
-                &[&tenant.id, &room_id, &document.get("id").and_then(Value::as_str).and_then(|id| Uuid::parse_str(id).ok()).unwrap_or(Uuid::nil())],
+                "SELECT room.status, reservation.check_in <= $4 AND reservation.check_out > $4 FROM hotel__room room CROSS JOIN hotel__reservation reservation WHERE room.tenant_id = $1 AND room.id = $2 AND reservation.tenant_id = $1 AND reservation.id = $3 FOR UPDATE OF room",
+                &[&tenant.id, &room_id, &document.get("id").and_then(Value::as_str).and_then(|id| Uuid::parse_str(id).ok()).unwrap_or(Uuid::nil()), &business_today],
             )
             .await?;
         let Some(row) = row else {
@@ -432,10 +433,11 @@ pub async fn validate_persistence(
             .and_then(Value::as_str)
             .and_then(|value| Uuid::parse_str(value).ok())
             .unwrap_or(Uuid::nil());
+        let business_today = tenant.business_today();
         let Some(row) = tx
             .query_opt(
-                "SELECT check_in < current_date FROM hotel__reservation WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
-                &[&tenant.id, &id],
+                "SELECT check_in < $3 FROM hotel__reservation WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                &[&tenant.id, &id, &business_today],
             )
             .await?
         else {

@@ -26,7 +26,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Nhà thuốc chỉ ghi nhận cấp phát qua state machine sau giao dịch POS hoàn tất; timestamp, lịch sử đơn thuốc và bán hàng cùng commit/rollback.
 - Lệnh sản xuất theo dõi sản lượng đạt/phế phẩm riêng trong QC; thành phẩm theo dõi lô nhận mã lô và hạn dùng được liên kết tới phiếu QC và tồn kho.
 - Sửa hàng lỗi sản xuất theo lệnh rework: bổ sung chi phí BOM vào WIP của lệnh gốc, khóa trùng lệnh đang chạy, kiểm tra lại QC sau sửa và đóng NC liên quan khi đạt.
-- Các ngày mặc định trong những màn hình kế toán, ngân hàng, mua hàng, nhân sự, nhà thuốc, xây dựng, lưu trú và các ngành khác dùng ngày lịch địa phương thay vì UTC để tránh lệch ngày quanh nửa đêm.
+- Các ngày mặc định, kiểm tra nghiệp vụ theo ngày và tác vụ đến hạn trong kế toán, ngân hàng, mua hàng, nhân sự, nông nghiệp, lưu trú, bảo trì, thuê bao và các ngành khác dùng ngày lịch địa phương của tenant thay vì ngày hệ điều hành/cơ sở dữ liệu; thời điểm vẫn lưu theo UTC.
 - Luồng logistics hỗ trợ xác nhận số lượng thực nhận theo từng dòng và lưu lý do giao thiếu; tồn kho, tiến độ đơn bán, quyền trả hàng và lượng còn có thể giao tiếp đều tính theo số thực nhận.
 - Bàn bán buôn cho phép lập thêm vận đơn theo số lượng còn lại, tính cả chuyến nháp/đang giao và số đã giao thực tế; phần giao thất bại hoặc giao thiếu được giải phóng để giao lại.
 - Lịch hẹn ở trạng thái yêu cầu tính lại giờ kết thúc và giá mặc định khi đổi dịch vụ hoặc giờ bắt đầu; khung giờ mới tiếp tục qua kiểm tra khóa tài nguyên và trùng lịch.

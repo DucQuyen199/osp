@@ -562,6 +562,8 @@ impl Kernel {
                 )),
             })
             .transpose()?;
+        let business_today = tenant.business_today();
+        let business_timezone = tenant.business_timezone().to_string();
         let mut conn = self.pool.get().await?;
         let tx = Tx::begin(&mut conn, &tenant.id, false).await?;
         let items = tx
@@ -596,7 +598,7 @@ impl Kernel {
                    'layerReceivedAt', layer.created_at, 'layerQty', layer.qty, 'heldQty', qi.held_qty, \
                    'unitCost', COALESCE(qi.unit_cost, layer.unit_cost, 0), \
                    'heldValue', qi.held_qty * COALESCE(qi.unit_cost, layer.unit_cost, 0), \
-                   'daysHeld', GREATEST(current_date - qi.created_at::date, 0) \
+                   'daysHeld', GREATEST($4::date - (qi.created_at AT TIME ZONE $5)::date, 0) \
                  ) FROM held_inspections qi \
                  JOIN master_data__product p ON p.tenant_id = qi.tenant_id AND p.id = qi.product \
                  LEFT JOIN master_data__uom u ON u.tenant_id = p.tenant_id AND u.id = p.uom \
@@ -609,7 +611,7 @@ impl Kernel {
                    AND round(layer.qty::numeric, 6) = round(qi.qty::numeric, 6) AND layer.layer_ordinal = qi.layer_ordinal \
                  WHERE qi.held_qty > 0.000001 \
                  ORDER BY qi.created_at, qi.id",
-                &[&tenant.id, &warehouse, &status],
+                &[&tenant.id, &warehouse, &status, &business_today, &business_timezone],
             )
             .await?;
         let held_value = items.iter().try_fold(Decimal::ZERO, |total, item| {

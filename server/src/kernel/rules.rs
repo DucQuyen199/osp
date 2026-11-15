@@ -546,6 +546,7 @@ impl Kernel {
     pub async fn run_jobs(&self, t: &Tenant) -> R<u32> {
         let quote = crate::schema::quote;
         let mut done = 0;
+        let business_today = t.business_today();
         for id in &t.modules {
             for job in crate::modules::scheduled_jobs(id) {
                 let q = self.reg.qualify(id, &job.entity);
@@ -553,15 +554,14 @@ impl Kernel {
                 let Some(due) = ent.def.field(&job.due.field) else {
                     continue;
                 };
-                let (now_expr, op) = (
-                    if due.ty == "date" {
-                        "current_date"
-                    } else {
-                        "now()"
-                    },
-                    if job.due.op == "lt" { "<" } else { "<=" },
-                );
+                let op = if job.due.op == "lt" { "<" } else { "<=" };
                 let mut params: Vec<Box<dyn ToSql + Sync + Send>> = vec![Box::new(t.id.clone())];
+                let now_expr = if due.ty == "date" {
+                    params.push(Box::new(business_today));
+                    format!("${}", params.len())
+                } else {
+                    "now()".to_string()
+                };
                 let mut wh = vec![
                     "e.tenant_id = $1".to_string(),
                     format!("e.{} {op} {now_expr}", quote(&job.due.field)),
@@ -610,10 +610,16 @@ impl Kernel {
                         };
                         let mut lock_params: Vec<Box<dyn ToSql + Sync + Send>> =
                             vec![Box::new(t.id.clone()), Box::new(record_id)];
+                        let lock_now_expr = if due.ty == "date" {
+                            lock_params.push(Box::new(business_today));
+                            format!("${}", lock_params.len())
+                        } else {
+                            "now()".to_string()
+                        };
                         let mut lock_wh = vec![
                             "e.tenant_id = $1".to_string(),
                             "e.id = $2".to_string(),
-                            format!("e.{} {op} {now_expr}", quote(&job.due.field)),
+                            format!("e.{} {op} {lock_now_expr}", quote(&job.due.field)),
                         ];
                         if let Some(Value::Object(w)) = &job.where_ {
                             for (k, v) in w {

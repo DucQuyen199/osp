@@ -83,7 +83,7 @@ async fn schedule_cycle(
     let Some(amount) = price.filter(|amount| *amount > Decimal::ZERO) else {
         return Ok(true);
     };
-    let today: NaiveDate = tx.query_one_row("SELECT current_date", &[]).await?.get(0);
+    let today: NaiveDate = tenant.business_today();
     let anchor = start.or(base_date).unwrap_or(today);
     let due_date = match base_date {
         Some(previous) => next_anchored_date(anchor, previous, months).ok_or_else(|| {
@@ -295,7 +295,7 @@ pub async fn prepare_document(
             .get("start")
             .is_none_or(|value| value.is_null() || value.as_str().is_some_and(str::is_empty))
     {
-        let start: NaiveDate = tx.query_one_row("SELECT current_date", &[]).await?.get(0);
+        let start: NaiveDate = tenant.business_today();
         document.insert("start".into(), json!(start));
         return Ok(Vec::new());
     }
