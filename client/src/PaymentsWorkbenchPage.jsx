@@ -69,8 +69,12 @@ export default function PaymentsWorkbenchPage() {
     const reference = window.prompt(action === 'succeeded' ? 'Nhập mã giao dịch thành công do nhà cung cấp trả về:' : 'Mã tham chiếu (nếu đã có):', transaction.reference || '');
     if (reference === null) return;
     await run(`${transaction.id}:${action}`, async () => {
-      if (reference.trim() !== (transaction.reference || '')) await api(dataPath('payments.payment_txn', transaction.id), { method: 'PATCH', body: { reference: reference.trim() } });
-      await api(dataPath('payments.payment_txn', transaction.id, action), { method: 'POST' });
+      const normalizedReference = reference.trim();
+      const changed = normalizedReference !== (transaction.reference || '');
+      await api(dataPath('payments.payment_txn', transaction.id, action), {
+        method: 'POST',
+        ...(changed ? { body: { reference: normalizedReference } } : {}),
+      });
     }, action === 'succeeded' ? 'Đã ghi nhận thanh toán thành công và cập nhật công nợ.' : 'Đã ghi nhận giao dịch thất bại.');
   }
 
@@ -87,8 +91,12 @@ export default function PaymentsWorkbenchPage() {
     const reference = action === 'succeeded' ? window.prompt('Nhập mã hoàn tiền do nhà cung cấp trả về:', refund.reference || '') : window.prompt('Ghi chú hoặc mã tham chiếu (nếu có):', refund.reference || '');
     if (reference === null) return;
     await run(`${refund.id}:${action}`, async () => {
-      if (reference.trim() !== (refund.reference || '')) await api(dataPath('payments.payment_refund', refund.id), { method: 'PATCH', body: { reference: reference.trim() } });
-      await api(dataPath('payments.payment_refund', refund.id, action), { method: 'POST' });
+      const normalizedReference = reference.trim();
+      const changed = normalizedReference !== (refund.reference || '');
+      await api(dataPath('payments.payment_refund', refund.id, action), {
+        method: 'POST',
+        ...(changed ? { body: { reference: normalizedReference } } : {}),
+      });
     }, action === 'succeeded' ? 'Đã ghi nhận hoàn tiền; sổ kế toán được cập nhật.' : 'Đã ghi nhận hoàn tiền thất bại.');
   }
 

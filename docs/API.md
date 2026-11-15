@@ -82,6 +82,8 @@ Bulk action nhận `{ "ids": ["<uuid>", "…"] }`. Danh sách phải có 1–100
 
 Khi tạo bản ghi, client có thể gửi `Idempotency-Key` (1–200 ký tự ASCII in được). Khóa được phân theo tenant, người gửi và entity. Gửi lại cùng khóa và cùng JSON trong 30 ngày trả lại phản hồi `201` đã lưu mà không tạo thêm bản ghi hay lặp lại nghiệp vụ. Dùng lại khóa cho JSON khác trả `409 IDEMPOTENCY_KEY_REUSED`. Sau 30 ngày, khóa hết hạn và có thể được tạo lại.
 
+Khi ghi nhận kết quả giao dịch thanh toán hoặc hoàn tiền, có thể gửi `{"reference":"mã nhà cung cấp"}` cùng request `POST .../{id}/{succeeded|failed}`. Mã tham chiếu và chuyển trạng thái sẽ commit hoặc rollback cùng nhau. Bỏ body nếu không cần đổi mã; gửi chuỗi rỗng để xóa mã khi ghi nhận thất bại.
+
 ### Truy xuất lô hàng
 
 `GET /api/t/{tenantId}/reports/inventory/lots/{lotId}/traceability` cần `inventory.lot.read` và `inventory.stock_move.read`. Kết quả gồm thông tin và hạn dùng lô, số dư lượng/giá trị theo kho, cùng lịch sử phiếu kho và mã nguồn liên quan. Dữ liệu được giới hạn trong tenant hiện tại; lịch sử phân trang bằng `limit` (mặc định 100, tối đa 500) và `offset` (tối đa 1.000.000).

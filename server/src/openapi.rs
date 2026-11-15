@@ -123,6 +123,24 @@ pub fn build(reg: &Registry) -> Value {
                         "description": format!("Phát sự kiện `{}.{action}` cho các module khác phản ứng.", def.qname()),
                         "responses": with_common(Map::from_iter([("200".to_string(), ok(&r#ref)), ("409".to_string(), err("Sai trạng thái"))])),
                     });
+                    if matches!(
+                        def.qname().as_str(),
+                        "payments.payment_txn" | "payments.payment_refund"
+                    ) && matches!(action.as_str(), "succeeded" | "failed")
+                    {
+                        operation["description"] = json!(
+                            "Optionally provide the provider reference with the outcome. When supplied, updating the reference and changing the payment state commit atomically."
+                        );
+                        operation["requestBody"] = json!({
+                            "required": false,
+                            "content": { "application/json": { "schema": {
+                                "type": "object",
+                                "required": ["reference"],
+                                "additionalProperties": false,
+                                "properties": { "reference": { "type": "string", "maxLength": 240 } }
+                            } } }
+                        });
+                    }
                     if def.qname() == "logistics.shipment" && action == "delivered" {
                         operation["description"] = json!(
                             "Hoàn tất vận đơn và ghi POD trong cùng giao dịch. Nhập số lượng thực nhận theo từng dòng; nếu giao thiếu cần nêu lý do."

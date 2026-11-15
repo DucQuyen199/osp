@@ -108096,7 +108096,7 @@
     },
     "/api/t/{tenantId}/data/payments/payment_refund/{id}/failed": {
       "post": {
-        "description": "Phát sự kiện `payments.payment_refund.failed` cho các module khác phản ứng.",
+        "description": "Optionally provide the provider reference with the outcome. When supplied, updating the reference and changing the payment state commit atomically.",
         "parameters": [
           {
             "in": "path",
@@ -108116,6 +108116,26 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "reference": {
+                    "maxLength": 240,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "reference"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": false
+        },
         "responses": {
           "200": {
             "content": {
@@ -108181,7 +108201,7 @@
     },
     "/api/t/{tenantId}/data/payments/payment_refund/{id}/succeeded": {
       "post": {
-        "description": "Phát sự kiện `payments.payment_refund.succeeded` cho các module khác phản ứng.",
+        "description": "Optionally provide the provider reference with the outcome. When supplied, updating the reference and changing the payment state commit atomically.",
         "parameters": [
           {
             "in": "path",
@@ -108201,6 +108221,26 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "reference": {
+                    "maxLength": 240,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "reference"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": false
+        },
         "responses": {
           "200": {
             "content": {
@@ -108884,7 +108924,7 @@
     },
     "/api/t/{tenantId}/data/payments/payment_txn/{id}/failed": {
       "post": {
-        "description": "Phát sự kiện `payments.payment_txn.failed` cho các module khác phản ứng.",
+        "description": "Optionally provide the provider reference with the outcome. When supplied, updating the reference and changing the payment state commit atomically.",
         "parameters": [
           {
             "in": "path",
@@ -108904,6 +108944,26 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "reference": {
+                    "maxLength": 240,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "reference"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": false
+        },
         "responses": {
           "200": {
             "content": {
@@ -109139,7 +109199,7 @@
     },
     "/api/t/{tenantId}/data/payments/payment_txn/{id}/succeeded": {
       "post": {
-        "description": "Phát sự kiện `payments.payment_txn.succeeded` cho các module khác phản ứng.",
+        "description": "Optionally provide the provider reference with the outcome. When supplied, updating the reference and changing the payment state commit atomically.",
         "parameters": [
           {
             "in": "path",
@@ -109159,6 +109219,26 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "reference": {
+                    "maxLength": 240,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "reference"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": false
+        },
         "responses": {
           "200": {
             "content": {

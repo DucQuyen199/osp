@@ -1836,6 +1836,40 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                 return json_ok(k.act_bulk(&actor, &t, &q, action, ids).await?);
             }
             (&Method::POST, [id, action]) => {
+                if (q == "payments.payment_txn" && matches!(*action, "succeeded" | "failed"))
+                    || (q == "payments.payment_refund" && matches!(*action, "succeeded" | "failed"))
+                {
+                    if !bytes.is_empty() {
+                        let mut body = json_obj(&bytes)?;
+                        let reference = body
+                            .get("reference")
+                            .and_then(Value::as_str)
+                            .map(str::trim)
+                            .map(str::to_owned);
+                        if body.len() != 1
+                            || !body.contains_key("reference")
+                            || reference
+                                .as_deref()
+                                .is_none_or(|value| value.chars().count() > 240)
+                        {
+                            return Err(ApiError::validation(
+                                &format!("{q}.{action}"),
+                                vec![
+                                    "Chỉ chấp nhận trường reference dạng chuỗi, tối đa 240 ký tự"
+                                        .into(),
+                                ],
+                            ));
+                        }
+                        body.insert(
+                            "reference".into(),
+                            reference
+                                .as_deref()
+                                .filter(|value| !value.is_empty())
+                                .map_or(Value::Null, |value| Value::String(value.to_owned())),
+                        );
+                        return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
+                    }
+                }
                 if q == "logistics.shipment" && *action == "delivered" {
                     return json_ok(
                         k.logistics_confirm_shipment_delivery(&actor, &t, id, json_obj(&bytes)?)
