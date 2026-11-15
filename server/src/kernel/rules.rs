@@ -84,6 +84,14 @@ impl Kernel {
                 ),
             ));
         }
+        let payload = if let Some((entity, _)) = ty
+            .strip_prefix("integration-hub.")
+            .and_then(|value| value.rsplit_once('.'))
+        {
+            crate::modules::integration_hub::redact_document(entity, payload)
+        } else {
+            payload
+        };
         let event = Event {
             id: Uuid::new_v4(),
             ty: ty.to_string(),

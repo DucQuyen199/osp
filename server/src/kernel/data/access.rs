@@ -55,7 +55,10 @@ impl Kernel {
             .create_in(&tx, actor, t, &ent, data, &Opts::top())
             .await?;
         tx.commit().await?;
-        Ok(out)
+        Ok(crate::modules::integration_hub::redact_document(
+            qname.strip_prefix("integration-hub.").unwrap_or_default(),
+            out,
+        ))
     }
 
     pub async fn update(
@@ -74,7 +77,10 @@ impl Kernel {
             .update_in(&tx, actor, t, &ent, id, patch, &Opts::top())
             .await?;
         tx.commit().await?;
-        Ok(out)
+        Ok(crate::modules::integration_hub::redact_document(
+            qname.strip_prefix("integration-hub.").unwrap_or_default(),
+            out,
+        ))
     }
 
     pub async fn act(
@@ -101,7 +107,10 @@ impl Kernel {
             .act_in(&tx, actor, t, &ent, id, action, &Opts::top())
             .await?;
         tx.commit().await?;
-        Ok(out)
+        Ok(crate::modules::integration_hub::redact_document(
+            qname.strip_prefix("integration-hub.").unwrap_or_default(),
+            out,
+        ))
     }
 
     pub async fn update_and_act(
@@ -136,7 +145,10 @@ impl Kernel {
             .act_in(&tx, actor, t, &ent, id, action, &Opts::top())
             .await?;
         tx.commit().await?;
-        Ok(out)
+        Ok(crate::modules::integration_hub::redact_document(
+            qname.strip_prefix("integration-hub.").unwrap_or_default(),
+            out,
+        ))
     }
 
     pub async fn remove(&self, actor: &Actor, t: &Tenant, qname: &str, id: &str) -> R<()> {
@@ -157,7 +169,12 @@ impl Kernel {
         let tx = Tx::begin(&mut conn, &t.id, false).await?;
         self.get_row(&tx, t, qname, id)
             .await?
-            .map(Value::Object)
+            .map(|document| {
+                crate::modules::integration_hub::redact_document(
+                    qname.strip_prefix("integration-hub.").unwrap_or_default(),
+                    Value::Object(document),
+                )
+            })
             .ok_or_else(|| ApiError::not_found(format!("Không tìm thấy {qname} {id}")))
     }
 }

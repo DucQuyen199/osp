@@ -6,7 +6,13 @@ impl Kernel {
         self.authorize(t, actor, &format!("{qname}.read"))?;
         let mut conn = self.pool.get().await?;
         let tx = Tx::begin(&mut conn, &t.id, false).await?;
-        let (items, total) = self.query_rows(&tx, t, &ent, q).await?;
+        let (mut items, total) = self.query_rows(&tx, t, &ent, q).await?;
+        if let Some(entity) = qname.strip_prefix("integration-hub.") {
+            items = items
+                .into_iter()
+                .map(|item| crate::modules::integration_hub::redact_document(entity, item))
+                .collect();
+        }
         Ok(json!({ "items": items, "total": total }))
     }
 

@@ -89,6 +89,81 @@ pub fn prepare_document(entity: &str, document: &mut Map<String, Value>) {
     }
 }
 
+/// Remove credentials from documents before returning them to clients or
+/// publishing them to external event subscribers. The stored document remains
+/// intact for the integration worker.
+pub fn redact_document(entity: &str, mut document: Value) -> Value {
+    if entity == "connector" {
+        redact_config(&mut document);
+        return document;
+    }
+    let Some(object) = document.as_object_mut() else {
+        return document;
+    };
+    match entity {
+        "webhook" => {
+            let configured = object
+                .remove("secret")
+                .is_some_and(|value| !value.is_null() && value.as_str() != Some(""));
+            object.insert("secretConfigured".into(), json!(configured));
+        }
+        "api_key" => {
+            let configured = object
+                .remove("key")
+                .is_some_and(|value| !value.is_null() && value.as_str() != Some(""));
+            object.insert("keyConfigured".into(), json!(configured));
+        }
+        _ => {}
+    }
+    document
+}
+
+fn redact_config(value: &mut Value) {
+    match value {
+        Value::Object(object) => {
+            let header_name = object
+                .get("name")
+                .or_else(|| object.get("key"))
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_ascii_lowercase();
+            for (key, value) in object.iter_mut() {
+                let normalized = key
+                    .chars()
+                    .filter(|character| character.is_ascii_alphanumeric())
+                    .flat_map(char::to_lowercase)
+                    .collect::<String>();
+                if normalized == "key"
+                    || [
+                        "secret",
+                        "password",
+                        "token",
+                        "authorization",
+                        "apikey",
+                        "credential",
+                        "privatekey",
+                        "accesskey",
+                    ]
+                    .iter()
+                    .any(|marker| normalized.contains(marker))
+                {
+                    *value = json!("[redacted]");
+                } else if matches!(normalized.as_str(), "value" | "header")
+                    && ["authorization", "cookie", "token", "secret", "api-key"]
+                        .iter()
+                        .any(|marker| header_name.contains(marker))
+                {
+                    *value = json!("[redacted]");
+                } else {
+                    redact_config(value);
+                }
+            }
+        }
+        Value::Array(items) => items.iter_mut().for_each(redact_config),
+        _ => {}
+    }
+}
+
 fn trim_field(document: &mut Map<String, Value>, field: &str) {
     if let Some(value) = document.get(field).and_then(Value::as_str) {
         document.insert(field.into(), Value::String(value.trim().to_string()));
