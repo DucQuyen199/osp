@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **50 module**, **199 loại dữ liệu**, **902 sự kiện**.
+Tổng: **50 module**, **199 loại dữ liệu**, **903 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -83,7 +83,7 @@ Tổng: **50 module**, **199 loại dữ liệu**, **902 sự kiện**.
 |---|---|
 | `resource` Tài nguyên | — |
 | `service` Dịch vụ | — |
-| `booking` Lịch hẹn | `requested` → **cancelled** (requested/confirmed→cancelled), **checked_in** (confirmed→checked_in), **completed** (checked_in→completed), **confirmed** (requested→confirmed), **no_show** (confirmed→no_show) |
+| `booking` Lịch hẹn | `requested` → **cancelled** (requested/confirmed→cancelled), **checked_in** (confirmed→checked_in), **completed** (checked_in→completed), **confirmed** (requested→confirmed), **expired** (requested→expired), **no_show** (confirmed→no_show) |
 
 ### sales
 **Bán hàng** — Báo giá, đơn bán, bảng giá và trả hàng. Đơn có vận đơn chỉ xuất kho khi giao thành công; đơn bán trực tiếp xuất kho khi xác nhận.

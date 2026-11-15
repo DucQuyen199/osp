@@ -8,13 +8,24 @@ pub use domain::{validate, validate_action, validate_update};
 pub use persistence::validate_persistence;
 
 pub(crate) fn scheduled_jobs() -> Vec<crate::defs::JobSpec> {
-    vec![crate::modules::scheduled_job(
-        "booking-no-show",
-        "Mark confirmed appointments as no-show after their end time",
-        "booking",
-        "confirmed",
-        "ends_at",
-        "lte",
-        "no_show",
-    )]
+    vec![
+        crate::modules::scheduled_job(
+            "booking-no-show",
+            "Mark confirmed appointments as no-show after their end time",
+            "booking",
+            "confirmed",
+            "ends_at",
+            "lte",
+            "no_show",
+        ),
+        crate::modules::scheduled_job(
+            "booking-expire-requested",
+            "Expire unconfirmed appointment requests after their end time",
+            "booking",
+            "requested",
+            "ends_at",
+            "lte",
+            "expired",
+        ),
+    ]
 }

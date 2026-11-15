@@ -39,6 +39,13 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                     errors.push("ends_at phải sau starts_at".into());
                 }
             }
+            if matches!(
+                document.get("status").and_then(Value::as_str),
+                None | Some("requested")
+            ) && start.is_some_and(|start| start.with_timezone(&Utc) <= Utc::now())
+            {
+                errors.push("Lịch đang chờ phải bắt đầu trong tương lai; lịch đã qua giờ sẽ được đánh dấu hết hạn".into());
+            }
             if document.get("price").is_some_and(|value| !value.is_null())
                 && !document
                     .get("price")
@@ -103,6 +110,9 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
         }
         "no_show" if ends_at > now => {
             vec!["Chỉ ghi nhận vắng mặt sau khi khung giờ lịch hẹn kết thúc".into()]
+        }
+        "expired" if ends_at > now => {
+            vec!["Yêu cầu chỉ hết hạn sau khi khung giờ hẹn kết thúc".into()]
         }
         _ => Vec::new(),
     }

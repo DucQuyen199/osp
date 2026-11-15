@@ -118,7 +118,8 @@
       "checked_in",
       "completed",
       "cancelled",
-      "no_show"
+      "no_show",
+      "expired"
      ]
     }
    ],
@@ -156,6 +157,12 @@
        "confirmed"
       ],
       "to": "no_show"
+     },
+     "expired": {
+      "from": [
+       "requested"
+      ],
+      "to": "expired"
      }
     }
    },
@@ -168,7 +175,8 @@
      "end": "ends_at",
      "ignoreStates": [
       "cancelled",
-      "no_show"
+      "no_show",
+      "expired"
      ],
      "message": "Tài nguyên đã có lịch hẹn khác trong khoảng thời gian này"
     }
