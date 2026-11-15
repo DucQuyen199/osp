@@ -1,9 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from './lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel } from './lib/i18n.js';
-import { app, can, loadRefs, recordLabel } from './lib/state.js';
-
-const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
+import { app, can, loadAll, loadRefs, recordLabel } from './lib/state.js';
 
 export default function ClinicWorkbenchPage() {
   const [patients, setPatients] = useState([]);
@@ -35,15 +33,15 @@ export default function ClinicWorkbenchPage() {
   const load = useCallback(async (preserveNotice = false) => {
     setLoading(true); setError(''); if (!preserveNotice) setNotice('');
     try {
-      const [patientResponse, partyMap, encounterResponse, prescriptionResponse, labResponse, productMap, unitMap, warehouseMap] = await Promise.all([
-        api(`${dataPath('clinic.patient')}?limit=1000`), loadRefs('master-data.party'),
-        api(`${dataPath('clinic.encounter')}?limit=1000`), api(`${dataPath('clinic.prescription')}?limit=1000`),
-        api(`${dataPath('clinic.lab_order')}?limit=1000`), loadRefs('master-data.product'),
+      const [patientRows, partyMap, encounterRows, prescriptionRows, labRows, productMap, unitMap, warehouseMap] = await Promise.all([
+        loadAll('clinic.patient'), loadRefs('master-data.party'),
+        loadAll('clinic.encounter'), loadAll('clinic.prescription'),
+        loadAll('clinic.lab_order'), loadRefs('master-data.product'),
         can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()), loadRefs('inventory.warehouse'),
       ]);
-      const encounterItems = itemsOf(encounterResponse).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
-      setPatients(itemsOf(patientResponse)); setParties(partyMap); setEncounters(encounterItems);
-      setPrescriptions(itemsOf(prescriptionResponse)); setLabOrders(itemsOf(labResponse));
+      const encounterItems = encounterRows.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+      setPatients(patientRows); setParties(partyMap); setEncounters(encounterItems);
+      setPrescriptions(prescriptionRows); setLabOrders(labRows);
       setProducts(productMap); setUnits(unitMap); setWarehouses(warehouseMap);
       setSelectedId((current) => encounterItems.some((item) => item.id === current) ? current : encounterItems.find((item) => item.status === 'open')?.id || encounterItems[0]?.id || '');
     } catch (reason) { setError(reason.message || 'Không tải được dữ liệu phòng khám.'); }

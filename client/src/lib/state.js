@@ -77,22 +77,24 @@ export function recordLabel(qname, rec) {
 }
 
 const refCache = new Map(); // qname -> Promise<Map<id, rec>>
+export async function loadAll(qname, filters = {}) {
+  const rows = [];
+  let offset = 0;
+  for (;;) {
+    const query = new URLSearchParams({ ...filters, limit: '1000', offset: String(offset) });
+    const response = await api(`${dataPath(qname)}?${query}`);
+    const items = Array.isArray(response?.items) ? response.items : [];
+    rows.push(...items);
+    offset += items.length;
+    const total = Number(response?.total);
+    if (!items.length || items.length < 1000 || (Number.isFinite(total) && offset >= total)) break;
+  }
+  return rows;
+}
+
 export function loadRefs(qname) {
   if (!refCache.has(qname)) {
-    refCache.set(qname, (async () => {
-      const rows = [];
-      let offset = 0;
-      for (;;) {
-        const query = new URLSearchParams({ limit: '1000', offset: String(offset) });
-        const response = await api(`${dataPath(qname)}?${query}`);
-        const items = Array.isArray(response?.items) ? response.items : [];
-        rows.push(...items);
-        offset += items.length;
-        const total = Number(response?.total);
-        if (!items.length || items.length < 1000 || (Number.isFinite(total) && offset >= total)) break;
-      }
-      return new Map(rows.map((row) => [row.id, row]));
-    })().catch(() => new Map()));
+    refCache.set(qname, loadAll(qname).then((rows) => new Map(rows.map((row) => [row.id, row]))).catch(() => new Map()));
   }
   return refCache.get(qname);
 }
