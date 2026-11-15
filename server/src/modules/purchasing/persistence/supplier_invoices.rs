@@ -10,7 +10,7 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 use uuid::Uuid;
 
-type LineKey = (Uuid, Decimal, Decimal);
+type LineKey = (Uuid, Decimal, Option<Uuid>);
 
 fn id(document: &Value, field: &str) -> Option<Uuid> {
     document
@@ -75,8 +75,12 @@ fn add_lines(
                 ],
             ));
         }
+        let unit = line
+            .get("uom")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok());
         let current = totals
-            .entry((product, price, Decimal::ZERO))
+            .entry((product, price, unit))
             .or_insert(Decimal::ZERO);
         *current = current.checked_add(qty).ok_or_else(|| {
             ApiError::validation(
