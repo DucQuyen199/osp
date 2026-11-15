@@ -6,6 +6,36 @@ use serde_json::Value;
 use std::collections::HashMap;
 use uuid::Uuid;
 
+type ReturnLineKey = (String, Decimal, Option<String>);
+
+fn line_quantities(lines: &Value, source: &str) -> R<HashMap<ReturnLineKey, Decimal>> {
+    let mut quantities = HashMap::new();
+    for line in lines.as_array().into_iter().flatten() {
+        let (Some(product), Some(price), Some(qty)) = (
+            line.get("product").and_then(Value::as_str),
+            line.get("price").and_then(money::decimal),
+            line.get("qty").and_then(money::decimal),
+        ) else {
+            continue;
+        };
+        let key = (
+            product.to_owned(),
+            price.round_dp(2),
+            line.get("uom").and_then(Value::as_str).map(str::to_owned),
+        );
+        let total = quantities.entry(key).or_insert(Decimal::ZERO);
+        *total = total.checked_add(qty).ok_or_else(|| {
+            crate::error::ApiError::validation(
+                "sales.return",
+                vec![format!(
+                    "{source} line quantity exceeds the supported decimal range"
+                )],
+            )
+        })?;
+    }
+    Ok(quantities)
+}
+
 pub(super) async fn validate(
     tx: &Tx<'_>,
     tenant: &Tenant,
@@ -16,14 +46,27 @@ pub(super) async fn validate(
     if entity != "sales_return" {
         return Ok(Vec::new());
     }
-    let assigning_invoice = action == "updated"
-        && document
-            .get("invoice")
-            .is_some_and(|invoice| !invoice.is_null());
-    if action == "updated" && !assigning_invoice {
+    let assigning_invoice = action == "invoice_assigned";
+    if !assigning_invoice && !matches!(action, "submitted" | "approved" | "received") {
         return Ok(Vec::new());
     }
-    if !assigning_invoice && !matches!(action, "submitted" | "approved" | "received") {
+    let current_status = document
+        .get("status")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let transition_is_applicable = match action {
+        "submitted" => matches!(current_status, "draft" | "rejected"),
+        "approved" => current_status == "submitted",
+        "received" => current_status == "approved",
+        "invoice_assigned" => {
+            matches!(
+                current_status,
+                "draft" | "rejected" | "submitted" | "approved"
+            )
+        }
+        _ => false,
+    };
+    if !transition_is_applicable {
         return Ok(Vec::new());
     }
     let Some(order_id) = document
@@ -65,21 +108,27 @@ pub(super) async fn validate(
         },
         None => None,
     };
+    let mut resolved_invoice = selected_invoice;
+    let mut invoice_lines = None;
+    let mut invoice_total = None;
     if let Some(invoice_id) = selected_invoice {
-        if tx
+        if let Some(invoice) = tx
             .query_opt(
-                "SELECT id FROM accounting__invoice WHERE tenant_id = $1 AND id = $2 AND source = 'sales_order' AND source_id = $3 AND status IN ('posted', 'partially_paid', 'partially_settled', 'paid', 'settled') FOR SHARE",
+                "SELECT id, lines, total::text FROM accounting__invoice WHERE tenant_id = $1 AND id = $2 AND source = 'sales_order' AND source_id = $3 AND status IN ('posted', 'partially_paid', 'partially_settled', 'paid', 'settled') FOR SHARE",
                 &[&tenant.id, &invoice_id, &order_id.to_string()],
             )
             .await?
-            .is_none()
         {
+            invoice_lines = invoice.get::<_, Option<Value>>(1);
+            invoice_total = Some(decimal_column(&invoice, 2, "source invoice total")?);
+        } else {
             errors.push("Hóa đơn gốc phải đã ghi sổ và thuộc đúng đơn bán nguồn".into());
+            resolved_invoice = None;
         }
     } else {
         let source_invoices = tx
             .query(
-                "SELECT id FROM accounting__invoice WHERE tenant_id = $1 AND source = 'sales_order' AND source_id = $2 AND status IN ('posted', 'partially_paid', 'partially_settled', 'paid', 'settled') ORDER BY created_at, id LIMIT 2 FOR SHARE",
+                "SELECT id, lines, total::text FROM accounting__invoice WHERE tenant_id = $1 AND source = 'sales_order' AND source_id = $2 AND status IN ('posted', 'partially_paid', 'partially_settled', 'paid', 'settled') ORDER BY created_at, id LIMIT 2 FOR SHARE",
                 &[&tenant.id, &order_id.to_string()],
             )
             .await?;
@@ -87,7 +136,15 @@ pub(super) async fn validate(
             0 => errors.push(
                 "Cần có hóa đơn kế toán đã ghi sổ cho đơn bán trước khi gửi duyệt phiếu trả".into(),
             ),
-            1 => {}
+            1 => {
+                resolved_invoice = Some(source_invoices[0].get(0));
+                invoice_lines = source_invoices[0].get(1);
+                invoice_total = Some(decimal_column(
+                    &source_invoices[0],
+                    2,
+                    "source invoice total",
+                )?);
+            }
             _ => errors.push(
                 "Đơn bán có nhiều hóa đơn đã ghi sổ; hãy chọn hóa đơn gốc cho phiếu trả".into(),
             ),
@@ -140,6 +197,100 @@ pub(super) async fn validate(
     else {
         return Ok(vec!["Could not identify the sales return record".into()]);
     };
+    if let Some(invoice_id) = resolved_invoice {
+        let return_total = document
+            .get("total")
+            .and_then(money::decimal)
+            .unwrap_or(Decimal::ZERO);
+        let posted_credit = tx
+            .query_opt(
+                "SELECT COALESCE(SUM(total), 0)::text FROM accounting__credit_note WHERE tenant_id = $1 AND invoice = $2 AND status = 'posted'",
+                &[&tenant.id, &invoice_id],
+            )
+            .await?
+            .map(|row| decimal_column(&row, 0, "posted credit note total"))
+            .transpose()?
+            .unwrap_or(Decimal::ZERO);
+        let reserved_credit = tx
+            .query_opt(
+                "SELECT COALESCE(SUM(return_record.total), 0)::text FROM sales__sales_return return_record WHERE return_record.tenant_id = $1 AND return_record.invoice = $2 AND return_record.id <> $3 AND return_record.status IN ('submitted', 'approved', 'received') AND NOT EXISTS (SELECT 1 FROM accounting__credit_note note WHERE note.tenant_id = return_record.tenant_id AND note.source = 'sales_return' AND note.source_id = return_record.id::text AND note.status = 'posted')",
+                &[&tenant.id, &invoice_id, &return_id],
+            )
+            .await?
+            .map(|row| decimal_column(&row, 0, "reserved return total"))
+            .transpose()?
+            .unwrap_or(Decimal::ZERO);
+        let projected_credit = posted_credit
+            .checked_add(reserved_credit)
+            .and_then(|total| total.checked_add(return_total))
+            .ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    "sales.return",
+                    vec!["Projected credit note total exceeds the supported decimal range".into()],
+                )
+            })?;
+        let maximum_credit = invoice_total
+            .unwrap_or(Decimal::ZERO)
+            .checked_add(Decimal::new(5, 3))
+            .unwrap_or(Decimal::MAX);
+        if projected_credit > maximum_credit {
+            errors.push(
+                "Tổng credit note và các phiếu trả đang xử lý vượt giá trị hóa đơn gốc".into(),
+            );
+        }
+        let invoiced = match invoice_lines.as_ref() {
+            Some(lines) if lines.as_array().is_some_and(|rows| !rows.is_empty()) => {
+                line_quantities(lines, "Source invoice")?
+            }
+            _ => {
+                errors
+                    .push("Hóa đơn gốc chưa có chi tiết mặt hàng để đối chiếu số lượng trả".into());
+                HashMap::new()
+            }
+        };
+        let prior_credit_rows = tx
+            .query(
+                "SELECT lines FROM accounting__credit_note WHERE tenant_id = $1 AND invoice = $2 AND status = 'posted'",
+                &[&tenant.id, &invoice_id],
+            )
+            .await?;
+        let mut already_credited = HashMap::<ReturnLineKey, Decimal>::new();
+        for row in prior_credit_rows {
+            let lines: Option<Value> = row.get(0);
+            if let Some(lines) = lines {
+                for (key, qty) in line_quantities(&lines, "Posted credit note")? {
+                    let total = already_credited.entry(key).or_insert(Decimal::ZERO);
+                    *total = total.checked_add(qty).ok_or_else(|| {
+                        crate::error::ApiError::validation(
+                            "sales.return",
+                            vec![
+                                "Posted credit note quantities exceed the supported decimal range"
+                                    .into(),
+                            ],
+                        )
+                    })?;
+                }
+            }
+        }
+        for (key, return_qty) in &requested {
+            let remaining = invoiced
+                .get(key)
+                .copied()
+                .unwrap_or_default()
+                .checked_sub(already_credited.get(key).copied().unwrap_or_default())
+                .unwrap_or(Decimal::ZERO)
+                .max(Decimal::ZERO);
+            if remaining
+                .checked_add(Decimal::new(1, 6))
+                .is_none_or(|allowed| *return_qty > allowed)
+            {
+                errors.push(format!(
+                    "Số lượng trả cho {} vượt số lượng còn lại trên hóa đơn gốc ({remaining})",
+                    key.0
+                ));
+            }
+        }
+    }
     for ((product, price, unit), return_qty) in requested {
         let mut sold_qty = Decimal::ZERO;
         for sold in &sold_lines {

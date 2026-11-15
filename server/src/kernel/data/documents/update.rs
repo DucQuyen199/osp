@@ -81,6 +81,9 @@ impl Kernel {
         let previous_tax_total = cur.get("tax_total").cloned();
         let previous_lines = cur.get("lines").cloned();
         let previous_voucher_discount = cur.get("voucher_discount").cloned();
+        let previous_return_invoice = (qname == "sales.sales_return")
+            .then(|| cur.get("invoice").cloned())
+            .flatten();
         let refresh_auto_prices = patch.contains_key("lines");
         let mut changed: Vec<String> = patch.keys().cloned().collect();
         for (k, v) in patch {
@@ -543,11 +546,19 @@ impl Kernel {
         if !domain_errors.is_empty() {
             return Err(ApiError::validation(&qname, domain_errors));
         }
+        let persistence_action = if qname == "sales.sales_return"
+            && changed.iter().any(|field| field == "invoice")
+            && previous_return_invoice != cur.get("invoice").cloned()
+        {
+            "invoice_assigned"
+        } else {
+            "updated"
+        };
         let persistence_errors = crate::modules::validate_persistence(
             tx,
             t,
             &qname,
-            "updated",
+            persistence_action,
             &Value::Object(cur.clone()),
         )
         .await?;
