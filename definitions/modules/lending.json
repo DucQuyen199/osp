@@ -137,7 +137,8 @@
     {
      "name": "legacy_schedule",
      "type": "bool",
-     "required": false
+     "required": false,
+     "system": true
     },
     {
      "name": "method",
