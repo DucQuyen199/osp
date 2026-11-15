@@ -15,9 +15,8 @@ async fn replenishment_rows(
     tenant: &Tenant,
     warehouse: Option<Uuid>,
 ) -> R<Vec<Value>> {
-    let sales_demand = if tenant.has_module("sales") {
-        let shipments = if tenant.has_module("logistics") {
-            "sales_shipments AS ( \
+    let sales_demand = if tenant.has_module("sales") && tenant.has_module("logistics") {
+        let shipments = "sales_shipments AS ( \
                SELECT shipment.source_id::uuid AS order_id, (line->>'product')::uuid AS product, \
                  sum(COALESCE((line->>'base_qty')::numeric, (line->>'qty')::numeric)) AS qty \
                FROM logistics__shipment shipment \
@@ -25,10 +24,7 @@ async fn replenishment_rows(
                WHERE shipment.tenant_id = $1 AND shipment.source = 'sales_order' \
                  AND shipment.status = 'delivered' AND line->>'tracked' = 'true' \
                GROUP BY shipment.source_id, (line->>'product')::uuid \
-             ), "
-        } else {
-            "sales_shipments AS (SELECT NULL::uuid AS order_id, NULL::uuid AS product, 0::numeric AS qty WHERE FALSE), "
-        };
+             ), ";
         format!(
             "sales_order_lines AS ( \
                SELECT orders.id AS order_id, orders.warehouse, (line->>'product')::uuid AS product, \
@@ -36,6 +32,7 @@ async fn replenishment_rows(
                FROM sales__sales_order orders \
                CROSS JOIN LATERAL jsonb_array_elements(COALESCE(orders.lines, '[]'::jsonb)) line \
                WHERE orders.tenant_id = $1 AND orders.status IN ('confirmed', 'partially_delivered') \
+                 AND NULLIF(BTRIM(orders.shipping_address), '') IS NOT NULL \
                  AND line->>'tracked' = 'true' \
                GROUP BY orders.id, orders.warehouse, (line->>'product')::uuid \
              ), {shipments} \
