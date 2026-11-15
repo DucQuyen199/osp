@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import EntityListPage from './EntityListPage.jsx';
 import EntityDetailPage from './EntityDetailPage.jsx';
@@ -209,11 +209,11 @@ function Search({ meta, onNavigate }) {
   </div>;
 }
 
-function Sidebar({ meta, route, onNavigate, open }) {
+function Sidebar({ meta, route, onNavigate, open, mobile }) {
   const activeModule = route.name === 'module' ? route.module : route.name === 'entity' ? route.qname.split('.')[0] : null;
   const link = (href, label, active, iconName) => <a key={href} className="nav-link" href={href} aria-current={active ? 'page' : undefined} onClick={onNavigate}>{iconName && <Icon name={iconName} />}{label}</a>;
   const groups = CATEGORY_ORDER.map((category) => [category, meta.modules.filter((module) => module.category === category)]).filter(([, items]) => items.length);
-  return <nav className={`sidebar${open ? ' open' : ''}`} id="nav" aria-label="Điều hướng chính">
+  return <nav className={`sidebar${open ? ' open' : ''}`} id="nav" aria-label="Điều hướng chính" aria-hidden={mobile && !open ? 'true' : undefined} inert={mobile && !open}>
     {link('#/', 'Trang chủ', route.name === 'home', 'home')}
     {link('#/events', 'Dòng sự kiện', route.name === 'events', 'bolt')}
     {meta.modules.some((module) => module.id === 'bi') && (can('bi.report.read') || can('bi.dashboard.read')) && link('#/reports/bi', 'Báo cáo & phân tích', route.name === 'bi-reports', 'list')}
@@ -299,9 +299,28 @@ function App() {
   const [user, setUser] = useState(null);
   const [error, setError] = useState('');
   const [navOpen, setNavOpen] = useState(false);
+  const [mobileNav, setMobileNav] = useState(() => window.matchMedia('(max-width: 960px)').matches);
+  const navToggleRef = useRef(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [theme, setTheme] = useState(() => { try { return localStorage.getItem('osp.theme') || ''; } catch { return ''; } });
   const [, setEpoch] = useState(0);
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 960px)');
+    const update = () => {
+      setMobileNav(media.matches);
+      if (!media.matches) setNavOpen(false);
+    };
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+
+  useEffect(() => {
+    if (!mobileNav || !navOpen) return;
+    [...document.querySelectorAll('#nav a[href], #nav summary, #nav button:not([disabled])')]
+      .find((element) => element.getClientRects().length > 0)?.focus();
+  }, [mobileNav, navOpen]);
   const authenticated = Boolean(session.current());
 
   const refresh = useCallback(() => setEpoch((value) => value + 1), []);
@@ -394,11 +413,30 @@ function App() {
         event.preventDefault();
         document.querySelector('.global-search-input')?.focus();
       }
-      if (event.key === 'Escape') setAccountOpen(false);
+      if (event.key === 'Escape') {
+        setAccountOpen(false);
+        if (mobileNav && navOpen) {
+          setNavOpen(false);
+          navToggleRef.current?.focus();
+        }
+      }
+      if (mobileNav && navOpen && event.key === 'Tab') {
+        const focusable = [...document.querySelectorAll('#nav a[href], #nav summary, #nav button:not([disabled])')].filter((element) => element.getClientRects().length > 0);
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && (document.activeElement === first || !document.querySelector('#nav')?.contains(document.activeElement))) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && (document.activeElement === last || !document.querySelector('#nav')?.contains(document.activeElement))) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
     };
     document.addEventListener('keydown', shortcut);
     return () => document.removeEventListener('keydown', shortcut);
-  }, []);
+  }, [mobileNav, navOpen]);
 
   useEffect(() => {
     if (!ready || !session.current() || !meta || !user) return;
@@ -421,7 +459,7 @@ function App() {
     <a className="skip-link" href="#main">Bỏ qua điều hướng</a>
     <div className="app">
       <header className="topbar">
-        <button className="btn btn-ghost btn-icon nav-toggle" type="button" aria-label="Mở menu" aria-expanded={navOpen} aria-controls="nav" onClick={() => setNavOpen((open) => !open)}><Icon name="menu" /></button>
+        <button ref={navToggleRef} className="btn btn-ghost btn-icon nav-toggle" type="button" aria-label={navOpen ? 'Đóng menu' : 'Mở menu'} aria-expanded={navOpen} aria-controls="nav" onClick={() => setNavOpen((open) => !open)}><Icon name="menu" /></button>
         <a className="brand" href="#/"><span className="brand-mark">O</span>OSP</a>
         <span className="tenant-chip">{meta.name}</span>
         <span className="grow" />
@@ -436,7 +474,7 @@ function App() {
           </div>}
         </div>
       </header>
-      <Sidebar meta={meta} route={route} open={navOpen} onNavigate={() => setNavOpen(false)} />
+      <Sidebar meta={meta} route={route} open={navOpen} mobile={mobileNav} onNavigate={() => setNavOpen(false)} />
       <main className="main" id="main" tabIndex="-1">
       <Suspense fallback={<div className="card-pad"><div className="skeleton" data-h="row" /></div>}>
       {route.name === 'entity'
@@ -528,7 +566,7 @@ function App() {
       </Suspense>
       </main>
     </div>
-    {navOpen && <button className="scrim" type="button" aria-label="Đóng menu" onClick={() => setNavOpen(false)} />}
+    {navOpen && <button className="scrim" type="button" aria-label="Đóng menu" onClick={() => { setNavOpen(false); navToggleRef.current?.focus(); }} />}
   </>;
 }
 

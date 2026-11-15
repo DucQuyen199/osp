@@ -256,7 +256,7 @@ Hiển thị chuỗi sự kiện liên module. Mỗi mục: tiêu đề ("Hóa �
 Nút có `aria-haspopup="menu"`, `aria-expanded`; đóng khi bấm ra ngoài. Hiện tên, email và "Đăng xuất".
 
 ### 3.15 Điều hướng — `.sidebar`
-`<nav aria-label="Điều hướng chính">`. Nhóm theo loại module (tiêu đề `.nav-title`), mỗi module là `<details>` chứa "Tổng quan" và từng loại dữ liệu; mục hiện tại có `aria-current="page"`; module đang xem và module lõi tự mở. Mục "Quản trị › Cài đặt" chỉ hiện với quản trị viên. Có **skip-link** "Bỏ qua điều hướng" là phần tử tab đầu tiên.
+`<nav aria-label="Điều hướng chính">`. Nhóm theo loại module (tiêu đề `.nav-title`), mỗi module là `<details>` chứa "Tổng quan" và từng loại dữ liệu; mục hiện tại có `aria-current="page"`; module đang xem và module lõi tự mở. Mục "Quản trị › Cài đặt" chỉ hiện với quản trị viên. Có **skip-link** "Bỏ qua điều hướng" là phần tử tab đầu tiên. Ở màn hình nhỏ, sidebar ẩn khỏi cây truy cập và thứ tự tab khi đóng; khi mở sẽ nhận focus, giữ focus trong menu, và trả focus về nút menu khi đóng bằng Escape hoặc nút phủ.
 
 ### 3.16 Avatar — `.avatar`
 Chữ cái đầu của hai từ cuối trong tên, nền `--accent-soft`.
