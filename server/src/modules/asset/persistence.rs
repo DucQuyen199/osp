@@ -96,13 +96,11 @@ pub async fn validate_persistence(
                     "SELECT 1 FROM accounting__journal_entry WHERE tenant_id = $1 AND source = 'fixed_asset' AND source_id = $2 LIMIT 1",
                     &[&tenant.id, &id.to_string()],
                 ).await?.is_some() {
-                    errors.push("TÃ i sáº£n Ä‘Ã£ cÃ³ bÃºt toÃ¡n vá»‘n hÃ³a; khÃ´ng thá»ƒ ghi sá»‘ dÆ° Ä‘áº§u ká»³ láº§n ná»¯a".into());
+                    errors.push("Tài sản đã có bút toán vốn hóa; không thể ghi số dư đầu kỳ lần nữa".into());
                 }
             }
             if !tenant.has_module("accounting") {
-                errors.push(
-                    "Module káº¿ toÃ¡n pháº£i Ä‘Æ°á»£c báº­t Ä‘á»ƒ ghi sá»• tÃ i sáº£n".into(),
-                );
+                errors.push("Cần bật module kế toán để ghi sổ tài sản".into());
             }
             let mut required_accounts = vec!["211", "411"];
             if number(document, "accumulated_depreciation").unwrap_or_default() > Decimal::new(5, 3)
@@ -114,7 +112,7 @@ pub async fn validate_persistence(
                     "SELECT 1 FROM accounting__account WHERE tenant_id = $1 AND code = $2 LIMIT 1",
                     &[&tenant.id, &code],
                 ).await?.is_none() {
-                    errors.push(format!("Thiáº¿u tÃ i khoáº£n káº¿ toÃ¡n {code}"));
+                    errors.push(format!("Thiếu tài khoản kế toán {code}"));
                 }
             }
         }

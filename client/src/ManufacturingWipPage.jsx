@@ -177,7 +177,7 @@ export default function ManufacturingWipPage() {
         qty: Number(reworkQty), reason: reworkReason.trim(),
       } });
       setReworkInspection(''); setReworkQty(''); setReworkReason(''); await load();
-    } catch (reason) { setError(reason.message || 'KhÃ´ng táº¡o Ä‘Æ°á»£c lá»‡nh sá»­a.'); }
+    } catch (reason) { setError(reason.message || 'Không tạo được lệnh sửa.'); }
     finally { setBusy(''); }
   };
 
@@ -186,7 +186,7 @@ export default function ManufacturingWipPage() {
     try {
       await api(dataPath('manufacturing.rework_order', order.id, action), { method: 'POST' });
       await load();
-    } catch (reason) { setError(reason.message || 'KhÃ´ng cáº­p nháº­t Ä‘Æ°á»£c lá»‡nh sá»­a.'); }
+    } catch (reason) { setError(reason.message || 'Không cập nhật được lệnh sửa.'); }
     finally { setBusy(''); }
   };
 

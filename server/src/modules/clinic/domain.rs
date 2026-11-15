@@ -171,9 +171,7 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
             .get("appointment")
             .is_some_and(|appointment| !appointment.is_null())
     {
-        return vec![
-            "LÆ°á»£t khÃ¡m táº¡o tá»« lá»‹ch háº¹n pháº£i Ä‘Æ°á»£c giá»¯ cÃ¹ng lá»‹ch sá»­".into(),
-        ];
+        return vec!["Lượt khám tạo từ lịch hẹn phải được giữ cùng lịch sử".into()];
     }
     match (entity, document.get("status").and_then(Value::as_str)) {
         ("encounter", Some("completed")) => {

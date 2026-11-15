@@ -82,10 +82,7 @@ pub async fn handle_source_event(
 ) -> R<bool> {
     if event_type == "ecommerce.web_order.cancelled" {
         let source_id = parse_id(document, "id").ok_or_else(|| {
-            ApiError::validation(
-                event_type,
-                vec!["ÄÆ¡n online cáº§n mÃ£ há»£p lá»‡ Ä‘á»ƒ há»§y".into()],
-            )
+            ApiError::validation(event_type, vec!["Đơn online cần mã hợp lệ để hủy".into()])
         })?;
         let key = format!("ecommerce-order:{}:{source_id}", tenant.id);
         tx.query_one_row(

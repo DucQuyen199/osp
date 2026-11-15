@@ -541,7 +541,7 @@ pub async fn validate_persistence(
         ("production_order", "cancelled") => {
             let Some(order_id) = id(document, "id") else {
                 return Ok(vec![
-                    "KhÃ´ng xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c lá»‡nh sáº£n xuáº¥t cáº§n há»§y".into(),
+                    "Không xác định được lệnh sản xuất cần hủy".into(),
                 ]);
             };
             if tx
@@ -553,7 +553,7 @@ pub async fn validate_persistence(
                 .is_some()
             {
                 errors.push(
-                    "KhÃ´ng thá»ƒ há»§y lá»‡nh sáº£n xuáº¥t Ä‘Ã£ phÃ¡t sinh phiáº¿u kho; hÃ£y dÃ¹ng nghiá»‡p vá»¥ Ä‘iá»u chá»‰nh".into(),
+                    "Không thể hủy lệnh sản xuất đã phát sinh phiếu kho; hãy dùng nghiệp vụ điều chỉnh".into(),
                 );
             }
         }

@@ -53,7 +53,7 @@ pub async fn validate_persistence(
             .await?
             .is_some()
         {
-            return Ok(vec!["Chá»‰ Ä‘Æ°á»£c má»Ÿ má»™t ca POS cho má»—i chi nhÃ¡nh vÃ  thu ngÃ¢n".into()]);
+            return Ok(vec!["Mỗi thu ngân chỉ được mở một ca POS cho mỗi chi nhánh".into()]);
         }
     }
     if entity == "pos_session" && action == "closed" {

@@ -28,7 +28,7 @@ pub fn validate_at(entity: &str, document: &Value, today: chrono::NaiveDate) -> 
                         && revision <= Decimal::from(1000)
                 })
             {
-                errors.push("Sá»‘ phiÃªn báº£n BOQ pháº£i lÃ  sá»‘ nguyÃªn dÆ°Æ¡ng".into());
+                errors.push("Số phiên bản BOQ phải là số nguyên dương".into());
             }
             let Some(items) = document.get("items").and_then(Value::as_array) else {
                 return vec!["BOQ cần danh sách hạng mục".into()];
@@ -129,9 +129,7 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
                 .and_then(Value::as_str)
                 .is_none_or(|reason| reason.trim().is_empty())
         {
-            return vec![
-                "PhiÃªn báº£n BOQ Ä‘iá»u chá»‰nh cáº§n nÃªu lÃ½ do trÆ°á»›c khi duyá»‡t".into(),
-            ];
+            return vec!["Phiên bản BOQ điều chỉnh cần nêu lý do trước khi duyệt".into()];
         }
     }
     if entity == "subcontract" && action == "signed" && !positive(document, "value") {
@@ -149,21 +147,18 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
     }
     if entity == "boq" {
         if patch.get("status").is_some() {
-            return vec![
-                "Tráº¡ng thÃ¡i BOQ chá»‰ Ä‘Æ°á»£c thay Ä‘á»•i qua thao tÃ¡c quy trÃ¬nh".into(),
-            ];
+            return vec!["Trạng thái BOQ chỉ được thay đổi qua thao tác quy trình".into()];
         }
         if ["project", "revision", "supersedes"]
             .iter()
             .any(|field| patch.get(*field).is_some())
         {
-            return vec!["CÃ´ng trÃ¬nh, sá»‘ phiÃªn báº£n vÃ  BOQ gá»‘c khÃ´ng thá»ƒ Ä‘á»•i sau khi táº¡o báº£n nhÃ¡p".into()];
+            return vec![
+                "Công trình, số phiên bản và BOQ gốc không thể đổi sau khi tạo bản nháp".into(),
+            ];
         }
         if current.get("status").and_then(Value::as_str) != Some("draft") {
-            return vec![
-                "BOQ Ä‘Ã£ duyá»‡t khÃ´ng Ä‘Æ°á»£c sá»­a; hÃ£y táº¡o phiÃªn báº£n Ä‘iá»u chá»‰nh"
-                    .into(),
-            ];
+            return vec!["BOQ đã duyệt không được sửa; hãy tạo phiên bản điều chỉnh".into()];
         }
         return Vec::new();
     }
@@ -183,7 +178,7 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
 pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
     match (entity, document.get("status").and_then(Value::as_str)) {
         ("boq", Some("approved" | "superseded")) => {
-            vec!["BOQ Ä‘Ã£ duyá»‡t pháº£i Ä‘Æ°á»£c giá»¯ lÃ m lá»‹ch sá»­ phiÃªn báº£n".into()]
+            vec!["BOQ đã duyệt phải được giữ làm lịch sử phiên bản".into()]
         }
         ("site_diary", _) => vec!["Nhật ký công trường không thể xóa khỏi lịch sử".into()],
         ("subcontract", Some("signed" | "completed")) => {
