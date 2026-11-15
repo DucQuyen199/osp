@@ -348,19 +348,40 @@ async fn dispensed_quantities_for_prescription(
     let mut totals = std::collections::BTreeMap::<Uuid, Decimal>::new();
     for row in rows {
         let lines: Value = row.get(0);
-        for line in lines.as_array().into_iter().flatten() {
+        let Some(lines) = lines.as_array() else {
+            return Err(crate::error::ApiError::validation(
+                "pos.pos_order",
+                vec!["Completed POS order has invalid lines; prescription quantities cannot be verified".into()],
+            ));
+        };
+        for (index, line) in lines.iter().enumerate() {
             let Some(product_id) = line
                 .get("product")
                 .and_then(Value::as_str)
                 .and_then(|value| Uuid::parse_str(value).ok())
             else {
-                continue;
+                return Err(crate::error::ApiError::validation(
+                    "pos.pos_order",
+                    vec![format!(
+                        "Completed POS order line {} has an invalid product",
+                        index + 1
+                    )],
+                ));
             };
             let qty = line
                 .get("base_qty")
                 .or_else(|| line.get("qty"))
                 .and_then(money::decimal)
-                .unwrap_or(Decimal::ZERO);
+                .filter(|quantity| *quantity > Decimal::ZERO)
+                .ok_or_else(|| {
+                    crate::error::ApiError::validation(
+                        "pos.pos_order",
+                        vec![format!(
+                            "Completed POS order line {} has an invalid quantity",
+                            index + 1
+                        )],
+                    )
+                })?;
             let current = totals.get(&product_id).copied().unwrap_or(Decimal::ZERO);
             let Some(total) = current.checked_add(qty) else {
                 return Err(crate::error::ApiError::validation(
