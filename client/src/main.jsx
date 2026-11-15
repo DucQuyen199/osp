@@ -35,7 +35,7 @@ import DataSettingsPage from './DataSettingsPage.jsx';
 import MfaSettingsPage from './MfaSettingsPage.jsx';
 import AuthPage from './AuthPage.jsx';
 import { api, onUnauthorized, session } from './lib/api.js';
-import { CATEGORY_ORDER, categoryLabel } from './lib/i18n.js';
+import { CATEGORY_ORDER, categoryLabel, formatLocale, setFormatLocale } from './lib/i18n.js';
 import { app, can, entityLabel, isAdmin, loadMeta, loadSummary, resetCaches } from './lib/state.js';
 import { listHref } from './lib/routes.js';
 
@@ -303,6 +303,7 @@ function App() {
   const navToggleRef = useRef(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [theme, setTheme] = useState(() => { try { return localStorage.getItem('osp.theme') || ''; } catch { return ''; } });
+  const [numberLocale, setNumberLocale] = useState(formatLocale);
   const [, setEpoch] = useState(0);
 
   useEffect(() => {
@@ -395,6 +396,12 @@ function App() {
     setTheme(next);
   };
 
+  const changeNumberLocale = (next) => {
+    setFormatLocale(next);
+    setNumberLocale(next);
+    try { localStorage.setItem('osp.formatLocale', next); } catch { /* preference remains active in memory */ }
+  };
+
   const logout = async () => {
     try { await api('/api/auth/logout', { method: 'POST' }); } catch { /* session may have expired */ }
     session.clear();
@@ -469,6 +476,11 @@ function App() {
           <button className="btn btn-ghost" type="button" aria-haspopup="menu" aria-expanded={accountOpen} aria-label={`Tài khoản ${user.name}`} onClick={() => setAccountOpen((open) => !open)}><span className="avatar">{initials}</span></button>
           {accountOpen && <div className="menu-pop" role="menu">
             <div className="menu-item" role="none"><div><strong>{user.name}</strong><div className="faint">{user.email || 'Tài khoản máy'}</div></div></div>
+            <div className="menu-item" role="none"><strong>Định dạng ngày và số</strong></div>
+            <div role="group" aria-label="Định dạng ngày và số">
+              <button className="menu-item" role="menuitemradio" aria-checked={numberLocale === 'vi-VN'} type="button" onClick={() => changeNumberLocale('vi-VN')}>Việt Nam · ngày/tháng/năm</button>
+              <button className="menu-item" role="menuitemradio" aria-checked={numberLocale === 'en-US'} type="button" onClick={() => changeNumberLocale('en-US')}>Hoa Kỳ · tháng/ngày/năm</button>
+            </div>
             <a className="menu-item" role="menuitem" href="#/account/security" onClick={() => setAccountOpen(false)}>Bảo mật tài khoản</a>
             <button className="menu-item" role="menuitem" type="button" onClick={logout}><Icon name="logout" />Đăng xuất</button>
           </div>}

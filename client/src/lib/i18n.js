@@ -120,8 +120,26 @@ export const actionLabel = (v) => ACTIONS[v] || STATUS[v] || humanize(v);
 export const tone = (v) => TONE_LOOKUP[v] || '';
 export const categoryLabel = (c) => CATEGORY[c] || humanize(c);
 
-const nf = new Intl.NumberFormat('vi-VN');
-export const fmtNumber = (n) => nf.format(n);
+const FORMAT_LOCALES = new Set(['vi-VN', 'en-US']);
+const storedFormatLocale = () => {
+  try {
+    const value = localStorage.getItem('osp.formatLocale');
+    return FORMAT_LOCALES.has(value) ? value : 'vi-VN';
+  } catch {
+    return 'vi-VN';
+  }
+};
+export let formatLocale = storedFormatLocale();
+export const setFormatLocale = (locale) => {
+  if (FORMAT_LOCALES.has(locale)) formatLocale = locale;
+};
+const numberFormatters = new Map();
+const numberFormatter = (locale = formatLocale, options = {}) => {
+  const key = `${locale}:${JSON.stringify(options)}`;
+  if (!numberFormatters.has(key)) numberFormatters.set(key, new Intl.NumberFormat(locale, options));
+  return numberFormatters.get(key);
+};
+export const fmtNumber = (n, options) => numberFormatter(formatLocale, options).format(n);
 export let baseCurrency = 'VND';
 const moneyFormatters = new Map();
 export const setBaseCurrency = (currency) => {
@@ -129,31 +147,41 @@ export const setBaseCurrency = (currency) => {
 };
 export const fmtMoney = (n, currency = baseCurrency) => {
   const code = typeof currency === 'string' && /^[A-Z]{3}$/.test(currency) ? currency : baseCurrency;
-  if (!moneyFormatters.has(code)) {
-    moneyFormatters.set(code, new Intl.NumberFormat('vi-VN', {
+  const key = `${formatLocale}:${code}`;
+  if (!moneyFormatters.has(key)) {
+    moneyFormatters.set(key, new Intl.NumberFormat(formatLocale, {
       style: 'currency', currency: code, maximumFractionDigits: 2,
     }));
   }
-  return moneyFormatters.get(code).format(n);
+  return moneyFormatters.get(key).format(n);
 };
 export function fmtDate(s) {
   if (!s) return '';
   const d = new Date(s.length <= 10 ? `${s}T00:00:00` : s);
-  return Number.isNaN(d.getTime()) ? s : d.toLocaleDateString('vi-VN');
+  return Number.isNaN(d.getTime()) ? s : d.toLocaleDateString(formatLocale);
 }
 export function fmtDateTime(s) {
   if (!s) return '';
   const d = new Date(s);
-  return Number.isNaN(d.getTime()) ? s : d.toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
+  return Number.isNaN(d.getTime()) ? s : d.toLocaleString(formatLocale, { dateStyle: 'short', timeStyle: 'short' });
 }
 export function fmtTime(s) {
   const d = new Date(s);
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString(formatLocale, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 export function fmtAgo(s) {
   const sec = Math.round((Date.now() - new Date(s).getTime()) / 1000);
-  if (sec < 45) return 'vừa xong';
-  if (sec < 3600) return `${Math.round(sec / 60)} phút trước`;
-  if (sec < 86400) return `${Math.round(sec / 3600)} giờ trước`;
-  return `${Math.round(sec / 86400)} ngày trước`;
+  if (!Number.isFinite(sec)) return '';
+  if (Math.abs(sec) < 45) return formatLocale === 'vi-VN' ? 'vừa xong' : 'just now';
+  const absoluteSeconds = Math.abs(sec);
+  const [value, unit] = absoluteSeconds < 3600
+    ? [Math.round(absoluteSeconds / 60), 'minute']
+    : absoluteSeconds < 86400
+      ? [Math.round(absoluteSeconds / 3600), 'hour']
+      : [Math.round(absoluteSeconds / 86400), 'day'];
+  if (formatLocale === 'vi-VN') {
+    const unitVi = { minute: 'phút', hour: 'giờ', day: 'ngày' }[unit];
+    return `${value} ${unitVi} ${sec > 0 ? 'trước' : 'sau'}`;
+  }
+  return new Intl.RelativeTimeFormat(formatLocale, { numeric: 'auto' }).format(sec > 0 ? -value : value, unit);
 }
