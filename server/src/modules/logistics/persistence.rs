@@ -19,8 +19,26 @@ fn price_bucket(price: Decimal, unit: Option<String>) -> PriceBucket {
 }
 
 fn quantities(lines: &Value) -> R<HashMap<(String, PriceBucket), Decimal>> {
+    let Some(lines) = lines.as_array() else {
+        return Err(crate::error::ApiError::validation(
+            "logistics.shipment",
+            vec![
+                "Shipment source lines are missing or invalid; quantities cannot be verified"
+                    .into(),
+            ],
+        ));
+    };
     let mut result = HashMap::new();
-    for line in lines.as_array().into_iter().flatten() {
+    for (index, line) in lines.iter().enumerate() {
+        if !line.is_object() {
+            return Err(crate::error::ApiError::validation(
+                "logistics.shipment",
+                vec![format!(
+                    "Shipment line {} is invalid; quantities cannot be verified",
+                    index + 1
+                )],
+            ));
+        }
         if matches!(
             line.get("kind").and_then(Value::as_str),
             Some("service" | "digital")
@@ -32,8 +50,23 @@ fn quantities(lines: &Value) -> R<HashMap<(String, PriceBucket), Decimal>> {
             line.get("price").and_then(money::decimal),
             line.get("qty").and_then(money::decimal),
         ) else {
-            continue;
+            return Err(crate::error::ApiError::validation(
+                "logistics.shipment",
+                vec![format!(
+                    "Shipment line {} is incomplete; quantities cannot be verified",
+                    index + 1
+                )],
+            ));
         };
+        if Uuid::parse_str(product).is_err() || price < Decimal::ZERO || qty <= Decimal::ZERO {
+            return Err(crate::error::ApiError::validation(
+                "logistics.shipment",
+                vec![format!(
+                    "Shipment line {} has an invalid product, price, or quantity",
+                    index + 1
+                )],
+            ));
+        }
         let key = (
             product.to_string(),
             price_bucket(
