@@ -51,6 +51,7 @@ Wrap every user-visible literal with `uiText()` or the feature-local translator,
 - The purchasing workbench owns requisition permissions and API actions; `PurchaseRequisitionsTable` renders request status and emits edit, submit, approve or reject actions through callbacks.
 - The purchasing workbench owns receipt validation and inventory API actions; `PurchaseReceiptForm` edits controlled actual quantities and notes, then submits through a callback.
 - The generic entity drawer owns payload normalization, validation and persistence; `EntityLineEditors` renders controlled sales, purchasing, inventory and journal lines with their reference data and preview.
+- The hotel front desk owns reservation permissions, validation and persistence; `ReservationCreateForm` renders controlled guest, room type, date and occupancy fields and emits updates and submit requests through callbacks.
 
 ## Styling layers
 

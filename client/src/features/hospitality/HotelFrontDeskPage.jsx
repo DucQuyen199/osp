@@ -5,6 +5,7 @@ import { fmtDate, fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../l
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import hotelEnglish from './hotel.en.js';
+import ReservationCreateForm from './components/ReservationCreateForm.jsx';
 
 const t = (text) => uiTextWith(text, hotelEnglish);
 
@@ -152,14 +153,27 @@ export default function HotelFrontDeskPage() {
     <div className="row wrap hotel-frontdesk-summary"><span className="badge warning">{t("Nhận phòng hôm nay")}: {arrivalsToday}</span><span className="badge plain">{t("Trả phòng hôm nay")}: {departuresToday}</span><span className="badge success">{t("Công suất hiện tại")}: {occupancy}%</span><a className="small" href="#/reports/hotel/housekeeping-board">{t('Mở bảng buồng phòng')}</a></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     {loading ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <>
-      {can('hotel.reservation.create') && <section className="card hotel-reservation-create"><h2>{t('Đặt phòng mới')}</h2><form className="hotel-reservation-form" onSubmit={createReservation}>
-        <label className="field"><span className="label">{t('Khách lưu trú *')}</span><select className="select" required value={party} onChange={(event) => setParty(event.target.value)}><option value="">{t('Chọn khách')}</option>{[...parties.values()].filter((item) => item.active !== false).map((item) => <option key={item.id} value={item.id}>{recordLabel('master-data.party', item)}</option>)}</select></label>
-        <label className="field"><span className="label">{t('Loại phòng *')}</span><select className="select" required value={roomType} onChange={(event) => setRoomType(event.target.value)}><option value="">{t('Chọn loại phòng')}</option>{[...roomTypes.values()].map((item) => <option key={item.id} value={item.id}>{item.name} · {fmtMoney(item.rate)} / {t("đêm")}{item.capacity ? ` · ${t("tối đa")} ${item.capacity} ${t("khách")}` : ''}</option>)}</select></label>
-        <label className="field"><span className="label">{t('Ngày nhận *')}</span><input className="input" type="date" min={today()} required value={checkIn} onChange={(event) => setCheckIn(event.target.value)} /></label>
-        <label className="field"><span className="label">{t('Ngày trả *')}</span><input className="input" type="date" min={checkIn} required value={checkOut} onChange={(event) => setCheckOut(event.target.value)} /></label>
-        <label className="field"><span className="label">{t('Số lượng khách *')}</span><input className="input num" type="number" min="1" step="1" required value={guestCount} onChange={(event) => setGuestCount(event.target.value)} /><span className="small muted">{roomTypes.get(roomType)?.capacity ? `${t("Sức chứa tối đa:")} ${roomTypes.get(roomType).capacity}` : t('Loại phòng chưa đặt giới hạn sức chứa')}</span></label>
-        <button className="btn btn-primary" type="submit" disabled={Boolean(busy) || (roomTypes.get(roomType)?.capacity && Number(guestCount) > Number(roomTypes.get(roomType).capacity)) || !can('hotel.reservation.create')}>{busy === 'create' ? t('Đang đặt…') : t('Tạo đặt phòng')}</button>
-      </form></section>}
+      {can('hotel.reservation.create') && <section className="card hotel-reservation-create"><h2>{t('Đặt phòng mới')}</h2><ReservationCreateForm
+        parties={parties}
+        roomTypes={roomTypes}
+        party={party}
+        onPartyChange={setParty}
+        roomType={roomType}
+        onRoomTypeChange={setRoomType}
+        checkIn={checkIn}
+        minCheckIn={today()}
+        onCheckInChange={(value) => { setCheckIn(value); if (checkOut && checkOut <= value) setCheckOut(''); }}
+        checkOut={checkOut}
+        minCheckOut={nextDay(checkIn)}
+        onCheckOutChange={setCheckOut}
+        guestCount={guestCount}
+        onGuestCountChange={setGuestCount}
+        busy={busy}
+        t={t}
+        fmtMoney={fmtMoney}
+        recordLabel={recordLabel}
+        onSubmit={createReservation}
+      /></section>}
       <div className="hotel-frontdesk-layout"><section className="hotel-reservation-list"><header className="hotel-list-head"><h2>{t('Đặt phòng')}</h2><select className="select" aria-label={t("Lọc đặt phòng")} value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">{t('Tất cả')}</option><option value="arrivals">{t('Nhận hôm nay')}</option><option value="departures">{t('Trả hôm nay')}</option><option value="booked">{t('Đã đặt')}</option><option value="checked_in">{t('Đang lưu trú')}</option><option value="checked_out">{t('Đã trả')}</option><option value="no_show">{t('Vắng mặt')}</option><option value="cancelled">{t('Đã hủy')}</option></select></header>
         {visible.length ? <div className="hotel-reservation-cards">{visible.map((reservation) => <button className={`card hotel-reservation-card${selectedId === reservation.id ? ' selected' : ''}`} type="button" key={reservation.id} onClick={() => { setSelectedId(reservation.id); setAssignment(reservation.room || ''); }}><strong>{recordLabel('master-data.party', parties.get(reservation.party))}</strong><span>{fmtDate(reservation.check_in)} → {fmtDate(reservation.check_out)} · {reservation.nights || '—'} {t("đêm")} · {reservation.guest_count || 1} {t("khách")}</span><span className="small muted">{roomTypes.get(reservation.room_type)?.name || t('Chưa rõ loại phòng')}{reservation.room ? ` · ${t("Phòng")} ${rooms.get(reservation.room)?.number || ''}` : ` · ${t("Chưa phân phòng")}`}</span><span className={`badge ${reservationStatus(reservation.status)}`}>{statusLabel(reservation.status)}</span><strong className="num">{fmtMoney(reservation.total || 0)}</strong></button>)}</div> : <div className="empty">{t('Không có đặt phòng theo bộ lọc.')}</div>}
       </section>
