@@ -4,7 +4,8 @@ import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, fmtNumber, uiText } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
-import { PurchaseOrderLinesEditor, RequisitionLinesEditor } from './components/PurchaseLineEditors.jsx';
+import PurchaseOrderDraftForm from './components/PurchaseOrderDraftForm.jsx';
+import PurchaseRequisitionForm from './components/PurchaseRequisitionForm.jsx';
 import PurchaseOrdersList from './components/PurchaseOrdersList.jsx';
 import PurchaseRequisitionsTable from './components/PurchaseRequisitionsTable.jsx';
 import PurchaseReceiptForm from './components/PurchaseReceiptForm.jsx';
@@ -404,25 +405,52 @@ export default function PurchasingWorkbenchPage() {
     {can('purchasing.rfq.read') && <div className="row u-legacy-41bc5191db" ><a className="btn btn-secondary btn-sm" href="#/sourcing">{uiText('RFQ và so sánh báo giá')}</a></div>}
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
     <div className="stats u-legacy-bf4a218e05" ><div className="card stat"><span className="stat-label">{uiText('Nháp / bị trả')}</span><strong className="stat-value">{totals.draft}</strong></div><div className="card stat"><span className="stat-label">{uiText('Chờ duyệt')}</span><strong className="stat-value">{totals.awaitingApproval}</strong></div><div className="card stat"><span className="stat-label">{uiText('Đang nhận hàng')}</span><strong className="stat-value">{totals.receiving}</strong></div><div className="card stat"><span className="stat-label">{uiText('Đã nhận đủ')}</span><strong className="stat-value">{totals.received}</strong></div></div>
-    {can('purchasing.purchase_requisition.read') && <section className="card card-pad u-legacy-bf4a218e05" ><div className="row wrap"><h2>{uiText(editingRequisitionId ? 'Sửa đề nghị mua nháp' : 'Đề nghị mua nội bộ')}</h2><span className="grow"/>{editingRequisitionId && <button className="btn btn-ghost btn-sm" type="button" onClick={() => { setEditingRequisitionId(''); setRequisitionLines([{ product: [...products.keys()][0] || '', uom: products.get([...products.keys()][0])?.uom || '', qty: '1' }]); }}>{uiText('Thoát chỉnh sửa')}</button>}</div><p className="small muted">{uiText('Ghi nhu cầu hàng hóa và kho nhận. Sau khi phê duyệt, hệ thống sinh đơn mua nháp có liên kết nguồn; đơn mua vẫn cần giá và phê duyệt riêng trước khi đặt hàng.')}</p>
-      {can('purchasing.purchase_requisition.create') && <><form onSubmit={saveRequisition}><div className="form-grid">
-<label className="field"><span className="label">{uiText('Phương thức mua')} *</span><select className="select" value={requisitionForm.sourcing_method} onChange={(event) => setRequisitionForm((current) => ({ ...current, sourcing_method: event.target.value, supplier: event.target.value === 'competitive' ? '' : current.supplier }))}><option value="direct">{uiText('Mua trực tiếp')}</option><option value="competitive">{uiText('So sánh báo giá nhà cung cấp')}</option></select></label>
-                <label className="field"><span className="label">{uiText('Nhà cung cấp')} *</span><select className="select" required={requisitionForm.sourcing_method === 'direct'} disabled={requisitionForm.sourcing_method === 'competitive'} value={requisitionForm.supplier} onChange={(event) => setRequisitionForm((current) => ({ ...current, supplier: event.target.value }))}><option value="">{uiText('Chọn nhà cung cấp')}</option>{[...suppliers.values()].map((row) => <option key={row.id} value={row.id}>{recordLabel('master-data.party', row)}</option>)}</select></label>
-        <label className="field"><span className="label">{uiText('Kho nhận')} *</span><select className="select" required value={requisitionForm.warehouse} onChange={(event) => setRequisitionForm((current) => ({ ...current, warehouse: event.target.value }))}><option value="">{uiText('Chọn kho')}</option>{[...warehouses.values()].filter((row) => row.active !== false).map((row) => <option key={row.id} value={row.id}>{recordLabel('inventory.warehouse', row)}</option>)}</select></label>
-        <label className="field"><span className="label">{uiText('Người yêu cầu')}</span><input className="input" maxLength="160" value={requisitionForm.requested_by} onChange={(event) => setRequisitionForm((current) => ({ ...current, requested_by: event.target.value }))}/></label>
-        <label className="field"><span className="label">{uiText('Lý do / mục đích')}</span><input className="input" maxLength="500" value={requisitionForm.reason} onChange={(event) => setRequisitionForm((current) => ({ ...current, reason: event.target.value }))}/></label>
-      </div><div className="row wrap u-legacy-0ee7f66ad9" ><strong>{uiText('Danh sách hàng cần mua')}</strong><span className="grow"/><button className="btn btn-secondary btn-sm" type="button" disabled={!products.size} onClick={() => setRequisitionLines((current) => [...current, { product: [...products.keys()][0] || '', uom: products.get([...products.keys()][0])?.uom || '', qty: '1' }])}>{uiText('Thêm dòng')}</button></div>
-      <RequisitionLinesEditor lines={requisitionLines} products={products} unitsFor={unitsFor} onProductChange={updateRequisitionProduct} onChange={updateRequisitionLine} onRemove={removeRequisitionLine}/>
-      <div className="row u-legacy-0ee7f66ad9" ><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !products.size || !warehouses.size}>{uiText(editingRequisitionId ? 'Lưu đề nghị nháp' : 'Tạo đề nghị nháp')}</button></div></form>
-      </>}<PurchaseRequisitionsTable requisitions={requisitions} suppliers={suppliers} warehouses={warehouses} products={products} units={units} approvalByRequisition={approvalByRequisition} orderByRequisition={orderByRequisition} workflowApproval={workflowApproval} busy={busy} can={can} onEdit={editRequisition} onAction={requisitionAction} />
-    </section>}
-    {can('purchasing.purchase_order.create') && <section className="card card-pad"><div className="row wrap"><h2>{uiText(editingId ? 'Sửa đơn mua nháp' : 'Lập đơn mua trực tiếp')}</h2><span className="grow"/>{editingId && <button className="btn btn-ghost btn-sm" type="button" onClick={() => { setEditingId(''); setLines([{ product: [...products.keys()][0] || '', qty: '1', price: '', tax: '' }]); }}>{uiText('Thoát chỉnh sửa')}</button>}</div>
-      <form onSubmit={saveOrder}><div className="form-grid"><label className="field"><span className="label">{uiText("Nhà cung cấp *")}</span><select className="select" required value={orderForm.supplier} onChange={(e) => setOrderForm({ ...orderForm, supplier: e.target.value })}><option value="">{uiText("Chọn nhà cung cấp")}</option>{[...suppliers.values()].map((row) => <option key={row.id} value={row.id}>{recordLabel('master-data.party', row)}</option>)}</select></label><label className="field"><span className="label">{uiText("Kho nhận *")}</span><select className="select" required value={orderForm.warehouse} onChange={(e) => setOrderForm({ ...orderForm, warehouse: e.target.value })}><option value="">{uiText("Chọn kho")}</option>{[...warehouses.values()].filter((row) => row.active !== false).map((row) => <option key={row.id} value={row.id}>{recordLabel('inventory.warehouse', row)}</option>)}</select></label><label className="field"><span className="label">{uiText("Ngày giao dự kiến")}</span><input className="input" type="date" value={orderForm.expected_date} onChange={(e) => setOrderForm({ ...orderForm, expected_date: e.target.value })}/></label></div>
-        <div className="row wrap u-legacy-c53ea1da23" ><strong>{uiText("Vật tư / hàng hóa")}</strong><span className="grow"/><button className="btn btn-secondary btn-sm" type="button" disabled={!products.size} onClick={addLine}>{uiText("Thêm dòng")}</button></div>
-        <PurchaseOrderLinesEditor lines={lines} products={products} unitsFor={unitsFor} taxes={taxes} taxById={taxById} onUpdate={updateLine} onRemove={(index) => setLines((current) => current.filter((_, i) => i !== index))} lineValue={lineValue}/>
-        <div className="row wrap u-legacy-0ee7f66ad9" ><span className="grow"/><strong>{uiText("Tổng dự kiến có thuế:")} {fmtMoney(orderLinesTotal)}</strong><button className="btn btn-primary" disabled={Boolean(busy) || !products.size || !warehouses.size || orderLinesTotal <= 0}>{uiText(editingId ? 'Lưu đơn mua nháp' : 'Tạo đơn mua nháp')}</button></div>
-      </form>
-    </section>}
+    {can('purchasing.purchase_requisition.read') && <>
+      {!can('purchasing.purchase_requisition.create') && <section className="card card-pad"><h2>{uiText('Đề nghị mua nội bộ')}</h2><p className="small muted">{uiText('Ghi nhu cầu hàng hóa và kho nhận. Sau khi phê duyệt, hệ thống sinh đơn mua nháp có liên kết nguồn; đơn mua vẫn cần giá và phê duyệt riêng trước khi đặt hàng.')}</p></section>}
+      {can('purchasing.purchase_requisition.create') && <PurchaseRequisitionForm
+        editingId={editingRequisitionId}
+        form={requisitionForm}
+        lines={requisitionLines}
+        suppliers={suppliers}
+        warehouses={warehouses}
+        products={products}
+        unitsFor={unitsFor}
+        busy={busy}
+        onSubmit={saveRequisition}
+        onFormChange={(field, value) => setRequisitionForm((current) => ({ ...current, [field]: value, ...(field === 'sourcing_method' && value === 'competitive' ? { supplier: '' } : {}) }))}
+        onAddLine={() => setRequisitionLines((current) => [...current, { product: [...products.keys()][0] || '', uom: products.get([...products.keys()][0])?.uom || '', qty: '1' }])}
+        onProductChange={updateRequisitionProduct}
+        onLineChange={updateRequisitionLine}
+        onRemoveLine={removeRequisitionLine}
+        onExitEdit={() => { setEditingRequisitionId(''); setRequisitionLines([{ product: [...products.keys()][0] || '', uom: products.get([...products.keys()][0])?.uom || '', qty: '1' }]); }}
+        label={recordLabel}
+        t={uiText}
+      />}
+      <section className="card card-pad"><PurchaseRequisitionsTable requisitions={requisitions} suppliers={suppliers} warehouses={warehouses} products={products} units={units} approvalByRequisition={approvalByRequisition} orderByRequisition={orderByRequisition} workflowApproval={workflowApproval} busy={busy} can={can} onEdit={editRequisition} onAction={requisitionAction} /></section>
+    </>}
+    {can('purchasing.purchase_order.create') && <PurchaseOrderDraftForm
+      editingId={editingId}
+      form={orderForm}
+      lines={lines}
+      suppliers={suppliers}
+      warehouses={warehouses}
+      products={products}
+      unitsFor={unitsFor}
+      taxes={taxes}
+      taxById={taxById}
+      total={orderLinesTotal}
+      busy={busy}
+      onSubmit={saveOrder}
+      onFormChange={(field, value) => setOrderForm((current) => ({ ...current, [field]: value }))}
+      onAddLine={addLine}
+      onLineChange={updateLine}
+      onRemoveLine={(index) => setLines((current) => current.filter((_, i) => i !== index))}
+      onExitEdit={() => { setEditingId(''); setLines([{ product: [...products.keys()][0] || '', qty: '1', price: '', tax: '' }]); }}
+      lineValue={lineValue}
+      formatMoney={fmtMoney}
+      label={recordLabel}
+      t={uiText}
+    />}
     {loading ? <div className="skeleton" data-h="row"/> : !orders.length ? <div className="card card-pad empty u-legacy-92c18f6bda" >{uiText('Chưa có đơn mua. Tạo đơn mua nháp, gửi duyệt rồi nhận hàng theo số lượng thực tế.')}</div> : <div className="layout-split u-legacy-92c18f6bda" >
       <PurchaseOrdersList orders={orders} suppliers={suppliers} selectedId={selectedId} onSelect={setSelectedId} />
       {selected && <section className="card card-pad"><div className="row wrap"><div><h2>{suppliers.has(selected.supplier) ? recordLabel('master-data.party', suppliers.get(selected.supplier)) : uiText('Đơn mua hàng')}</h2><div className="small muted">{uiText("Kho nhận:")} {warehouses.get(selected.warehouse)?.name || '—'} · Giao dự kiến: {fmtDate(selected.expected_date)}</div></div><span className="grow"/><span className="badge warning">{statusLabel(selected.status)}</span></div>
