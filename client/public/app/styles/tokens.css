@@ -42,6 +42,8 @@
   --success-solid: #0f6b37; /* toast thành công, chữ trắng 6.4:1 */
   --on-solid: #ffffff;      /* chữ trên nền đặc (danger/success) */
   --hero-bg: var(--accent); /* nền khối giới thiệu ở trang đích */
+  --chart-1: #2563eb; --chart-2: #16a34a; --chart-3: #b45309; --chart-4: #7e22ce;
+  --chart-5: #b91c1c; --chart-6: #0e7490; --chart-7: #475569; --chart-empty: #e9ecf1;
 
   /* ── Workspace và điều hướng ── */
   --workspace-bg: #f3f6fb;
@@ -133,6 +135,7 @@
   --info-text: #74bbf3;    --info-bg: #102c44;
   --neutral-text: #c2cad6; --neutral-bg: #252d38;
   --danger-solid: #d83a2f; --success-solid: #0f6b37; --on-solid: #ffffff; --hero-bg: #14234f;
+  --chart-empty: #252d38;
   --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4); --shadow-2: 0 4px 12px rgb(0 0 0 / 0.45); --shadow-3: 0 12px 32px rgb(0 0 0 / 0.6);
 }
 
@@ -149,6 +152,7 @@
     --info-text: #74bbf3;    --info-bg: #102c44;
     --neutral-text: #c2cad6; --neutral-bg: #252d38;
     --danger-solid: #d83a2f; --success-solid: #0f6b37; --on-solid: #ffffff; --hero-bg: #14234f;
+    --chart-empty: #252d38;
     --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4); --shadow-2: 0 4px 12px rgb(0 0 0 / 0.45); --shadow-3: 0 12px 32px rgb(0 0 0 / 0.6);
   }
 }

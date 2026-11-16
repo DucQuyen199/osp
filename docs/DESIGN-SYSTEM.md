@@ -6,6 +6,8 @@ Tài liệu này là quy chuẩn thiết kế và giao diện của OSP Suite. �
 
 **Công nghệ.** React + Vite, CSS thuần và ES modules. Production dùng bundle có bước build; vẫn chạy dưới CSP nghiêm ngặt (`script-src 'self'; style-src 'self'`), nên **cấm** `style="..."` inline và `<script>` inline.
 
+Trong JSX cũng không dùng prop `style={{...}}`: CSP sẽ chặn thuộc tính style do React tạo. Dùng lớp CSS và design token; với biểu đồ dùng thuộc tính hình học SVG như `width`, `points` và `fill` để biểu diễn dữ liệu.
+
 ---
 
 ## 1. Nguyên tắc
