@@ -1413,6 +1413,9 @@ export const setUiLocale = (locale) => {
   if (locale === 'vi-VN' || locale === 'en-US') uiLocale = locale;
 };
 export const uiText = (text) => uiLocale === 'en-US' ? (UI_TEXT_EN[text] || text) : text;
+export const uiTextWith = (text, featureTranslations) => uiLocale === 'en-US'
+  ? (featureTranslations?.[text] || uiText(text))
+  : text;
 
 const humanize = (s) => {
   const t = String(s).replace(/[_-]+/g, ' ').trim();
