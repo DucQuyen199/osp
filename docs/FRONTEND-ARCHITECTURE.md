@@ -35,6 +35,7 @@ For translations used only by a lazy-loaded feature, keep its English text map i
 - The school workbench owns tuition issuance permissions and invoice actions; `TuitionLedgerTable` renders controlled fee and invoice records and emits issuance requests through a callback.
 - The manufacturing workbench keeps production commands and output drafts in `ManufacturingWipPage`; `ProductionOrderCard` renders the controlled output fields and emits requested transitions.
 - The manufacturing workbench keeps QC permissions and inspection actions in `ManufacturingWipPage`; `ProductionInspectionQueue` renders pending production inspections and emits pass/fail decisions through callbacks.
+- The manufacturing workbench owns WIP report filters and reconciliation actions; `ManufacturingWipReport` renders the order level WIP table and its reconciliation context.
 - The purchasing workbench owns supplier-invoice state and validation; `SupplierInvoiceAdjustmentsEditor` edits controlled charge and landed-cost allocations through a callback.
 - The POS terminal owns cart, tender, permissions and checkout; `PosCheckoutPanel` displays controlled payment fields and emits the checkout request.
 - The HR workbench owns attendance-date rules and punch actions; `AttendanceEntriesTable` renders the controlled daily records and emits punch-out requests.
