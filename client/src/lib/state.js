@@ -9,6 +9,32 @@ export const app = {
   entities: new Map(), // qname -> {def, module}
 };
 
+let revision = 0;
+const appListeners = new Set();
+
+export function subscribeAppState(listener) {
+  appListeners.add(listener);
+  return () => appListeners.delete(listener);
+}
+
+export function getAppStateRevision() {
+  return revision;
+}
+
+export function publishAppState() {
+  revision += 1;
+  for (const listener of appListeners) listener();
+}
+
+export function resetAppState() {
+  app.meta = null;
+  app.user = null;
+  app.summary = {};
+  app.entities.clear();
+  resetCaches();
+  publishAppState();
+}
+
 export async function loadMeta() {
   const s = session.current();
   const [meta, me] = await Promise.all([api(tenantPath('/meta')), api('/api/auth/me')]);
@@ -18,6 +44,7 @@ export async function loadMeta() {
   app.entities.clear();
   for (const m of meta.modules) for (const e of m.entities) app.entities.set(`${m.id}.${e.name}`, { def: e, module: m });
   s.tenantName = meta.name;
+  publishAppState();
   return meta;
 }
 
@@ -27,6 +54,7 @@ export async function loadSummary() {
   } catch {
     app.summary = {};
   }
+  publishAppState();
   return app.summary;
 }
 

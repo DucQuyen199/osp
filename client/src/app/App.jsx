@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import AuthPage from '../features/auth/AuthPage.jsx';
 import PageRouter from './PageRouter.jsx';
 import { parseRoute } from './parseRoute.js';
@@ -8,12 +8,11 @@ import Sidebar from '../components/Sidebar.jsx';
 import { api, onUnauthorized, session } from '../lib/api.js';
 import { setBusinessTimezone } from '../lib/dates.js';
 import { ensureUiTranslations, formatLocale, setFormatLocale, setUiLocale, uiLocale, uiText } from '../lib/i18n.js';
-import { app, loadMeta, loadSummary, resetCaches } from '../lib/state.js';
+import { app, getAppStateRevision, loadMeta, loadSummary, publishAppState, resetAppState, subscribeAppState } from '../lib/state.js';
 export default function App() {
+  useSyncExternalStore(subscribeAppState, getAppStateRevision, getAppStateRevision);
   const [route, setRoute] = useState(() => parseRoute());
   const [ready, setReady] = useState(false);
-  const [meta, setMeta] = useState(null);
-  const [user, setUser] = useState(null);
   const [error, setError] = useState('');
   const [navOpen, setNavOpen] = useState(false);
   const [mobileNav, setMobileNav] = useState(() => window.matchMedia('(max-width: 960px)').matches);
@@ -22,7 +21,8 @@ export default function App() {
   const [theme, setTheme] = useState(() => { try { return localStorage.getItem('osp.theme') || ''; } catch { return ''; } });
   const [numberLocale, setNumberLocale] = useState(formatLocale);
   const [interfaceLanguage, setInterfaceLanguage] = useState(uiLocale);
-  const [, setEpoch] = useState(0);
+  const meta = app.meta;
+  const user = app.user;
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 960px)');
@@ -46,39 +46,33 @@ export default function App() {
   }, [mobileNav, navOpen]);
   const authenticated = Boolean(session.current());
 
-  const refresh = useCallback(() => setEpoch((value) => value + 1), []);
   const signedIn = useCallback(async () => {
     try {
       const loaded = await loadMeta();
       await loadSummary();
       setBusinessTimezone(loaded.settings?.businessTimezone || 'UTC');
-      setMeta(loaded);
-      setUser(app.user);
       setError('');
-      refresh();
       setRoute(parseRoute());
     } catch (reason) {
       session.clear();
-      resetCaches();
+      resetAppState();
       setError(reason.message || 'Không tải được dữ liệu doanh nghiệp.');
       setRoute({ name: 'login' });
-      refresh();
     }
-  }, [refresh]);
+  }, []);
 
   useEffect(() => {
     const changed = () => { setRoute(parseRoute()); setNavOpen(false); };
     const metaChanged = () => {
       setBusinessTimezone(app.meta?.settings?.businessTimezone || 'UTC');
-      setMeta(app.meta);
-      setUser(app.user);
+      publishAppState();
     };
     window.addEventListener('hashchange', changed);
     window.addEventListener('osp:meta', metaChanged);
     document.documentElement.dataset.theme = theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-    const stop = onUnauthorized(() => { session.clear(); setMeta(null); setUser(null); setError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'); location.hash = '#/login'; refresh(); });
+    const stop = onUnauthorized(() => { session.clear(); resetAppState(); setError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'); location.hash = '#/login'; });
     return () => { window.removeEventListener('hashchange', changed); window.removeEventListener('osp:meta', metaChanged); stop?.(); };
-  }, [theme, refresh]);
+  }, [theme]);
 
   useEffect(() => {
     let alive = true;
@@ -97,10 +91,10 @@ export default function App() {
         try {
           const loaded = await loadMeta();
           await loadSummary();
-          if (alive) { setBusinessTimezone(loaded.settings?.businessTimezone || 'UTC'); setMeta(loaded); setUser(app.user); }
+          if (alive) setBusinessTimezone(loaded.settings?.businessTimezone || 'UTC');
         } catch {
           session.clear();
-          resetCaches();
+          resetAppState();
         }
       }
       if (alive) setReady(true);
@@ -140,13 +134,9 @@ export default function App() {
   const logout = async () => {
     try { await api('/api/auth/logout', { method: 'POST' }); } catch { /* session may have expired */ }
     session.clear();
-    resetCaches();
-    app.meta = null;
-    setMeta(null);
-    setUser(null);
+    resetAppState();
     setAccountOpen(false);
     location.hash = '#/login';
-    refresh();
   };
 
   useEffect(() => {

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { api, tenantPath } from '../../lib/api.js';
 import { confirmDialog } from '../../lib/feedback.js';
 import { fmtDateTime, uiText } from '../../lib/i18n.js';
-import { app } from '../../lib/state.js';
+import { app, publishAppState } from '../../lib/state.js';
 
 export default function MfaSettingsPage() {
   const [status, setStatus] = useState(null);
@@ -45,6 +45,7 @@ export default function MfaSettingsPage() {
       setRecoveryCodes(result.recoveryCodes || []); setSetup(null); setCode('');
       setStatus({ enabled: true, recoveryCodesRemaining: result.recoveryCodes?.length || 0 });
       app.user.mfaEnabled = true;
+      publishAppState();
       setNotice(uiText('Đã bật xác thực hai lớp. Hãy lưu các mã khôi phục ở nơi an toàn.'));
       await reload();
     } catch (reason) { setError(reason.message || uiText('Mã xác thực không đúng.')); }
@@ -57,6 +58,7 @@ export default function MfaSettingsPage() {
       await api(tenantPath('/auth/mfa/disable'), { method: 'POST', body: { password, code } });
       setPassword(''); setCode(''); setRecoveryCodes([]); setStatus({ enabled: false, recoveryCodesRemaining: 0 });
       app.user.mfaEnabled = false;
+      publishAppState();
       setNotice(uiText('Đã tắt xác thực hai lớp. Các phiên và API token khác đã bị thu hồi.'));
       await reload();
     } catch (reason) { setError(reason.message || uiText('Không tắt được xác thực hai lớp.')); }
