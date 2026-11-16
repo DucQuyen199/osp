@@ -1,4 +1,4 @@
-﻿# OSP Suite
+# OSP Suite
 
 Bộ phần mềm quản trị doanh nghiệp dạng **module**: ERP, CRM, kế toán, nhân sự, kho, POS, thương mại điện tử… cho **22 ngành**. Các bounded context có mã nguồn và ranh giới riêng trong một Rust modular monolith, triển khai cùng một ứng dụng và dùng PostgreSQL chung. Các luồng liên module được điều phối bằng sự kiện trong cùng giao dịch.
 

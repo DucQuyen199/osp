@@ -1,4 +1,4 @@
-﻿# Lộ trình
+# Lộ trình
 
 Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQL, API REST và React; chưa phải sản phẩm hoàn chỉnh để bán.
 
