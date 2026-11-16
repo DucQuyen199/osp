@@ -201,6 +201,7 @@ const uiTextEnglish = {
   'Hoàn tiền theo phương thức gốc': 'Refund to original payment method',
   'Lý do trả hàng cần từ 5 đến 500 ký tự.': 'The return reason must be 5–500 characters.',
   'Đơn thuốc hoặc đơn dùng voucher cần xử lý hoàn theo quy trình riêng.': 'Prescription and voucher sales require their dedicated return workflow.',
+  'Đơn thuốc cần quy trình hoàn riêng.': 'Prescription sales require their dedicated return workflow.',
   'Giao dịch có nhiều mức thuế cần được trả qua chứng từ điều chỉnh thuế riêng.': 'Transactions with multiple tax rates require a separate tax adjustment return workflow.',
   'Đơn thuốc, voucher hoặc nhiều mức thuế cần quy trình hoàn riêng.': 'Prescription, voucher, or multi-tax sales require a separate return workflow.',
   'Nhập số lượng lớn hơn 0 cho ít nhất một mặt hàng.': 'Enter a quantity greater than zero for at least one item.',

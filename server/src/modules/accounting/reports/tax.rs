@@ -97,7 +97,8 @@ WHERE d.tenant_id = $1 AND d.status = 'posted'
   AND ($3::date IS NULL OR COALESCE(j.posting_date, (j.created_at AT TIME ZONE 'UTC')::date) <= $3::date)
 UNION ALL
 SELECT p.id::text, abs(COALESCE(p.base_amount, p.amount))::text, abs(COALESCE(p.base_tax_amount, p.tax_amount, 0))::text,
-       CASE WHEN p.tax_rate IS NULL OR p.tax_amount IS NULL THEN '[]'::jsonb ELSE
+       CASE WHEN p.source IN ('pos_order', 'pos_order_refund') THEN COALESCE(pos_return.lines, pos_order.lines, '[]'::jsonb)
+       WHEN p.tax_rate IS NULL OR p.tax_amount IS NULL THEN '[]'::jsonb ELSE
          jsonb_build_array(jsonb_build_object(
            'net_amount', abs(p.amount) - abs(p.tax_amount),
            'line_total', abs(p.amount),
@@ -117,6 +118,10 @@ JOIN accounting__journal_entry j ON j.tenant_id = p.tenant_id AND j.status = 'po
     OR (p.source = 'pos_order_refund' AND j.source = 'pos_refund' AND j.source_id = p.source_id))
 LEFT JOIN master_data__party party ON party.tenant_id = p.tenant_id AND party.id = p.party
 LEFT JOIN master_data__currency currency ON currency.tenant_id = p.tenant_id AND currency.id = p.currency
+LEFT JOIN pos__pos_return pos_return ON pos_return.tenant_id = p.tenant_id AND p.source = 'pos_order_refund' AND pos_return.id::text = p.source_id
+LEFT JOIN pos__pos_order pos_order ON pos_order.tenant_id = p.tenant_id AND (
+    (p.source = 'pos_order' AND pos_order.id::text = p.source_id)
+    OR (p.source = 'pos_order_refund' AND (pos_order.id::text = p.source_id OR pos_order.id = pos_return.pos_order)))
 WHERE p.tenant_id = $1 AND p.source IN ('ticket', 'event_ticket_refund', 'pos_order', 'pos_order_refund')
   AND abs(COALESCE(p.tax_amount, 0)) > 0.005
   AND ($2::date IS NULL OR COALESCE(j.posting_date, (j.created_at AT TIME ZONE 'UTC')::date) >= $2::date)

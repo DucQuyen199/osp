@@ -174,26 +174,6 @@ pub async fn prepare_return_document(
     let Some(source_lines) = source_lines.as_array() else {
         return Ok(vec!["Giao dịch POS gốc không có dòng hàng hợp lệ".into()]);
     };
-    if let Some(first) = source_lines.first() {
-        let tax_id = first.get("tax").and_then(Value::as_str);
-        let tax_rate = first
-            .get("tax_rate")
-            .and_then(money::decimal)
-            .unwrap_or_default();
-        if source_lines.iter().skip(1).any(|line| {
-            line.get("tax").and_then(Value::as_str) != tax_id
-                || line
-                    .get("tax_rate")
-                    .and_then(money::decimal)
-                    .unwrap_or_default()
-                    != tax_rate
-        }) {
-            return Ok(vec![
-                "Giao dịch có nhiều mức thuế cần được trả qua chứng từ điều chỉnh thuế riêng"
-                    .into(),
-            ]);
-        }
-    }
     let Some(selected) = document.get("lines").and_then(Value::as_array) else {
         return Ok(vec!["Phiếu trả hàng cần chọn ít nhất một dòng hàng".into()]);
     };
@@ -234,31 +214,30 @@ pub async fn prepare_return_document(
             errors.push(format!("Số lượng trả ở dòng {} vượt số đã bán", index + 1));
             continue;
         }
+        if selected_quantities.contains_key(&line_index) {
+            errors.push(format!("Dòng trả hàng {} bị lặp", index + 1));
+            continue;
+        }
         let prior = tx.query_opt(
-            "SELECT COALESCE(SUM((item.line->>'qty')::numeric), 0)::text FROM pos__pos_return r CROSS JOIN LATERAL jsonb_array_elements(COALESCE(r.lines, '[]'::jsonb)) AS item(line) WHERE r.tenant_id = $1 AND r.pos_order = $2 AND r.id <> NULLIF($3, '')::uuid AND r.status = 'received' AND (item.line->>'source_line_index')::int = $4",
+            "SELECT COALESCE(SUM((item.line->>'qty')::numeric), 0)::text, COALESCE(SUM(COALESCE((item.line->>'discount_amount')::numeric, 0)), 0)::text, COALESCE(SUM(COALESCE((item.line->>'net_amount')::numeric, 0)), 0)::text, COALESCE(SUM(COALESCE((item.line->>'tax_amount')::numeric, 0)), 0)::text, COALESCE(SUM(COALESCE((item.line->>'line_total')::numeric, 0)), 0)::text, COALESCE(SUM(COALESCE((item.line->>'voucher_discount_amount')::numeric, 0)), 0)::text FROM pos__pos_return r CROSS JOIN LATERAL jsonb_array_elements(COALESCE(r.lines, '[]'::jsonb)) AS item(line) WHERE r.tenant_id = $1 AND r.pos_order = $2 AND r.id <> NULLIF($3, '')::uuid AND r.status = 'received' AND (item.line->>'source_line_index')::int = $4",
             &[&tenant.id, &order_id, &return_id, &(line_index as i32)],
         ).await?;
-        let already = prior
-            .as_ref()
+        let prior = prior.as_ref();
+        let prior_qty = prior
             .and_then(|row| row.get::<_, String>(0).parse::<Decimal>().ok())
             .unwrap_or_default();
-        let selected_before = selected_quantities
-            .get(&line_index)
-            .copied()
-            .unwrap_or_default();
-        let selected_after = selected_before.checked_add(qty);
-        if selected_after
-            .and_then(|selected| already.checked_add(selected))
-            .is_none_or(|amount| amount > sold_qty)
-        {
+        let cumulative_qty = prior_qty.checked_add(qty);
+        if cumulative_qty.is_none_or(|amount| amount > sold_qty) {
             errors.push(format!(
                 "Số lượng trả ở dòng {} vượt số lượng còn được trả",
                 index + 1
             ));
             continue;
         }
-        selected_quantities.insert(line_index, selected_after.unwrap_or_default());
+        selected_quantities.insert(line_index, qty);
+        let cumulative_qty = cumulative_qty.unwrap_or_default();
         let ratio = qty.checked_div(sold_qty).unwrap_or_default();
+        let cumulative_ratio = cumulative_qty.checked_div(sold_qty).unwrap_or_default();
         let mut line = source.as_object().cloned().unwrap_or_default();
         let Some(base_qty) = source
             .get("base_qty")
@@ -275,17 +254,30 @@ pub async fn prepare_return_document(
         line.insert("qty".into(), json!(qty));
         line.insert("base_qty".into(), json!(base_qty));
         line.insert("source_line_index".into(), json!(line_index));
-        for field in ["discount_amount", "net_amount", "tax_amount", "line_total"] {
-            let amount = source
-                .get(field)
-                .and_then(money::decimal)
-                .unwrap_or_default()
-                .checked_mul(ratio);
+        for (field, prior_index) in [
+            ("discount_amount", 1),
+            ("net_amount", 2),
+            ("tax_amount", 3),
+            ("line_total", 4),
+            ("voucher_discount_amount", 5),
+        ] {
+            let Some(source_amount) = source.get(field).and_then(money::decimal) else {
+                continue;
+            };
+            let target_amount = source_amount
+                .checked_mul(cumulative_ratio)
+                .map(money::round_money);
+            let prior_amount = prior
+                .and_then(|row| row.get::<_, String>(prior_index).parse::<Decimal>().ok())
+                .unwrap_or_default();
+            let amount = target_amount
+                .and_then(|target| target.checked_sub(prior_amount))
+                .filter(|value| *value >= Decimal::ZERO);
             let Some(amount) = amount else {
                 errors.push(format!("Giá trị dòng {} vượt giới hạn", index + 1));
                 continue;
             };
-            line.insert(field.into(), json!(money::round_money(amount)));
+            line.insert(field.into(), json!(amount));
         }
         let line_total = line
             .get("line_total")

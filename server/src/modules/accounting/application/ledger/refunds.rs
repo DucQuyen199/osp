@@ -355,9 +355,10 @@ pub(super) async fn handle_event(
                 .and_then(Value::as_str)
                 .unwrap_or_default();
             if tx.query_opt("SELECT id FROM accounting__journal_entry WHERE tenant_id = $1 AND source = 'pos_refund' AND source_id = $2 AND status = 'posted' FOR UPDATE", &[&tenant.id, &return_id]).await?.is_some() { return Ok(Some(true)); }
-            let original = tx.query_opt("SELECT id, amount::text FROM accounting__payment WHERE tenant_id = $1 AND source = 'pos_order' AND source_id = $2 FOR UPDATE", &[&tenant.id, &order_id]).await?.ok_or_else(|| crate::error::ApiError::validation(event_type, vec!["POS order has no original accounting payment".into()]))?;
+            let original = tx.query_opt("SELECT id, amount::text, COALESCE(tax_amount, 0)::text FROM accounting__payment WHERE tenant_id = $1 AND source = 'pos_order' AND source_id = $2 FOR UPDATE", &[&tenant.id, &order_id]).await?.ok_or_else(|| crate::error::ApiError::validation(event_type, vec!["POS order has no original accounting payment".into()]))?;
             let payment_id: Uuid = original.get(0);
             let original_amount = decimal_column(&original, 1, event_type)?;
+            let original_tax = decimal_column(&original, 2, event_type)?;
             let refund_amount = event
                 .get("total")
                 .and_then(crate::money::decimal)
@@ -367,18 +368,44 @@ pub(super) async fn handle_event(
                         vec!["POS return has no valid amount".into()],
                     )
                 })?;
-            let ratio = refund_amount
-                .checked_div(original_amount)
-                .filter(|ratio| *ratio > Decimal::ZERO && *ratio <= Decimal::ONE)
-                .ok_or_else(|| {
-                    crate::error::ApiError::validation(
-                        event_type,
-                        vec!["POS return amount exceeds the original payment".into()],
-                    )
-                })?;
+            let refund_tax = event
+                .get("tax_total")
+                .and_then(crate::money::decimal)
+                .unwrap_or_default();
+            let original_net = original_amount.checked_sub(original_tax);
+            let refund_net = refund_amount.checked_sub(refund_tax);
+            if refund_amount <= Decimal::ZERO
+                || refund_amount > original_amount
+                || refund_tax < Decimal::ZERO
+                || refund_tax > original_tax
+                || refund_net.is_none_or(|net| net < Decimal::ZERO)
+                || original_net.is_none_or(|net| net <= Decimal::ZERO)
+            {
+                return Err(crate::error::ApiError::validation(
+                    event_type,
+                    vec!["POS return amount and tax must fit the original transaction".into()],
+                ));
+            }
             let journal = tx.query_opt("SELECT lines FROM accounting__journal_entry WHERE tenant_id = $1 AND source = 'payment' AND source_id = $2 AND status = 'posted' FOR SHARE", &[&tenant.id, &payment_id.to_string()]).await?.ok_or_else(|| crate::error::ApiError::validation(event_type, vec!["POS order payment has no posted journal to reverse".into()]))?;
             let mut reversal_lines = reversal::lines_to_reverse(&journal.get(0), event_type)?;
-            scale_reversal_lines(&mut reversal_lines, ratio, event_type)?;
+            let tax_account = if original_tax > Decimal::ZERO {
+                tx.query_opt(
+                    "SELECT id FROM accounting__account WHERE tenant_id = $1 AND code = '3331' FOR SHARE",
+                    &[&tenant.id],
+                )
+                .await?
+                .map(|row| row.get::<_, Uuid>(0))
+            } else {
+                None
+            };
+            scale_pos_return_lines(
+                &mut reversal_lines,
+                refund_amount,
+                refund_net.unwrap_or_default(),
+                refund_tax,
+                tax_account,
+                event_type,
+            )?;
             create_posted_journal_decimal(
                 kernel,
                 tx,
@@ -449,6 +476,201 @@ pub(super) async fn handle_event(
         }
         _ => Ok(None),
     }
+}
+
+fn scale_pos_return_lines(
+    lines: &mut Vec<Value>,
+    refund_total: Decimal,
+    refund_net: Decimal,
+    refund_tax: Decimal,
+    tax_account: Option<Uuid>,
+    event_type: &str,
+) -> R<()> {
+    let mut cash_lines = Vec::new();
+    let mut revenue_lines = Vec::new();
+    let mut tax_lines = Vec::new();
+    for (index, line) in lines.iter().enumerate() {
+        let account = line
+            .get("account")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok());
+        let debit = line
+            .get("debit")
+            .and_then(crate::money::decimal)
+            .unwrap_or_default();
+        let credit = line
+            .get("credit")
+            .and_then(crate::money::decimal)
+            .unwrap_or_default();
+        if tax_account.is_some() && account == tax_account {
+            tax_lines.push(index);
+        } else if debit > Decimal::ZERO {
+            revenue_lines.push(index);
+        } else if credit > Decimal::ZERO {
+            cash_lines.push(index);
+        }
+    }
+    scale_pos_return_component(lines, &cash_lines, "credit", refund_total, event_type)?;
+    scale_pos_return_component(lines, &revenue_lines, "debit", refund_net, event_type)?;
+    scale_pos_return_component(lines, &tax_lines, "debit", refund_tax, event_type)?;
+    lines.retain(|line| {
+        line.get("debit")
+            .and_then(crate::money::decimal)
+            .unwrap_or_default()
+            > Decimal::ZERO
+            || line
+                .get("credit")
+                .and_then(crate::money::decimal)
+                .unwrap_or_default()
+                > Decimal::ZERO
+    });
+    if lines.iter().any(|line| {
+        line.get("debit")
+            .and_then(crate::money::decimal)
+            .unwrap_or_default()
+            != Decimal::ZERO
+            && line
+                .get("credit")
+                .and_then(crate::money::decimal)
+                .unwrap_or_default()
+                != Decimal::ZERO
+    }) {
+        return Err(crate::error::ApiError::validation(
+            event_type,
+            vec!["POS return journal contains an invalid mixed-side line".into()],
+        ));
+    }
+    let debit_total = lines
+        .iter()
+        .filter_map(|line| line.get("debit").and_then(crate::money::decimal))
+        .try_fold(Decimal::ZERO, |sum, value| sum.checked_add(value))
+        .ok_or_else(|| {
+            crate::error::ApiError::validation(
+                event_type,
+                vec!["POS return debit total exceeds the supported range".into()],
+            )
+        })?;
+    let credit_total = lines
+        .iter()
+        .filter_map(|line| line.get("credit").and_then(crate::money::decimal))
+        .try_fold(Decimal::ZERO, |sum, value| sum.checked_add(value))
+        .ok_or_else(|| {
+            crate::error::ApiError::validation(
+                event_type,
+                vec!["POS return credit total exceeds the supported range".into()],
+            )
+        })?;
+    if debit_total != credit_total || debit_total != refund_total {
+        return Err(crate::error::ApiError::validation(
+            event_type,
+            vec!["POS return journal does not balance to the refund total".into()],
+        ));
+    }
+    Ok(())
+}
+
+fn scale_pos_return_component(
+    lines: &mut [Value],
+    indexes: &[usize],
+    side: &str,
+    target: Decimal,
+    event_type: &str,
+) -> R<()> {
+    if indexes.is_empty() {
+        return if target == Decimal::ZERO {
+            Ok(())
+        } else {
+            Err(crate::error::ApiError::validation(
+                event_type,
+                vec!["POS return journal is missing a required account line".into()],
+            ))
+        };
+    }
+    let original_total = indexes
+        .iter()
+        .filter_map(|index| lines[*index].get(side).and_then(crate::money::decimal))
+        .try_fold(Decimal::ZERO, |sum, amount| sum.checked_add(amount))
+        .ok_or_else(|| {
+            crate::error::ApiError::validation(
+                event_type,
+                vec!["POS return journal component exceeds the supported range".into()],
+            )
+        })?;
+    let ratio = if original_total == Decimal::ZERO {
+        if target != Decimal::ZERO {
+            return Err(crate::error::ApiError::validation(
+                event_type,
+                vec!["POS return journal component has no original value".into()],
+            ));
+        }
+        Decimal::ZERO
+    } else {
+        target.checked_div(original_total).ok_or_else(|| {
+            crate::error::ApiError::validation(
+                event_type,
+                vec!["POS return component ratio exceeds the supported range".into()],
+            )
+        })?
+    };
+    let opposite = if side == "debit" { "credit" } else { "debit" };
+    let mut scaled_total = Decimal::ZERO;
+    for index in indexes {
+        let original = lines[*index]
+            .get(side)
+            .and_then(crate::money::decimal)
+            .unwrap_or_default();
+        let scaled = original
+            .checked_mul(ratio)
+            .map(|value| {
+                value
+                    .round_dp_with_strategy(2, rust_decimal::RoundingStrategy::MidpointAwayFromZero)
+            })
+            .ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    event_type,
+                    vec!["POS return journal component exceeds the supported range".into()],
+                )
+            })?;
+        lines[*index][side] = crate::money::json_number(scaled).ok_or_else(|| {
+            crate::error::ApiError::validation(
+                event_type,
+                vec!["POS return journal amount cannot be serialized".into()],
+            )
+        })?;
+        lines[*index][opposite] = crate::money::json_number(Decimal::ZERO).unwrap_or(Value::Null);
+        scaled_total = scaled_total.checked_add(scaled).ok_or_else(|| {
+            crate::error::ApiError::validation(
+                event_type,
+                vec!["POS return journal total exceeds the supported range".into()],
+            )
+        })?;
+    }
+    let residual = target.checked_sub(scaled_total).ok_or_else(|| {
+        crate::error::ApiError::validation(
+            event_type,
+            vec!["POS return rounding residual exceeds the supported range".into()],
+        )
+    })?;
+    let index = *indexes.last().expect("non-empty component indexes");
+    let corrected = lines[index]
+        .get(side)
+        .and_then(crate::money::decimal)
+        .unwrap_or_default()
+        .checked_add(residual)
+        .filter(|value| *value >= Decimal::ZERO)
+        .ok_or_else(|| {
+            crate::error::ApiError::validation(
+                event_type,
+                vec!["POS return rounding cannot be balanced".into()],
+            )
+        })?;
+    lines[index][side] = crate::money::json_number(corrected).ok_or_else(|| {
+        crate::error::ApiError::validation(
+            event_type,
+            vec!["POS return journal amount cannot be serialized".into()],
+        )
+    })?;
+    Ok(())
 }
 
 fn scale_reversal_lines(lines: &mut [Value], ratio: Decimal, event_type: &str) -> R<()> {
