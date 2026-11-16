@@ -197,6 +197,25 @@ await step('cài đặt, dòng sự kiện: accessibility', async () => {
   await page.waitForSelector('table.table');
 });
 
+const retailScreens = [
+  ['#/pos', 'POS'], ['#/sales', 'Sales'], ['#/purchasing', 'Purchasing'], ['#/sourcing', 'Sourcing'],
+  ['#/loyalty', 'Loyalty'], ['#/reports/crm/pipeline', 'CRM pipeline'],
+  ['#/reports/marketing/campaign-performance', 'Marketing performance'], ['#/ecommerce', 'Ecommerce'],
+  ['#/communications', 'Communication'], ['#/reports/accounting', 'Accounting reports'],
+  ['#/bank-reconciliation', 'Bank reconciliation'], ['#/einvoices', 'E-invoice'], ['#/people', 'HRM'],
+  ['#/recruitment', 'Recruitment'], ['#/payroll', 'Payroll'], ['#/expenses', 'Expenses'],
+  ['#/reports/bi', 'BI reports'], ['#/inventory-counts', 'Inventory counts'],
+  ['#/reports/inventory/replenishment', 'Replenishment'], ['#/reports/inventory/lot-expiry', 'Lot expiry'],
+];
+for (const [hash, label] of retailScreens) {
+  await step(`${label} workbench: route and accessibility`, async () => {
+    await page.goto(`${BASE}/${hash}`, { waitUntil: 'networkidle0' });
+    await page.waitForSelector('h1');
+    must(!(await page.$('.route-error')), `${label} route failed to render`);
+    await axe(`${label} workbench`);
+  });
+}
+
 await step('lazy route load failure: recovery boundary', async () => {
   let blocked = false;
   const intercept = (request) => {

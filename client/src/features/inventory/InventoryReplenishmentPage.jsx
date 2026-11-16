@@ -72,7 +72,7 @@ export default function InventoryReplenishmentPage() {
           {creatingWarehouse === warehouse.id ? 'Đang tạo…' : `Tạo cho ${warehouse.name} · ${warehouse.count} dòng`}
         </button>)}</div>
       </section>}
-      {!report.items?.length ? <div className="empty"><h3>Không có đề xuất bổ sung</h3><p>Tồn dự kiến ở các định mức đã cấu hình đang trên ngưỡng tối thiểu.</p></div> : <div className="card table-wrap"><table className="table">
+      {!report.items?.length ? <div className="empty"><h2>Không có đề xuất bổ sung</h2><p>Tồn dự kiến ở các định mức đã cấu hình đang trên ngưỡng tối thiểu.</p></div> : <div className="card table-wrap"><table className="table">
         <thead><tr><th scope="col">SKU</th><th scope="col">Sản phẩm</th><th scope="col">Kho</th><th scope="col" className="right">Tồn khả dụng</th><th scope="col" className="right">Đơn bán chưa giao</th><th scope="col" className="right">Tồn dự kiến</th><th scope="col" className="right">Đơn mua chờ nhận</th><th scope="col" className="right">Đề nghị mua mở</th><th scope="col" className="right">Tối thiểu</th><th scope="col" className="right">Mục tiêu</th><th scope="col" className="right">Đề xuất mua</th></tr></thead>
         <tbody>{report.items.map((item) => <tr key={item.id}>
           <td>{item.sku}</td><td>{item.product}</td><td>{item.warehouse}</td>

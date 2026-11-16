@@ -37,13 +37,14 @@ impl Kernel {
             .iter()
             .find_map(|(suffix, operator)| k.strip_suffix(suffix).map(|field| (field, operator)));
             if let Some((field, operator)) = range_filter {
-                if is_ident(field)
-                    && ent
-                        .field(field)
-                        .is_some_and(|definition| definition.ty == "date")
-                    && NaiveDate::parse_from_str(v, "%Y-%m-%d").is_ok()
-                {
-                    params.push(Box::new(v.clone()));
+                if let (true, Some(date)) = (
+                    is_ident(field)
+                        && ent
+                            .field(field)
+                            .is_some_and(|definition| definition.ty == "date"),
+                    NaiveDate::parse_from_str(v, "%Y-%m-%d").ok(),
+                ) {
+                    params.push(Box::new(date));
                     wh.push(format!(
                         "t.{} {operator} ${}::date",
                         quote(field),

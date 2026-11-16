@@ -364,9 +364,10 @@ impl Kernel {
            LEFT JOIN inventory__warehouse warehouse ON warehouse.tenant_id = move.tenant_id AND warehouse.id = move.warehouse \
            WHERE lot.tenant_id = $1 AND lot.expiry IS NOT NULL \
              AND (lot.expiry < $2::date OR ($3 > 0 AND lot.expiry <= $2::date + $3)) \
-           GROUP BY lot.id, lot.code, lot.expiry, product.id, product.sku, product.name, product.uom, warehouse.id, warehouse.name \
+           GROUP BY lot.tenant_id, lot.id, lot.code, lot.expiry, product.id, product.sku, product.name, product.uom, warehouse.id, warehouse.name \
            HAVING SUM(CASE WHEN move.direction = 'in' THEN move.qty::numeric ELSE -move.qty::numeric END) > 0.000001";
-        let count_sql = format!("SELECT COUNT(*) AS count FROM ({grouped}) lot_balances");
+        let count_sql =
+            format!("SELECT jsonb_build_object('count', COUNT(*)) FROM ({grouped}) lot_balances");
         let today = tenant.business_today();
         let count = tx
             .query_json(&count_sql, &[&tenant.id, &today, &days])
