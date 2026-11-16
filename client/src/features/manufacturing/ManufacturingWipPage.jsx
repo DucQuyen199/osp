@@ -5,6 +5,7 @@ import { fmtMoney, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js'
 import { can, loadRefs, loadAllResponse } from '../../lib/state.js';
 import manufacturingEnglish from './manufacturing.en.js';
 import ProductionOrderCard from './components/ProductionOrderCard.jsx';
+import ProductionOrderForm from './components/ProductionOrderForm.jsx';
 import ProductionInspectionQueue from './components/ProductionInspectionQueue.jsx';
 import ManufacturingWipReport from './components/ManufacturingWipReport.jsx';
 
@@ -291,19 +292,22 @@ export default function ManufacturingWipPage() {
         </form>}
         <div className="manufacturing-bom-list">{boms.map((bom) => <article className="manufacturing-bom-card" key={bom.id}><div><strong>{products.get(bom.product)?.name || bom.product}</strong><span className="small muted"> · {bom.output_qty || 1} thành phẩm / định mức</span><div className="small muted">{(bom.components || []).map((item) => `${products.get(item.product)?.name || t("Vật tư")} ${item.qty} ${units.get(item.uom)?.name || ''}`).join(' · ')}</div></div>{can('manufacturing.bom.update') && <button className="btn btn-ghost btn-sm" type="button" onClick={() => editBom(bom)}>{t("Sửa")}</button>}</article>)}{!boms.length && <div className="empty">{t("Chưa có BOM. Tạo định mức trước khi lập lệnh sản xuất.")}</div>}</div>
       </div>}
-      {can('manufacturing.production_order.create') && <form className="manufacturing-form manufacturing-order-form" onSubmit={createProductionOrder}>
-        <h3>{t("Lập lệnh sản xuất")}</h3>
-        <label className="field"><span>BOM *</span><select className="select" required value={orderBom} onChange={(event) => setOrderBom(event.target.value)}><option value="">{t("Chọn BOM")}</option>{boms.map((bom) => <option key={bom.id} value={bom.id}>{products.get(bom.product)?.name || bom.product}</option>)}</select></label>
-        <label className="field"><span>{t("Số lượng *")}</span><input className="input num" type="number" min="0.000001" step="any" required value={orderQty} onChange={(event) => setOrderQty(event.target.value)} /></label>
-        <label className="field"><span>{t("Kho xuất / nhập *")}</span><select className="select" required value={orderWarehouse} onChange={(event) => setOrderWarehouse(event.target.value)}><option value="">{t("Chọn kho")}</option>{[...warehouses.values()].filter((warehouse) => warehouse.active !== false).map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}</select></label>
-        <label className="field"><span>{t("Trung tâm sản xuất")}</span><select className="select" value={orderCenter} onChange={(event) => setOrderCenter(event.target.value)}><option value="">{t("Không lập lịch trung tâm")}</option>{[...workCenters.values()].map((center) => <option key={center.id} value={center.id}>{center.name}{center.capacity_per_day ? ` · ${center.capacity_per_day} đơn vị gốc/ngày` : ''}</option>)}</select><span className="hint">{t("Công suất được tính theo đơn vị gốc của thành phẩm. Không thể xếp chung một ngày các sản phẩm có đơn vị gốc khác nhau.")}</span></label>
-        {orderCenter && <label className="field"><span>{t("Ngày dự kiến bắt đầu *")}</span><input className="input" type="date" required value={orderDate} onChange={(event) => setOrderDate(event.target.value)} /></label>}
-        {products.get(selectedBom?.product)?.lot_tracked && <label className="field"><span>{t("Mã lô thành phẩm *")}</span><input className="input" required maxLength="120" value={outputLot} onChange={(event) => setOutputLot(event.target.value)} /></label>}
-        {products.get(selectedBom?.product)?.lot_tracked && <label className="field"><span>{t("Hạn dùng thành phẩm")}</span><input className="input" type="date" value={outputExpiry} onChange={(event) => setOutputExpiry(event.target.value)} /></label>}
-        <label className="field"><span>{t("Hạch toán phế phẩm")}</span><select className="select" value={scrapMethod} onChange={(event) => setScrapMethod(event.target.value)}><option value="absorb">{t("Phân bổ vào giá thành phẩm đạt")}</option><option value="expense">{t("Ghi nhận chi phí bất thường")}</option></select></label>
-        {scrapMethod === 'expense' && <label className="field"><span>{t("Tài khoản chi phí phế phẩm *")}</span><select className="select" required value={scrapAccount} onChange={(event) => setScrapAccount(event.target.value)}><option value="">{t("Chọn tài khoản chi phí")}</option>{[...accounts.values()].filter((account) => account.kind === 'expense').map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}</select></label>}
-        <button className="btn btn-primary" type="submit" disabled={busy === 'order' || !orderBom || !orderWarehouse}>{busy === 'order' ? t("Đang lập lệnh…") : t("Tạo lệnh")}</button>
-      </form>}
+      {can('manufacturing.production_order.create') && <ProductionOrderForm
+        boms={boms}
+        products={products}
+        warehouses={warehouses}
+        workCenters={workCenters}
+        accounts={accounts}
+        values={{ bom: orderBom, qty: orderQty, warehouse: orderWarehouse, center: orderCenter, date: orderDate, outputLot, outputExpiry, scrapMethod, scrapAccount }}
+        lotTracked={Boolean(products.get(selectedBom?.product)?.lot_tracked)}
+        busy={busy}
+        t={t}
+        onChange={(field, value) => {
+          const setters = { bom: setOrderBom, qty: setOrderQty, warehouse: setOrderWarehouse, center: setOrderCenter, date: setOrderDate, outputLot: setOutputLot, outputExpiry: setOutputExpiry, scrapMethod: setScrapMethod, scrapAccount: setScrapAccount };
+          setters[field](value);
+        }}
+        onSubmit={createProductionOrder}
+      />}
       <div className="manufacturing-orders"><h3>{t("L\u1ec7nh s\u1ea3n xu\u1ea5t")}</h3>{productionOrders.map((order) => <ProductionOrderCard key={order.id} order={order} productName={products.get(order.product)?.name} workCenterName={workCenters.get(order.work_center)?.name} draft={outputs[order.id] || {}} busy={busy} formatQty={qty} t={t} onOutputChange={(field, value) => setOutputs((rows) => ({ ...rows, [order.id]: { ...rows[order.id], [field]: value } }))} onAction={operateOrder} />)}{!productionOrders.length && <p className="small muted">{t("Ch\u01b0a c\u00f3 l\u1ec7nh s\u1ea3n xu\u1ea5t.")}</p>}</div>
       {can('quality.inspection.read') && <ProductionInspectionQueue inspections={inspections} products={products} qcNotes={qcNotes} busy={busy} canPass={can('quality.inspection.passed')} canRecordFailure={can('quality.inspection.failed') && can('quality.inspection.update')} formatQty={qty} baseUnitName={baseUnitName} t={t} onNoteChange={(id, value) => setQcNotes((rows) => ({ ...rows, [id]: value }))} onDecide={decideInspection} />}
     </section>

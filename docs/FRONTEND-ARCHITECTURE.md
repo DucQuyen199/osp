@@ -36,6 +36,7 @@ Wrap every user-visible literal with `uiText()` or the feature-local translator,
 - The school workbench owns tuition issuance permissions and invoice actions; `TuitionLedgerTable` renders controlled fee and invoice records and emits issuance requests through a callback.
 - The school workbench owns grade filters, permissions and persistence; `GradebookSection` renders controlled class, term and subject filters with editable grade rows.
 - The manufacturing workbench keeps production commands and output drafts in `ManufacturingWipPage`; `ProductionOrderCard` renders the controlled output fields and emits requested transitions.
+- The manufacturing workbench owns production-order permissions and creation; `ProductionOrderForm` renders the controlled BOM, warehouse, work-center, lot and scrap-account fields and emits changes through a callback.
 - The manufacturing workbench keeps QC permissions and inspection actions in `ManufacturingWipPage`; `ProductionInspectionQueue` renders pending production inspections and emits pass/fail decisions through callbacks.
 - The manufacturing workbench owns WIP report filters and reconciliation actions; `ManufacturingWipReport` renders the order level WIP table and its reconciliation context.
 - The purchasing workbench owns supplier-invoice state and validation; `SupplierInvoiceAdjustmentsEditor` edits controlled charge and landed-cost allocations through a callback.
