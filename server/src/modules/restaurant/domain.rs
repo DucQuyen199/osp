@@ -1,10 +1,64 @@
 //! Pure restaurant order and kitchen rules.
 use crate::money;
+use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
 use serde_json::Value;
 use uuid::Uuid;
 
 pub fn validate(entity: &str, document: &Value) -> Vec<String> {
+    if entity == "reservation" {
+        let mut errors = Vec::new();
+        let start = document
+            .get("starts_at")
+            .and_then(Value::as_str)
+            .and_then(|value| DateTime::parse_from_rfc3339(value).ok());
+        let end = document
+            .get("ends_at")
+            .and_then(Value::as_str)
+            .and_then(|value| DateTime::parse_from_rfc3339(value).ok());
+        if start.is_none() {
+            errors.push("Thời gian bắt đầu đặt bàn không hợp lệ".into());
+        }
+        if end.is_none() {
+            errors.push("Thời gian kết thúc đặt bàn không hợp lệ".into());
+        }
+        if let (Some(start), Some(end)) = (start, end) {
+            if end <= start {
+                errors.push("Thời gian kết thúc phải sau thời gian bắt đầu".into());
+            }
+            if start.with_timezone(&Utc) <= Utc::now() {
+                errors.push("Đặt bàn phải bắt đầu trong tương lai".into());
+            }
+        }
+        if !document
+            .get("guest_count")
+            .and_then(money::decimal)
+            .is_some_and(|count| count > Decimal::ZERO && count.fract().is_zero())
+        {
+            errors.push("Số khách phải là số nguyên dương".into());
+        }
+        if document
+            .get("guest_name")
+            .and_then(Value::as_str)
+            .is_none_or(|name| name.trim().is_empty() || name.chars().count() > 160)
+        {
+            errors.push("Tên khách phải có từ 1 đến 160 ký tự".into());
+        }
+        if document.get("phone").is_some_and(|phone| {
+            phone
+                .as_str()
+                .is_none_or(|phone| phone.chars().count() > 80)
+        }) {
+            errors.push("Số điện thoại không được vượt quá 80 ký tự".into());
+        }
+        if document
+            .get("note")
+            .is_some_and(|note| note.as_str().is_none_or(|note| note.chars().count() > 1000))
+        {
+            errors.push("Ghi chú không được vượt quá 1.000 ký tự".into());
+        }
+        return errors;
+    }
     if entity == "table" {
         return if document.get("seats").is_some_and(|value| !value.is_null())
             && !document
@@ -116,6 +170,31 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
 
 pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<String> {
     match entity {
+        "reservation" if current.get("status").and_then(Value::as_str) != Some("requested") => {
+            let assigning_waitlist_table = matches!(
+                current.get("status").and_then(Value::as_str),
+                Some("confirmed" | "arrived")
+            ) && current.get("table").is_none_or(Value::is_null)
+                && patch
+                    .as_object()
+                    .is_some_and(|fields| fields.len() == 1 && fields.contains_key("table"));
+            if !assigning_waitlist_table
+                && [
+                    "guest_name",
+                    "phone",
+                    "table",
+                    "guest_count",
+                    "starts_at",
+                    "ends_at",
+                    "note",
+                ]
+                .iter()
+                .any(|field| patch.get(*field).is_some())
+            {
+                return vec!["Đặt bàn đã xác nhận không được sửa; hãy hủy và tạo lại".into()];
+            }
+            Vec::new()
+        }
         "kitchen_ticket" => vec!["Phiếu bếp chỉ được cập nhật qua hành động trạng thái".into()],
         "table_order" => match current.get("status").and_then(Value::as_str) {
             Some("sent" | "served")
@@ -146,6 +225,9 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
 
 pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
     match entity {
+        "reservation" if document.get("status").and_then(Value::as_str) != Some("requested") => {
+            vec!["Đặt bàn đã xác nhận phải được hủy qua luồng trạng thái, không được xóa".into()]
+        }
         "kitchen_ticket" => vec!["Phiếu bếp là dấu vết vận hành, không được xóa trực tiếp".into()],
         "table_order" if document.get("status").and_then(Value::as_str) != Some("open") => {
             vec!["Order đã gửi bếp phải hủy qua luồng trạng thái, không được xóa".into()]
@@ -155,6 +237,37 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
+    if entity == "reservation" {
+        let now = Utc::now();
+        let instant = |field: &str| {
+            document
+                .get(field)
+                .and_then(Value::as_str)
+                .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
+                .map(|value| value.with_timezone(&Utc))
+        };
+        let Some(start) = instant("starts_at") else {
+            return vec!["Đặt bàn cần thời gian bắt đầu hợp lệ trước khi đổi trạng thái".into()];
+        };
+        let Some(end) = instant("ends_at") else {
+            return vec!["Đặt bàn cần thời gian kết thúc hợp lệ trước khi đổi trạng thái".into()];
+        };
+        return match action {
+            "confirmed" if start <= now => {
+                vec!["Không thể xác nhận đặt bàn đã bắt đầu hoặc đã qua".into()]
+            }
+            "arrived" if now < start || now >= end => {
+                vec!["Chỉ ghi nhận khách đã đến trong khung giờ đặt bàn".into()]
+            }
+            "cancelled" if start <= now => {
+                vec!["Không thể hủy đặt bàn sau giờ bắt đầu; hãy ghi nhận khách vắng mặt".into()]
+            }
+            "no_show" if end > now => {
+                vec!["Chỉ ghi nhận khách vắng mặt sau khi khung giờ đặt bàn kết thúc".into()]
+            }
+            _ => Vec::new(),
+        };
+    }
     if entity == "table_order"
         && action == "cancelled"
         && document.get("status").and_then(Value::as_str) == Some("sent")

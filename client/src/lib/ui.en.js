@@ -153,7 +153,7 @@ const uiTextEnglish = {
   'No lot selected': 'No lot selected', '— Chọn sản phẩm —': '— Select a product —', '— Chọn tài khoản —': '— Select an account —',
   '— Chọn —': '— Select —', '— Không chọn —': '— None —', 'Không chỉ định vị trí xuất': 'No source location specified',
   'Không chỉ định vị trí nhận': 'No destination location specified', 'bắt buộc': 'required',
-  'Quầy bán hàng POS': 'POS terminal', 'Mở ca theo kho, ghi nhận hàng bán và phương thức thanh toán; giá và thuế cuối cùng do máy chủ tính theo danh mục.': 'Open a shift by warehouse, record sales and payment methods; the server calculates final prices and taxes from the catalog.',
+  'Quầy bán hàng POS': 'POS terminal', 'Mở ca theo kho, ghi nhận hàng bán và phương thức thanh toán; giá và thuế cuối cùng do máy chủ tính theo danh mục.': 'Open a shift by warehouse, record sales and payment methods; the server calculates final prices and taxes from the catalog.', 'Khách đã đến': 'Guest arrived',
   'Ca đang mở': 'Open shift', 'Chưa chọn ca': 'No shift selected', 'Không gán chi nhánh': 'No branch assigned',
   'Ca cũ chưa có kho': 'Legacy shift has no warehouse', 'Thu ngân': 'Cashier', 'Kho:': 'Warehouse:',
   'Ca cũ chưa khai báo kho': 'Legacy shift has no warehouse configured', 'Tiền đầu ca:': 'Opening cash:',

@@ -25,6 +25,66 @@ pub async fn validate_persistence(
     action: &str,
     document: &Value,
 ) -> R<Vec<String>> {
+    if entity == "reservation" && matches!(action, "created" | "updated" | "confirmed" | "arrived")
+    {
+        let table_id = document
+            .get("table")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok());
+        if let Some(table_id) = table_id {
+            let lock_key = format!("restaurant.table:{}:{}", tenant.id, table_id);
+            tx.query_opt(
+                "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                &[&lock_key],
+            )
+            .await?;
+            let Some(row) = tx.query_opt("SELECT seats::text FROM restaurant__table WHERE tenant_id=$1 AND id=$2 FOR UPDATE", &[&tenant.id, &table_id]).await? else {
+                return Ok(vec!["Bàn đặt trước không tồn tại trong doanh nghiệp".into()]);
+            };
+            let seats: Option<String> = row.get(0);
+            let seats = seats.as_deref().and_then(crate::money::decimal_str);
+            let guests = document.get("guest_count").and_then(crate::money::decimal);
+            if seats
+                .zip(guests)
+                .is_some_and(|(seats, guests)| guests > seats)
+            {
+                return Ok(vec!["Số khách vượt sức chứa của bàn đã chọn".into()]);
+            }
+            if (action == "arrived" || (action == "updated" && document.get("status").and_then(Value::as_str) == Some("arrived"))) && tx.query_opt("SELECT id FROM restaurant__table_order WHERE tenant_id=$1 AND \"table\"=$2 AND status IN ('open','sent','served') LIMIT 1 FOR UPDATE", &[&tenant.id, &table_id]).await?.is_some() {
+                return Ok(vec!["Bàn vẫn đang có order chưa thanh toán; hãy đóng order trước khi ghi nhận lượt đặt bàn mới".into()]);
+            }
+            if matches!(action, "confirmed")
+                || matches!(
+                    document.get("status").and_then(Value::as_str),
+                    Some("confirmed" | "arrived")
+                )
+            {
+                let Some(start) = document
+                    .get("starts_at")
+                    .and_then(Value::as_str)
+                    .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
+                else {
+                    return Ok(vec!["Thời gian bắt đầu đặt bàn không hợp lệ".into()]);
+                };
+                let Some(end) = document
+                    .get("ends_at")
+                    .and_then(Value::as_str)
+                    .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
+                else {
+                    return Ok(vec!["Thời gian kết thúc đặt bàn không hợp lệ".into()]);
+                };
+                let id = document
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .and_then(|value| Uuid::parse_str(value).ok())
+                    .unwrap_or(Uuid::nil());
+                if tx.query_opt("SELECT id FROM restaurant__reservation WHERE tenant_id=$1 AND \"table\"=$2 AND id<>$3 AND status IN ('confirmed','arrived') AND starts_at < $4 AND ends_at > $5 LIMIT 1 FOR UPDATE", &[&tenant.id, &table_id, &id, &end.with_timezone(&chrono::Utc), &start.with_timezone(&chrono::Utc)]).await?.is_some() {
+                    return Ok(vec!["Bàn đã có một đặt chỗ được xác nhận trong khung giờ này".into()]);
+                }
+            }
+        }
+        return Ok(Vec::new());
+    }
     if entity == "table" && action == "updated" {
         let Some(table_id) = document
             .get("id")
@@ -35,6 +95,9 @@ pub async fn validate_persistence(
         };
         if let Some(seats) = document.get("seats").and_then(crate::money::decimal) {
             let seats = seats.normalize().to_string();
+            if tx.query_opt("SELECT id FROM restaurant__reservation WHERE tenant_id=$1 AND \"table\"=$2 AND status IN ('confirmed','arrived') AND guest_count::numeric > $3::numeric LIMIT 1 FOR UPDATE", &[&tenant.id, &table_id, &seats]).await?.is_some() {
+                return Ok(vec!["Không thể giảm sức chứa dưới số khách của đặt bàn đã xác nhận".into()]);
+            }
             if tx
                 .query_opt(
                     "SELECT id FROM restaurant__table_order WHERE tenant_id = $1 AND \"table\" = $2 AND status IN ('open', 'sent', 'served') AND COALESCE(guest_count, 1)::double precision > $3::double precision LIMIT 1 FOR UPDATE",
@@ -50,6 +113,21 @@ pub async fn validate_persistence(
         }
         return Ok(Vec::new());
     }
+    if entity == "table" && action == "removed" {
+        let Some(table_id) = document
+            .get("id")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+        else {
+            return Ok(vec!["Table id is required".into()]);
+        };
+        if tx.query_opt("SELECT id FROM restaurant__reservation WHERE tenant_id=$1 AND \"table\"=$2 LIMIT 1 FOR UPDATE", &[&tenant.id, &table_id]).await?.is_some()
+            || tx.query_opt("SELECT id FROM restaurant__table_order WHERE tenant_id=$1 AND \"table\"=$2 LIMIT 1 FOR UPDATE", &[&tenant.id, &table_id]).await?.is_some()
+        {
+            return Ok(vec!["Không thể xóa bàn đã có lịch sử order hoặc đặt bàn".into()]);
+        }
+        return Ok(Vec::new());
+    }
     if entity == "table_order" && matches!(action, "created" | "updated") {
         if let Some(table) = document
             .get("table")
@@ -62,6 +140,22 @@ pub async fn validate_persistence(
                 &[&lock_key],
             )
             .await?;
+            let same_table_update = if action == "updated" {
+                if let Some(id) = document
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .and_then(|value| Uuid::parse_str(value).ok())
+                {
+                    tx.query_opt("SELECT \"table\" FROM restaurant__table_order WHERE tenant_id=$1 AND id=$2 FOR UPDATE", &[&tenant.id, &id]).await?.and_then(|row| row.get::<_, Option<Uuid>>(0)) == Some(table)
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+            if !same_table_update && tx.query_opt("SELECT id FROM restaurant__reservation WHERE tenant_id=$1 AND \"table\"=$2 AND status='confirmed' AND starts_at <= now() AND ends_at > now() LIMIT 1 FOR UPDATE", &[&tenant.id, &table]).await?.is_some() {
+                return Ok(vec!["Bàn đang được giữ cho khách đặt trước; hãy ghi nhận khách đến trước khi mở order".into()]);
+            }
             let current_id = document
                 .get("id")
                 .and_then(Value::as_str)

@@ -66,7 +66,7 @@ const STATUS = {
   dispatched: 'Đã xuất phát', failed: 'Thất bại', issued: 'Đã phát hành', withdrawn: 'Đã rút', signed: 'Đã ký', sold: 'Đã bán', leased: 'Đã cho thuê', terminated: 'Đã chấm dứt',
   superseded: 'Đã thay thế',
   expired: 'Hết hạn', disposed: 'Đã thanh lý', on_hold: 'Tạm hoãn', succeeded: 'Thành công', hired: 'Đã tuyển', resulted: 'Có kết quả', partially_dispensed: 'Đã cấp một phần', dispensed: 'Đã phát thuốc',
-  checked_in: 'Đã nhận phòng/Check-in', checked_out: 'Đã trả phòng', no_show: 'Vắng mặt', occupied: 'Có khách', cleaning: 'Đang dọn', served: 'Đã phục vụ',
+  checked_in: 'Đã nhận phòng/Check-in', checked_out: 'Đã trả phòng', arrived: 'Khách đã đến', no_show: 'Vắng mặt', occupied: 'Có khách', cleaning: 'Đang dọn', served: 'Đã phục vụ',
   preparing: 'Đang chế biến', ready: 'Sẵn sàng', disbursed: 'Đã giải ngân', defaulted: 'Nợ xấu', overdue: 'Quá hạn', lapsed: 'Mất hiệu lực', harvested: 'Đã thu hoạch',
   dropped: 'Đã nghỉ', declined: 'Từ chối ký', published: 'Đã đăng', in: 'Nhập', out: 'Xuất',
   period_closed: 'Kỳ đã khóa',

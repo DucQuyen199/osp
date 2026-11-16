@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { localDateTime as businessDateTime, localDateTimeToIso } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
@@ -9,6 +10,7 @@ const t = (text) => uiTextWith(text, restaurantEnglish);
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const METHODS = [['cash', 'Tiền mặt'], ['card', 'Thẻ'], ['transfer', 'Chuyển khoản'], ['ewallet', 'Ví điện tử']];
+const reservationStart = () => businessDateTime(new Date(Date.now() + 60 * 60 * 1000));
 
 export default function RestaurantServicePage() {
   const [tables, setTables] = useState([]);
@@ -17,6 +19,7 @@ export default function RestaurantServicePage() {
   const [orders, setOrders] = useState([]);
   const [tickets, setTickets] = useState([]);
   const [invoices, setInvoices] = useState([]);
+  const [reservations, setReservations] = useState([]);
   const [products, setProducts] = useState(new Map());
   const [units, setUnits] = useState(new Map());
   const [warehouses, setWarehouses] = useState(new Map());
@@ -36,22 +39,25 @@ export default function RestaurantServicePage() {
   const [recipeProduct, setRecipeProduct] = useState('');
   const [recipeOutputQty, setRecipeOutputQty] = useState('1');
   const [recipeIngredients, setRecipeIngredients] = useState([{ product: '', qty: '1', uom: '' }]);
+  const [reservationForm, setReservationForm] = useState({ guest_name: '', phone: '', table: '', guest_count: '2', starts_at: reservationStart(), ends_at: businessDateTime(new Date(Date.now() + 2 * 60 * 60 * 1000)), note: '' });
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const canReadTickets = can('restaurant.kitchen_ticket.read');
       const canReadInvoices = app.meta?.modules?.some((module) => module.id === 'accounting') && can('accounting.payment.read');
-      const [tableResponse, menuResponse, recipeResponse, orderResponse, productMap, unitMap, warehouseMap, ticketResponse, invoiceResponse] = await Promise.all([
+      const canReadReservations = can('restaurant.reservation.read');
+      const [tableResponse, menuResponse, recipeResponse, orderResponse, productMap, unitMap, warehouseMap, ticketResponse, invoiceResponse, reservationResponse] = await Promise.all([
         loadAllResponse('restaurant.table'), loadAllResponse('restaurant.menu_item'),
         can('restaurant.recipe.read') ? loadAllResponse('restaurant.recipe') : Promise.resolve({ items: [] }),
         loadAllResponse('restaurant.table_order'), loadRefs('master-data.product'),
         can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()), loadRefs('inventory.warehouse'),
         canReadTickets ? loadAllResponse('restaurant.kitchen_ticket') : Promise.resolve({ items: [] }),
         canReadInvoices ? loadAllResponse('accounting.payment') : Promise.resolve({ items: [] }),
+        canReadReservations ? loadAllResponse('restaurant.reservation') : Promise.resolve({ items: [] }),
       ]);
       const nextOrders = itemsOf(orderResponse).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
-      setTables(itemsOf(tableResponse)); setMenuItems(itemsOf(menuResponse)); setRecipes(itemsOf(recipeResponse)); setOrders(nextOrders); setProducts(productMap); setUnits(unitMap); setWarehouses(warehouseMap); setTickets(itemsOf(ticketResponse)); setInvoices(itemsOf(invoiceResponse));
+      setTables(itemsOf(tableResponse)); setMenuItems(itemsOf(menuResponse)); setRecipes(itemsOf(recipeResponse)); setOrders(nextOrders); setProducts(productMap); setUnits(unitMap); setWarehouses(warehouseMap); setTickets(itemsOf(ticketResponse)); setInvoices(itemsOf(invoiceResponse)); setReservations(itemsOf(reservationResponse).sort((a, b) => String(a.starts_at || '').localeCompare(String(b.starts_at || ''))));
       setSelectedId((current) => nextOrders.some((order) => order.id === current) ? current : nextOrders[0]?.id || '');
     } catch (reason) { setError(reason.message || t('Không tải được dữ liệu nhà hàng.')); }
     finally { if (!quiet) setLoading(false); }
@@ -113,6 +119,40 @@ export default function RestaurantServicePage() {
     finally { setBusy(''); }
   };
 
+  const createReservation = async (event) => {
+    event.preventDefault(); setBusy('reservation:create'); setError(''); setNotice('');
+    try {
+      await api(dataPath('restaurant.reservation'), { method: 'POST', body: {
+        guest_name: reservationForm.guest_name.trim(), phone: reservationForm.phone.trim() || undefined,
+        table: reservationForm.table || undefined, guest_count: Number(reservationForm.guest_count),
+        starts_at: localDateTimeToIso(reservationForm.starts_at), ends_at: localDateTimeToIso(reservationForm.ends_at),
+        note: reservationForm.note.trim() || undefined,
+      } });
+      setReservationForm({ guest_name: '', phone: '', table: '', guest_count: '2', starts_at: reservationStart(), ends_at: businessDateTime(new Date(Date.now() + 2 * 60 * 60 * 1000)), note: '' });
+      await load(true); setNotice(t('Đã ghi nhận yêu cầu đặt bàn. Xác nhận để giữ bàn trong khung giờ đã chọn.'));
+    } catch (reason) { setError(reason.message || t('Không tạo được yêu cầu đặt bàn. Kiểm tra sức chứa và thời gian.')); }
+    finally { setBusy(''); }
+  };
+
+  const transitionReservation = async (reservation, action) => {
+    setBusy(`${reservation.id}:${action}`); setError(''); setNotice('');
+    try {
+      await api(dataPath('restaurant.reservation', reservation.id, action), { method: 'POST' });
+      await load(true); setNotice(t({ confirmed: 'Đã xác nhận đặt bàn.', arrived: 'Đã ghi nhận khách đến.', cancelled: 'Đã hủy đặt bàn.', no_show: 'Đã ghi nhận khách vắng mặt.', completed: 'Đã hoàn tất lượt đặt bàn.' }[action]));
+    } catch (reason) { setError(reason.message || t('Không cập nhật được trạng thái đặt bàn.')); await load(true); }
+    finally { setBusy(''); }
+  };
+
+  const assignReservationTable = async (reservation, table) => {
+    if (!table) return;
+    setBusy(`${reservation.id}:table`); setError(''); setNotice('');
+    try {
+      await api(dataPath('restaurant.reservation', reservation.id), { method: 'PATCH', body: { table } });
+      await load(true); setNotice(t('Đã gán bàn cho yêu cầu đặt trước.'));
+    } catch (reason) { setError(reason.message || t('Không gán được bàn. Kiểm tra sức chứa và lịch đặt trùng.')); await load(true); }
+    finally { setBusy(''); }
+  };
+
   const transition = async (order, action) => {
     if (action === 'cancelled' && order.status === 'sent') {
       const reason = cancellationReasons[order.id]?.trim() || '';
@@ -147,6 +187,16 @@ export default function RestaurantServicePage() {
       </form>}
       <div className="restaurant-recipe-list">{recipes.map((recipe) => <article className="restaurant-recipe-card" key={recipe.id}><div><strong>{products.get(recipe.product)?.name || recipe.product}</strong><span className="small muted"> {recipe.output_qty || 1} {t('đơn vị đầu ra')} · {(recipe.ingredients || []).length} {t('nguyên liệu')}</span><div className="small muted">{(recipe.ingredients || []).map((ingredient) => `${products.get(ingredient.product)?.name || t('Nguyên liệu')} ${ingredient.qty} ${units.get(ingredient.uom)?.name || ''}`).join(' · ')}</div></div>{can('restaurant.recipe.update') && <button className="button" type="button" onClick={() => editRecipe(recipe)}>{t('Sửa')}</button>}</article>)}{!recipes.length && <p className="small muted">{t('Chưa có công thức nào.')}</p>}</div>
     </section>}
+    {can('restaurant.reservation.read') && <section className="card card-pad restaurant-reservations"><h2>{t('Đặt bàn và danh sách chờ')}</h2><p className="small muted">{t('Yêu cầu chưa xác nhận chưa giữ bàn. Khi xác nhận, hệ thống khóa bàn và ngăn đặt trùng giờ.')}</p>{can('restaurant.reservation.create') && <form className="form-grid" onSubmit={createReservation}>
+      <label className="field"><span className="label">{t('Tên khách *')}</span><input className="input" required maxLength="160" value={reservationForm.guest_name} onChange={(event) => setReservationForm((current) => ({ ...current, guest_name: event.target.value }))}/></label>
+      <label className="field"><span className="label">{t('Điện thoại')}</span><input className="input" maxLength="80" value={reservationForm.phone} onChange={(event) => setReservationForm((current) => ({ ...current, phone: event.target.value }))}/></label>
+      <label className="field"><span className="label">{t('Bàn')}</span><select className="select" value={reservationForm.table} onChange={(event) => setReservationForm((current) => ({ ...current, table: event.target.value }))}><option value="">{t('Danh sách chờ, chưa chọn bàn')}</option>{tables.map((table) => <option key={table.id} value={table.id}>{table.name}{table.seats ? ` · ${table.seats} ${t('chỗ')}` : ''}</option>)}</select></label>
+      <label className="field"><span className="label">{t('Số khách *')}</span><input className="input num" required type="number" min="1" step="1" value={reservationForm.guest_count} onChange={(event) => setReservationForm((current) => ({ ...current, guest_count: event.target.value }))}/></label>
+      <label className="field"><span className="label">{t('Bắt đầu *')}</span><input className="input" required type="datetime-local" value={reservationForm.starts_at} onChange={(event) => setReservationForm((current) => ({ ...current, starts_at: event.target.value }))}/></label>
+      <label className="field"><span className="label">{t('Kết thúc *')}</span><input className="input" required type="datetime-local" min={reservationForm.starts_at} value={reservationForm.ends_at} onChange={(event) => setReservationForm((current) => ({ ...current, ends_at: event.target.value }))}/></label>
+      <label className="field full"><span className="label">{t('Ghi chú')}</span><input className="input" maxLength="1000" value={reservationForm.note} onChange={(event) => setReservationForm((current) => ({ ...current, note: event.target.value }))}/></label>
+      <div className="row full"><span className="grow"/><button className="button primary" disabled={busy === 'reservation:create'}>{busy === 'reservation:create' ? t('Đang lưu…') : t('Ghi nhận yêu cầu')}</button></div>
+    </form>}{!reservations.length ? <div className="empty">{t('Chưa có yêu cầu đặt bàn.')}</div> : <div className="table-wrap" style={{ marginTop: 14 }}><table className="table"><thead><tr><th>{t('Thời gian')}</th><th>{t('Khách')}</th><th>{t('Bàn')}</th><th>{t('Số khách')}</th><th>{t('Trạng thái')}</th><th>{t('Thao tác')}</th></tr></thead><tbody>{reservations.map((reservation) => <tr key={reservation.id}><td>{fmtDateTime(reservation.starts_at)} – {fmtDateTime(reservation.ends_at)}</td><td><strong>{reservation.guest_name}</strong>{reservation.phone && <div className="small muted">{reservation.phone}</div>}{reservation.note && <div className="small muted">{reservation.note}</div>}</td><td>{['confirmed', 'arrived'].includes(reservation.status) && !reservation.table && can('restaurant.reservation.update') ? <select className="select" aria-label={t('Gán bàn cho đặt chỗ')} value="" disabled={Boolean(busy)} onChange={(event) => assignReservationTable(reservation, event.target.value)}><option value="">{t('Chọn bàn')}</option>{tables.map((table) => <option key={table.id} value={table.id}>{table.name}{table.seats ? ` · ${table.seats} ${t('chỗ')}` : ''}</option>)}</select> : tables.find((table) => table.id === reservation.table)?.name || t('Danh sách chờ')}</td><td>{reservation.guest_count}</td><td>{statusLabel(reservation.status)}</td><td><div className="row wrap">{reservation.status === 'requested' && can('restaurant.reservation.confirmed') && <button className="button primary" type="button" disabled={Boolean(busy)} onClick={() => transitionReservation(reservation, 'confirmed')}>{t('Xác nhận')}</button>}{reservation.status === 'confirmed' && can('restaurant.reservation.arrived') && <button className="button" type="button" disabled={Boolean(busy)} onClick={() => transitionReservation(reservation, 'arrived')}>{t('Khách đã đến')}</button>}{['requested', 'confirmed'].includes(reservation.status) && can('restaurant.reservation.cancelled') && <button className="button" type="button" disabled={Boolean(busy)} onClick={() => transitionReservation(reservation, 'cancelled')}>{t('Hủy')}</button>}{reservation.status === 'confirmed' && can('restaurant.reservation.no_show') && <button className="button" type="button" disabled={Boolean(busy)} onClick={() => transitionReservation(reservation, 'no_show')}>{t('Vắng mặt')}</button>}{reservation.status === 'arrived' && can('restaurant.reservation.completed') && <button className="button" type="button" disabled={Boolean(busy)} onClick={() => transitionReservation(reservation, 'completed')}>{t('Hoàn tất')}</button>}</div></td></tr>)}</tbody></table></div>}</section>}
     <div className="restaurant-service-layout">
       <section className="restaurant-order-create card"><h2>{t('Tạo order')}</h2><form onSubmit={createOrder}>
         <div className="restaurant-order-tools">

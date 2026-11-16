@@ -1,7 +1,7 @@
 {
  "id": "restaurant",
- "name": "Nhà hàng / F&B",
- "description": "Bàn, thực đơn, công thức, order tại bàn, màn hình bếp. Gửi bếp tự tạo phiếu bếp; thanh toán tự trừ kho và ghi thu.",
+ "name": "NhÃ  hÃ ng / F&B",
+ "description": "BÃ n, Ä‘áº·t chá»—, thá»±c Ä‘Æ¡n, cÃ´ng thá»©c, order táº¡i bÃ n, mÃ n hÃ¬nh báº¿p. Gá»­i báº¿p tá»± táº¡o phiáº¿u báº¿p; thanh toÃ¡n tá»± trá»« kho vÃ  ghi thu.",
  "category": "industry",
  "version": "0.2.0",
  "depends": [
@@ -13,7 +13,7 @@
  "entities": [
   {
    "name": "table",
-   "label": "Bàn",
+   "label": "BÃ n",
    "fields": [
     {
      "name": "name",
@@ -38,7 +38,7 @@
   },
   {
    "name": "menu_item",
-   "label": "Món",
+   "label": "MÃ³n",
    "fields": [
     {
      "name": "product",
@@ -67,7 +67,7 @@
   },
   {
    "name": "recipe",
-   "label": "Công thức",
+   "label": "CÃ´ng thá»©c",
    "fields": [
     {
      "name": "product",
@@ -92,7 +92,7 @@
   },
   {
    "name": "table_order",
-   "label": "Order bàn",
+   "label": "Order bÃ n",
    "fields": [
     {
      "name": "table",
@@ -102,7 +102,7 @@
     },
     {
      "name": "guest_count",
-     "label": "Số khách",
+     "label": "Sá»‘ khÃ¡ch",
      "type": "number",
      "required": false
     },
@@ -131,7 +131,7 @@
     },
     {
      "name": "cancellation_reason",
-     "label": "Lý do hủy sau khi gửi bếp",
+     "label": "LÃ½ do há»§y sau khi gá»­i báº¿p",
      "type": "text",
      "required": false
     },
@@ -195,8 +195,8 @@
      },
      "cancelled": {
       "from": [
-        "open",
-        "sent"
+       "open",
+       "sent"
       ],
       "to": "cancelled"
      }
@@ -207,7 +207,7 @@
   },
   {
    "name": "kitchen_ticket",
-   "label": "Phiếu bếp",
+   "label": "Phiáº¿u báº¿p",
    "fields": [
     {
      "name": "order",
@@ -262,6 +262,83 @@
        "queued"
       ],
       "to": "cancelled"
+     }
+    }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "reservation",
+   "label": "Äáº·t bÃ n",
+   "fields": [
+    {
+     "name": "guest_name",
+     "label": "TÃªn khÃ¡ch",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "phone",
+     "label": "Äiá»‡n thoáº¡i",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "table",
+     "label": "BÃ n",
+     "type": "ref",
+     "required": false,
+     "ref": "restaurant.table"
+    },
+    {
+     "name": "guest_count",
+     "label": "Sá»‘ khÃ¡ch",
+     "type": "number",
+     "required": true
+    },
+    {
+     "name": "starts_at",
+     "label": "Báº¯t Ä‘áº§u",
+     "type": "datetime",
+     "required": true
+    },
+    {
+     "name": "ends_at",
+     "label": "Káº¿t thÃºc",
+     "type": "datetime",
+     "required": true
+    },
+    {
+     "name": "note",
+     "label": "Ghi chÃº",
+     "type": "text",
+     "required": false
+    }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "requested",
+    "actions": {
+     "confirmed": {
+      "from": ["requested"],
+      "to": "confirmed"
+     },
+     "arrived": {
+      "from": ["confirmed"],
+      "to": "arrived"
+     },
+     "cancelled": {
+      "from": ["requested", "confirmed"],
+      "to": "cancelled"
+     },
+     "no_show": {
+      "from": ["confirmed"],
+      "to": "no_show"
+     },
+     "completed": {
+      "from": ["arrived"],
+      "to": "completed"
      }
     }
    },
