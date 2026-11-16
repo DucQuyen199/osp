@@ -1,0 +1,27 @@
+const recruitmentEnglish = {
+  'Sàng lọc hồ sơ': 'Application screening', 'Phỏng vấn': 'Interview', 'Tham chiếu': 'Reference check', 'Đề nghị tuyển dụng': 'Offer',
+  'Tuyển dụng': 'Recruitment', 'Không tải được dữ liệu tuyển dụng.': 'Could not load recruitment data.', 'Thao tác không thành công.': 'The operation could not be completed.',
+  'Đã mở vị trí tuyển dụng.': 'Job opening created.', 'Đã lưu hồ sơ ứng viên.': 'Candidate profile saved.',
+  'Đã ghi nhận hồ sơ ứng tuyển ở vòng sàng lọc.': 'Application recorded at the screening stage.', 'Đã cập nhật vòng tuyển dụng.': 'Recruitment stage updated.',
+  'Đã tuyển ứng viên; hồ sơ nhân viên được tạo tự động trong HRM.': 'Candidate hired; an employee record was automatically created in HRM.',
+  'Đã từ chối hồ sơ và lưu lại lịch sử tuyển dụng.': 'Application rejected and retained in recruitment history.', 'Đã đóng vị trí tuyển dụng.': 'Job opening closed.',
+  'Tuyển dụng và quản lý ứng viên': 'Recruitment and candidate management',
+  'Mở vị trí, lưu hồ sơ ứng viên, theo dõi từng vòng tuyển và chuyển ứng viên trúng tuyển thành nhân viên.': 'Open positions, maintain candidate profiles, track hiring stages, and convert successful candidates into employees.',
+  'Làm mới': 'Refresh', 'Vị trí đang mở': 'Open positions', 'Hồ sơ đang xét': 'Applications in progress', 'Đã tuyển': 'Hired', 'Đã từ chối': 'Rejected',
+  'Mở vị trí tuyển dụng': 'Open a job position', 'Tên vị trí *': 'Job title *', 'Ví dụ: Kế toán tổng hợp': 'Example: General accountant',
+  'Phòng ban': 'Department', 'Chọn phòng ban': 'Select a department', 'Chức danh': 'Position', 'Chọn chức danh': 'Select a position',
+  'Số lượng cần tuyển': 'Headcount', 'Mở vị trí': 'Open position', 'Tiếp nhận ứng viên': 'Add a candidate', 'Họ và tên *': 'Full name *',
+  'Điện thoại': 'Phone', 'Lưu ứng viên': 'Save candidate', 'Tạo hồ sơ ứng tuyển': 'Create an application', 'Vị trí *': 'Position *',
+  'Chọn vị trí đang mở': 'Select an open position', 'không giới hạn': 'unlimited', 'chỗ': 'seats', 'Ứng viên *': 'Candidate *',
+  'Chọn ứng viên': 'Select a candidate', 'Tạo và đưa vào sàng lọc': 'Create and move to screening',
+  'Vị trí tuyển dụng': 'Job openings', 'Chưa có vị trí tuyển dụng.': 'No job openings yet.', 'Vị trí / phòng ban': 'Position / department',
+  'Ứng viên': 'Candidate', 'Trạng thái': 'Status', 'Chưa gắn phòng ban': 'No department assigned', 'Đóng vị trí': 'Close position',
+  'đã tuyển': 'hired', 'Hồ sơ ứng tuyển': 'Applications', 'Chưa có hồ sơ ứng tuyển.': 'No applications yet.',
+  'Ứng viên / vị trí': 'Candidate / position', 'Vòng tuyển': 'Hiring stage', 'Vị trí': 'Position', 'Chưa phân loại': 'Uncategorized',
+  'Không có email': 'No email', 'Vòng tuyển dụng': 'Hiring stage', 'Từ chối': 'Reject',
+  'Tuyển và tạo hồ sơ nhân viên': 'Hire and create employee record',
+  'Ứng viên đã được tuyển. Hồ sơ nhân viên được tạo tự động trong module HRM.': 'Candidate hired. An employee profile was automatically created in HRM.',
+  'Mỗi ứng viên chỉ được ứng tuyển một lần cho cùng vị trí. Số lượng tuyển và email ứng viên được kiểm tra ở máy chủ; khi tuyển thành công, hồ sơ nhân viên được tạo trong cùng luồng sự kiện.': 'Each candidate may apply once per position. The server validates headcount and candidate email; successful hiring creates the employee record in the same event flow.',
+};
+
+export default recruitmentEnglish;
