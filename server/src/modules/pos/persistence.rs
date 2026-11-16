@@ -342,7 +342,7 @@ async fn dispensed_quantities_for_prescription(
     let rows = tx
         .query(
             "SELECT lines FROM pos__pos_order WHERE tenant_id = $1 AND prescription = $2::text AND status = 'completed' FOR SHARE",
-            &[&tenant.id, &prescription_id],
+            &[&tenant.id, &prescription_id.to_string()],
         )
         .await?;
     let mut totals = std::collections::BTreeMap::<Uuid, Decimal>::new();

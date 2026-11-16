@@ -209,8 +209,8 @@ async fn run(k: Arc<Kernel>, url: String, defs: PathBuf) {
 
     finance::run(&k).await;
     verticals::run(&k).await;
-    commerce::run(&k).await;
     operations::run(&k).await;
+    commerce::run(&k).await;
     support::run(&k).await;
 
     // ── Di trú chạy lại không đổi gì (idempotent) ──

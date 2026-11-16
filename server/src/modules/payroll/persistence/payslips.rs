@@ -62,8 +62,8 @@ pub(super) async fn validate_created(
                            COALESCE(e.dependent_count, 0)::text, COALESCE(overtime.hours, 0)::text, \
                            COALESCE(overtime.weighted_hours, 0)::text, \
                            COALESCE(e.contribution_exempt, false), \
-                           COALESCE(e.work_weekdays, $4::jsonb)::text, \
-                           COALESCE(e.standard_hours_per_day::numeric, $5::numeric)::text \
+                           COALESCE(e.work_weekdays, ($4::text)::jsonb)::text, \
+                           COALESCE(e.standard_hours_per_day::numeric, ($5::text)::numeric)::text \
                          FROM hrm__employee e LEFT JOIN LATERAL (SELECT sr.id, sr.base_salary FROM hrm__salary_revision sr \
                            WHERE sr.tenant_id = e.tenant_id AND sr.employee = e.id AND sr.status = 'approved' \
                              AND sr.effective_from <= to_date($3 || '-01', 'YYYY-MM-DD') \

@@ -63,7 +63,7 @@ pub(super) async fn validate_calculated(
              AND (e.hire_date IS NULL OR e.hire_date < $3) AND (e.termination_date IS NULL OR e.termination_date >= $2)
              AND work_day.work_date::date >= COALESCE(e.hire_date, $2::date) AND work_day.work_date::date <= COALESCE(e.termination_date, $3::date - 1)
              AND COALESCE((SELECT sr.base_salary::numeric FROM hrm__salary_revision sr WHERE sr.tenant_id = e.tenant_id AND sr.employee = e.id AND sr.status = 'approved' AND sr.effective_from <= $2 ORDER BY sr.effective_from DESC LIMIT 1), e.base_salary::numeric, 0) > 0
-             AND CASE WHEN ws.id IS NULL THEN EXTRACT(ISODOW FROM work_day.work_date)::int IN (SELECT value::int FROM jsonb_array_elements_text(COALESCE(e.work_weekdays, $4::jsonb)) AS selected(value)) ELSE ws.is_working END
+             AND CASE WHEN ws.id IS NULL THEN EXTRACT(ISODOW FROM work_day.work_date)::int IN (SELECT value::int FROM jsonb_array_elements_text(COALESCE(e.work_weekdays, ($4::text)::jsonb)) AS selected(value)) ELSE ws.is_working END
              AND (EXISTS (SELECT 1 FROM hrm__attendance a WHERE a.tenant_id = e.tenant_id AND a.employee = e.id AND a.date = work_day.work_date::date AND a.check_in IS NOT NULL AND a.check_out IS NOT NULL)
                OR EXISTS (SELECT 1 FROM hrm__leave_request lr WHERE lr.tenant_id = e.tenant_id AND lr.employee = e.id AND lr.status = 'approved' AND COALESCE(lr.pay_treatment, CASE WHEN lr.kind = 'unpaid' THEN 'unpaid' ELSE 'paid' END) = 'paid' AND lr.start_date <= work_day.work_date::date AND lr.end_date >= work_day.work_date::date)
                OR EXISTS (SELECT 1 FROM hrm__holiday h WHERE h.tenant_id = e.tenant_id AND h.date = work_day.work_date::date AND h.pay_treatment = 'paid'))

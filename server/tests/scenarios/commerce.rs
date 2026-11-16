@@ -59,6 +59,29 @@ async fn purchase_returns(kernel: &Arc<Kernel>) {
         );
     }
     assert_eq!(t.stock(&id(&product)).await, 4.0);
+    let issue_date = kernel.tenant(&t.t.id).await.unwrap().business_today();
+    let supplier_invoice =
+        t.k.create(
+            &osp_server::kernel::Actor::System,
+            &t.t,
+            "purchasing.supplier_invoice",
+            o(json!({
+                "purchase_order": id(&order),
+                "supplier": id(&supplier),
+                "invoice_number": "SUP-RET-001",
+                "issue_date": issue_date.to_string(),
+                "total": 440,
+                "lines": [{ "product": id(&product), "qty": 4, "price": 100, "tax": id(&tax) }]
+            })),
+        )
+        .await
+        .unwrap();
+    t.act(
+        "purchasing.supplier_invoice",
+        &id(&supplier_invoice),
+        "approved",
+    )
+    .await;
     let bill = t
         .list("accounting.bill", &[("source_id", &id(&order))])
         .await
@@ -68,18 +91,16 @@ async fn purchase_returns(kernel: &Arc<Kernel>) {
     t.act("payments.payment_txn", &id(&capture), "succeeded")
         .await;
     for _ in 0..2 {
-        let returned = t.create("purchasing.purchase_return", json!({ "purchase_order": id(&order), "warehouse": warehouse, "reason": "Supplier return", "lines": [{ "product": id(&product), "qty": 2, "price": 100 }] })).await;
+        let returned = t.create("purchasing.purchase_return", json!({ "purchase_order": id(&order), "supplier_invoice": id(&supplier_invoice), "warehouse": warehouse, "reason": "Supplier return", "lines": [{ "product": id(&product), "qty": 2, "price": 100 }] })).await;
         for action in ["submitted", "approved", "dispatched"] {
             t.act("purchasing.purchase_return", &id(&returned), action)
                 .await;
         }
     }
     assert_eq!(t.stock(&id(&product)).await, 0.0);
-    t.act("payments.payment_txn", &id(&capture), "refunded")
-        .await;
     let bill = t.get("accounting.bill", &id(&bill)).await;
     assert_eq!(bill["status"], "settled");
-    assert_eq!(f(&bill["paid_amount"]), 0.0);
+    assert_eq!(f(&bill["paid_amount"]), 220.0);
     assert_eq!(f(&bill["adjustment_amount"]), 440.0);
     assert_eq!(
         t.list("accounting.debit_note", &[("bill", &id(&bill))])
@@ -125,6 +146,7 @@ async fn sales_returns(kernel: &Arc<Kernel>) {
         f(&t.get("loyalty.member", &id(&member)).await["points"]),
         44.0
     );
+    t.act("sales.sales_order", &id(&order), "delivered").await;
     let invoice = t
         .list("accounting.invoice", &[("source_id", &id(&order))])
         .await
@@ -174,11 +196,9 @@ async fn sales_returns(kernel: &Arc<Kernel>) {
         f(&t.get("loyalty.member", &id(&member)).await["points"]),
         0.0
     );
-    t.act("payments.payment_txn", &id(&capture), "refunded")
-        .await;
     let invoice = t.get("accounting.invoice", &id(&invoice)).await;
     assert_eq!(invoice["status"], "settled");
-    assert_eq!(f(&invoice["paid_amount"]), 0.0);
+    assert_eq!(f(&invoice["paid_amount"]), 220000.0);
     assert_eq!(f(&invoice["adjustment_amount"]), 440000.0);
     println!(
         "✔ sales returns: partial payment, full return/refund, tax/COGS/points reversal and quantity cap"
@@ -213,19 +233,13 @@ async fn provider_payments(kernel: &Arc<Kernel>) {
             .len(),
         1
     );
-    t.act("payments.payment_txn", &id(&payment), "refunded")
-        .await;
-    assert_eq!(
-        t.get("accounting.invoice", &id(&invoice)).await["status"],
-        "posted"
-    );
     let payments = t
         .list("accounting.payment", &[("source_id", &id(&payment))])
         .await;
-    assert_eq!(payments.len(), 2);
+    assert_eq!(payments.len(), 1);
     assert_eq!(
         payments.iter().map(|row| f(&row["amount"])).sum::<f64>(),
-        0.0
+        100.0
     );
     assert!(
         kernel

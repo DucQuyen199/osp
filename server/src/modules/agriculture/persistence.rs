@@ -260,7 +260,7 @@ async fn validate_harvest(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<V
     }
     if let Some(row) = tx
         .query_opt(
-            "SELECT CASE WHEN exposure.days IS NULL THEN NULL ELSE ia.date + ceil(exposure.days)::int END::text AS harvest_allowed_on, p.name FROM agriculture__input_application ia JOIN master_data__product p ON p.tenant_id = ia.tenant_id AND p.id = ia.product CROSS JOIN LATERAL (SELECT CASE WHEN ia.preharvest_interval_configured IS TRUE THEN ia.preharvest_interval_days ELSE p.preharvest_interval_days END AS days) exposure WHERE ia.tenant_id = $1 AND ia.cycle = $2 AND ia.kind = 'pesticide' AND (exposure.days IS NULL OR ia.date + ceil(exposure.days)::int > $3::date) ORDER BY harvest_allowed_on DESC NULLS FIRST LIMIT 1",
+            "SELECT CASE WHEN exposure.days IS NULL THEN NULL ELSE ia.date + ceil(exposure.days)::int END::text AS harvest_allowed_on, p.name FROM agriculture__input_application ia JOIN master_data__product p ON p.tenant_id = ia.tenant_id AND p.id = ia.product CROSS JOIN LATERAL (SELECT CASE WHEN ia.preharvest_interval_configured IS TRUE THEN ia.preharvest_interval_days ELSE p.preharvest_interval_days END AS days) exposure WHERE ia.tenant_id = $1 AND ia.cycle = $2 AND ia.kind = 'pesticide' AND (exposure.days IS NULL OR ia.date + ceil(exposure.days)::int > ($3::text)::date) ORDER BY harvest_allowed_on DESC NULLS FIRST LIMIT 1",
             &[&tenant.id, &cycle, &date],
         )
         .await?

@@ -108,7 +108,7 @@ pub(super) async fn dispensed_quantities(
 ) -> R<BTreeMap<Uuid, rust_decimal::Decimal>> {
     let rows = tx.query(
         "SELECT lines FROM pos__pos_order WHERE tenant_id = $1 AND prescription = $2::text AND status = 'completed' FOR SHARE",
-        &[&tenant.id, &prescription_id],
+        &[&tenant.id, &prescription_id.to_string()],
     ).await?;
     let mut quantities = BTreeMap::<Uuid, rust_decimal::Decimal>::new();
     for row in rows {
@@ -315,7 +315,7 @@ pub async fn validate_dispense(
     if tx
         .query_opt(
             "SELECT 1 FROM pos__pos_order WHERE tenant_id = $1 AND prescription = $2::text AND status = 'completed' LIMIT 1",
-            &[&tenant.id, &prescription_id],
+            &[&tenant.id, &prescription_id.to_string()],
         )
         .await?
         .is_none()

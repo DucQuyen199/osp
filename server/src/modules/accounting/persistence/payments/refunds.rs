@@ -1,5 +1,5 @@
 use super::super::database_amount;
-use super::shared::{amount, amount_tolerance, refund_matches};
+use super::shared::{amount, amount_tolerance, amounts_match, refund_matches};
 use crate::{db::Tx, error::R, kernel::Tenant};
 use rust_decimal::Decimal;
 use serde_json::Value;
@@ -27,12 +27,12 @@ pub(super) async fn validate(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> 
             let party: Uuid = row.get(2);
             let invoice: Option<Uuid> = row.get(3);
             let bill: Option<Uuid> = row.get(4);
-            provider_refund_amount > Decimal::ZERO
+            let matched = provider_refund_amount > Decimal::ZERO
                 && original_amount > Decimal::ZERO
                 && provider_refund_amount <= original_amount
                 && amount(document, "amount").is_some_and(|accounting_amount| {
                     accounting_amount < Decimal::ZERO
-                        && refund_matches(provider_refund_amount, accounting_amount.abs())
+                        && amounts_match(provider_refund_amount, accounting_amount.abs())
                 })
                 && document
                     .get("party")
@@ -48,7 +48,8 @@ pub(super) async fn validate(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> 
                     .get("bill")
                     .and_then(Value::as_str)
                     .and_then(|value| Uuid::parse_str(value).ok())
-                    == bill
+                    == bill;
+            matched
         } else {
             false
         };

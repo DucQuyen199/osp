@@ -54,11 +54,11 @@ async fn ecommerce(kernel: &Arc<Kernel>) {
     assert_eq!(order["status"], "confirmed");
     assert_eq!(f(&order["total"]), 176.0);
     assert_eq!(t.stock(&id(&product)).await, 3.0);
-    assert_eq!(
+    assert!(
         t.list("accounting.invoice", &[("source_id", &id(&order))])
             .await
-            .len(),
-        1
+            .is_empty(),
+        "An ecommerce sales order is invoiced after delivery"
     );
     assert!(
         kernel
@@ -222,12 +222,45 @@ async fn utilities(kernel: &Arc<Kernel>) {
 
 async fn lending(kernel: &Arc<Kernel>) {
     let t = Ctx::new(kernel, None, &["lending"]).await;
+    let (_, reviewer_token) = kernel
+        .add_user(
+            &t.t,
+            "Independent loan reviewer",
+            None,
+            None,
+            &["admin".into()],
+        )
+        .await
+        .unwrap();
+    let (_, reviewer, _) = kernel.authenticate(&reviewer_token.unwrap()).await.unwrap();
+    let (_, disburser_token) = kernel
+        .add_user(
+            &t.t,
+            "Independent loan disburser",
+            None,
+            None,
+            &["admin".into()],
+        )
+        .await
+        .unwrap();
+    let (_, disburser, _) = kernel
+        .authenticate(&disburser_token.unwrap())
+        .await
+        .unwrap();
     let party = t
         .create("master-data.party", json!({ "name": "Borrower" }))
         .await;
-    let loan = t.create("lending.loan", json!({ "party": id(&party), "principal": 3000, "rate": 12, "term_months": 3, "method": "bank" })).await;
-    t.act("lending.loan", &id(&loan), "approved").await;
-    t.act("lending.loan", &id(&loan), "disbursed").await;
+    let first_due_date =
+        kernel.tenant(&t.t.id).await.unwrap().business_today() + chrono::Duration::days(30);
+    let loan = t.create("lending.loan", json!({ "party": id(&party), "principal": 3000, "rate": 12, "term_months": 3, "method": "bank", "first_due_date": first_due_date.to_string() })).await;
+    kernel
+        .act(&reviewer, &t.t, "lending.loan", &id(&loan), "approved")
+        .await
+        .unwrap();
+    kernel
+        .act(&disburser, &t.t, "lending.loan", &id(&loan), "disbursed")
+        .await
+        .unwrap();
     let installments = t.list("lending.repayment", &[("loan", &id(&loan))]).await;
     assert_eq!(installments.len(), 3);
     let principal: Decimal = installments

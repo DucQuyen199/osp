@@ -194,7 +194,7 @@ pub async fn validate_persistence(
                 errors.push("Mã sản phẩm trong đơn thuốc không hợp lệ".into());
                 continue;
             };
-            let row = tx.query_opt("SELECT custom, active FROM master_data__product WHERE tenant_id=$1 AND id=$2 FOR SHARE", &[&tenant.id, &pid]).await?;
+            let row = tx.query_opt("SELECT custom, COALESCE(active, true) FROM master_data__product WHERE tenant_id=$1 AND id=$2 FOR SHARE", &[&tenant.id, &pid]).await?;
             if let Some(row) = row {
                 let custom: Value = row.get(0);
                 let active: bool = row.get(1);

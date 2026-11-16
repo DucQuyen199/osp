@@ -134,8 +134,8 @@ pub(super) async fn calculate_from_attendance(
                  COALESCE(e.tax_residency, 'resident')::text AS tax_residency, \
                  COALESCE(e.dependent_count, 0)::numeric AS dependent_count, \
                  COALESCE(e.contribution_exempt, false) AS contribution_exempt, \
-                 COALESCE(e.work_weekdays, $5::jsonb) AS work_weekdays, \
-                 COALESCE(e.standard_hours_per_day::numeric, $4::numeric) AS standard_hours_per_day, \
+                 COALESCE(e.work_weekdays, ($5::text)::jsonb) AS work_weekdays, \
+                 COALESCE(e.standard_hours_per_day::numeric, ($4::text)::numeric) AS standard_hours_per_day, \
                  e.hire_date, e.termination_date \
                FROM hrm__employee e \
                LEFT JOIN LATERAL (SELECT sr.id, sr.base_salary FROM hrm__salary_revision sr \
@@ -221,7 +221,7 @@ pub(super) async fn calculate_from_attendance(
              WHERE e.salary > 0 \
              GROUP BY e.id, e.salary, e.salary_revision, e.additions, e.taxable_additions, e.deductions, \
                e.overtime_hours, e.overtime_weighted_hours, e.tax_residency, e.dependent_count, \
-               e.contribution_exempt, e.standard_hours_per_day, wd.working_days \
+               e.contribution_exempt, e.standard_hours_per_day, e.work_weekdays, wd.working_days \
              HAVING COALESCE(sum(d.day_fraction), 0) > 0 OR e.overtime_hours > 0 ORDER BY e.id",
             &[
                 &tenant.id,

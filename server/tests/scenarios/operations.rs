@@ -14,6 +14,129 @@ pub(super) async fn run(kernel: &Arc<Kernel>) {
     agriculture(kernel).await;
     services(kernel).await;
     recruitment(kernel).await;
+    pharmacy(kernel).await;
+}
+
+async fn pharmacy(kernel: &Arc<Kernel>) {
+    let t = Ctx::new(kernel, Some("pharmacy"), &[]).await;
+    let warehouse = t.warehouse().await;
+    let session = t
+        .create(
+            "pos.pos_session",
+            json!({ "warehouse": warehouse, "opening_cash": 0 }),
+        )
+        .await;
+    let party = t
+        .create("master-data.party", json!({ "name": "Pharmacy customer" }))
+        .await;
+    let other_party = t
+        .create("master-data.party", json!({ "name": "Different customer" }))
+        .await;
+    let medicine = t
+        .create(
+            "master-data.product",
+            json!({
+                "sku": "RX-001",
+                "name": "Prescription medicine",
+                "price": 5,
+                "requires_prescription": true
+            }),
+        )
+        .await;
+    t.create(
+        "inventory.stock_move",
+        json!({ "product": id(&medicine), "warehouse": warehouse, "qty": 20, "direction": "in" }),
+    )
+    .await;
+    let today = kernel.tenant(&t.t.id).await.unwrap().business_today();
+    let prescription = t
+        .create(
+            "pharmacy.prescription",
+            json!({
+                "prescription_no": "RX-TEST-001",
+                "party": id(&party),
+                "prescriber": "Dr Test",
+                "issued_at": today.to_string(),
+                "valid_until": (today + chrono::Duration::days(30)).to_string(),
+                "items": [{ "product": id(&medicine), "qty": 6, "dosage": "Uống một viên mỗi tám giờ" }]
+            }),
+        )
+        .await;
+    t.act("pharmacy.prescription", &id(&prescription), "verified")
+        .await;
+
+    assert!(
+        t.try_create(
+            "pos.pos_order",
+            json!({
+                "party": id(&other_party),
+                "warehouse": warehouse,
+                "session": id(&session),
+                "prescription": id(&prescription),
+                "method": "card",
+                "lines": [{ "product": id(&medicine), "qty": 2, "price": 5 }]
+            }),
+        )
+        .await
+        .is_err()
+    );
+    assert!(
+        t.try_create(
+            "pos.pos_order",
+            json!({
+                "party": id(&party),
+                "warehouse": warehouse,
+                "session": id(&session),
+                "prescription": id(&prescription),
+                "method": "cash",
+                "lines": [{ "product": id(&medicine), "qty": 7, "price": 5 }]
+            }),
+        )
+        .await
+        .is_err()
+    );
+
+    let first_dispense = t
+        .create(
+            "pos.pos_order",
+            json!({
+                "party": id(&party),
+                "warehouse": warehouse,
+                "session": id(&session),
+                "prescription": id(&prescription),
+                "method": "card",
+                "lines": [{ "product": id(&medicine), "qty": 2, "price": 5 }]
+            }),
+        )
+        .await;
+    t.act("pos.pos_order", &id(&first_dispense), "completed")
+        .await;
+    assert_eq!(
+        t.get("pharmacy.prescription", &id(&prescription)).await["status"],
+        "partially_dispensed"
+    );
+
+    let final_dispense = t
+        .create(
+            "pos.pos_order",
+            json!({
+                "party": id(&party),
+                "warehouse": warehouse,
+                "session": id(&session),
+                "prescription": id(&prescription),
+                "method": "card",
+                "lines": [{ "product": id(&medicine), "qty": 4, "price": 5 }]
+            }),
+        )
+        .await;
+    t.act("pos.pos_order", &id(&final_dispense), "completed")
+        .await;
+    assert_eq!(
+        t.get("pharmacy.prescription", &id(&prescription)).await["status"],
+        "dispensed"
+    );
+    assert_eq!(t.stock(&id(&medicine)).await, 14.0);
+    println!("✔ pharmacy: patient match, quantity limits, partial and complete POS dispensing");
 }
 
 async fn services(kernel: &Arc<Kernel>) {
@@ -65,9 +188,23 @@ async fn services(kernel: &Arc<Kernel>) {
             .await[0]["total"]),
         40.0
     );
-    for action in ["responded", "resolved", "closed", "reopened"] {
+    t.create(
+        "helpdesk.message",
+        json!({ "ticket": id(&ticket), "direction": "outbound", "author": "Support agent", "body": "Replacement installed" }),
+    )
+    .await;
+    for action in ["resolved", "closed"] {
         t.act("helpdesk.ticket", &id(&ticket), action).await;
     }
+    t.create(
+        "helpdesk.message",
+        json!({ "ticket": id(&ticket), "direction": "inbound", "author": "Service customer", "body": "The issue is still present" }),
+    )
+    .await;
+    assert_eq!(
+        t.get("helpdesk.ticket", &id(&ticket)).await["status"],
+        "open"
+    );
     assert_eq!(
         t.list(
             "field-service.work_order",
@@ -83,7 +220,7 @@ async fn services(kernel: &Arc<Kernel>) {
     let today = chrono::Utc::now().date_naive();
     let plan = t.create("maintenance.maintenance_plan", json!({ "asset": id(&asset), "title": "Monthly service", "interval_days": 30, "next_due": today.to_string() })).await;
     assert_eq!(kernel.run_jobs(&t.t).await.unwrap(), 1);
-    assert_eq!(kernel.run_jobs(&t.t).await.unwrap(), 0);
+    assert_eq!(kernel.run_jobs(&t.t).await.unwrap(), 1);
     let request = t
         .list(
             "maintenance.maintenance_request",
@@ -109,7 +246,7 @@ async fn services(kernel: &Arc<Kernel>) {
         )
         .await;
     let repair = t.create("auto-service.repair_order", json!({ "vehicle": id(&vehicle), "party": id(&party), "odometer_reading": 100, "warehouse": warehouse, "complaint": "Replace part", "lines": [{ "product": id(&part), "qty": 3, "price": 20 }] })).await;
-    for action in ["started", "completed", "delivered"] {
+    for action in ["approved", "started", "completed", "delivered"] {
         t.act("auto-service.repair_order", &id(&repair), action)
             .await;
     }
@@ -184,7 +321,7 @@ async fn recruitment(kernel: &Arc<Kernel>) {
     let reviewer = t
         .create("hrm.employee", json!({ "name": "Reviewer" }))
         .await;
-    let review = t.create("performance.review", json!({ "employee": id(&employee), "reviewer": id(&reviewer), "period": "2026-Q4", "score": 4, "comment": "Meets expectations" })).await;
+    let review = t.create("performance.review", json!({ "employee": id(&employee), "reviewer": id(&reviewer), "period": "2026-Q4", "score": 4, "comment": "Meets expectations", "revision_note": "Please add supporting examples" })).await;
     for action in ["submitted", "returned"] {
         t.act("performance.review", &id(&review), action).await;
     }
@@ -272,17 +409,38 @@ async fn logistics(kernel: &Arc<Kernel>) {
             .await
             .is_err()
     );
-    t.act("logistics.shipment", &id(&shipment), "delivered")
-        .await;
+    kernel
+        .logistics_confirm_shipment_delivery(
+            &t.a,
+            &t.t,
+            &id(&shipment),
+            json!({ "received_by": "Customer", "delivered_lines": [{ "product": id(&product), "qty": 2, "price": 100 }] })
+                .as_object()
+                .unwrap()
+                .clone(),
+        )
+        .await
+        .unwrap();
     assert_eq!(t.stock(&id(&product)).await, 8.0);
     assert_eq!(
         t.get("sales.sales_order", &id(&order)).await["status"],
         "partially_delivered"
     );
     let second = t.create("logistics.shipment", json!({ "source": "sales_order", "source_id": id(&order), "party": id(&party), "warehouse": warehouse, "destination": "Destination A", "vehicle": id(&vehicle), "driver": id(&driver), "lines": [{ "product": id(&product), "qty": 2, "price": 100 }] })).await;
-    for action in ["dispatched", "delivered"] {
-        t.act("logistics.shipment", &id(&second), action).await;
-    }
+    t.act("logistics.shipment", &id(&second), "dispatched")
+        .await;
+    kernel
+        .logistics_confirm_shipment_delivery(
+            &t.a,
+            &t.t,
+            &id(&second),
+            json!({ "received_by": "Customer" })
+                .as_object()
+                .unwrap()
+                .clone(),
+        )
+        .await
+        .unwrap();
     assert_eq!(t.stock(&id(&product)).await, 6.0);
     assert_eq!(
         t.get("sales.sales_order", &id(&order)).await["status"],
@@ -468,7 +626,7 @@ async fn projects(kernel: &Arc<Kernel>) {
     );
     let sheet = t.create("project.timesheet", json!({ "project": id(&project), "task": id(&first), "hours": 2.5, "rate": 12.34, "date": "2026-11-01" })).await;
     assert_eq!(f(&sheet["amount"]), 30.85);
-    let boq = t.create("construction.boq", json!({ "project": id(&project), "items": [{ "description": "Concrete", "qty": 2.5, "unit_price": 100 }] })).await;
+    let boq = t.create("construction.boq", json!({ "project": id(&project), "items": [{ "description": "Concrete", "qty": 2.5, "unit": "m3", "unit_price": 100 }] })).await;
     assert_eq!(f(&boq["total"]), 250.0);
     let vendor = t
         .create(
@@ -582,13 +740,38 @@ async fn learning(kernel: &Arc<Kernel>) {
 
 async fn insurance(kernel: &Arc<Kernel>) {
     let t = Ctx::new(kernel, None, &["insurance"]).await;
+    let (_, reviewer_token) = kernel
+        .add_user(
+            &t.t,
+            "Independent claims reviewer",
+            None,
+            None,
+            &["admin".into()],
+        )
+        .await
+        .unwrap();
+    let (_, reviewer, _) = kernel.authenticate(&reviewer_token.unwrap()).await.unwrap();
+    let (_, payer_token) = kernel
+        .add_user(
+            &t.t,
+            "Independent claims payer",
+            None,
+            None,
+            &["admin".into()],
+        )
+        .await
+        .unwrap();
+    let (_, payer, _) = kernel.authenticate(&payer_token.unwrap()).await.unwrap();
     let party = t
         .create("master-data.party", json!({ "name": "Insured party" }))
         .await;
     let policy = t.create("insurance.policy", json!({ "number": "POL-1", "party": id(&party), "product": "Property", "premium": 100, "coverage_limit": 1000, "start_date": "2026-01-01", "end_date": "2026-12-31" })).await;
     t.act("insurance.policy", &id(&policy), "activated").await;
     let claim = t.create("insurance.claim", json!({ "number": "CL-1", "policy": id(&policy), "amount": 700, "incident_date": "2026-10-01", "description": "Storm damage" })).await;
-    t.act("insurance.claim", &id(&claim), "approved").await;
+    kernel
+        .act(&reviewer, &t.t, "insurance.claim", &id(&claim), "approved")
+        .await
+        .unwrap();
     assert!(
         kernel
             .act(&t.a, &t.t, "insurance.claim", &id(&claim), "paid")
@@ -607,7 +790,10 @@ async fn insurance(kernel: &Arc<Kernel>) {
         json!({ "expense_account": id(&expense), "method": "bank" }),
     )
     .await;
-    t.act("insurance.claim", &id(&claim), "paid").await;
+    kernel
+        .act(&payer, &t.t, "insurance.claim", &id(&claim), "paid")
+        .await
+        .unwrap();
     let payouts = t
         .list("accounting.journal_entry", &[("source_id", &id(&claim))])
         .await;

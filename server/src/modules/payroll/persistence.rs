@@ -55,11 +55,11 @@ async fn counted_paid_days(
     let row = tx
         .query_one_row(
             "WITH work_calendar AS ( \
-               SELECT work_day.work_date::date AS work_date, CASE WHEN ws.id IS NULL THEN $6::numeric \
+               SELECT work_day.work_date::date AS work_date, CASE WHEN ws.id IS NULL THEN ($6::text)::numeric \
                  ELSE EXTRACT(EPOCH FROM (ws.end_at - ws.start_at))::numeric / 3600 - COALESCE(ws.break_minutes, 0)::numeric / 60 END AS expected_hours \
                FROM generate_series($3::date, $4::date - 1, interval '1 day') AS work_day(work_date) \
                LEFT JOIN hrm__work_schedule_entry ws ON ws.tenant_id = $1 AND ws.employee = $2 AND ws.work_date = work_day.work_date::date \
-               WHERE (ws.id IS NULL AND EXTRACT(ISODOW FROM work_day.work_date)::int IN (SELECT value::int FROM jsonb_array_elements_text($5::jsonb) AS selected(value))) \
+               WHERE (ws.id IS NULL AND EXTRACT(ISODOW FROM work_day.work_date)::int IN (SELECT value::int FROM jsonb_array_elements_text(($5::text)::jsonb) AS selected(value))) \
                  OR (ws.id IS NOT NULL AND ws.is_working) \
              ), counted_days AS ( \
                SELECT a.date AS work_date, LEAST(1::numeric, GREATEST(0::numeric, round( \
