@@ -6,7 +6,7 @@ export default function SupplierInvoiceAdjustmentsEditor({ lines, onChange, rece
   return <section className="field full">
     <span className="label">{uiText('Phí và chiết khấu')}</span>
     <p className="small muted">{uiText('Phí có thể hạch toán vào chi phí mua (632) hoặc vốn hóa vào giá trị hàng nhận; thuế của phí được hạch toán riêng.')}</p>
-    {lines.map((line, index) => <div className="row wrap" key={index} data-inline-style="inline-43a97fe494">
+    {lines.map((line, index) => <div className="row wrap u-legacy-43a97fe494" key={index} >
       <select className="input" aria-label={`${uiText('Loại điều chỉnh hóa đơn')} ${index + 1}`} value={line.kind} onChange={(event) => update(index, { kind: event.target.value })}>
         <option value="charge">{uiText('Phí cộng thêm')}</option><option value="discount">{uiText('Chiết khấu')}</option>
       </select>
@@ -22,12 +22,12 @@ export default function SupplierInvoiceAdjustmentsEditor({ lines, onChange, rece
         </select>
       </>}
       <input className="input grow" aria-label={`${uiText('Mô tả điều chỉnh hóa đơn')} ${index + 1}`} placeholder={uiText('Mô tả: vận chuyển, giảm giá...')} value={line.description} onChange={(event) => update(index, { description: event.target.value })} />
-      <input className="input num" aria-label={`${uiText('Số tiền điều chỉnh hóa đơn')} ${index + 1}`} type="number" min="0" step="any" placeholder={`${uiText('Số tiền')} (${currencyCode})`} value={line.amount} onChange={(event) => update(index, { amount: event.target.value })} data-inline-style="inline-5e96948257" />
+      <input className="input num u-legacy-5e96948257" aria-label={`${uiText('Số tiền điều chỉnh hóa đơn')} ${index + 1}`} type="number" min="0" step="any" placeholder={`${uiText('Số tiền')} (${currencyCode})`} value={line.amount} onChange={(event) => update(index, { amount: event.target.value })}  />
       <select className="input" aria-label={`${uiText('Thuế điều chỉnh hóa đơn')} ${index + 1}`} value={line.tax || ''} onChange={(event) => update(index, { tax: event.target.value })}>
         <option value="">{uiText('Không chịu thuế')}</option>{taxes.map((tax) => <option key={tax.id} value={tax.id}>{tax.name} · {tax.rate}%</option>)}
       </select>
       <button className="btn btn-ghost btn-sm" type="button" aria-label={`${uiText('Xóa điều chỉnh hóa đơn')} ${index + 1}`} onClick={() => onChange(lines.filter((_, i) => i !== index))}>{uiText('Xóa')}</button>
     </div>)}
-    <button className="btn btn-ghost btn-sm" type="button" data-inline-style="inline-43a97fe494" onClick={() => onChange([...lines, { kind: 'charge', description: '', amount: '', tax: '', account_code: '632', allocation: 'expense', allocation_basis: 'value', receipt_ids: [] }])}>{uiText('Thêm phí/chiết khấu')}</button>
+    <button className="btn btn-ghost btn-sm u-legacy-43a97fe494" type="button"  onClick={() => onChange([...lines, { kind: 'charge', description: '', amount: '', tax: '', account_code: '632', allocation: 'expense', allocation_basis: 'value', receipt_ids: [] }])}>{uiText('Thêm phí/chiết khấu')}</button>
   </section>;
 }

@@ -15,7 +15,7 @@ export default function PurchaseRequisitionsTable({
   onEdit,
   onAction,
 }) {
-  return <div className="table-wrap" data-inline-style="inline-92c18f6bda"><table className="table">
+  return <div className="table-wrap u-legacy-92c18f6bda" ><table className="table">
     <thead><tr><th>{uiText('Đề nghị')}</th><th>{uiText('Người yêu cầu / lý do')}</th><th>{uiText('Hàng / số lượng')}</th><th>{uiText('Trạng thái / thao tác')}</th></tr></thead>
     <tbody>{requisitions.map((row) => {
       const request = approvalByRequisition.get(row.id);

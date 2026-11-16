@@ -111,8 +111,8 @@ export default function MfaSettingsPage() {
       </form>}
       {setup && <div className="stack">
         <div className="alert">{uiText('Thêm tài khoản bằng cách nhập khóa này vào ứng dụng xác thực. Khóa chỉ hiển thị trong phiên thiết lập 10 phút.')}</div>
-        <label className="field"><span className="label">{uiText('Khóa TOTP')}</span><code className="input mono" data-inline-style="inline-c662271093">{setup.secret}</code></label>
-        <details><summary>{uiText('Liên kết otpauth')}</summary><p className="small mono" data-inline-style="inline-408df8584c">{setup.otpauthUrl}</p></details>
+        <label className="field"><span className="label">{uiText('Khóa TOTP')}</span><code className="input mono u-legacy-c662271093" >{setup.secret}</code></label>
+        <details><summary>{uiText('Liên kết otpauth')}</summary><p className="small mono u-legacy-408df8584c" >{setup.otpauthUrl}</p></details>
         <form className="stack" onSubmit={confirmSetup}>
           <label className="field"><span className="label">{uiText('Mã 6 chữ số trong ứng dụng')}</span><input className="input mono" autoComplete="one-time-code" inputMode="numeric" maxLength="6" required value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} /></label>
           <div className="row"><button className="btn btn-primary" disabled={busy || code.length !== 6}>{busy ? uiText('Đang xác minh…') : uiText('Bật xác thực hai lớp')}</button><button className="btn" type="button" disabled={busy} onClick={() => { setSetup(null); setCode(''); }}>{uiText('Hủy')}</button></div>
