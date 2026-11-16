@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from '../../lib/api.js';
-import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
+import { fmtDate, statusLabel, uiText } from '../../lib/i18n.js';
 import { app, can, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
+import StockCountLinesEditor from './components/StockCountLinesEditor.jsx';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 async function listAll(qname) {
@@ -76,8 +77,6 @@ export default function InventoryStockCountWorkbenchPage() {
     const search = productSearch.trim().toLocaleLowerCase();
     return !search || `${row.sku || ''} ${row.name || ''}`.toLocaleLowerCase().includes(search);
   }).slice(0, 100), [productRows, productSearch]);
-  const activeLocations = (warehouseId) => [...locations.values()].filter((row) => row.warehouse === warehouseId && row.active !== false);
-  const lotsFor = (productId) => [...lots.values()].filter((row) => row.product === productId);
   const approvalFor = (row) => approvalRequests.find((request) => request.entity === 'inventory.stock_count' && request.record_id === row.id);
 
   function startNew() {
@@ -158,14 +157,7 @@ export default function InventoryStockCountWorkbenchPage() {
             <label className="field"><span className="label">{uiText('Loại kiểm kê')} *</span><select className="select" value={reason} onChange={(e) => setReason(e.target.value)}><option value="cycle_count">{uiText('Kiểm kê định kỳ')}</option><option value="correction">{uiText('Điều chỉnh sai lệch')}</option><option value="damage">{uiText('Hư hỏng / mất mát')}</option><option value="opening_balance">{uiText('Số dư đầu kỳ')}</option></select></label>
             <label className="field full"><span className="label">{uiText('Ghi chú')}</span><input className="input" maxLength="500" value={note} onChange={(e) => setNote(e.target.value)} placeholder={uiText('Phạm vi, khu vực hoặc lý do kiểm kê')}/></label>
           </div>
-          <div className="row wrap" style={{ margin: '16px 0 8px' }}><h3>{uiText('Dòng đếm thực tế')}</h3><span className="grow"/><input className="input" style={{ maxWidth: 260 }} type="search" value={productSearch} onChange={(e) => setProductSearch(e.target.value)} placeholder={uiText('Tìm SKU hoặc sản phẩm')} aria-label={uiText('Tìm sản phẩm')}/><button className="btn btn-secondary btn-sm" type="button" onClick={addLine}>{uiText('Thêm dòng')}</button></div>
-          <div className="table-wrap"><table className="table"><thead><tr><th>{uiText('Sản phẩm')}</th><th>{uiText('Lô')}</th><th>{uiText('Vị trí')}</th><th>{uiText('Số lượng thực tế (đơn vị gốc)')}</th><th scope="col">{uiText('Thao tác')}</th></tr></thead><tbody>{lines.map((line, index) => { const product = products.get(line.product); const productLots = lotsFor(line.product); const productOptions = product && !matchingProducts.some((row) => row.id === product.id) ? [product, ...matchingProducts] : matchingProducts; return <tr key={line.rowId}>
-            <td><select className="select" aria-label={`${uiText('Sản phẩm')} ${uiText('dòng')} ${index + 1}`} required value={line.product} onChange={(e) => updateLine(line.rowId, 'product', e.target.value)}><option value="">{uiText('Chọn sản phẩm…')}</option>{productOptions.map((row) => <option key={row.id} value={row.id}>{row.sku} · {row.name} · {units.get(row.uom)?.name || (row.uom ? uiText('đơn vị gốc') : uiText('chưa đặt đơn vị'))}{row.lot_tracked ? ` · ${uiText('theo lô')}` : ''}</option>)}</select></td>
-            <td><select className="select" aria-label={`${uiText('Lô')} ${uiText('dòng')} ${index + 1}`} value={line.lot} required={Boolean(product?.lot_tracked)} disabled={!product?.lot_tracked} onChange={(e) => updateLine(line.rowId, 'lot', e.target.value)}><option value="">{product?.lot_tracked ? uiText('Chọn lô…') : uiText('Không áp dụng')}</option>{productLots.map((row) => <option key={row.id} value={row.id}>{row.code}{row.expiry ? ` · ${uiText('HSD')} ${row.expiry}` : ''}</option>)}</select></td>
-            <td><select className="select" aria-label={`${uiText('Vị trí')} ${uiText('dòng')} ${index + 1}`} value={line.location} disabled={!warehouse} onChange={(e) => updateLine(line.rowId, 'location', e.target.value)}><option value="">{uiText('Không gán vị trí')}</option>{activeLocations(warehouse).map((row) => <option key={row.id} value={row.id}>{row.code} · {row.name}</option>)}</select></td>
-            <td><div><input className="input num" aria-label={`${uiText('Số lượng thực tế')} ${uiText('dòng')} ${index + 1} (${unitForProduct(line.product)})`} type="number" min="0" step="0.000001" required value={line.counted_qty} onChange={(e) => updateLine(line.rowId, 'counted_qty', e.target.value)} placeholder="0"/><span className="small muted">{unitForProduct(line.product)}</span></div></td>
-            <td><button className="btn btn-ghost btn-sm" type="button" disabled={lines.length <= 1} onClick={() => removeLine(line.rowId)} aria-label={`${uiText('Xóa dòng')} ${index + 1}`}>{uiText('Xóa')}</button></td>
-          </tr>; })}</tbody></table></div>
+          <StockCountLinesEditor lines={lines} matchingProducts={matchingProducts} products={products} units={units} lots={lots} locations={locations} warehouse={warehouse} productSearch={productSearch} onProductSearchChange={setProductSearch} onAddLine={addLine} onUpdateLine={updateLine} onRemoveLine={removeLine} unitForProduct={unitForProduct} />
           <div className="row wrap" style={{ marginTop: 12 }}><span className="small muted">{uiText('Số tồn sổ được giữ kín trong lúc đếm để giảm sai lệch do thiên kiến. Backend sẽ chụp tồn kho và tính chênh lệch khi gửi duyệt.')}</span><span className="grow"/><button className="btn btn-secondary" type="submit" disabled={Boolean(busy) || !can('inventory.stock_count.create') || (selected && !can('inventory.stock_count.update'))}>{uiText('Lưu nháp')}</button><button className="btn btn-primary" type="button" disabled={Boolean(busy) || !can('inventory.stock_count.submitted') || (selected && !can('inventory.stock_count.update'))} onClick={saveAndSubmit}>{busy === 'submit' ? uiText('Đang chốt số đếm…') : uiText('Lưu và gửi duyệt')}</button></div>
         </form>}
 
