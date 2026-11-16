@@ -1,0 +1,25 @@
+const loyaltyEnglish = {
+  'Đồng': 'Bronze', 'Bạc': 'Silver', 'Vàng': 'Gold', 'Bạch kim': 'Platinum',
+  'Đơn POS': 'POS order', 'Đơn bán hàng': 'Sales order', 'Hoàn POS': 'POS refund', 'Trả hàng': 'Sales return',
+  'Không tải được chương trình thành viên.': 'Could not load the loyalty program.', 'Thao tác không thành công.': 'The operation could not be completed.',
+  'Giá trị voucher không hợp lệ.': 'The voucher value is invalid.',
+  'Đã đăng ký thành viên. Điểm sẽ được cộng tự động từ đơn hàng đủ điều kiện.': 'Member enrolled. Points are earned automatically from eligible orders.',
+  'Đã cập nhật hạng thành viên.': 'Member tier updated.',
+  'Đã phát hành voucher đơn lẻ. Mã được đánh dấu đã dùng khi đơn bán hoặc POS hoàn tất.': 'Single-use voucher issued. It is marked as redeemed when a sales or POS order is completed.',
+  'Khách hàng thân thiết': 'Loyalty program', 'Đăng ký thành viên và tra cứu số dư, lịch sử điểm được ghi tự động từ bán hàng, POS và trả hàng.': 'Enroll members and review balances and point history generated automatically from sales, POS, and returns.',
+  'Làm mới': 'Refresh', 'Thành viên': 'Members', 'Tổng điểm đang lưu hành': 'Outstanding points', 'Giao dịch điểm': 'Point transactions',
+  'Đăng ký thành viên': 'Enroll a member', 'Khách hàng *': 'Customer *', 'Chọn khách hàng': 'Select a customer', 'Hạng khởi điểm': 'Starting tier', 'Đăng ký': 'Enroll', 'Đăng ký ': 'Enrolled ',
+  'Cần tạo khách hàng trong Danh mục trước khi đăng ký.': 'Create the customer in Master Data before enrolling them.',
+  'Phát hành voucher': 'Issue a voucher', 'Mã voucher *': 'Voucher code *', 'Hình thức giảm': 'Discount type', 'Phần trăm': 'Percentage',
+  'Số tiền': 'Fixed amount', 'Giá trị': 'Value', 'Hạn dùng': 'Valid until', 'Phát hành': 'Issue voucher',
+  'Bạn chưa có quyền xem thành viên.': 'You do not have permission to view members.', 'Chưa có thành viên nào.': 'No members yet.',
+  'Khách hàng': 'Customer', 'Hạng': 'Tier', 'điểm': 'points', 'Điểm': 'Points', 'Hạng thành viên': 'Member tier', 'Sổ điểm': 'Points ledger',
+  'Bạn chưa có quyền xem lịch sử điểm.': 'You do not have permission to view point history.', 'Chưa có giao dịch điểm. Điểm được phát sinh khi đơn hàng hoàn tất.': 'No point transactions yet. Points are earned when an order is completed.',
+  'Thời gian': 'Date and time', 'Nguồn': 'Source', 'Mã chứng từ': 'Source reference',
+  'Số dư và giao dịch điểm chỉ cập nhật từ sự kiện bán hàng, hoàn tiền hoặc trả hàng; nhân viên không thể sửa sổ điểm thủ công.': 'Balances and point transactions update only from sales, refunds, or returns; staff cannot edit the ledger manually.',
+  'Voucher đã phát hành': 'Issued vouchers', 'Chưa có voucher.': 'No vouchers yet.', 'Mã': 'Code', 'Mức giảm': 'Discount', 'Trạng thái': 'Status', 'Đơn sử dụng': 'Redeemed order',
+  'Không hết hạn': 'No expiry', 'Đã sử dụng': 'Redeemed', 'Còn hiệu lực': 'Available',
+  'Mỗi mã dùng một lần cho một đơn POS hoặc đơn bán hàng; giảm giá được phân bổ trước thuế theo từng dòng.': 'Each code is valid for one POS or sales order; the discount is allocated to each line before tax.',
+};
+
+export default loyaltyEnglish;
