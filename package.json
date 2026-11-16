@@ -21,9 +21,10 @@
     "test:container": "node tools/verify-container.mjs",
     "e2e": "npm run build && node tests/e2e/ui.mjs",
     "lint": "cargo run --manifest-path server/Cargo.toml --bin catalog -- lint",
+    "lint:translations": "node tools/check-ui-translations.mjs",
     "docs": "cargo run --manifest-path server/Cargo.toml --bin catalog -- docs",
     "new:module": "cargo run --manifest-path server/Cargo.toml --bin catalog -- new",
-    "check": "node tools/check-no-typescript.mjs && node tools/check-ui-csp.mjs && cargo fmt --manifest-path server/Cargo.toml -- --check && cargo check --manifest-path server/Cargo.toml --no-default-features --all-targets && npm run lint && npm run build",
+    "check": "node tools/check-no-typescript.mjs && node tools/check-ui-csp.mjs && node tools/check-ui-translations.mjs && cargo fmt --manifest-path server/Cargo.toml -- --check && cargo check --manifest-path server/Cargo.toml --no-default-features --all-targets && npm run lint && npm run build",
     "backup": "node tools/backup.mjs",
     "check:ui-csp": "node tools/check-ui-csp.mjs",
     "export:defs": "cargo run --manifest-path server/Cargo.toml --bin catalog -- export"
