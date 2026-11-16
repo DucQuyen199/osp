@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
-import { fmtDateTime, fmtMoney, statusLabel } from '../../lib/i18n.js';
+import { fmtDateTime, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { app, can, loadAll, loadRefs, recordLabel } from '../../lib/state.js';
 
 export default function ClinicWorkbenchPage() {

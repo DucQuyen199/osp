@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
-import { fmtNumber } from '../../lib/i18n.js';
+import { fmtNumber, uiText } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
 
 const asItems = (value) => Array.isArray(value?.items) ? value.items : [];

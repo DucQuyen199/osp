@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
-import { fmtDate, fmtMoney, fmtNumber, statusLabel } from '../../lib/i18n.js';
+import { fmtDate, fmtMoney, fmtNumber, statusLabel, uiText } from '../../lib/i18n.js';
 import { app, can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
 
 const emptyProject = { name: '', party: '', budget: '' };
