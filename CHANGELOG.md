@@ -4,6 +4,7 @@
 
 ## [Unreleased]
 ### Added
+- Sales returns now keep separate quantities and pricing terms for same-product lines with different discounts or tax snapshots, so the credit value follows the original order line.
 - POS prescription selection appears only when the cart contains prescription medicine, clears if those items are removed, and lists only verified, partially dispensed, unexpired prescriptions.
 - E-commerce storefront currency now has to exist in the tenant currency catalog and match its price list; carts snapshot that currency into the sales order, delivered-order invoices retain it for accounting FX posting, and the order desk formats totals in the order currency.
 - Restaurant orders now let staff add a per-item kitchen/bar note (up to 500 characters); the normalized note is retained on the order and copied to the station ticket for preparation and print.

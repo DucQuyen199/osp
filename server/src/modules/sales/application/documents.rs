@@ -84,6 +84,12 @@ async fn prepare_document_with_lock(
             errors.push(format!("lines[{}] phải là một dòng hàng", index + 1));
             continue;
         };
+        let requested_discount = line_map
+            .get("effective_discount_pct")
+            .or_else(|| line_map.get("discount_pct"))
+            .and_then(money::decimal);
+        let requested_tax = line_map.get("tax").cloned();
+        let requested_tax_rate = line_map.get("tax_rate").and_then(money::decimal);
         // Calculated amounts are rebuilt on every write; never trust JSON from a client.
         for field in [
             "discount_amount",
@@ -104,22 +110,79 @@ async fn prepare_document_with_lock(
         else {
             continue;
         };
-        let original = source_lines.iter().find(|source| {
-            source.get("product").and_then(Value::as_str) == Some(product.to_string().as_str())
-                && line_map
-                    .get("uom")
-                    .and_then(Value::as_str)
-                    .is_none_or(|unit| source.get("uom").and_then(Value::as_str) == Some(unit))
-                && match (
-                    source.get("price").and_then(money::decimal),
-                    line_map.get("price").and_then(money::decimal),
-                ) {
-                    (Some(source_price), Some(price)) => {
-                        money::within_tolerance(source_price, price, Decimal::new(5, 3))
+        let candidates = source_lines
+            .iter()
+            .filter(|source| {
+                source.get("product").and_then(Value::as_str) == Some(product.to_string().as_str())
+                    && line_map
+                        .get("uom")
+                        .and_then(Value::as_str)
+                        .is_none_or(|unit| source.get("uom").and_then(Value::as_str) == Some(unit))
+                    && match (
+                        source.get("price").and_then(money::decimal),
+                        line_map.get("price").and_then(money::decimal),
+                    ) {
+                        (Some(source_price), Some(price)) => {
+                            money::within_tolerance(source_price, price, Decimal::new(5, 3))
+                        }
+                        _ => true,
                     }
-                    _ => true,
-                }
-        });
+            })
+            .filter(|source| {
+                requested_discount.is_none_or(|discount| {
+                    let source_discount = source
+                        .get("effective_discount_pct")
+                        .or_else(|| source.get("discount_pct"))
+                        .and_then(money::decimal)
+                        .unwrap_or_default();
+                    money::within_tolerance(source_discount, discount, Decimal::new(1, 6))
+                }) && requested_tax
+                    .as_ref()
+                    .is_none_or(|tax| source.get("tax").unwrap_or(&Value::Null) == tax)
+                    && requested_tax_rate.is_none_or(|rate| {
+                        let source_rate = source
+                            .get("tax_rate")
+                            .and_then(money::decimal)
+                            .unwrap_or_default();
+                        money::within_tolerance(source_rate, rate, Decimal::new(1, 6))
+                    })
+            })
+            .collect::<Vec<_>>();
+        if entity == "sales_return"
+            && let Some(first) = candidates.first()
+        {
+            let first_discount = first
+                .get("effective_discount_pct")
+                .or_else(|| first.get("discount_pct"))
+                .and_then(money::decimal)
+                .unwrap_or_default();
+            let first_tax = first.get("tax").unwrap_or(&Value::Null);
+            let first_rate = first
+                .get("tax_rate")
+                .and_then(money::decimal)
+                .unwrap_or_default();
+            if candidates.iter().skip(1).any(|source| {
+                source
+                    .get("effective_discount_pct")
+                    .or_else(|| source.get("discount_pct"))
+                    .and_then(money::decimal)
+                    .unwrap_or_default()
+                    != first_discount
+                    || source.get("tax").unwrap_or(&Value::Null) != first_tax
+                    || source
+                        .get("tax_rate")
+                        .and_then(money::decimal)
+                        .unwrap_or_default()
+                        != first_rate
+            }) {
+                errors.push(format!(
+                    "Return line {} must identify the original discount and tax terms",
+                    index + 1
+                ));
+                continue;
+            }
+        }
+        let original = candidates.first().copied();
         if entity == "sales_return"
             && let Some(unit) = original.and_then(|source| source.get("uom"))
         {

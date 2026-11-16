@@ -88,17 +88,20 @@ export default function SalesReturnsWorkbenchPage() {
     for (const line of order?.lines || []) {
       const price = Number(line.price || 0);
       const uom = line.uom || '';
-      const key = line.product + ':' + price.toFixed(2) + ':' + uom;
-      const current = groups.get(key) || { key, product: line.product, price, uom: line.uom, uom_name: line.uom_name, uom_ratio: line.uom_ratio, ordered: 0, name: products.get(line.product)?.name || 'Item' };
+      const discount = Number(line.effective_discount_pct ?? line.discount_pct ?? 0);
+      const tax = line.tax || '';
+      const taxRate = Number(line.tax_rate || 0);
+      const key = [line.product, price.toFixed(2), uom, discount.toFixed(6), tax, taxRate.toFixed(6)].join(':');
+      const current = groups.get(key) || { key, product: line.product, price, uom: line.uom, uom_name: line.uom_name, uom_ratio: line.uom_ratio, discount_pct: discount, tax: line.tax ?? null, tax_rate: taxRate, ordered: 0, name: products.get(line.product)?.name || 'Item' };
       current.ordered += Number(line.qty || 0);
       groups.set(key, current);
     }
     const requiresDelivery = logisticsEnabled && Boolean(order?.shipping_address?.trim());
     return [...groups.values()].map((line) => {
       const delivered = requiresDelivery
-        ? shipmentsFor(order).filter((shipment) => shipment.status === 'delivered').flatMap((shipment) => shipment.delivered_lines || shipment.lines || []).filter((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && Math.abs(Number(item.price || 0) - line.price) <= .005).reduce((sum, item) => sum + Number(item.qty || 0), 0)
+        ? shipmentsFor(order).filter((shipment) => shipment.status === 'delivered').flatMap((shipment) => shipment.delivered_lines || shipment.lines || []).filter((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && Math.abs(Number(item.price || 0) - line.price) <= .005 && Number(item.effective_discount_pct ?? item.discount_pct ?? 0) === line.discount_pct && (item.tax || '') === (line.tax || '') && Number(item.tax_rate || 0) === line.tax_rate).reduce((sum, item) => sum + Number(item.qty || 0), 0)
         : line.ordered;
-      const reserved = returns.filter((row) => row.sales_order === order.id && ['submitted','approved','received'].includes(row.status)).flatMap((row) => row.lines || []).filter((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && Math.abs(Number(item.price || 0) - line.price) <= .005).reduce((sum, item) => sum + Number(item.qty || 0), 0);
+      const reserved = returns.filter((row) => row.sales_order === order.id && ['submitted','approved','received'].includes(row.status)).flatMap((row) => row.lines || []).filter((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && Math.abs(Number(item.price || 0) - line.price) <= .005 && Number(item.discount_pct || 0) === line.discount_pct && (item.tax || '') === (line.tax || '') && Number(item.tax_rate || 0) === line.tax_rate).reduce((sum, item) => sum + Number(item.qty || 0), 0);
       return { ...line, delivered: Math.min(line.ordered, delivered), remaining: Math.max(0, Math.min(line.ordered, delivered) - reserved) };
     }).filter((line) => line.remaining > .000001);
   }
@@ -119,7 +122,7 @@ export default function SalesReturnsWorkbenchPage() {
   async function createReturn(event) {
     event.preventDefault(); if (!formOrder) return;
     if (!selectedInvoice) { setError('Chọn một hóa đơn đã ghi sổ của đơn bán trước khi gửi duyệt phiếu trả.'); return; }
-    const lines = eligible.map((line) => ({ product: line.product, uom: line.uom || undefined, price: line.price, qty: Number(quantities[line.key]) || 0 })).filter((line) => line.qty > 0);
+    const lines = eligible.map((line) => ({ product: line.product, uom: line.uom || undefined, price: line.price, qty: Number(quantities[line.key]) || 0, discount_pct: line.discount_pct, tax: line.tax, tax_rate: line.tax_rate })).filter((line) => line.qty > 0);
     if (!lines.length || !reason.trim()) { setError('Nhập số lượng trả và lý do cho ít nhất một mặt hàng.'); return; }
     await run('return:create', async () => {
       const row = await api(dataPath('sales.sales_return'), { method: 'POST', body: { sales_order: formOrder.id, invoice: selectedInvoice.id, warehouse: formOrder.warehouse || undefined, lines, reason: reason.trim() } });

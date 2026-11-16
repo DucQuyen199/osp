@@ -6,7 +6,31 @@ use serde_json::Value;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-type ReturnLineKey = (String, Decimal, Option<String>);
+type ReturnLineKey = (
+    String,
+    Decimal,
+    Option<String>,
+    Decimal,
+    Option<String>,
+    Decimal,
+);
+
+fn discount_pct(line: &Value) -> Decimal {
+    line.get("effective_discount_pct")
+        .or_else(|| line.get("discount_pct"))
+        .and_then(money::decimal)
+        .unwrap_or_default()
+}
+
+fn tax_id(line: &Value) -> Option<String> {
+    line.get("tax").and_then(Value::as_str).map(str::to_owned)
+}
+
+fn tax_rate(line: &Value) -> Decimal {
+    line.get("tax_rate")
+        .and_then(money::decimal)
+        .unwrap_or_default()
+}
 
 fn line_quantities(lines: &Value, source: &str) -> R<HashMap<ReturnLineKey, Decimal>> {
     let Some(lines) = lines.as_array() else {
@@ -53,6 +77,9 @@ fn line_quantities(lines: &Value, source: &str) -> R<HashMap<ReturnLineKey, Deci
             product.to_owned(),
             price.round_dp(2),
             line.get("uom").and_then(Value::as_str).map(str::to_owned),
+            discount_pct(line),
+            tax_id(line),
+            tax_rate(line),
         );
         let total = quantities.entry(key).or_insert(Decimal::ZERO);
         *total = total.checked_add(qty).ok_or_else(|| {
@@ -198,7 +225,7 @@ pub(super) async fn validate(
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
-    let mut requested: HashMap<(String, Decimal, Option<String>), Decimal> = HashMap::new();
+    let mut requested: HashMap<ReturnLineKey, Decimal> = HashMap::new();
     for line in &return_lines {
         let Some(product) = line.get("product").and_then(Value::as_str) else {
             continue;
@@ -212,7 +239,14 @@ pub(super) async fn validate(
         let unit = line.get("uom").and_then(Value::as_str).map(str::to_owned);
         let price_key = price.round_dp(2);
         let requested_qty = requested
-            .entry((product.to_string(), price_key, unit))
+            .entry((
+                product.to_string(),
+                price_key,
+                unit,
+                discount_pct(line),
+                tax_id(line),
+                tax_rate(line),
+            ))
             .or_insert(Decimal::ZERO);
         *requested_qty = requested_qty.checked_add(qty).ok_or_else(|| {
             crate::error::ApiError::validation(
@@ -322,7 +356,7 @@ pub(super) async fn validate(
             }
         }
     }
-    for ((product, price, unit), return_qty) in requested {
+    for ((product, price, unit, discount, tax, rate), return_qty) in requested {
         let mut sold_qty = Decimal::ZERO;
         for sold in &sold_lines {
             if sold.get("product").and_then(Value::as_str) == Some(product.as_str())
@@ -333,6 +367,9 @@ pub(super) async fn validate(
                     .is_some_and(|sold_price| {
                         money::within_tolerance(sold_price, price, Decimal::new(5, 3))
                     })
+                && discount_pct(sold) == discount
+                && tax_id(sold) == tax
+                && tax_rate(sold) == rate
             {
                 sold_qty = sold_qty
                     .checked_add(
@@ -355,10 +392,12 @@ pub(super) async fn validate(
             continue;
         }
         let price_text = price.normalize().to_string();
+        let discount_text = discount.normalize().to_string();
+        let tax_rate_text = rate.normalize().to_string();
         let prior_row = tx
             .query_opt(
-                "SELECT COALESCE(SUM((item.line->>'qty')::numeric), 0)::text FROM sales__sales_return sr CROSS JOIN LATERAL jsonb_array_elements(COALESCE(sr.lines, '[]'::jsonb)) AS item(line) WHERE sr.tenant_id = $1 AND sr.sales_order = $2 AND sr.id <> $3 AND sr.status IN ('submitted', 'approved', 'received') AND item.line->>'product' = $4 AND abs((item.line->>'price')::numeric - $5::text::numeric) <= 0.005 AND item.line->>'uom' IS NOT DISTINCT FROM $6",
-                &[&tenant.id, &order_id, &return_id, &product, &price_text, &unit],
+                "SELECT COALESCE(SUM((item.line->>'qty')::numeric), 0)::text FROM sales__sales_return sr CROSS JOIN LATERAL jsonb_array_elements(COALESCE(sr.lines, '[]'::jsonb)) AS item(line) WHERE sr.tenant_id = $1 AND sr.sales_order = $2 AND sr.id <> $3 AND sr.status IN ('submitted', 'approved', 'received') AND item.line->>'product' = $4 AND abs((item.line->>'price')::numeric - $5::text::numeric) <= 0.005 AND item.line->>'uom' IS NOT DISTINCT FROM $6 AND COALESCE(NULLIF(item.line->>'effective_discount_pct', '')::numeric, NULLIF(item.line->>'discount_pct', '')::numeric, 0) = $7::text::numeric AND item.line->>'tax' IS NOT DISTINCT FROM $8 AND COALESCE(NULLIF(item.line->>'tax_rate', '')::numeric, 0) = $9::text::numeric",
+                &[&tenant.id, &order_id, &return_id, &product, &price_text, &unit, &discount_text, &tax, &tax_rate_text],
             )
             .await?;
         let prior = prior_row
@@ -369,8 +408,8 @@ pub(super) async fn validate(
         let eligible_qty = if requires_logistics_delivery {
             let eligible_row = tx
                 .query_opt(
-                    "SELECT COALESCE(SUM((item.line->>'qty')::numeric), 0)::text FROM logistics__shipment shipment CROSS JOIN LATERAL jsonb_array_elements(COALESCE(shipment.delivered_lines, shipment.lines, '[]'::jsonb)) AS item(line) WHERE shipment.tenant_id = $1 AND shipment.source = 'sales_order' AND shipment.source_id = $2 AND shipment.status = 'delivered' AND item.line->>'product' = $3 AND abs((item.line->>'price')::numeric - $4::text::numeric) <= 0.005 AND item.line->>'uom' IS NOT DISTINCT FROM $5",
-                    &[&tenant.id, &order_id.to_string(), &product, &price_text, &unit],
+                    "SELECT COALESCE(SUM((item.line->>'qty')::numeric), 0)::text FROM logistics__shipment shipment CROSS JOIN LATERAL jsonb_array_elements(COALESCE(shipment.delivered_lines, shipment.lines, '[]'::jsonb)) AS item(line) WHERE shipment.tenant_id = $1 AND shipment.source = 'sales_order' AND shipment.source_id = $2 AND shipment.status = 'delivered' AND item.line->>'product' = $3 AND abs((item.line->>'price')::numeric - $4::text::numeric) <= 0.005 AND item.line->>'uom' IS NOT DISTINCT FROM $5 AND COALESCE(NULLIF(item.line->>'effective_discount_pct', '')::numeric, NULLIF(item.line->>'discount_pct', '')::numeric, 0) = $6::text::numeric AND item.line->>'tax' IS NOT DISTINCT FROM $7 AND COALESCE(NULLIF(item.line->>'tax_rate', '')::numeric, 0) = $8::text::numeric",
+                    &[&tenant.id, &order_id.to_string(), &product, &price_text, &unit, &discount_text, &tax, &tax_rate_text],
                 )
                 .await?;
             eligible_row
