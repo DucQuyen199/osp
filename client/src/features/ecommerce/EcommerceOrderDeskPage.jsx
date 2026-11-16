@@ -4,6 +4,7 @@ import { fmtMoney, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import ecommerceEnglish from './ecommerce.en.js';
 import WebOrderCard from './components/WebOrderCard.jsx';
+import WebOrderCreateForm from './components/WebOrderCreateForm.jsx';
 
 const t = (text) => uiTextWith(text, ecommerceEnglish);
 
@@ -139,15 +140,27 @@ export default function EcommerceOrderDeskPage() {
     <div className="row wrap ecommerce-summary"><span className="badge warning">{t('Giỏ chờ đặt:')} {draftCarts.length}</span><span className="badge success">{t('Đã đặt:')} {placedOrders.length}</span><span className="badge plain">{t('Đã hủy:')} {cancelledOrders.length}</span></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     {loading && !orders.length ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <>
-      {can('ecommerce.web_order.create') && <section className="card ecommerce-create"><header><h2>{t('Tạo giỏ hàng / nhận đơn')}</h2><p className="small muted">{t('Tạo giỏ để máy chủ áp dụng đúng giá và thuế; sau đó kiểm tra tổng tiền trước khi xác nhận đặt.')}</p></header><form className="ecommerce-create-form" onSubmit={createCart}>
-        <label className="field"><span className="label">{t('Gian hàng *')}</span><select className="select" required value={storefront} onChange={(event) => setStorefront(event.target.value)}><option value="">{t('Chọn gian hàng')}</option>{[...storefronts.values()].map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-        <label className="field"><span className="label">{t('Khách hàng *')}</span><select className="select" required value={party} onChange={(event) => setParty(event.target.value)}><option value="">{t('Chọn khách hàng')}</option>{[...parties.values()].filter((item) => item.active !== false && item.is_customer !== false).map((item) => <option key={item.id} value={item.id}>{recordLabel('master-data.party', item)}</option>)}</select></label>
-        <label className="field"><span className="label">{t('Kênh')}</span><select className="select" value={channel} onChange={(event) => setChannel(event.target.value)}><option value="web">Website</option><option value="app">{t('Ứng dụng')}</option><option value="marketplace">{t('Sàn thương mại')}</option></select></label>
-        <label className="field"><span className="label">{t('Địa chỉ giao hàng')}</span><input className="input" value={address} onChange={(event) => setAddress(event.target.value)} /></label>
-        <div className="ecommerce-product-picker"><div className="row wrap"><h3>{t('Sản phẩm')}</h3><span className="grow" /><input className="input" type="search" placeholder={t('Tìm sản phẩm')} value={query} onChange={(event) => setQuery(event.target.value)} /></div><div className="ecommerce-products">{filteredProducts.map((product) => <button key={product.id} type="button" className={`card ecommerce-product${quantities[product.id] ? ' selected' : ''}`} onClick={() => setQty(product.id, (Number(quantities[product.id]) || 0) + 1)}><strong>{product.name}</strong><span className="small muted">{product.sku || ''}</span><span>{quantities[product.id] ? `${t('Đã chọn ·')} ${quantities[product.id]}` : t('Thêm vào giỏ')}</span></button>)}</div></div>
-        {cartLines.length > 0 && <div className="ecommerce-cart-lines">{cartLines.map(({ product, qty }) => <div className="ecommerce-cart-line" key={product.id}><span>{product.name}</span><input className="input num" type="number" min="0.001" step="any" aria-label={`${t('Số lượng')} ${product.name}`} value={qty} onChange={(event) => setQty(product.id, event.target.value)} /><button className="btn btn-ghost btn-sm" type="button" onClick={() => setQty(product.id, 0)}>{t('Xóa')}</button></div>)}</div>}
-        <button className="btn btn-primary" type="submit" disabled={Boolean(busy) || !cartLines.length}>{busy === 'create' ? t('Đang tạo…') : t('Tạo giỏ và tính giá')}</button>
-      </form></section>}
+      {can('ecommerce.web_order.create') && <WebOrderCreateForm
+        storefronts={storefronts}
+        parties={parties}
+        filteredProducts={filteredProducts}
+        quantities={quantities}
+        cartLines={cartLines}
+        storefront={storefront}
+        party={party}
+        channel={channel}
+        address={address}
+        query={query}
+        busy={busy}
+        onStorefrontChange={setStorefront}
+        onPartyChange={setParty}
+        onChannelChange={setChannel}
+        onAddressChange={setAddress}
+        onQueryChange={setQuery}
+        onSetQuantity={setQty}
+        onSubmit={createCart}
+        t={t}
+      />}
       <section className="ecommerce-order-section"><header><h2>{t('Giỏ chờ xác nhận')}</h2><span className="badge plain">{draftCarts.length}</span></header><div className="ecommerce-orders">{draftCarts.map(renderOrder)}{!draftCarts.length && <div className="empty">{t('Không có giỏ hàng chờ xử lý.')}</div>}</div></section>
       <section className="ecommerce-order-section"><header><h2>{t('Đơn đã đặt')}</h2><span className="badge plain">{placedOrders.length}</span></header><div className="ecommerce-orders">{placedOrders.map(renderOrder)}{!placedOrders.length && <div className="empty">{t('Chưa có đơn online được đặt.')}</div>}</div></section>
     </>}
