@@ -31,6 +31,10 @@
 }
 .nav-group { margin-top: 1.25rem; }
 .nav-title { padding: .1rem .75rem .5rem; color: var(--sidebar-muted); font-size: .68rem; letter-spacing: .1em; }
+.nav-group-toggle { display: flex; align-items: center; justify-content: space-between; list-style: none; cursor: pointer; user-select: none; }
+.nav-group-toggle::-webkit-details-marker { display: none; }
+.nav-group-chevron { font-size: 1rem; transition: transform var(--dur-fast) var(--ease); }
+.nav-workbench-group[open] .nav-group-chevron { transform: rotate(90deg); }
 .nav-link, .nav-sum {
   min-height: 2.55rem; padding-inline: .75rem; border-radius: .6rem; color: var(--sidebar-text); font-size: .875rem;
   transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);

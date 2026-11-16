@@ -3,13 +3,18 @@ import { CATEGORY_ORDER, categoryLabel } from '../lib/i18n.js';
 import { can, entityLabel, isAdmin } from '../lib/state.js';
 import { listHref } from '../lib/routes.js';
 
+const STANDARD_ROUTES = new Set(['home', 'events', 'not-found', 'module', 'entity', 'settings', 'login', 'signup', 'forgot-password', 'reset-password', 'verify-email']);
+
 export default function Sidebar({ meta, route, onNavigate, open, mobile }) {
+  const workbenchOpen = !STANDARD_ROUTES.has(route.name);
   const activeModule = route.name === 'module' ? route.module : route.name === 'entity' ? route.qname.split('.')[0] : null;
   const link = (href, label, active, iconName) => <a key={href} className="nav-link" href={href} aria-current={active ? 'page' : undefined} onClick={onNavigate}>{iconName && <Icon name={iconName} />}{label}</a>;
   const groups = CATEGORY_ORDER.map((category) => [category, meta.modules.filter((module) => module.category === category)]).filter(([, items]) => items.length);
   return <nav className={`sidebar${open ? ' open' : ''}`} id="nav" aria-label="Điều hướng chính" aria-hidden={mobile && !open ? 'true' : undefined} inert={mobile && !open}>
     {link('#/', 'Trang chủ', route.name === 'home', 'home')}
     {link('#/events', 'Dòng sự kiện', route.name === 'events', 'bolt')}
+    <details className="nav-group nav-workbench-group" open={workbenchOpen}>
+      <summary className="nav-title nav-group-toggle">Quy trình & báo cáo<span className="nav-group-chevron">›</span></summary>
     {meta.modules.some((module) => module.id === 'bi') && (can('bi.report.read') || can('bi.dashboard.read')) && link('#/reports/bi', 'Báo cáo & phân tích', route.name === 'bi-reports', 'list')}
     {meta.modules.some((module) => module.id === 'workflow-approval') && (can('workflow-approval.approval_request.read') || can('workflow-approval.approval_request.approved') || can('workflow-approval.approval_request.rejected') || can('workflow-approval.approval_rule.read') || can('workflow-approval.approval_rule.create') || can('workflow-approval.approval_rule.update')) && link('#/approvals', 'Phê duyệt', route.name === 'approval-workbench', 'list')}
     {meta.modules.some((module) => module.id === 'contract') && can('contract.contract.read') && link('#/contracts', 'Sổ hợp đồng', route.name === 'contract-workbench', 'list')}
@@ -72,6 +77,7 @@ export default function Sidebar({ meta, route, onNavigate, open, mobile }) {
     {meta.modules.some((module) => module.id === 'marketing') && can('marketing.campaign.read') && link('#/reports/marketing/campaign-performance', 'Hiệu quả chiến dịch', route.name === 'marketing-campaign-performance', 'list')}
     {meta.modules.some((module) => module.id === 'helpdesk') && can('helpdesk.ticket.read') && link('#/reports/helpdesk/sla', 'SLA hỗ trợ', route.name === 'helpdesk-sla', 'list')}
     {meta.modules.some((module) => module.id === 'helpdesk') && can('helpdesk.ticket.read') && link('#/helpdesk', 'Hộp thư hỗ trợ', route.name === 'helpdesk-workbench', 'list')}
+    </details>
     {groups.map(([category, modules]) => <div className="nav-group" key={category}>
       <div className="nav-title">{category === 'core' ? 'Dữ liệu gốc' : categoryLabel(category)}</div>
       {modules.map((module) => <details className="nav-mod" key={module.id} open={activeModule === module.id || module.core}>
