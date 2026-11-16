@@ -14,6 +14,12 @@ const clinicEnglish = {
   'Mỗi thuốc kê đơn cần hướng dẫn sử dụng': 'Every prescribed medicine needs dosage instructions.',
   'Thuốc kê đơn phải là hàng hóa tồn kho': 'Prescribed medicines must be inventory goods.',
   'Thuốc kê đơn cần được theo dõi tồn kho': 'Prescribed medicines must be inventory-tracked.',
+  "Chưa phân bác sĩ": "Doctor not assigned",
+  "Chưa ghi nhận nội dung": "No complaint or diagnosis recorded",
+  "Chưa ghi nhận": "Not recorded",
+  "Chưa phân công": "Not assigned",
+  "Thuốc": "Medication",
+  "Chưa lập": "Not prescribed",
 };
 
 export default clinicEnglish;

@@ -163,12 +163,12 @@ export default function EntityFormDialog({ qname, record, onClose, onSaved }) {
       return <div {...common}><FieldLines qname={qname} value={values[field.name]} onChange={(value) => setValue(field.name, value.length ? value : undefined)}
         priceList={values.price_list} salesOrder={values.sales_order} purchaseOrder={values.purchase_order} inspection={values.inspection} /></div>;
     if (field.type === 'enum') return <select {...common} className="select" value={values[field.name] ?? ''} onChange={(event) => setValue(field.name, event.target.value || undefined)}>
-      <option value="">{field.required ? '— Chọn —' : '— Không chọn —'}</option>
+      <option value="">{field.required ? uiText('— Chọn —') : uiText('— Không chọn —')}</option>
       {(field.options || []).map((option) => <option key={option} value={option}>{statusLabel(option)}</option>)}
     </select>;
     if (field.type === 'ref') return <>
       <select {...common} className="select" value={values[field.name] ?? ''} onChange={(event) => setValue(field.name, event.target.value || undefined)}>
-        <option value="">{field.required ? '— Chọn —' : '— Không chọn —'}</option>
+        <option value="">{field.required ? uiText('— Chọn —') : uiText('— Không chọn —')}</option>
         {[...(references[field.ref]?.values() || [])].map((item) => <option key={item.id} value={item.id}>{recordLabel(field.ref, item)}</option>)}
       </select>
       <div className="hint"><a href={listHref(field.ref)}>Quản lý {entityLabel(field.ref).toLowerCase()}</a></div>

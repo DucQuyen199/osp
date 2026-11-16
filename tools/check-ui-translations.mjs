@@ -54,7 +54,7 @@ for (const file of walk(sourceRoot).filter((candidate) => candidate.endsWith('.j
   for (const key of callStrings(source, 'uiText')) addMissing(missing, file, key, [globalKeys]);
 
   const relative = path.relative(root, file).replaceAll(path.sep, '/');
-  const hasVietnamese = (value) => /[ÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚÝàáâãèéêìíòóôõùúýĂăĐđĨĩŨũƠơƯưẠ-ỹ]/u.test(value);
+  const hasVietnamese = (value) => /[\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF\u0102\u0103\u0110\u0111\u0128\u0129\u0168\u0169\u01A0\u01A1\u01AF\u01B0\u1EA0-\u1EF9]/u.test(value);
   for (const match of source.matchAll(/>([^\r\n<>{}]+)</g)) {
     const text = match[1].trim();
     if (text && hasVietnamese(decodeString(text))) {
@@ -67,6 +67,39 @@ for (const file of walk(sourceRoot).filter((candidate) => candidate.endsWith('.j
     if (hasVietnamese(decodeString(match[2]))) {
       const entries = missing.get(relative) || new Set();
       entries.add(`Untranslated literal attribute: ${decodeString(match[2])}`);
+      missing.set(relative, entries);
+    }
+  }
+  const insideTranslatedCall = (offset) => {
+    const prefix = source.slice(0, offset);
+    const calls = [...prefix.matchAll(/\b(?:t|uiText|uiTextWith)\s*\(/g)];
+    return calls.some((call) => {
+      let depth = 1;
+      let quote = '';
+      let escaped = false;
+      for (let index = call.index + call[0].length; index < offset; index += 1) {
+        const character = source[index];
+        if (quote) {
+          if (escaped) escaped = false;
+          else if (character === '\\') escaped = true;
+          else if (character === quote) quote = '';
+          continue;
+        }
+        if (character === '\'' || character === '"' || character === '`') quote = character;
+        else if (character === '(') depth += 1;
+        else if (character === ')' && --depth === 0) return false;
+      }
+      return depth > 0;
+    });
+  };
+  for (const match of source.matchAll(/(?:\?|:|\|\||\?\?)\s*(['"])((?:\\.|(?!\1)[\s\S])*)\1/g)) {
+    const text = decodeString(match[2]);
+    const lineStart = source.lastIndexOf('\n', match.index) + 1;
+    const nextLine = source.indexOf('\n', match.index);
+    const line = source.slice(lineStart, nextLine < 0 ? source.length : nextLine);
+    if (line.includes('<') && line.includes('>') && hasVietnamese(text) && !insideTranslatedCall(match.index)) {
+      const entries = missing.get(relative) || new Set();
+      entries.add('Untranslated conditional literal: ' + text);
       missing.set(relative, entries);
     }
   }

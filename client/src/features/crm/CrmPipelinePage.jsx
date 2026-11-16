@@ -97,7 +97,7 @@ export default function CrmPipelinePage() {
     <section className="card"><form className="toolbar" onSubmit={(event) => { event.preventDefault(); load(); }}>
       <label className="field"><span className="label">{t('Dự kiến chốt từ')}</span><input className="input" type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label>
       <label className="field"><span className="label">{t('Đến')}</span><input className="input" type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label>
-      <button className="btn btn-primary" type="submit" disabled={loading}>{loading ? 'Đang tải…' : 'Cập nhật'}</button>
+      <button className="btn btn-primary" type="submit" disabled={loading}>{loading ? t('Đang tải…') : t('Cập nhật')}</button>
     </form></section>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}
     {loading && !report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : report && <div className="stack">

@@ -1299,5 +1299,7 @@ const uiTextEnglish = {
     "Đã gỡ quan hệ phụ thuộc.": "Task dependency removed.",
     "Đã ghi timesheet; thành tiền được máy chủ tính theo số giờ và đơn giá.": "Time entry recorded; the server calculated the amount from hours and rate.",
   },
+  "hàng hóa": "Goods",
+  "Hợp đồng độc lập": "Standalone contract",
 };
 export default uiTextEnglish;
