@@ -33,6 +33,7 @@ For translations used only by a lazy-loaded feature, keep its English text map i
 - The ecommerce order desk follows this boundary: `EcommerceOrderDeskPage` owns loading, permissions, API actions and cart state; `WebOrderCreateForm` edits controlled values through callbacks, and `WebOrderCard` renders an order and emits requested actions.
 - The school workbench keeps attendance persistence and permission checks in `EducationWorkbenchPage`; `AttendanceRosterTable` renders the roster and requests marks through a callback.
 - The school workbench owns tuition issuance permissions and invoice actions; `TuitionLedgerTable` renders controlled fee and invoice records and emits issuance requests through a callback.
+- The school workbench owns grade filters, permissions and persistence; `GradebookSection` renders controlled class, term and subject filters with editable grade rows.
 - The manufacturing workbench keeps production commands and output drafts in `ManufacturingWipPage`; `ProductionOrderCard` renders the controlled output fields and emits requested transitions.
 - The manufacturing workbench keeps QC permissions and inspection actions in `ManufacturingWipPage`; `ProductionInspectionQueue` renders pending production inspections and emits pass/fail decisions through callbacks.
 - The manufacturing workbench owns WIP report filters and reconciliation actions; `ManufacturingWipReport` renders the order level WIP table and its reconciliation context.

@@ -6,6 +6,7 @@ import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js'
 import educationEnglish from './education.en.js';
 import AttendanceRosterTable from './components/AttendanceRosterTable.jsx';
 import TuitionLedgerTable from './components/TuitionLedgerTable.jsx';
+import GradebookSection from './components/GradebookSection.jsx';
 
 const t = (text) => uiTextWith(text, educationEnglish);
 
@@ -298,14 +299,7 @@ export default function EducationWorkbenchPage() {
         <p className="small muted">Đã ghi nhận {roster.filter(({ enrollment }) => marks.has(enrollment.id)).length}/{roster.length} học viên. Chỉ có thể điểm danh từ giờ bắt đầu; cần ghi nhận đủ học viên để chốt buổi.</p>
       </>}
     </section>
-    {can('school.grade.read') && <section className="card card-pad" style={{ marginTop: 20 }}><div className="row wrap"><div><h2>{t("Sổ điểm")}</h2><p className="small muted">{t("Quản lý điểm theo lớp, học kỳ và môn; mỗi học viên có một điểm cho từng môn trong mỗi kỳ.")}</p></div></div>
-      <div className="form-grid" style={{ marginBottom: 14 }}>
-        <label className="field"><span className="label">{t("Lớp *")}</span><select className="select" value={gradeClass} onChange={(event) => setGradeClass(event.target.value)}><option value="">{t("Chọn lớp")}</option>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}{item.subject ? ` · ${item.subject}` : ''}</option>)}</select></label>
-        <label className="field"><span className="label">{t("Học kỳ *")}</span><input className="input" required value={gradeTerm} onChange={(event) => setGradeTerm(event.target.value)} placeholder={t('Ví dụ: 2026-2027 / HK1')} /></label>
-        <label className="field"><span className="label">{t("Môn học *")}</span><input className="input" required value={gradeSubject} onChange={(event) => setGradeSubject(event.target.value)} placeholder={t('Ví dụ: Toán')} /></label>
-      </div>
-      {!gradeClass ? <div className="empty">{t("Chọn lớp để mở sổ điểm.")}</div> : gradeRoster.length === 0 ? <div className="empty">{t("Lớp chưa có học viên đang hoặc đã hoàn thành ghi danh.")}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t("Mã học viên")}</th><th>{t("Học viên")}</th><th>{t("Trạng thái ghi danh")}</th><th>{t("Điểm (0–100)")}</th><th>{t("Thao tác")}</th></tr></thead><tbody>{gradeRoster.map(({ enrollment, student }) => { const party = parties.get(student?.party); const grade = gradeMap.get(enrollment.id); return <GradeRow key={enrollment.id} enrollment={enrollment} student={student} party={party} grade={grade} busy={busy} canCreate={can('school.grade.create')} canUpdate={can('school.grade.update')} onSave={saveGrade} />; })}</tbody></table></div>}
-    </section>}
+    <GradebookSection canRead={can('school.grade.read')} canCreate={can('school.grade.create')} canUpdate={can('school.grade.update')} classes={classes} gradeClass={gradeClass} gradeTerm={gradeTerm} gradeSubject={gradeSubject} gradeRoster={gradeRoster} gradeMap={gradeMap} parties={parties} busy={busy} onGradeClassChange={setGradeClass} onGradeTermChange={setGradeTerm} onGradeSubjectChange={setGradeSubject} onSave={saveGrade} t={t} />
     {can('school.fee.read') && <section className="card card-pad" style={{ marginTop: 20 }}><div className="row wrap"><div><h2>{t("Sổ học phí")}</h2><p className="small muted">{t("Học phí phát hành sẽ tạo hóa đơn phải thu. Khi hóa đơn được thanh toán đủ, trạng thái khoản học phí tự chuyển sang đã thu.")}</p></div><span className="grow"/><span className="badge warning">{fees.filter((fee) => fee.status === 'issued').length} {t('chưa thu đủ')}</span></div>
       {can('school.tuition_batch.create') && <section className="card card-pad" style={{ marginTop: 14 }}><h3>{t("Lập đợt học phí theo lớp")}</h3><p className="small muted">{t("Tạo khoản thu nháp cho toàn bộ học viên đang ghi danh. Học phí hiện tại của lớp được lưu thành số tiền từng khoản; có thể rà soát và phát hành hóa đơn riêng sau đó.")}</p><form className="form-grid" onSubmit={createTuitionBatch}>
         <label className="field"><span className="label">{t("Lớp *")}</span><select className="select" required value={tuitionBatchForm.class} onChange={(event) => setTuitionBatchForm((current) => ({ ...current, class: event.target.value }))}><option value="">{t("Chọn lớp có học phí")}</option>{classes.filter((item) => Number(item.tuition) > 0).map((item) => <option key={item.id} value={item.id}>{item.name} · {fmtMoney(item.tuition)} · {enrollments.filter((row) => row.class === item.id && row.status === 'active').length} {t('học viên')}</option>)}</select></label>
@@ -325,13 +319,6 @@ export default function EducationWorkbenchPage() {
       <TuitionLedgerTable fees={fees} loading={loading} studentById={studentById} parties={parties} invoiceByFee={invoiceByFee} busy={busy} canIssue={can('school.fee.issued')} onIssue={issueFee} recordLabel={recordLabel} t={t} />
     </section>}
   </div>;
-}
-
-function GradeRow({ enrollment, student, party, grade, busy, canCreate, canUpdate, onSave }) {
-  const [score, setScore] = useState(grade?.score == null ? '' : String(grade.score));
-  useEffect(() => setScore(grade?.score == null ? '' : String(grade.score)), [grade?.id, grade?.score]);
-  const allowed = enrollment.status === 'active' && (grade ? canUpdate : canCreate);
-  return <tr><td>{student?.student_code || '—'}</td><td>{party ? recordLabel('master-data.party', party) : 'Học viên'}</td><td>{statusLabel(enrollment.status)}</td><td><input className="input num" aria-label={`Điểm ${student?.student_code || ''}`} type="number" min="0" max="100" step="any" value={score} disabled={!allowed} onChange={(event) => setScore(event.target.value)} /></td><td>{allowed ? <button className="btn btn-primary btn-sm" type="button" disabled={busy || !score.trim()} onClick={() => onSave(enrollment.id, score)}>{grade ? 'Cập nhật điểm' : t('Lưu điểm')}</button> : grade ? <span className="small muted">{t("Chỉ xem")}</span> : <span className="small muted">{t("Không thể nhập điểm")}</span>}</td></tr>;
 }
 
 function studentName(student, parties) {
