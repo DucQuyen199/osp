@@ -218,6 +218,9 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Nonconformance register', 'quality workbench title is not translated');
   await axe('quality workbench tiếng Anh');
+  await page.goto(`${BASE}/#/m/inventory`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#main h1');
+  await axe('inventory module overview tiếng Anh');
   await page.goto(`${BASE}/#/settings/audit`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#main h2');
   must((await page.$eval('#main h2', (heading) => heading.textContent)) === 'Audit log', 'audit log is not translated');

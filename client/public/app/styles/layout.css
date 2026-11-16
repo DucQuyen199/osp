@@ -55,7 +55,7 @@
 .mod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: var(--sp-4); }
 .mod-card { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-4); color: inherit; }
 .mod-card:hover { text-decoration: none; border-color: var(--accent); }
-.mod-card h3 { font-size: var(--fs-md); }
+.mod-card h2 { font-size: var(--fs-md); }
 
 @media (max-width: 960px) {
   .app { grid-template-columns: minmax(0, 1fr); }

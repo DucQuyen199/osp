@@ -536,6 +536,8 @@ const UI_TEXT_EN = {
   'Múi giờ nghiệp vụ': 'Business time zone', 'Tiền tệ': 'Currency', 'Người dùng': 'Users', 'Vai trò': 'Roles', 'Phân hệ': 'Modules',
   'Trường mở rộng': 'Custom fields', 'Tồn kho': 'Inventory', 'Ngân sách': 'Budgets', 'Dữ liệu': 'Data', 'Nhật ký': 'Audit log',
   'Lỗi tích hợp': 'Integration failures', 'Hàng đợi tích hợp': 'Integration outbox', 'Mục cài đặt': 'Settings sections',
+  'Module chưa được bật': 'Module is not enabled', 'Quản trị viên có thể bật module trong Cài đặt.': 'An administrator can enable this module in Settings.',
+  'Trang chủ': 'Home', 'hành động': 'actions', 'Danh mục': 'Catalog',
 };
 
 const storedUiLocale = () => {
