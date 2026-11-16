@@ -263,6 +263,11 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Accounts receivable/payable settlement', 'accounting settlement workbench is not translated');
   await axe('accounting settlement workbench tiếng Anh');
+  await page.goto(`${BASE}/#/reports/accounting`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#main h1');
+  must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Accounting reports', 'accounting reports title is not translated');
+  must((await page.$eval('#main select', (select) => select.options[0].textContent)) === 'Income statement', 'accounting report types are not translated');
+  await axe('accounting reports tiếng Anh');
   await page.goto(`${BASE}/#/bank-reconciliation`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Bank reconciliation', 'bank reconciliation workbench is not translated');
