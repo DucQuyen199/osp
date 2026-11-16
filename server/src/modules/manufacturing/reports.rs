@@ -46,7 +46,7 @@ async fn wip_subledger_balance(tx: &Tx<'_>, tenant: &Tenant, as_of: NaiveDate) -
                  (sm.source = 'production_order_bom' AND (sm.source_id = po.id::text OR EXISTS (SELECT 1 FROM manufacturing__rework_order ro WHERE ro.tenant_id = po.tenant_id AND ro.id::text = sm.source_id AND ro.production_order = po.id))) OR \
                  (sm.source IN ('production_order', 'production_concession') AND sm.source_id = po.id::text) OR \
                  (sm.source = 'production_rework' AND EXISTS (SELECT 1 FROM manufacturing__rework_order ro WHERE ro.tenant_id = po.tenant_id AND ro.id::text = sm.source_id AND ro.production_order = po.id)) \
-               ) WHERE po.tenant_id = $1 GROUP BY po.id \
+               ) WHERE po.tenant_id = $1 GROUP BY po.tenant_id, po.id \
              ) SELECT COALESCE(SUM(cost.base_material_cost + cost.rework_material_cost - cost.finished_cost - cost.qc_scrap_cost - cost.scrap_expense_cost), 0)::text \
                FROM manufacturing__production_order po \
                JOIN production_costs cost ON cost.source_id = po.id::text \
@@ -113,7 +113,7 @@ impl Kernel {
                  (sm.source = 'production_order_bom' AND (sm.source_id = po.id::text OR EXISTS (SELECT 1 FROM manufacturing__rework_order ro WHERE ro.tenant_id = po.tenant_id AND ro.id::text = sm.source_id AND ro.production_order = po.id))) OR \
                  (sm.source IN ('production_order', 'production_concession') AND sm.source_id = po.id::text) OR \
                  (sm.source = 'production_rework' AND EXISTS (SELECT 1 FROM manufacturing__rework_order ro WHERE ro.tenant_id = po.tenant_id AND ro.id::text = sm.source_id AND ro.production_order = po.id)) \
-               ) WHERE po.tenant_id = $1 GROUP BY po.id \
+               ) WHERE po.tenant_id = $1 GROUP BY po.tenant_id, po.id \
                  ) SELECT jsonb_build_object( \
                    'id', po.id, 'productId', product.id, 'product', product.name, \
                    'warehouseId', po.warehouse, 'plannedQty', po.qty, 'goodQty', po.good_qty, \

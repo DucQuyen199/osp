@@ -212,6 +212,7 @@ for (const [hash, label] of retailScreens) {
     await page.goto(`${BASE}/${hash}`, { waitUntil: 'networkidle0' });
     await page.waitForSelector('h1');
     must(!(await page.$('.route-error')), `${label} route failed to render`);
+    must(!(await page.$('.not-found-page')), `${label} route resolved to not found`);
     await axe(`${label} workbench`);
   });
 }
@@ -233,9 +234,10 @@ const verticalScreens = [
 for (const [vertical, hash, label] of verticalScreens) {
   await step(`${label} vertical: route and accessibility`, async () => {
     await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
-    await page.goto(`${BASE}/?demo=${encodeURIComponent(vertical)}&go=${encodeURIComponent(hash)}`, { waitUntil: 'networkidle0' });
+    await page.goto(`${BASE}/?demo=${encodeURIComponent(vertical)}&go=${encodeURIComponent(hash.slice(1))}`, { waitUntil: 'networkidle0' });
     await page.waitForSelector('h1');
     must(!(await page.$('.route-error')), `${label} vertical route failed to render`);
+    must(!(await page.$('.not-found-page')), `${label} vertical route resolved to not found`);
     await axe(`${label} vertical`);
   });
 }
