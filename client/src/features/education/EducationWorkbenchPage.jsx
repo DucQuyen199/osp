@@ -5,6 +5,7 @@ import { fmtDate, fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../l
 import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import educationEnglish from './education.en.js';
 import AttendanceRosterTable from './components/AttendanceRosterTable.jsx';
+import StudentIntakeForm from './components/StudentIntakeForm.jsx';
 import TuitionLedgerTable from './components/TuitionLedgerTable.jsx';
 import GradebookSection from './components/GradebookSection.jsx';
 
@@ -269,15 +270,15 @@ export default function EducationWorkbenchPage() {
         <label className="field"><span className="label">{t("Học phí mỗi kỳ")}</span><input className="input num" type="number" min="0.01" step="any" value={classForm.tuition} onChange={(event) => setClassForm((current) => ({ ...current, tuition: event.target.value }))} /></label>
         <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={busy || loading}>{t("Tạo lớp")}</button></div>
       </form></section>}
-      {can('school.student.create') && can('master-data.party.create') && <section className="card card-pad"><h2>{t("Tiếp nhận học viên")}</h2><p className="small muted">{t("Tạo hồ sơ cá nhân và liên kết với hồ sơ học viên trong một luồng.")}</p>{pendingStudentParty && <div className="alert warning">Đã tạo liên hệ “{pendingStudentParty.name}”. Gửi lại để hoàn tất hồ sơ học viên mà không tạo liên hệ trùng.</div>}<form className="form-grid" onSubmit={createStudent}>
-        <label className="field"><span className="label">{t("Họ và tên *")}</span><input className="input" required maxLength="160" value={studentForm.name} disabled={Boolean(pendingStudentParty)} onChange={(event) => setStudentForm((current) => ({ ...current, name: event.target.value }))} /></label>
-        <label className="field"><span className="label">{t("Mã học viên")}</span><input className="input" maxLength="80" value={studentForm.student_code} onChange={(event) => setStudentForm((current) => ({ ...current, student_code: event.target.value }))} /></label>
-        <label className="field"><span className="label">{t("Ngày sinh")}</span><input className="input" type="date" value={studentForm.dob} onChange={(event) => setStudentForm((current) => ({ ...current, dob: event.target.value }))} /></label>
-        <label className="field"><span className="label">{t("Người giám hộ")}</span><input className="input" maxLength="160" value={studentForm.guardian} onChange={(event) => setStudentForm((current) => ({ ...current, guardian: event.target.value }))} /></label>
-        <label className="field"><span className="label">{t("Điện thoại")}</span><input className="input" type="tel" maxLength="80" value={studentForm.phone} disabled={Boolean(pendingStudentParty)} onChange={(event) => setStudentForm((current) => ({ ...current, phone: event.target.value }))} /></label>
-        <label className="field"><span className="label">Email</span><input className="input" type="email" maxLength="254" value={studentForm.email} disabled={Boolean(pendingStudentParty)} onChange={(event) => setStudentForm((current) => ({ ...current, email: event.target.value }))} /></label>
-        <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={busy || loading}>{pendingStudentParty ? t('Hoàn tất hồ sơ') : t('Tiếp nhận học viên')}</button></div>
-      </form></section>}
+      {can('school.student.create') && can('master-data.party.create') && <StudentIntakeForm
+        student={studentForm}
+        pendingParty={pendingStudentParty}
+        busy={busy}
+        loading={loading}
+        onChange={(field, value) => setStudentForm((current) => ({ ...current, [field]: value }))}
+        onSubmit={createStudent}
+        t={t}
+      />}
     </div>
     {can('school.class_session.create') && <section className="card card-pad"><h2>{t("Lên lịch buổi học")}</h2>
       <form className="form-grid" onSubmit={createSession}>
