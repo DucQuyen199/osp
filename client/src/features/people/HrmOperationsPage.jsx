@@ -4,8 +4,10 @@ import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import { listHref, recordHref } from '../../lib/routes.js';
+import AttendanceEntriesTable from './components/AttendanceEntriesTable.jsx';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
+const fmtTime = (value) => value ? localTime(new Date(value)) : '--';
 const rotationEmployees = (row) => Array.isArray(row?.employees) ? row.employees : row?.employee ? [row.employee] : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
 const weekdayOptions = [[1, uiText('T2')], [2, uiText('T3')], [3, uiText('T4')], [4, uiText('T5')], [5, uiText('T6')], [6, uiText('T7')], [7, uiText('CN')]];
@@ -16,7 +18,7 @@ const nowIso = () => new Date().toISOString();
 const nextLocalDate = (date) => addCalendarDays(date, 1);
 const addLocalDays = addCalendarDays;
 const nextMonthStart = (date) => addCalendarMonths(`${date.slice(0, 7)}-01`, 1);
-const fmtTime = (value) => value ? localTime(new Date(value)) : '--';
+
 async function listAllRows(entity, filters = {}) {
   const rows = [];
   let total = Number.POSITIVE_INFINITY;
@@ -275,7 +277,7 @@ export default function HrmOperationsPage() {
     <div className="stats" style={{ marginBottom: 16 }}><div className="card stat"><span className="stat-label">{uiText("Nhân viên đang làm")}</span><strong className="stat-value">{activeEmployees.length}</strong></div><div className="card stat"><span className="stat-label">{uiText("Đơn nghỉ chờ duyệt")}</span><strong className="stat-value">{pendingLeaves.length}</strong></div><div className="card stat"><span className="stat-label">{uiText("Điều chỉnh lương chờ duyệt")}</span><strong className="stat-value">{pendingRevisions.length}</strong></div><div className="card stat"><span className="stat-label">{uiText("Thiếu giờ ra hôm nay")}</span><strong className="stat-value">{attendanceDate === localDate() ? incompleteAttendance : '—'}</strong></div></div>
 
     <section className="card card-pad"><h2>{uiText("Chấm công trong ngày")}</h2><div className="row wrap"><label className="field"><span className="label">{uiText("Ngày")}</span><input className="input" type="date" value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)}/></label><label className="field grow"><span className="label">{uiText("Nhân viên ghi nhận giờ vào")}</span><select className="select" value={punchEmployee} onChange={(event) => setPunchEmployee(event.target.value)}><option value="">{uiText("Chọn nhân viên")}</option>{activeEmployees.map((row) => <option key={row.id} value={row.id}>{recordLabel('hrm.employee', row)}</option>)}</select></label>{can('hrm.attendance.create') && <button className="btn btn-primary" type="button" disabled={Boolean(busy) || !punchEmployee || attendanceDate !== localDate() || Boolean(attendanceByEmployee.get(punchEmployee)?.check_in)} onClick={punchIn}>{uiText("Ghi giờ vào")}</button>}</div>
-      {attendance.length > 0 && <div className="table-wrap" style={{ marginTop: 12 }}><table className="table"><thead><tr><th>{uiText("Nhân viên")}</th><th>{uiText("Giờ vào")}</th><th>{uiText("Giờ ra")}</th><th scope="col">{uiText("Thao tác")}</th></tr></thead><tbody>{attendance.map((row) => <tr key={row.id}><td>{employeeMap.get(row.employee) ? recordLabel('hrm.employee', employeeMap.get(row.employee)) : uiText('Nhân viên')}</td><td>{row.check_in ? fmtTime(row.check_in) : uiText('Chưa ghi')}</td><td>{row.check_out ? fmtTime(row.check_out) : uiText('Chưa ghi')}</td><td>{row.check_in && !row.check_out && can('hrm.attendance.update') && attendanceDate === localDate() && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => punchOut(row)}>{uiText("Ghi giờ ra")}</button>}</td></tr>)}</tbody></table></div>}
+      {attendance.length > 0 && <AttendanceEntriesTable attendance={attendance} employees={employeeMap} busy={busy} canPunchOut={can('hrm.attendance.update') && attendanceDate === localDate()} onPunchOut={punchOut} />}
       {!attendance.length && !loading && <p className="small muted">{uiText("Chưa có bản ghi chấm công trong ngày đã chọn.")}</p>}
     </section>
 
