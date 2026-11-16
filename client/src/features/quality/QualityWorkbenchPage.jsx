@@ -59,7 +59,7 @@ export default function QualityWorkbenchPage() {
 
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Sổ sự không phù hợp')}</h1><p className="sub">{uiText('Theo dõi nguyên nhân, mức độ và trạng thái xử lý của các vấn đề chất lượng; NCR từ phiếu QC không đạt được ghi nhận tự động.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{uiText('Làm mới')}</button></div>
-    {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
     <div className="stats" style={{ marginBottom: 16 }}><div className="card stat"><span className="stat-label">{uiText('NCR đang mở')}</span><strong className="stat-value">{openCount}</strong></div><div className="card stat"><span className="stat-label">{uiText('NCR tới hạn đang mở')}</span><strong className="stat-value">{criticalCount}</strong></div><div className="card stat"><span className="stat-label">{uiText('Tổng hồ sơ')}</span><strong className="stat-value">{records.length}</strong></div></div>
     {can('quality.nonconformance.create') && <section className="card card-pad"><h2>{uiText('Ghi nhận vấn đề chất lượng')}</h2><form className="form-grid" onSubmit={create}>
       <label className="field"><span className="label">{uiText('Tiêu đề')} *</span><input className="input" required maxLength="240" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })}/></label>

@@ -43,7 +43,7 @@ export default function RolesSettingsPage() {
     <div className="page-head"><div><h1>{uiText('Cài đặt')}</h1><p className="sub">{uiText('Vai trò và quyền của doanh nghiệp')} “{app.meta.name}”.</p></div></div>
     <SettingsTabs active="roles" />
     <section className="stack">
-      {error && <div className="alert danger" role="alert">{error}</div>}
+      {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
       <form className="card stack" onSubmit={save}>
         <div className="card-head"><h2>{Object.hasOwn(app.meta.roles, roleId) ? uiText('Cập nhật vai trò') : uiText('Tạo vai trò')}</h2><button className="btn btn-sm" type="button" onClick={() => edit('', { name: '', permissions: [] })}>{uiText('Vai trò mới')}</button></div>
         <div className="form-grid">

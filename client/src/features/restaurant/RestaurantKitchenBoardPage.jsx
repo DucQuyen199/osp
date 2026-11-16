@@ -104,7 +104,7 @@ export default function RestaurantKitchenBoardPage() {
       <button className="btn btn-secondary" type="button" disabled={loading} onClick={() => load()} aria-label={t('Làm mới màn hình bếp')}>{loading ? t('Đang tải…') : t('Làm mới')}</button>
     </div></div>
     {lastUpdated && <p className="small muted">{t('Cập nhật lúc')} {fmtDateTime(lastUpdated)}</p>}
-    {error && <div className="alert danger" role="alert">{error}</div>}
+    {error && <div className="alert danger" role="alert">{t(error)}</div>}
     {truncated && <div className="alert warning" role="status">{t('Đang hiển thị tối đa 500 phiếu đang mở. Hãy lọc theo trạm để xem ít phiếu hơn.')}</div>}
     {loading && !lastUpdated ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <div className="kitchen-board">
       {[

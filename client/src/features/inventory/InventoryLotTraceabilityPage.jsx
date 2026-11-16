@@ -25,7 +25,7 @@ export default function InventoryLotTraceabilityPage({ lotId }) {
     <div className="page-head"><div><a className="back-link" href={recordHref('inventory.lot', lotId)}>← {uiText('Mở thẻ lô')}</a><h1>{uiText('Truy xuất lô hàng')}</h1>
       {report && <p className="sub">{report.lot.product} · {report.lot.sku || uiText('Không có SKU')} · {uiText('Lô')} {report.lot.code}{report.lot.expiry ? ` · ${uiText('Hạn dùng')} ${fmtDate(report.lot.expiry)}` : ''}</p>}
     </div></div>
-    {error && <div className="alert danger" role="alert">{error}</div>}
+    {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
     {!report && !error && <div className="card-pad"><div className="skeleton" data-h="row" /></div>}
     {report && <div className="stack">
       {report.lot.expired && <div className="alert danger" role="alert">{uiText('Lô đã hết hạn. Hệ thống chặn xuất kho theo quy tắc hạn dùng.')}</div>}

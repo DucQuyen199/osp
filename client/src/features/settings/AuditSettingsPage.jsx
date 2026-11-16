@@ -25,7 +25,7 @@ export default function AuditSettingsPage() {
     <div className="page-head"><div><h1>{uiText('Cài đặt')}</h1><p className="sub">{uiText('Nhật ký hoạt động của doanh nghiệp')} “{app.meta.name}”.</p></div></div>
     <SettingsTabs active="audit" />
     <section className="card"><div className="card-head"><h2>{uiText('Nhật ký kiểm toán')}</h2></div>
-      {error && <div className="card-pad"><div className="alert danger" role="alert">{error}</div></div>}
+      {error && <div className="card-pad"><div className="alert danger" role="alert">{uiText(error)}</div></div>}
       {busy ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : entries.length === 0 ? <div className="card-pad muted">{uiText('Chưa có hoạt động nào.')}</div> : <div className="table-wrap"><table className="table">
         <thead><tr><th>{uiText('Thời gian')}</th><th>{uiText('Người thực hiện')}</th><th>{uiText('Hành động')}</th><th>{uiText('Đối tượng')}</th><th>{uiText('Chi tiết')}</th></tr></thead>
         <tbody>{entries.map((entry, index) => <tr key={`${entry.at}:${entry.userId}:${index}`}><td className="nowrap">{fmtDateTime(entry.at)}</td><td>{userName(entry.userId)}</td><td><span className="chip neutral">{entry.action}</span></td><td className="mono small">{entry.target || ''}</td><td className="muted small">{entry.detail || ''}</td></tr>)}</tbody>

@@ -158,7 +158,7 @@ export default function AutoServiceWorkshopPage() {
   const orderVehicle = selected && vehicleById.get(selected.vehicle);
   return <div className="page-content workshop-page">
     <header className="page-header"><div><h1>{t('Xưởng sửa chữa')}</h1><p className="muted">{t('Tiếp nhận xe, báo giá theo danh mục, xác nhận khách hàng, sửa chữa và bàn giao.')}</p></div><button className="button" onClick={() => load()} disabled={loading}>{t('Làm mới')}</button></header>
-    {error && <div className="alert error" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert error" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
     {canCreateVehicle && <section className="workshop-intake card"><h2>{t('Tiếp nhận xe mới')}</h2><form className="workshop-form" onSubmit={createVehicle}>
       <label className="field"><span>{t('Chủ xe')}</span><select className="select" required value={party} onChange={(event) => setParty(event.target.value)}><option value="">{t('Chọn khách hàng')}</option>{[...parties.values()].map((item) => <option key={item.id} value={item.id}>{recordLabel('master-data.party', item)}</option>)}</select></label>
       <label className="field"><span>{t('Biển số')}</span><input className="input" required value={plate} onChange={(event) => setPlate(event.target.value)} /></label>

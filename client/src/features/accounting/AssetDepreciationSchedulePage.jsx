@@ -41,7 +41,7 @@ export default function AssetDepreciationSchedulePage() {
         <button className="btn btn-primary" type="submit" disabled={loading}>{loading ? uiText('Đang tính…') : uiText('Cập nhật dự báo')}</button>
       </form>
     </section>
-    {error && <div className="alert danger" role="alert">{error}</div>}
+    {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
     {loading && !report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : report && <div className="stack">
       <div className="stats">
         <div className="card stat"><span className="stat-label">{uiText('Tài sản đang hoạt động')}</span><strong className="stat-value num">{fmtNumber(Number(report.assetCount || 0))}</strong></div>

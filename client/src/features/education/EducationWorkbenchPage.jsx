@@ -254,7 +254,7 @@ export default function EducationWorkbenchPage() {
 
   return <div className="page">
     <div className="page-head"><div><h1>{t("Lịch lớp và điểm danh")}</h1><p className="sub">{t("Lên lịch buổi học, ghi nhận từng học viên và chốt danh sách sau khi buổi học kết thúc.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={load}>{t("Làm mới")}</button></div>
-    {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
     <div className="grid-2" style={{ marginTop: 20 }}>
       {can('school.course_class.create') && <section className="card card-pad"><h2>{t("Tạo lớp học")}</h2><form className="form-grid" onSubmit={createClass}>
         <label className="field"><span className="label">{t("Tên lớp *")}</span><input className="input" required maxLength="160" value={classForm.name} onChange={(event) => setClassForm((current) => ({ ...current, name: event.target.value }))} /></label>

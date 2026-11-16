@@ -60,7 +60,7 @@ export default function InventoryLotExpiryPage() {
       </select></label>
       <span className="muted">{uiText('Lô không khai báo hạn dùng sẽ không xuất hiện.')}</span>
     </div></section>
-    {error && <div className="alert danger" role="alert">{error}</div>}
+    {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
     {notice && <div className="alert success" role="status">{notice.message} {notice.id && <a href={`#/e/inventory/stock_count/${encodeURIComponent(notice.id)}`}>{uiText('Mở phiếu để rà soát và duyệt')}</a>}</div>}
     {report?.items.some((item) => item.expired && !item.warehouseId) && <div className="alert warning" role="status">{uiText('Một số lô hết hạn chưa gán kho nên chưa thể tạo phiếu kiểm kê xử lý. Hãy gán tồn vào kho trước.')}</div>}
     {loading && !report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : report && <section className="card report-section">

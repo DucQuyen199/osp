@@ -144,7 +144,7 @@ export default function UtilitiesWorkbenchPage() {
 
   return <div className="page">
     <div className="page-head"><div><h1>{t("Ghi chỉ số và hóa đơn tiện ích")}</h1><p className="sub">{t("Ghi lần lượt theo kỳ để giữ chính xác tiêu thụ lũy kế, sau đó phát hành và theo dõi thu tiền qua kế toán.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={load}>{t("Làm mới")}</button></div>
-    {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
     <section className="card card-pad"><h2>{t("Chỉ số công tơ")}</h2>
       {can('utilities.meter.create') && <form className="form-grid" style={{ marginBottom: 16 }} onSubmit={createMeter}><h3 className="full">{t("Tạo công-tơ / thuê bao")}</h3>
         <label className="field"><span className="label">{t("Khách hàng *")}</span><select className="select" required value={meterForm.party} onChange={(event) => setMeterForm((current) => ({ ...current, party: event.target.value }))}><option value="">{t("Chọn khách hàng")}</option>{[...parties.values()].map((party) => <option key={party.id} value={party.id}>{recordLabel('master-data.party', party)}</option>)}</select></label>

@@ -274,7 +274,7 @@ export default function ManufacturingWipPage() {
 
   return <div className="page">
     <div className="page-head"><div><h1>{t("WIP sản xuất")}</h1><p className="sub">{t("Đối chiếu giá trị vật tư theo lệnh sản xuất với số dư tài khoản 154 trên sổ cái.")}</p></div></div>
-    {error && <div className="alert danger" role="alert">{error}</div>}
+    {error && <div className="alert danger" role="alert">{t(error)}</div>}
     {notice && <div className="alert success" role="status">{notice}</div>}
     <section className="card card-pad manufacturing-workbench">
       <header className="card-head"><div><h2>{t("BOM và lệnh sản xuất")}</h2><p className="small muted">{t("Lập định mức, giữ lịch sử BOM đã dùng, xuất vật tư khi bắt đầu và chuyển thành phẩm sang QC khi hoàn tất.")}</p></div></header>

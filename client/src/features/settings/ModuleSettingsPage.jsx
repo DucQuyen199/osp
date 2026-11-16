@@ -46,7 +46,7 @@ export default function ModuleSettingsPage() {
     <SettingsTabs active="modules" />
     <section className="stack" aria-label={uiText('Quản lý module')}>
       <div className="alert">{uiText('Bật module để nối các luồng liên mô-đun. Tắt module không xóa dữ liệu; bật lại sẽ tiếp tục dùng dữ liệu cũ.')}</div>
-      {error && <div className="alert danger" role="alert">{error}</div>}
+      {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
       {groups.map(([category, modules]) => <section key={category} className="card">
         <div className="card-head"><h2>{category === 'core' ? uiText('Dữ liệu gốc') : categoryLabel(category)}</h2></div>
         <div className="table-wrap"><table className="table">

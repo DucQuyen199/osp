@@ -34,7 +34,7 @@ export default function FieldsSettingsPage() {
     <div className="page-head"><div><h1>{uiText('Cài đặt')}</h1><p className="sub">{uiText('Trường mở rộng của doanh nghiệp')} “{app.meta.name}”.</p></div></div>
     <SettingsTabs active="fields" />
     <section className="stack">
-      {error && <div className="alert danger" role="alert">{error}</div>}
+      {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
       <form className="card stack" onSubmit={add}>
         <div className="card-head"><h2>{uiText('Thêm trường cho một loại dữ liệu')}</h2></div>
         <div className="form-grid">

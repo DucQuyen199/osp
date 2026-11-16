@@ -51,7 +51,7 @@ export default function HelpdeskSlaPage() {
 
   return <div className="page">
     <div className="page-head"><div><h1>{t('SLA hỗ trợ')}</h1><p className="sub">{t('Đo phản hồi đầu tiên và thời hạn giải quyết theo chính sách gắn trên ticket.')}</p></div><a className="btn btn-secondary" href="#/e/helpdesk/ticket">{t('Ticket hỗ trợ')}</a></div>
-    {error && <div className="alert danger" role="alert">{error}</div>}
+    {error && <div className="alert danger" role="alert">{t(error)}</div>}
     {!report && !error && <div className="card-pad"><div className="skeleton" data-h="row" /></div>}
     {report && <div className="stack">
       <div className="stats">

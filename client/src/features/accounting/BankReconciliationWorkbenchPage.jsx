@@ -228,7 +228,7 @@ export default function BankReconciliationWorkbenchPage() {
 
   return <div className="page">
     <div className="page-head"><div><h1>{uiText("Đối soát ngân hàng")}</h1><p className="sub">{uiText("Nhập sao kê, khớp từng giao dịch với payment hoặc bút toán đã ghi sổ, giải trình dòng bỏ qua và khóa kỳ khi số dư khớp.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={async () => { await load(); await loadLines(statementId); }}>{uiText("Làm mới")}</button></div>
-    {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
 
     {can('accounting.bank_statement.create') && <section className="card card-pad"><h2>{uiText("Mở sao kê ngân hàng")}</h2><form className="form-grid" onSubmit={createStatement}>
       <label className="field"><span className="label">{uiText("Tài khoản ngân hàng *")}</span><select className="select" required value={statementForm.account} onChange={(event) => setStatementForm((form) => ({ ...form, account: event.target.value }))}><option value="">{uiText("Chọn tài khoản nhóm 112")}</option>{[...accounts.values()].filter(isBankAccount).map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}</select></label>

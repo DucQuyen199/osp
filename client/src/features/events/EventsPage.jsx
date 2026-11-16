@@ -29,7 +29,7 @@ export default function EventsPage() {
       </div>
       <label className="check"><input type="checkbox" checked={rootsOnly} onChange={(event) => setRootsOnly(event.target.checked)} />{uiText('Chỉ hiện sự kiện gốc')}</label>
     </div>
-    {error && <div className="alert danger" role="alert">{error}</div>}
+    {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
     <section className="card" aria-label={uiText('Chuỗi sự kiện')}>
       <div className="card-pad">
         {events ? <EventTimeline events={displayed} /> : <div className="skeleton" data-h="row" aria-label={uiText('Đang tải sự kiện')} />}

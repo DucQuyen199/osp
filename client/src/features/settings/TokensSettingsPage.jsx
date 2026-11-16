@@ -71,7 +71,7 @@ export default function TokensSettingsPage() {
     <div className="page-head"><div><h1>{uiText('Cài đặt')}</h1><p className="sub">{uiText('API token của doanh nghiệp')} “{app.meta.name}”.</p></div></div>
     <SettingsTabs active="tokens" />
     <section className="stack">
-      {error && <div className="alert danger" role="alert">{error}</div>}
+      {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
       {revealed && <section className="card stack">
         <div className="card-head"><h2>{uiText('Sao chép token ngay')}</h2></div>
         <div className="card-pad stack">

@@ -153,7 +153,7 @@ export default function FieldServiceWorkbenchPage() {
 
   return <div className="page">
     <div className="page-head"><div><h1>{t('Điều phối dịch vụ hiện trường')}</h1><p className="sub">{t('Tiếp nhận việc, chốt vật tư và giá theo danh mục, xếp lịch kỹ thuật viên, xuất kho và lập hóa đơn khi hoàn tất.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div>
-    {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
 
     {can('field-service.work_order.create') && <section className="card card-pad"><h2>{t('Tạo lệnh công việc')}</h2><form className="form-grid" onSubmit={createOrder}>
       <label className="field"><span className="label">{t('Khách hàng *')}</span><select className="select" required value={form.party} onChange={(e) => updateForm('party', e.target.value)}><option value="">{t('Chọn khách hàng')}</option>{[...parties.values()].map((party) => <option key={party.id} value={party.id}>{recordLabel('master-data.party', party)}</option>)}</select></label>

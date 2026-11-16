@@ -84,7 +84,7 @@ export default function AccountingChartTemplateDialog({ onClose }) {
             {mismatches.length} {t('tài khoản có cùng mã nhưng tên, loại hoặc quan hệ tài khoản cha khác mẫu; dữ liệu hiện tại được giữ nguyên. Hãy rà soát trước khi hạch toán.')}
           </div>}
         </>}
-        {error && <div className="alert danger" role="alert">{error}</div>}
+        {error && <div className="alert danger" role="alert">{t(error)}</div>}
       </div>
       <div className="modal-foot">
         <button className="btn" type="button" onClick={close}>{t('Đóng')}</button>

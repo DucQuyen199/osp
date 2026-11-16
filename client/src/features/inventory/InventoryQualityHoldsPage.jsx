@@ -77,7 +77,7 @@ export default function InventoryQualityHoldsPage() {
       </select></label>
       <button className="btn btn-primary" type="submit" disabled={loading}>{loading ? uiText('Đang tải…') : uiText('Làm mới')}</button>
     </form></section>
-    {error && <div className="alert danger" role="alert">{error}</div>}
+    {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
     {loading && !report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : report && <div className="stack">
       <div className="stats">
         <div className="card stat"><span className="stat-label">{uiText('Phiếu kiểm tra còn giữ hàng')}</span><strong className="stat-value num">{fmtNumber(Number(report.itemCount || 0))}</strong></div>

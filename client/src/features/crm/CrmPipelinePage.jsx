@@ -106,7 +106,7 @@ export default function CrmPipelinePage() {
       <label className="field"><span className="label">{t('Đến')}</span><input className="input" type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label>
       <button className="btn btn-primary" type="submit" disabled={loading}>{loading ? 'Đang tải…' : 'Cập nhật'}</button>
     </form></section>
-    {error && <div className="alert danger" role="alert">{error}</div>}
+    {error && <div className="alert danger" role="alert">{t(error)}</div>}
     {loading && !report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : report && <div className="stack">
       <div className="stats">
         <div className="card stat"><span className="stat-label">{t('Cơ hội đang mở')}</span><strong className="stat-value num">{fmtNumber(Number(report.dealCount || 0))}</strong></div>

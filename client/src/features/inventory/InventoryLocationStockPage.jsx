@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { api, tenantPath } from '../../lib/api.js';
 import { fmtMoney, fmtNumber, uiText } from '../../lib/i18n.js';
 import { loadRefs } from '../../lib/state.js';
@@ -40,7 +40,7 @@ export default function InventoryLocationStockPage() {
       </select></label>
       <button className="btn btn-primary" type="submit" disabled={loading}>{loading ? uiText('Đang tải…') : uiText('Làm mới')}</button>
     </form></section>
-    {error && <div className="alert danger" role="alert">{error}</div>}
+    {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
     {loading && !report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : report && <section className="card report-section">
       <div className="card-head"><h2>{report.itemCount} {uiText('dòng tồn')}</h2></div>
       {!report.items?.length ? <div className="empty"><h3>{uiText('Chưa có phiếu kho theo vị trí')}</h3><p>{uiText('Chọn bin khi điều chuyển hàng để bắt đầu theo dõi tồn theo vị trí.')}</p></div> : <div className="table-wrap"><table className="table">

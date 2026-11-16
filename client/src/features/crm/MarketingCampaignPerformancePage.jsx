@@ -23,7 +23,7 @@ export default function MarketingCampaignPerformancePage() {
 
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Hiệu quả chiến dịch')}</h1><p className="sub">{uiText('Đo lead, chuyển đổi và doanh thu theo mô hình quy nguồn đã chọn.')}</p></div><label className="field"><span className="field-label">{uiText('Mô hình ghi nhận')}</span><select className="input" value={model} onChange={(event) => setModel(event.target.value)}><option value="first_touch">{uiText('Chạm đầu tiên')}</option><option value="last_touch">{uiText('Chạm cuối cùng')}</option><option value="linear">{uiText('Chia đều các lần chạm')}</option></select></label><a className="btn btn-secondary" href="#/e/marketing/campaign">{uiText('Chiến dịch')}</a></div>
-    {error && <div className="alert danger" role="alert">{error}</div>}
+    {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
     {loading ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : report && <div className="stack">
       <div className="stats">
         <div className="card stat"><span className="stat-label">{uiText('Chiến dịch')}</span><strong className="stat-value num">{fmtNumber(Number(report.campaignCount || 0))}</strong></div>

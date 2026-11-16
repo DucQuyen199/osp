@@ -36,7 +36,7 @@ export default function BudgetSettingsPage() {
     <div className="page-head"><div><h1>{uiText('Cài đặt')}</h1><p className="sub">{uiText('Kiểm soát ngân sách của doanh nghiệp')} “{app.meta.name}”.</p></div></div>
     <SettingsTabs active="budget" />
     <section className="stack" aria-label={uiText('Kiểm soát ngân sách')}>
-      {error && <div className="alert danger" role="alert">{error}</div>}
+      {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
       {!budgetEnabled && <div className="alert" role="status">{uiText('Hãy bật module Ngân sách trước khi cấu hình kiểm soát hạn mức.')}</div>}
       <section className="card">
         <div className="card-head"><h2>{uiText('Chặn ghi sổ vượt ngân sách')}</h2></div>

@@ -226,7 +226,7 @@ export default function WholesaleSalesDeskPage() {
 
   return <div className="page-content wholesale-sales-page">
     <header className="page-header"><div><h1>{uiText('Bán hàng, báo giá và giao hàng')}</h1><p className="muted">{uiText('Lập báo giá theo khách hàng, chuyển báo giá được chấp nhận thành đơn, kiểm soát tín dụng và theo dõi giao hàng.')}</p></div><button className="button" onClick={() => load()} disabled={loading}>{uiText('Làm mới')}</button></header>
-    {error && <div className="alert error" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert error" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
     {can('sales.quotation.create') && <section className="wholesale-create card"><h2>{uiText('Lập báo giá')}</h2><form onSubmit={createQuote}>
       <div className="wholesale-form">
         <label className="field"><span>{uiText('Khách hàng / đại lý')}</span><select className="select" required value={party} onChange={(event) => setParty(event.target.value)}><option value="">{uiText('Chọn khách hàng')}</option>{[...parties.values()].map((item) => <option key={item.id} value={item.id}>{recordLabel('master-data.party', item)}</option>)}</select></label>

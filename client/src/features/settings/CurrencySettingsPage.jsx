@@ -43,7 +43,7 @@ export default function CurrencySettingsPage() {
     <div className="page-head"><div><h1>{uiText('Cài đặt')}</h1><p className="sub">{uiText('Chính sách tiền tệ của doanh nghiệp')} “{app.meta.name}”.</p></div></div>
     <SettingsTabs active="currency" />
     <section className="stack" aria-label={uiText('Cài đặt tiền tệ')}>
-      {error && <div className="alert danger" role="alert">{error}</div>}
+      {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
       <section className="card">
         <div className="card-head"><h2>{uiText('Tiền tệ cơ sở')}</h2></div>
         <div className="card-pad stack">

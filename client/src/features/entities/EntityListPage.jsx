@@ -234,7 +234,7 @@ export default function EntityListPage({ qname }) {
           {bulkAction === action ? uiText('Đang xử lý…') : actionLabel(action)}
         </button>)}
       </div>}
-      {error && <div className="alert danger" role="alert">{error}</div>}
+      {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
       {loading ? <div className="skeleton" data-h="row" aria-label={uiText('Đang tải danh sách')} />
         : rows.length === 0 ? <div className="empty">
           <h3>{uiText(total ? 'Không có kết quả khớp' : 'Chưa có dữ liệu')}</h3>

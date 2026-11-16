@@ -176,7 +176,7 @@ export default function ClinicWorkbenchPage() {
 
   return <div className="page clinic-page">
     <div className="page-head"><div><h1>{t("Điều phối phòng khám")}</h1><p className="sub">{t("Tiếp nhận bệnh nhân, hoàn tất lượt khám, theo dõi xét nghiệm và phát thuốc theo kho. Hồ sơ được hiển thị theo quyền clinic của tài khoản.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={() => load()}>{t("Làm mới")}</button></div>
-    {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
     {loading ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <>
       {can('clinic.patient.create') && (can('master-data.party.create') || can('master-data.party.read')) && <section className="card clinic-intake"><div><h2>{t("Đăng ký bệnh nhân")}</h2><p className="small muted">{t("Tạo hồ sơ bệnh nhân và thông tin liên hệ; dị ứng, nhóm máu và bảo hiểm sẽ gắn với hồ sơ y tế.")}</p></div><form className="clinic-intake-form" onSubmit={registerPatient}>
         {!pendingPatientParty && can('master-data.party.create') && <label className="field"><span className="label">{t("Thông tin liên hệ *")}</span><select className="select" value={patientRegistration.mode} onChange={(event) => setPatientRegistration({ ...patientRegistration, mode: event.target.value, party: '' })}><option value="new">{t("Tạo người liên hệ mới")}</option><option value="existing">{t("Dùng người liên hệ có sẵn")}</option></select></label>}

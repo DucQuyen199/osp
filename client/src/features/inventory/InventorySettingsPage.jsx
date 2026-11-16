@@ -47,7 +47,7 @@ export default function InventorySettingsPage() {
     <div className="page-head"><div><h1>{uiText('Cài đặt')}</h1><p className="sub">{uiText('Chính sách kho của doanh nghiệp')} “{app.meta.name}”.</p></div></div>
     <SettingsTabs active="inventory" />
     <section className="stack" aria-label={uiText('Chính sách kho')}>
-      {error && <div className="alert danger" role="alert">{error}</div>}
+      {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
       <section className="card">
         <div className="card-head"><h2>{uiText('Phương pháp tính giá vốn')}</h2></div>
         <div className="card-pad stack">

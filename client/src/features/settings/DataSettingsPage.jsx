@@ -55,7 +55,7 @@ export default function DataSettingsPage() {
     <div className="page-head"><div><h1>{uiText('Cài đặt')}</h1><p className="sub">{uiText('Dữ liệu của doanh nghiệp')} “{app.meta.name}”.</p></div></div>
     <SettingsTabs active="data" />
     <section className="stack">
-      {error && <div className="alert danger" role="alert">{error}</div>}
+      {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
       <section className="card"><div className="card-head"><h2>{uiText('Xuất dữ liệu')}</h2></div><div className="card-pad stack">
         <p className="muted">{uiText('Tải dữ liệu doanh nghiệp về bất cứ lúc nào. Bản JSON gồm dữ liệu, vai trò và trường mở rộng; không chứa mật khẩu hoặc bí mật token.')}</p>
         <div><button className="btn btn-primary" type="button" disabled={Boolean(busy)} onClick={() => exportData('/export', `osp-${app.meta.id}.json`)}>{busy === '/export' ? uiText('Đang xuất…') : uiText('Tải toàn bộ (JSON)')}</button></div>

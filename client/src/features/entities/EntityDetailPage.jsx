@@ -225,7 +225,7 @@ export default function EntityDetailPage({ qname, id }) {
       </header>
       <div className="drawer-body">
         {loading ? <div className="skeleton" data-h="row" aria-label={uiText('Đang tải bản ghi')} /> : error
-          ? <div className="alert danger" role="alert">{error}</div>
+          ? <div className="alert danger" role="alert">{uiText(error)}</div>
           : <div className="stack">
             <div className="row wrap">
               {actions.map(([action, transition], index) => <button key={action} className={`btn btn-sm${index === 0 && tone(transition.to) !== 'danger' ? ' btn-primary' : ''}`} type="button" disabled={Boolean(working)} onClick={() => runAction(action, transition.to)}>
@@ -244,7 +244,7 @@ export default function EntityDetailPage({ qname, id }) {
               <button className="tab" type="button" role="tab" aria-selected={tab === 'info'} onClick={() => setTab('info')}>{uiText('Thông tin')}</button>
               <button className="tab" type="button" role="tab" aria-selected={tab === 'flow'} onClick={() => setTab('flow')}>{uiText('Hệ quả liên mô-đun')}</button>
             </div>
-            {error && <div className="alert danger" role="alert">{error}</div>}
+            {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
             {tab === 'info' ? <>
               <dl className="dl">{fields.map((field) => <React.Fragment key={field.name}>
                 <dt>{uiText(fieldLabelOf(qname, field.name))}</dt>

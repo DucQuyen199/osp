@@ -47,7 +47,7 @@ export default function BudgetVariancePage() {
       <label className="field"><span className="label">{uiText('Kỳ ngân sách')}</span><input className="input" value={period} onChange={(event) => setPeriod(event.target.value)} placeholder={uiText('YYYY hoặc YYYY-MM')} /></label>
       <button className="btn btn-primary" type="submit" disabled={loading}>{loading ? uiText('Đang tải…') : uiText('Xem báo cáo')}</button>
     </form></section>
-    {error && <div className="alert danger" role="alert">{error}</div>}
+    {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
     {loading && !report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : report && <div className="stack">
       {period.trim() ? <VarianceStats summary={report} /> : <section className="stack" aria-label={uiText('Tổng hợp theo kỳ ngân sách')}>
         {(report.periodSummaries || []).map((summary) => <section className="card" key={summary.period}>

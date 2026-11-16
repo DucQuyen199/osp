@@ -110,7 +110,7 @@ export default function RealEstateWorkbenchPage() {
 
   return <div className="page">
     <div className="page-head"><div><h1>{t("Sàn giao dịch và cho thuê")}</h1><p className="sub">{t("Quản lý giỏ hàng, lịch xem, giữ chỗ, chốt bán và hợp đồng thuê kèm kỳ thu tiền.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t("Làm mới")}</button></div>
-    {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
     <div className="stats" style={{ marginBottom: 16 }}><div className="card stat"><span className="stat-label">{t("Đang mở bán / cho thuê")}</span><strong className="stat-value">{availableCount}</strong></div><div className="card stat"><span className="stat-label">{t("Đang giữ chỗ")}</span><strong className="stat-value">{reservedCount}</strong></div><div className="card stat"><span className="stat-label">{t("Đang cho thuê")}</span><strong className="stat-value">{leasedCount}</strong></div></div>
 
     {can('real-estate.property.create') && <section className="card card-pad"><h2>{t("Đưa bất động sản vào giỏ hàng")}</h2><form className="form-grid" onSubmit={createProperty}>

@@ -66,7 +66,7 @@ export default function HotelHousekeepingBoardPage() {
       <span className="badge plain">{t('Đang có khách:')} {totals.occupiedCount}</span>
       {lastUpdated && <span className="small muted">{t('Cập nhật lúc')} {fmtDateTime(lastUpdated)}</span>}
     </div>
-    {error && <div className="alert danger" role="alert">{error}</div>}
+    {error && <div className="alert danger" role="alert">{t(error)}</div>}
     {truncated && <div className="alert warning" role="status">{t('Đang hiển thị tối đa 500 phòng đang chờ dọn.')}</div>}
     {loading && !lastUpdated ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : items.length ? <div className="housekeeping-grid">
       {items.map((room) => <article className={`card housekeeping-card${room.priority === 'today' ? ' due-today' : ''}`} key={room.id}>

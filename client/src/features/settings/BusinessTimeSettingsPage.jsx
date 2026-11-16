@@ -47,7 +47,7 @@ export default function BusinessTimeSettingsPage() {
     <div className="page-head"><div><h1>{uiText('Cài đặt')}</h1><p className="sub">{uiText('Chính sách lịch của doanh nghiệp')} “{app.meta.name}”.</p></div></div>
     <SettingsTabs active="business-time" />
     <section className="stack" aria-label={uiText('Cài đặt múi giờ nghiệp vụ')}>
-      {error && <div className="alert danger" role="alert">{error}</div>}
+      {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
       <section className="card">
         <div className="card-head"><h2>{uiText('Múi giờ nghiệp vụ')}</h2></div>
         <form className="card-pad stack" onSubmit={save}>

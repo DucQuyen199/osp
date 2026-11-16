@@ -141,7 +141,7 @@ export default function AccountingReportsPage() {
         <button className="btn btn-primary" type="submit" disabled={loading}>{loading ? uiText('Đang tải…') : uiText('Xem báo cáo')}</button>
       </form>
     </section>
-    {error && <div className="alert danger" role="alert">{error}</div>}
+    {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
     {loading && !report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : report && <div className="stack">
       {mode === 'income' && <>
         <div className="stats"><Stat label="Doanh thu" value={report.totalRevenue} /><Stat label="Chi phí" value={report.totalExpense} /><Stat label="Lãi / lỗ thuần" value={report.netIncome} /></div>

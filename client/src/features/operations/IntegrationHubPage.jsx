@@ -85,7 +85,7 @@ export default function IntegrationHubPage() {
 
   return <div className="page">
     <div className="page-head"><div><h1>{t('Cổng tích hợp')}</h1><p className="sub">{t('Quản lý connector và webhook để kết nối OSP với dịch vụ bên ngoài. Giao nhận webhook được theo dõi riêng trong Cài đặt → Outbox.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div>
-    {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
     {(can('integration-hub.connector.create') || can('integration-hub.webhook.create')) && <div className="two-col">
       {can('integration-hub.connector.create') && <section className="card card-pad"><h2>{t('Thêm connector HTTP')}</h2><p className="small muted">{t('Adapter HTTP gửi payload JSON của sự kiện đến API nhà cung cấp, hỗ trợ header xác thực và chữ ký HMAC. Giao nhận có retry và theo dõi trong Outbox.')}</p><form className="form-grid" onSubmit={createConnector}>
         <label className="field"><span className="label">{t('Tên hiển thị *')}</span><input className="input" required maxLength="120" value={connectorForm.name} onChange={(event) => setConnectorForm({ ...connectorForm, name: event.target.value })}/></label>

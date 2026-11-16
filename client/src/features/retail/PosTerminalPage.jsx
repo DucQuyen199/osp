@@ -282,7 +282,7 @@ export default function PosTerminalPage() {
 
   return <div className="page pos-page">
     <div className="page-head"><div><h1>{t('Quầy bán hàng POS')}</h1><p className="sub">{t('Mở ca theo kho, ghi nhận hàng bán và phương thức thanh toán; giá và thuế cuối cùng do máy chủ tính theo danh mục.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={() => load()}>{t('Làm mới')}</button></div>
-    {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
     {loading ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <>
       <section className="card pos-session-bar">
         <div className="pos-session-select"><label className="field"><span className="label">{t('Ca đang mở')}</span><select className="select" value={sessionId} onChange={(event) => { setSessionId(event.target.value); setClosingCash(''); }}><option value="">{t('Chưa chọn ca')}</option>{sessions.map((item) => <option key={item.id} value={item.id}>{branches.get(item.branch)?.name || t('Không gán chi nhánh')} · {warehouses.get(item.warehouse)?.name || t('Ca cũ chưa có kho')} · {item.cashier || t('Thu ngân')}</option>)}</select></label>

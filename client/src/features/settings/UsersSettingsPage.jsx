@@ -102,7 +102,7 @@ export default function UsersSettingsPage() {
     <div className="page-head"><div><h1>{uiText('Cài đặt')}</h1><p className="sub">{uiText('Quản trị người dùng của doanh nghiệp')} “{app.meta.name}”.</p></div></div>
     <SettingsTabs active="users" />
     <section className="stack" aria-label={uiText('Quản lý người dùng')}>
-      {error && <div className="alert danger" role="alert">{error}</div>}
+      {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
       {showAdd && <form className="card stack" onSubmit={createUser}>
         <div className="card-head"><h2>{uiText('Thêm người dùng')}</h2></div>
         <div className="form-grid">
