@@ -440,6 +440,11 @@ for (const [vertical, hash, label, summaryEntity, setupEntity] of verticalScreen
     if (vertical === 'construction') {
       await page.evaluate(() => localStorage.setItem('osp.uiLocale', 'en-US'));
       await page.reload({ waitUntil: 'networkidle0' });
+      await page.goto(`${BASE}/#/expenses`, { waitUntil: 'networkidle0' });
+      await page.waitForSelector('#main h1');
+      must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Employee expenses and reimbursements', 'employee expenses workbench is not translated');
+      must((await page.$eval('#main', (main) => main.innerText)).includes('Create expense claim'), 'employee expense workflow is not translated');
+      await axe('employee expenses tiếng Anh');
       await page.goto(`${BASE}/#/reports/asset/depreciation-schedule`, { waitUntil: 'networkidle0' });
       await page.waitForSelector('#main h1');
       must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Depreciation schedule', 'asset depreciation schedule is not translated');
