@@ -1,117 +1,59 @@
 import { uiText } from './i18n.js';
 
+let nextId = 1;
+let state = Object.freeze({ toasts: [], dialog: null });
+const listeners = new Set();
+const queuedDialogs = [];
+const toastTimers = new Map();
+
+const publish = (next) => {
+  state = Object.freeze(next);
+  listeners.forEach((listener) => listener());
+};
+
+export const subscribeFeedback = (listener) => {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+};
+export const getFeedbackSnapshot = () => state;
+
+function dismissToast(id) {
+  const timer = toastTimers.get(id);
+  if (timer) clearTimeout(timer);
+  toastTimers.delete(id);
+  publish({ ...state, toasts: state.toasts.filter((item) => item.id !== id) });
+}
+
 export function toast(message, kind = '') {
-  const urgent = kind === 'danger' || kind === 'error';
-  const toastHost = document.getElementById(urgent ? 'osp-toast-alert' : 'osp-toast-status');
-  if (!toastHost) return;
-  const item = document.createElement('div');
-  item.className = `toast ${kind}`;
-  item.textContent = uiText(message);
-  toastHost.append(item);
-  setTimeout(() => item.remove(), kind === 'danger' ? 7000 : 3800);
+  const item = { id: nextId++, message: uiText(message), kind };
+  publish({ ...state, toasts: [...state.toasts, item] });
+  toastTimers.set(item.id, setTimeout(() => dismissToast(item.id), kind === 'danger' || kind === 'error' ? 7000 : 3800));
+}
+
+function showNextDialog() {
+  const dialog = queuedDialogs.shift() || null;
+  publish({ ...state, dialog });
+}
+
+export function resolveFeedbackDialog(id, value) {
+  if (!state.dialog || state.dialog.id !== id) return;
+  const current = state.dialog;
+  current.resolve(value);
+  showNextDialog();
+}
+
+function requestDialog(options) {
+  return new Promise((resolve) => {
+    const dialog = { id: nextId++, ...options, resolve };
+    if (state.dialog) queuedDialogs.push(dialog);
+    else publish({ ...state, dialog });
+  });
 }
 
 export function confirmDialog({ title, message, confirmLabel = 'Xác nhận', danger = false }) {
-  return new Promise((resolve) => {
-    let confirmed = false;
-    const dialog = document.createElement('dialog');
-    dialog.className = 'modal';
-    dialog.setAttribute('aria-labelledby', 'osp-confirm-title');
-
-    const body = document.createElement('div');
-    body.className = 'modal-body stack-sm';
-    const heading = document.createElement('h2');
-    heading.id = 'osp-confirm-title';
-    heading.textContent = uiText(title);
-    const copy = document.createElement('p');
-    copy.className = 'muted';
-    copy.textContent = uiText(message);
-    body.append(heading, copy);
-
-    const footer = document.createElement('div');
-    footer.className = 'modal-foot';
-    const cancel = document.createElement('button');
-    cancel.className = 'btn';
-    cancel.type = 'button';
-    cancel.textContent = uiText('Hủy');
-    cancel.addEventListener('click', () => dialog.close());
-    const accept = document.createElement('button');
-    accept.className = `btn ${danger ? 'btn-danger' : 'btn-primary'}`;
-    accept.type = 'button';
-    accept.textContent = uiText(confirmLabel);
-    accept.addEventListener('click', () => { confirmed = true; dialog.close(); });
-    footer.append(cancel, accept);
-    dialog.append(body, footer);
-
-    const previous = document.activeElement;
-    dialog.addEventListener('close', () => {
-      dialog.remove();
-      if (previous instanceof HTMLElement && document.contains(previous)) previous.focus();
-      resolve(confirmed);
-    }, { once: true });
-    document.body.append(dialog);
-    dialog.showModal();
-    cancel.focus();
-  });
+  return requestDialog({ type: 'confirm', title, message, confirmLabel, danger });
 }
 
 export function textDialog({ title, message, label, minLength = 1, maxLength = 1000, confirmLabel = 'Lưu', danger = false }) {
-  return new Promise((resolve) => {
-    const dialog = document.createElement('dialog');
-    dialog.className = 'modal';
-    dialog.setAttribute('aria-labelledby', 'osp-text-title');
-    const body = document.createElement('div');
-    body.className = 'modal-body stack-sm';
-    const heading = document.createElement('h2');
-    heading.id = 'osp-text-title';
-    heading.textContent = uiText(title);
-    const copy = document.createElement('p');
-    copy.className = 'muted';
-    copy.textContent = uiText(message);
-    const field = document.createElement('label');
-    field.className = 'field';
-    const fieldLabel = document.createElement('span');
-    fieldLabel.className = 'label';
-    fieldLabel.textContent = uiText(label);
-    const input = document.createElement('textarea');
-    input.className = 'textarea';
-    input.required = true;
-    input.minLength = minLength;
-    input.maxLength = maxLength;
-    input.rows = 4;
-    field.append(fieldLabel, input);
-    body.append(heading, copy, field);
-    const footer = document.createElement('div');
-    footer.className = 'modal-foot';
-    const cancel = document.createElement('button');
-    cancel.className = 'btn';
-    cancel.type = 'button';
-    cancel.textContent = uiText('Hủy');
-    cancel.addEventListener('click', () => dialog.close());
-    const accept = document.createElement('button');
-    accept.className = `btn ${danger ? 'btn-danger' : 'btn-primary'}`;
-    accept.type = 'button';
-    accept.textContent = uiText(confirmLabel);
-    accept.disabled = true;
-    input.addEventListener('input', () => { accept.disabled = input.value.trim().length < minLength; });
-    accept.addEventListener('click', () => {
-      const value = input.value.trim();
-      if (value.length >= minLength && value.length <= maxLength) {
-        dialog.dataset.value = value;
-        dialog.close();
-      }
-    });
-    footer.append(cancel, accept);
-    dialog.append(body, footer);
-    const previous = document.activeElement;
-    dialog.addEventListener('close', () => {
-      const value = dialog.dataset.value || null;
-      dialog.remove();
-      if (previous instanceof HTMLElement && document.contains(previous)) previous.focus();
-      resolve(value);
-    }, { once: true });
-    document.body.append(dialog);
-    dialog.showModal();
-    input.focus();
-  });
+  return requestDialog({ type: 'text', title, message, label, minLength, maxLength, confirmLabel, danger });
 }
