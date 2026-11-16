@@ -189,6 +189,8 @@ pub async fn prepare_return_document(
     let mut total = Decimal::ZERO;
     let mut tax_total = Decimal::ZERO;
     let mut selected_quantities = std::collections::HashMap::<usize, Decimal>::new();
+    let mut selected_lot_quantities =
+        std::collections::HashMap::<(Uuid, Option<String>), Decimal>::new();
     for (index, selection) in selected.iter().enumerate() {
         let line_index = selection
             .get("line_index")
@@ -251,9 +253,128 @@ pub async fn prepare_return_document(
             ));
             continue;
         };
+        let product_id = source
+            .get("product")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok());
+        let lot_tracked = if let Some(product_id) = product_id {
+            tx.query_opt(
+                "SELECT COALESCE(lot_tracked, false) FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                &[&tenant.id, &product_id],
+            )
+            .await?
+            .is_some_and(|row| row.get::<_, bool>(0))
+        } else {
+            false
+        };
+        let lot_allocations = if lot_tracked {
+            let product_id = product_id.expect("lot-tracked POS line has a product id");
+            let sold_lots = tx.query(
+                "SELECT lot::text, SUM(qty::numeric)::text FROM inventory__stock_move WHERE tenant_id = $1 AND source = 'pos_order' AND source_id = $2 AND product = $3 AND direction = 'out' GROUP BY lot ORDER BY lot NULLS LAST",
+                &[&tenant.id, &order_id.to_string(), &product_id],
+            ).await?;
+            let returned_lots = tx.query(
+                "SELECT sm.lot::text, SUM(sm.qty::numeric)::text FROM inventory__stock_move sm JOIN pos__pos_return r ON r.tenant_id = sm.tenant_id AND r.id::text = sm.source_id WHERE sm.tenant_id = $1 AND r.pos_order = $2 AND r.status = 'received' AND sm.source = 'pos_return' AND sm.product = $3 AND sm.direction = 'in' GROUP BY sm.lot",
+                &[&tenant.id, &order_id, &product_id],
+            ).await?;
+            let mut returned_by_lot = std::collections::HashMap::<Option<String>, Decimal>::new();
+            for row in returned_lots {
+                let lot: Option<String> = row.get(0);
+                let qty = row
+                    .get::<_, String>(1)
+                    .parse::<Decimal>()
+                    .unwrap_or_default();
+                returned_by_lot.insert(lot, qty);
+            }
+            let mut unassigned_returned = returned_by_lot.get(&None).copied().unwrap_or_default();
+            let mut available_lots = Vec::new();
+            for row in sold_lots {
+                let lot: Option<String> = row.get(0);
+                if lot.is_none() {
+                    errors.push(format!(
+                        "Sản phẩm theo dõi lô ở dòng {} không có lô xuất gốc",
+                        index + 1
+                    ));
+                    continue;
+                }
+                let sold = row
+                    .get::<_, String>(1)
+                    .parse::<Decimal>()
+                    .unwrap_or_default();
+                let returned = returned_by_lot.get(&lot).copied().unwrap_or_default();
+                let current_selected = selected_lot_quantities
+                    .get(&(product_id, lot.clone()))
+                    .copied()
+                    .unwrap_or_default();
+                let Some(mut available) = sold
+                    .checked_sub(returned)
+                    .and_then(|value| value.checked_sub(current_selected))
+                else {
+                    errors.push(format!("Tồn trả lô hàng dòng {} không hợp lệ", index + 1));
+                    continue;
+                };
+                if available < Decimal::ZERO {
+                    errors.push(format!("Số lượng trả vượt lô đã bán ở dòng {}", index + 1));
+                    continue;
+                }
+                let consume_unassigned = available.min(unassigned_returned);
+                available = available
+                    .checked_sub(consume_unassigned)
+                    .unwrap_or_default();
+                unassigned_returned = unassigned_returned
+                    .checked_sub(consume_unassigned)
+                    .unwrap_or_default();
+                if available > Decimal::ZERO {
+                    available_lots.push((lot, available));
+                }
+            }
+            if available_lots.is_empty() {
+                errors.push(format!(
+                    "Không tìm thấy lô tồn kho gốc để truy xuất hàng trả ở dòng {}",
+                    index + 1
+                ));
+            }
+            let mut remaining = base_qty;
+            let mut allocations = Vec::new();
+            for (lot, available) in available_lots {
+                if remaining <= Decimal::ZERO {
+                    break;
+                }
+                let allocated = remaining.min(available);
+                if allocated > Decimal::ZERO {
+                    allocations.push(json!({"lot": lot, "qty": allocated}));
+                    let key = (product_id, lot);
+                    let current = selected_lot_quantities
+                        .get(&key)
+                        .copied()
+                        .unwrap_or_default();
+                    if let Some(updated) = current.checked_add(allocated) {
+                        selected_lot_quantities.insert(key, updated);
+                    } else {
+                        errors.push(format!(
+                            "Tổng số lượng trả theo lô vượt giới hạn ở dòng {}",
+                            index + 1
+                        ));
+                    }
+                    remaining = remaining.checked_sub(allocated).unwrap_or_default();
+                }
+            }
+            if remaining > Decimal::ZERO {
+                errors.push(format!(
+                    "Không đủ số lượng lô gốc còn được trả ở dòng {}",
+                    index + 1
+                ));
+            }
+            Some(Value::Array(allocations))
+        } else {
+            None
+        };
         line.insert("qty".into(), json!(qty));
         line.insert("base_qty".into(), json!(base_qty));
         line.insert("source_line_index".into(), json!(line_index));
+        if let Some(lot_allocations) = lot_allocations {
+            line.insert("lot_allocations".into(), lot_allocations);
+        }
         for (field, prior_index) in [
             ("discount_amount", 1),
             ("net_amount", 2),

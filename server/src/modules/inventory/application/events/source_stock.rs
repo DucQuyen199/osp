@@ -419,7 +419,50 @@ pub async fn handle_source_stock_event(
         } else {
             movement_source_id.clone()
         };
-        let allocations = if line_direction == "out" && source != "quality_return" {
+        let allocations = if line_direction == "in" && source == "pos_return" {
+            if let Some(lot_allocations) = line.get("lot_allocations").and_then(Value::as_array) {
+                lot_allocations
+                    .iter()
+                    .map(|lot_allocation| -> R<Value> {
+                        let lot = lot_allocation
+                            .get("lot")
+                            .and_then(Value::as_str)
+                            .ok_or_else(|| {
+                                crate::error::ApiError::validation(
+                                    event_type,
+                                    vec!["POS return lot allocation requires a valid lot".into()],
+                                )
+                            })?;
+                        let qty = lot_allocation
+                            .get("qty")
+                            .and_then(money::decimal)
+                            .filter(|qty| *qty > Decimal::ZERO)
+                            .ok_or_else(|| {
+                                crate::error::ApiError::validation(
+                                    event_type,
+                                    vec![
+                                        "POS return lot allocation requires a positive quantity"
+                                            .into(),
+                                    ],
+                                )
+                            })?;
+                        let mut allocated = line.clone();
+                        let quantity = money::json_number(qty).ok_or_else(|| {
+                            crate::error::ApiError::validation(
+                                event_type,
+                                vec!["POS return lot quantity exceeds the supported range".into()],
+                            )
+                        })?;
+                        allocated["qty"] = quantity.clone();
+                        allocated["base_qty"] = quantity;
+                        allocated["lot"] = json!(lot);
+                        Ok(allocated)
+                    })
+                    .collect::<R<Vec<_>>>()?
+            } else {
+                vec![line]
+            }
+        } else if line_direction == "out" && source != "quality_return" {
             if let Some(warehouse_id) = warehouse
                 .as_ref()
                 .and_then(Value::as_str)
