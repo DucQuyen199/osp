@@ -108,7 +108,7 @@ async fn services(kernel: &Arc<Kernel>) {
             json!({ "party": id(&party), "plate": "REPAIR-1", "make": "Make", "odometer": 100 }),
         )
         .await;
-    let repair = t.create("auto-service.repair_order", json!({ "vehicle": id(&vehicle), "party": id(&party), "warehouse": warehouse, "complaint": "Replace part", "lines": [{ "product": id(&part), "qty": 3, "price": 20 }] })).await;
+    let repair = t.create("auto-service.repair_order", json!({ "vehicle": id(&vehicle), "party": id(&party), "odometer_reading": 100, "warehouse": warehouse, "complaint": "Replace part", "lines": [{ "product": id(&part), "qty": 3, "price": 20 }] })).await;
     for action in ["started", "completed", "delivered"] {
         t.act("auto-service.repair_order", &id(&repair), action)
             .await;

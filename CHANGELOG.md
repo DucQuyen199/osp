@@ -4,7 +4,7 @@
 
 ## [Unreleased]
 ### Added
-- Automotive repair orders now require an intake odometer snapshot and the server prevents mileage from moving backward across workshop history or vehicle updates.
+- Automotive repair orders now require an integer intake odometer snapshot and the server prevents mileage from moving backward across workshop history or vehicle updates.
 - Moved 88 React screens and entity dialogs into 32 domain feature folders and rewrote local imports to preserve the existing route and page behavior.
 - Replaced the nested route rendering chain with explicit screen and settings registries, including a lazy not-found fallback for unsupported paths.
 - Unknown frontend routes now show a clear 404 page with a direct return to the workspace instead of silently opening the home dashboard.

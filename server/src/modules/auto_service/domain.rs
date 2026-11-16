@@ -15,18 +15,20 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                 errors.push("Xe phải có biển số".into());
             }
             if document.get("odometer").is_some_and(|odometer| {
-                !money::decimal(odometer).is_some_and(|value| value >= Decimal::ZERO)
+                !money::decimal(odometer)
+                    .is_some_and(|value| value >= Decimal::ZERO && value.fract() == Decimal::ZERO)
             }) {
-                errors.push("Số công-tơ-mét phải là số không âm".into());
+                errors.push("Số công-tơ-mét phải là số km nguyên không âm".into());
             }
             errors
         }
         "repair_order" => {
             let mut errors = Vec::new();
             if document.get("odometer_reading").is_some_and(|reading| {
-                !money::decimal(reading).is_some_and(|value| value >= Decimal::ZERO)
+                !money::decimal(reading)
+                    .is_some_and(|value| value >= Decimal::ZERO && value.fract() == Decimal::ZERO)
             }) {
-                errors.push("Số km lúc tiếp nhận phải là số không âm".into());
+                errors.push("Số km lúc tiếp nhận phải là số km nguyên không âm".into());
             }
             if let Some(lines) = document.get("lines") {
                 let Some(lines) = lines.as_array() else {
