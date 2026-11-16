@@ -21,6 +21,12 @@ The client is a React 19 application built with Vite. It uses JavaScript and the
 5. Use semantic headings, labels, accessible names, visible focus, and the existing CSS tokens. Add reusable styles to shared components only when more than one screen needs them.
 6. Keep generated `client-dist/` output out of commits. `npm run build` copies the public assets and creates deployable output.
 
+### Feature-local workflow components
+
+- Keep route-level loading, permission checks, and business actions in the feature page or a feature hook.
+- Split a long workflow view into focused components under `features/<domain>/components/`. Pass controlled values and callbacks so child components render and edit the state owned by the workflow.
+- Keep business rules, API calls, and cross-module coordination out of presentational line editors and panels. Promote a component to `components/` only when more than one domain uses it.
+
 ## Styling layers
 
 `client/public/app/styles/` loads in this order: design tokens, base/reset and utilities, reusable components, page layout, then shared workspace refinements. Components should use semantic variables (`--surface`, `--text-muted`, `--accent`) instead of hard-coded colors. Responsive behavior and reduced-motion preferences belong in shared styles unless a workflow needs a distinct interaction model.
