@@ -42,6 +42,21 @@ export const onUnauthorized = (fn) => {
   return () => listeners.delete(fn);
 };
 
+const dataMutationListeners = new Set();
+export const onDataMutation = (fn) => {
+  dataMutationListeners.add(fn);
+  return () => dataMutationListeners.delete(fn);
+};
+
+function notifyDataMutation(path) {
+  const match = String(path).match(/^\/api\/t\/[^/?]+\/data\/([^/?]+)\/([^/?]+)/);
+  if (!match) return;
+  const qname = `${match[1]}.${match[2]}`;
+  dataMutationListeners.forEach((fn) => {
+    try { fn(qname); } catch { /* cache notifications must not mask a successful write */ }
+  });
+}
+
 export async function api(path, { method = 'GET', body, token, raw = false, headers = {}, signal } = {}) {
   const requestMethod = method.toUpperCase();
   const isWrite = !['GET', 'HEAD', 'OPTIONS'].includes(requestMethod);
@@ -72,7 +87,10 @@ export async function api(path, { method = 'GET', body, token, raw = false, head
     }
     throw new ApiError(0, 'NETWORK', 'Không kết nối được máy chủ. Kiểm tra mạng và thử lại.');
   }
-  if (raw && res.ok) return res;
+  if (raw && res.ok) {
+    if (isWrite) notifyDataMutation(path);
+    return res;
+  }
   const text = await res.text();
   let data = null;
   try { data = text ? JSON.parse(text) : null; } catch { /* không phải JSON */ }
@@ -81,6 +99,7 @@ export async function api(path, { method = 'GET', body, token, raw = false, head
     if (res.status === 401 && tok && !path.includes('/auth/login')) listeners.forEach((fn) => fn());
     throw new ApiError(res.status, e.code || 'ERROR', e.message || `Lỗi ${res.status}`, e.details ?? data);
   }
+  if (isWrite) notifyDataMutation(path);
   return data;
 }
 

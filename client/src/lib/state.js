@@ -1,5 +1,5 @@
 // Trạng thái ứng dụng: metadata tenant, tra cứu entity, quyền phía client (chỉ để ẩn/hiện nút; máy chủ luôn kiểm tra lại), cache tham chiếu.
-import { api, dataPath, session, tenantPath } from './api.js';
+import { api, dataPath, onDataMutation, session, tenantPath } from './api.js';
 import { fieldLabel, setBaseCurrency } from './i18n.js';
 
 export const app = {
@@ -104,7 +104,9 @@ export function recordLabel(qname, rec) {
   return ref ? `${entityLabel(qname)} · ${String(rec.id).slice(0, 6)}` : `#${String(rec.id).slice(0, 8)}`;
 }
 
-const refCache = new Map(); // qname -> Promise<Map<id, rec>>
+const REF_CACHE_TTL_MS = 30_000;
+const refCache = new Map(); // qname -> { promise, value, loadedAt, settled }
+const refVersions = new Map();
 export async function loadAll(qname, filters = {}) {
   const rows = [];
   let offset = 0;
@@ -126,13 +128,45 @@ export async function loadAllResponse(qname, filters = {}) {
 }
 
 export function loadRefs(qname) {
-  if (!refCache.has(qname)) {
-    refCache.set(qname, loadAll(qname).then((rows) => new Map(rows.map((row) => [row.id, row]))).catch(() => new Map()));
+  const cached = refCache.get(qname);
+  if (cached && (!cached.settled || Date.now() - cached.loadedAt < REF_CACHE_TTL_MS)) {
+    return cached.promise;
   }
-  return refCache.get(qname);
+
+  const version = refVersions.get(qname) || 0;
+  const entry = { promise: null, value: null, loadedAt: 0, settled: false };
+  entry.promise = loadAll(qname)
+    .then((rows) => {
+      const records = new Map(rows.map((row) => [row.id, row]));
+      entry.settled = true;
+      entry.loadedAt = Date.now();
+      entry.value = records;
+      if (refVersions.get(qname) === version && refCache.get(qname) === entry) {
+        refCache.set(qname, entry);
+      }
+      return records;
+    })
+    .catch((error) => {
+      entry.settled = true;
+      if (refVersions.get(qname) === version && refCache.get(qname) === entry) {
+        refCache.delete(qname);
+      }
+      throw error;
+    });
+  refCache.set(qname, entry);
+  return entry.promise;
 }
-export const invalidateRefs = (qname) => refCache.delete(qname);
-export const resetCaches = () => refCache.clear();
+export function invalidateRefs(qname) {
+  if (qname) {
+    refVersions.set(qname, (refVersions.get(qname) || 0) + 1);
+    refCache.delete(qname);
+    return;
+  }
+  for (const key of refCache.keys()) refVersions.set(key, (refVersions.get(key) || 0) + 1);
+  refCache.clear();
+}
+onDataMutation(invalidateRefs);
+export const resetCaches = () => invalidateRefs();
 
 // ───── Chọn cột hiển thị cho danh sách ─────
 export function listColumns(def, max = 6) {
