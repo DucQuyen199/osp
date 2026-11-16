@@ -1,4 +1,6 @@
-﻿export function parseRoute(hash = location.hash) {
+import { WORKBENCH_ROUTES } from '../lib/routes.js';
+
+export function parseRoute(hash = location.hash) {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
   const [a, b, c, d] = parts;
   if (!a) return { name: 'home' };
@@ -8,55 +10,7 @@
   if (a === 'verify-email' && b) return { name: 'verify-email', token: b };
   if (a === 'm' && b) return { name: 'module', module: b };
   if (a === 'e' && b && c) return { name: 'entity', qname: `${b}.${c}`, id: d };
-  if (a === 'events') return { name: 'events' };
-  if (a === 'pos') return { name: 'pos-terminal' };
-  if (a === 'clinic') return { name: 'clinic-workbench' };
-  if (a === 'pharmacy') return { name: 'pharmacy-workbench' };
-  if (a === 'education') return { name: 'education-workbench' };
-  if (a === 'lms') return { name: 'lms-workbench' };
-  if (a === 'quality') return { name: 'quality-workbench' };
-  if (a === 'communications') return { name: 'communication-workbench' };
-  if (a === 'payments') return { name: 'payments-workbench' };
-  if (a === 'assets') return { name: 'asset-workbench' };
-  if (a === 'utilities') return { name: 'utilities-workbench' };
-  if (a === 'finance') return { name: 'finance-operations' };
-  if (a === 'event-ops') return { name: 'events-operations' };
-  if (a === 'field-service') return { name: 'field-service-workbench' };
-  if (a === 'real-estate') return { name: 'real-estate-workbench' };
-  if (a === 'construction') return { name: 'construction-workbench' };
-  if (a === 'projects') return { name: 'project-workbench' };
-  if (a === 'subscriptions') return { name: 'subscription-workbench' };
-  if (a === 'charity') return { name: 'charity-workbench' };
-  if (a === 'cases') return { name: 'professional-services-workbench' };
-  if (a === 'wellness') return { name: 'wellness-booking-workbench' };
-  if (a === 'purchasing') return { name: 'purchasing-workbench' };
-  if (a === 'sourcing') return { name: 'purchasing-sourcing-workbench' };
-  if (a === 'sales') return { name: 'wholesale-sales-desk' };
-  if (a === 'maintenance') return { name: 'maintenance-workbench' };
-  if (a === 'recruitment') return { name: 'recruitment-workbench' };
-  if (a === 'payroll') return { name: 'payroll-workbench' };
-  if (a === 'people') return { name: 'hrm-operations' };
-  if (a === 'helpdesk') return { name: 'helpdesk-workbench' };
-  if (a === 'performance') return { name: 'performance-workbench' };
-  if (a === 'approvals') return { name: 'approval-workbench' };
-  if (a === 'contracts') return { name: 'contract-workbench' };
-  if (a === 'documents') return { name: 'document-workbench' };
-  if (a === 'integrations') return { name: 'integration-hub-workbench' };
-  if (a === 'loyalty') return { name: 'loyalty-workbench' };
-  if (a === 'expenses') return { name: 'expense-workbench' };
-  if (a === 'returns') return { name: 'sales-returns-workbench' };
-  if (a === 'bank-reconciliation') return { name: 'bank-reconciliation-workbench' };
-  if (a === 'inventory-counts') return { name: 'inventory-stock-count-workbench' };
-  if (a === 'period-close') return { name: 'accounting-period-close' };
-  if (a === 'refunds') return { name: 'accounting-adjustment-refunds' };
-  if (a === 'settlements') return { name: 'accounting-settlement-workbench' };
-  if (a === 'einvoices') return { name: 'einvoice-workbench' };
-  if (a === 'ecommerce') return { name: 'ecommerce-order-desk' };
-  if (a === 'agriculture') return { name: 'agriculture-operations' };
-  if (a === 'hotel') return { name: 'hotel-frontdesk' };
-  if (a === 'workshop') return { name: 'auto-service-workshop' };
-  if (a === 'restaurant') return { name: 'restaurant-service' };
-  if (a === 'wholesale') return { name: 'wholesale-sales-desk' };
+  if (WORKBENCH_ROUTES[a]) return { name: WORKBENCH_ROUTES[a] };
   if (a === 'reports' && b === 'accounting') return { name: 'accounting-reports' };
   if (a === 'reports' && b === 'bi' && c === 'dashboard' && d) return { name: 'bi-reports', view: 'dashboard', id: d };
   if (a === 'reports' && b === 'bi' && c === 'report' && d) return { name: 'bi-reports', view: 'report', id: d };
@@ -79,4 +33,3 @@
   if (a === 'account' && b === 'security') return { name: 'account-security' };
   return { name: 'not-found' };
 }
-
