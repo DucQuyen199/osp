@@ -1,7 +1,7 @@
 {
  "id": "auto-service",
  "name": "Garage / Dịch vụ ô tô-xe máy",
- "description": "Hồ sơ xe, lệnh sửa chữa kèm phụ tùng. Hoàn tất sửa chữa tự trừ kho phụ tùng và lập hóa đơn.",
+ "description": "Hồ sơ xe theo dõi số công-tơ-mét tăng dần, lệnh sửa chữa lưu số km lúc tiếp nhận kèm phụ tùng. Hoàn tất sửa chữa tự trừ kho phụ tùng và lập hóa đơn.",
  "category": "industry",
  "version": "0.2.0",
  "depends": [
@@ -66,6 +66,12 @@
      "type": "ref",
      "required": true,
      "ref": "master-data.party"
+    },
+    {
+     "name": "odometer_reading",
+     "label": "Số km lúc tiếp nhận",
+     "type": "number",
+     "required": false
     },
     {
      "name": "warehouse",

@@ -23,6 +23,11 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
         }
         "repair_order" => {
             let mut errors = Vec::new();
+            if document.get("odometer_reading").is_some_and(|reading| {
+                !money::decimal(reading).is_some_and(|value| value >= Decimal::ZERO)
+            }) {
+                errors.push("Số km lúc tiếp nhận phải là số không âm".into());
+            }
             if let Some(lines) = document.get("lines") {
                 let Some(lines) = lines.as_array() else {
                     return vec!["Dòng sửa chữa phải là danh sách".into()];
@@ -113,7 +118,7 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
             Some("approved" | "in_progress")
         )
         && patch.as_object().is_some_and(|fields| {
-            ["lines", "warehouse", "complaint"]
+            ["lines", "warehouse", "complaint", "odometer_reading"]
                 .iter()
                 .any(|field| fields.contains_key(*field))
         })

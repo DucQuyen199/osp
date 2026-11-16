@@ -17,7 +17,7 @@ pub async fn validate_persistence(
 ) -> R<Vec<String>> {
     match entity {
         "vehicle" => validate_vehicle(tx, tenant, action, document).await,
-        "repair_order" => validate_repair_order(tx, tenant, document).await,
+        "repair_order" => validate_repair_order(tx, tenant, action, document).await,
         _ => Ok(Vec::new()),
     }
 }
@@ -143,7 +143,24 @@ async fn validate_vehicle(
                     errors.push("Chủ xe, biển số và VIN không thể đổi sau khi đã có lịch sử sửa chữa".into());
                 }
                 let next_odometer = document.get("odometer").and_then(money::decimal);
-                if previous_odometer.zip(next_odometer).is_some_and(|(old, new)| new < old) {
+                let latest_repair_odometer = tx
+                    .query_one_row(
+                        "SELECT MAX(odometer_reading)::text FROM auto_service__repair_order WHERE tenant_id = $1 AND vehicle = $2",
+                        &[&tenant.id, &id],
+                    )
+                    .await?
+                    .get::<_, Option<String>>(0)
+                    .map(|value| {
+                        money::decimal_str(&value).ok_or_else(|| {
+                            ApiError::validation(
+                                "auto_service.repair_order.odometer_reading",
+                                vec!["Stored repair mileage is not a valid decimal".into()],
+                            )
+                        })
+                    })
+                    .transpose()?;
+                let minimum_odometer = previous_odometer.into_iter().chain(latest_repair_odometer).max();
+                if minimum_odometer.zip(next_odometer).is_some_and(|(old, new)| new < old) {
                     errors.push("Số công-tơ-mét không thể giảm so với lần cập nhật trước".into());
                 }
             }
@@ -166,7 +183,12 @@ async fn validate_vehicle(
     Ok(errors)
 }
 
-async fn validate_repair_order(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<Vec<String>> {
+async fn validate_repair_order(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    action: &str,
+    document: &Value,
+) -> R<Vec<String>> {
     let mut errors = Vec::new();
     let vehicle = parse_id(document, "vehicle");
     let party = parse_id(document, "party");
@@ -175,7 +197,7 @@ async fn validate_repair_order(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -
         Some(vehicle) => {
             if let Some(row) = tx
                 .query_opt(
-                    "SELECT party FROM auto_service__vehicle WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                    "SELECT party, odometer::text FROM auto_service__vehicle WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
                     &[&tenant.id, &vehicle],
                 )
                 .await?
@@ -185,6 +207,47 @@ async fn validate_repair_order(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -
                     errors.push("Khách hàng trên lệnh sửa chữa phải trùng chủ sở hữu của xe".into());
                 }
                 let order_id = parse_id(document, "id");
+                let reading = document.get("odometer_reading").and_then(money::decimal);
+                if action == "created" && reading.is_none() {
+                    errors.push("Lệnh tiếp nhận phải lưu số km trên đồng hồ của xe".into());
+                }
+                if let Some(reading) = reading {
+                    let vehicle_odometer = row
+                        .get::<_, Option<String>>(1)
+                        .map(|value| {
+                            money::decimal_str(&value).ok_or_else(|| {
+                                ApiError::validation(
+                                    "auto_service.vehicle.odometer",
+                                    vec!["Stored vehicle mileage is not a valid decimal".into()],
+                                )
+                            })
+                        })
+                        .transpose()?;
+                    let previous_repair_odometer = tx
+                        .query_one_row(
+                            "SELECT MAX(odometer_reading)::text FROM auto_service__repair_order WHERE tenant_id = $1 AND vehicle = $2 AND ($3::uuid IS NULL OR id <> $3)",
+                            &[&tenant.id, &vehicle, &order_id],
+                        )
+                        .await?
+                        .get::<_, Option<String>>(0)
+                        .map(|value| {
+                            money::decimal_str(&value).ok_or_else(|| {
+                                ApiError::validation(
+                                    "auto_service.repair_order.odometer_reading",
+                                    vec!["Stored repair mileage is not a valid decimal".into()],
+                                )
+                            })
+                        })
+                        .transpose()?;
+                    if vehicle_odometer
+                        .into_iter()
+                        .chain(previous_repair_odometer)
+                        .max()
+                        .is_some_and(|previous| reading < previous)
+                    {
+                        errors.push("Số km lúc tiếp nhận không thể thấp hơn số đo xe hoặc lịch sử xưởng trước đó".into());
+                    }
+                }
                 let active_order = tx
                     .query_opt(
                         "SELECT id FROM auto_service__repair_order WHERE tenant_id = $1 AND vehicle = $2 AND status NOT IN ('delivered', 'quote_declined') AND ($3::uuid IS NULL OR id <> $3) LIMIT 1",

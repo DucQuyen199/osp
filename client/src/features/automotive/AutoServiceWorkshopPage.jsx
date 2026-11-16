@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from '../../lib/api.js';
-import { fmtDateTime, fmtMoney, statusLabel } from '../../lib/i18n.js';
+import { fmtDateTime, fmtMoney, fmtNumber, statusLabel } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 
@@ -22,6 +22,7 @@ export default function AutoServiceWorkshopPage() {
   const [vin, setVin] = useState('');
   const [odometer, setOdometer] = useState('');
   const [odometerReading, setOdometerReading] = useState('');
+  const [intakeOdometer, setIntakeOdometer] = useState('');
   const [declineReasons, setDeclineReasons] = useState({});
   const [vehicleId, setVehicleId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
@@ -58,7 +59,23 @@ export default function AutoServiceWorkshopPage() {
   const canCreateOrder = can('auto-service.repair_order.create');
   const vehicleById = useMemo(() => new Map(vehicles.map((item) => [item.id, item])), [vehicles]);
   const currentVehicle = selected ? vehicleById.get(selected.vehicle) : null;
-  useEffect(() => { setOdometerReading(currentVehicle?.odometer == null ? '' : String(currentVehicle.odometer)); }, [currentVehicle?.id, currentVehicle?.odometer]);
+  const lastOdometerByVehicle = useMemo(() => {
+    const latest = new Map(vehicles.map((vehicle) => [vehicle.id, Number(vehicle.odometer || 0)]));
+    for (const order of orders) {
+      const reading = Number(order.odometer_reading);
+      if (Number.isFinite(reading) && reading >= 0) latest.set(order.vehicle, Math.max(latest.get(order.vehicle) || 0, reading));
+    }
+    return latest;
+  }, [orders, vehicles]);
+  const currentOdometer = currentVehicle ? lastOdometerByVehicle.get(currentVehicle.id) ?? currentVehicle.odometer : null;
+  useEffect(() => {
+    const reading = currentVehicle ? lastOdometerByVehicle.get(currentVehicle.id) ?? currentVehicle.odometer : null;
+    setOdometerReading(reading == null ? '' : String(reading));
+  }, [currentVehicle?.id, lastOdometerByVehicle]);
+  useEffect(() => {
+    const reading = lastOdometerByVehicle.get(vehicleId);
+    setIntakeOdometer(reading == null ? '' : String(reading));
+  }, [vehicleId, lastOdometerByVehicle]);
   const openOrders = orders.filter((item) => !['completed', 'delivered', 'quote_declined'].includes(item.status));
   const productChoices = [...products.values()].filter((item) => item.active !== false && ['goods', 'service', undefined].includes(item.kind)).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
   const unitsFor = (productId) => {
@@ -89,12 +106,12 @@ export default function AutoServiceWorkshopPage() {
   const addLine = () => setDraftLines((current) => [...current, { product: productChoices[0]?.id || '', qty: '1', uom: '' }]);
   const updateLine = (index, key, value) => setDraftLines((current) => current.map((line, i) => i === index ? { ...line, [key]: value, ...(key === 'product' ? { uom: '' } : {}) } : line));
   const createOrder = async (event) => {
-    event.preventDefault(); if (!vehicleId || !draftLines.length) return;
+    event.preventDefault(); if (!vehicleId || !draftLines.length || intakeOdometer === '') return;
     const vehicle = vehicleById.get(vehicleId);
     setBusy('order'); setError(''); setNotice('');
     try {
       const created = await api(dataPath('auto-service.repair_order'), { method: 'POST', body: {
-        vehicle: vehicleId, party: vehicle.party, warehouse: warehouseId || undefined, complaint: complaint.trim() || undefined,
+        vehicle: vehicleId, party: vehicle.party, odometer_reading: Number(intakeOdometer), warehouse: warehouseId || undefined, complaint: complaint.trim() || undefined,
         lines: draftLines.map((line) => ({ product: line.product, qty: Number(line.qty), ...(line.uom ? { uom: line.uom } : {}) })),
       } });
       setDraftLines([]); setComplaint(''); await load(true); setSelectedId(created.id);
@@ -152,6 +169,7 @@ export default function AutoServiceWorkshopPage() {
     {canCreateOrder && <section className="workshop-intake card"><h2>Lập lệnh và báo giá</h2><form onSubmit={createOrder}>
       <div className="workshop-form">
         <label className="field"><span>Xe</span><select className="select" required value={vehicleId} onChange={(event) => setVehicleId(event.target.value)}><option value="">Chọn xe</option>{vehicles.map((item) => <option key={item.id} value={item.id}>{item.plate} · {[item.make, item.model].filter(Boolean).join(' ')}</option>)}</select></label>
+        <label className="field"><span>Số km lúc tiếp nhận *</span><input className="input num" type="number" min={vehicleId ? lastOdometerByVehicle.get(vehicleId) || 0 : 0} step="1" required value={intakeOdometer} onChange={(event) => setIntakeOdometer(event.target.value)} /><span className="hint">Không thấp hơn lần ghi nhận gần nhất của xe.</span></label>
         <label className="field"><span>Kho phụ tùng xuất</span><select className="select" value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)}><option value="">Chọn khi có phụ tùng theo dõi tồn</option>{[...warehouses.values()].map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         <label className="field workshop-complaint"><span>Khách mô tả / yêu cầu</span><textarea className="input textarea" value={complaint} onChange={(event) => setComplaint(event.target.value)} /></label>
       </div>
@@ -164,7 +182,7 @@ export default function AutoServiceWorkshopPage() {
         </div>; })}
       </div>
       {needsWarehouse && !warehouseId && <p className="small muted">Lệnh có phụ tùng theo dõi tồn kho cần chọn kho trước khi lập.</p>}
-      <button className="button primary" disabled={busy === 'order' || !vehicleId || !draftLines.length || (needsWarehouse && !warehouseId)}>{busy === 'order' ? 'Đang lập…' : 'Lập báo giá chờ khách duyệt'}</button>
+      <button className="button primary" disabled={busy === 'order' || !vehicleId || intakeOdometer === '' || !draftLines.length || (needsWarehouse && !warehouseId)}>{busy === 'order' ? 'Đang lập…' : 'Lập báo giá chờ khách duyệt'}</button>
     </form></section>}
 
     <div className="workshop-layout">
@@ -177,8 +195,8 @@ export default function AutoServiceWorkshopPage() {
 
       <section className="workshop-detail card">{selected ? <>
         <header className="workshop-section-head"><div><h2>{orderVehicle?.plate || 'Lệnh sửa chữa'}</h2><div className="muted">{recordLabel('master-data.party', parties.get(selected.party))} · {warehouses.get(selected.warehouse)?.name || 'Chưa chọn kho'}</div></div><span className={`badge ${['completed', 'delivered'].includes(selected.status) ? 'success' : selected.status === 'quote_declined' ? 'plain' : 'warning'}`}>{statusLabel(selected.status)}</span></header>
-        <dl className="workshop-summary"><div><dt>Xe</dt><dd>{[orderVehicle?.make, orderVehicle?.model].filter(Boolean).join(' ') || 'Chưa khai báo'} · {orderVehicle?.odometer || '—'} km</dd></div><div><dt>VIN</dt><dd>{orderVehicle?.vin || '—'}</dd></div><div><dt>Ngày nhận</dt><dd>{fmtDateTime(selected.created_at)}</dd></div></dl>
-        {currentVehicle && can('auto-service.vehicle.update') && <form className="workshop-form" style={{ margin: '12px 0' }} onSubmit={updateOdometer}><label className="field"><span>Số công-tơ-mét hiện tại (km)</span><input className="input" type="number" min={currentVehicle.odometer ?? 0} step="1" required value={odometerReading} onChange={(event) => setOdometerReading(event.target.value)} /></label><button className="button" disabled={busy === 'odometer' || odometerReading === '' || Number(odometerReading) === Number(currentVehicle.odometer || 0)}>Cập nhật số km</button><span className="small muted">Số km không được thấp hơn lần cập nhật trước.</span></form>}
+        <dl className="workshop-summary"><div><dt>Xe</dt><dd>{[orderVehicle?.make, orderVehicle?.model].filter(Boolean).join(' ') || 'Chưa khai báo'}</dd></div><div><dt>Km lúc tiếp nhận</dt><dd>{selected.odometer_reading == null ? 'Chưa ghi' : `${fmtNumber(selected.odometer_reading)} km`}</dd></div><div><dt>Km ghi nhận gần nhất</dt><dd>{orderVehicle && lastOdometerByVehicle.has(orderVehicle.id) ? `${fmtNumber(lastOdometerByVehicle.get(orderVehicle.id))} km` : '—'}</dd></div><div><dt>VIN</dt><dd>{orderVehicle?.vin || '—'}</dd></div><div><dt>Ngày nhận</dt><dd>{fmtDateTime(selected.created_at)}</dd></div></dl>
+        {currentVehicle && can('auto-service.vehicle.update') && <form className="workshop-form" style={{ margin: '12px 0' }} onSubmit={updateOdometer}><label className="field"><span>Số công-tơ-mét hiện tại (km)</span><input className="input" type="number" min={currentOdometer ?? 0} step="1" required value={odometerReading} onChange={(event) => setOdometerReading(event.target.value)} /></label><button className="button" disabled={busy === 'odometer' || odometerReading === '' || Number(odometerReading) === Number(currentOdometer || 0)}>Cập nhật số km</button><span className="small muted">Số km không được thấp hơn lần ghi nhận trước hoặc lịch sử xưởng.</span></form>}
         {selected.complaint && <p className="workshop-complaint"><strong>Yêu cầu:</strong> {selected.complaint}</p>}
         {selected.status === 'quote_declined' && selected.declined_reason && <div className="alert">Khách từ chối báo giá: {selected.declined_reason}</div>}
         <h3>Báo giá</h3><ul className="workshop-estimate">{(selected.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{line.product_name || products.get(line.product)?.name || 'Sản phẩm'} × {line.qty} {line.uom_name || units.get(line.uom)?.name || ''}</span><strong className="num">{fmtMoney((Number(line.qty) || 0) * (Number(line.price) || 0))}</strong></li>)}</ul>
@@ -191,7 +209,7 @@ export default function AutoServiceWorkshopPage() {
           {selected.status === 'in_progress' && can('auto-service.repair_order.completed') && <button className="button primary" onClick={() => transition(selected, 'completed')} disabled={!!busy}>Hoàn tất, xuất phụ tùng và lập hóa đơn</button>}
           {selected.status === 'completed' && can('auto-service.repair_order.delivered') && <button className="button primary" onClick={() => transition(selected, 'delivered')} disabled={!!busy}>Bàn giao xe</button>}
         </div>
-        <details className="workshop-history"><summary>Lịch sử xe ({vehicleOrders.length} lệnh)</summary>{vehicleOrders.map((order) => <div className="workshop-history-row" key={order.id}><span>{fmtDateTime(order.created_at)} · {order.complaint || 'Bảo dưỡng'}</span><strong>{statusLabel(order.status)} · {fmtMoney(order.total || 0)}</strong></div>)}</details>
+        <details className="workshop-history"><summary>Lịch sử xe ({vehicleOrders.length} lệnh)</summary>{vehicleOrders.map((order) => <div className="workshop-history-row" key={order.id}><span>{fmtDateTime(order.created_at)} · {order.odometer_reading == null ? 'Chưa ghi số km' : `${fmtNumber(order.odometer_reading)} km`} · {order.complaint || 'Bảo dưỡng'}</span><strong>{statusLabel(order.status)} · {fmtMoney(order.total || 0)}</strong></div>)}</details>
       </> : <div className="card-pad muted">Chọn lệnh để xem báo giá và tiến độ.</div>}</section>
     </div>
   </div>;
