@@ -83,7 +83,7 @@ export default function HomePage({ summary }) {
         <div className="card-head"><h2 id="mods-title">Module của bạn</h2></div>
         <div className="card-pad stack-sm">{app.meta.modules.filter((module) => module.id !== 'master-data').map((module) =>
           <a key={module.id} className="list-link" href={`#/m/${module.id}`}><span>{module.name}</span><span aria-hidden="true">›</span></a>)}
-          {app.meta.kpis.length > 0 && <div className="stack-sm"><hr /><div className="label">Chỉ tiêu nên theo dõi</div><ul className="muted small">{app.meta.kpis.map((kpi) => <li key={kpi}>{kpi}</li>)}</ul></div>}
+          {app.meta.kpis.length > 0 && <div className="stack-sm"><hr /><div className="label">Gợi ý KPI cho {app.meta.verticalName || 'doanh nghiệp'}</div><p className="small muted">Đây là các chỉ tiêu tham khảo. Để xem số liệu thực tế, hãy cấu hình KPI từ báo cáo tổng hợp trong module BI.</p><ul className="muted small">{app.meta.kpis.map((kpi) => <li key={kpi}>{kpi}</li>)}</ul>{app.meta.modules.some((module) => module.id === 'bi') && (can('bi.report.read') || can('bi.kpi.create')) && <a className="btn btn-sm" href="#/reports/bi">Mở báo cáo &amp; phân tích</a>}</div>}
         </div>
       </section>
     </div>
