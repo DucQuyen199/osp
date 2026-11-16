@@ -224,6 +224,21 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   must(await clickText('Approval rules', '[role="tab"]'), 'approval rules tab is not translated');
   must((await page.$eval('#main h2', (heading) => heading.textContent)) === 'Rules by amount and role', 'approval rule setup is not translated');
   await axe('approval workbench tiếng Anh');
+  const hrmModule = await page.evaluate(async () => {
+    const session = JSON.parse(sessionStorage.getItem('osp.session') || localStorage.getItem('osp.session') || 'null');
+    const response = await fetch(`/api/t/${session.tenantId}/modules/enable`, {
+      method: 'POST', headers: { authorization: `Bearer ${session.token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ ids: ['hrm'] }),
+    });
+    return { ok: response.ok, status: response.status };
+  });
+  must(hrmModule.ok, `could not enable HRM module for UI test (${hrmModule.status})`);
+  await page.goto(`${BASE}/#/people`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#main h1');
+  must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'HR operations', 'HR workbench is not translated');
+  const hrmText = await page.$eval('#main', (main) => main.innerText);
+  must(hrmText.includes('Daily attendance') && hrmText.includes('Leave requests to review') && hrmText.includes('Employee records'), 'HR workbench workflows are not translated');
+  await axe('HR workbench tiếng Anh');
   await page.goto(`${BASE}/#/reports/inventory/replenishment`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Inventory replenishment suggestions', 'màn hình bổ sung tồn kho chưa được dịch');
