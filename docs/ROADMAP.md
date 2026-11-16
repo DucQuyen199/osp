@@ -4,7 +4,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 
 ## Đã có
 
-- 50 module, 199 loại dữ liệu, 903 sự kiện, 22 gói ngành; nghiệp vụ liên module chạy trong Rust bounded contexts.
+- 50 module, 202 loại dữ liệu, 921 sự kiện, 22 gói ngành; nghiệp vụ liên module chạy trong Rust bounded contexts.
 - Điện/nước/khí/viễn thông hỗ trợ biểu giá lũy tiến theo ngưỡng lũy kế, phí cố định mỗi kỳ và snapshot chi tiết từng bậc trên lịch sử chỉ số/hóa đơn.
 - LMS tự phát hành chứng chỉ bất biến khi học viên hoàn thành đủ bài bắt buộc; lưu snapshot người học/khóa học, tra cứu theo số và in từ workbench.
 - Trường học liên kết lớp với hồ sơ giáo viên HRM tùy chọn, chặn xếp trùng giờ giữa các lớp và không cho chấm dứt nhân viên còn buổi dạy tương lai; buổi học lưu snapshot giáo viên.

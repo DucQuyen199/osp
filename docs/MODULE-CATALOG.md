@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **50 module**, **199 loại dữ liệu**, **903 sự kiện**.
+Tổng: **50 module**, **202 loại dữ liệu**, **921 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -48,7 +48,7 @@ Tổng: **50 module**, **199 loại dữ liệu**, **903 sự kiện**.
 | [`payroll`](#payroll) — Tính lương | Nhân sự | `hrm`, `accounting` |
 | [`performance`](#performance) — Đánh giá hiệu suất (OKR) | Nhân sự | `hrm` |
 | [`pos`](#pos) — POS - Bán lẻ tại quầy | Bán hàng & khách hàng | `master-data`, `inventory`, `accounting` |
-| [`pharmacy`](#pharmacy) — Nhà thuốc | Module chuyên ngành | `master-data`, `inventory`, `pos` |
+| [`pharmacy`](#pharmacy) — Nhà thuốc | Module chuyên ngành | `master-data`, `inventory`, `pos`, `quality` |
 | [`purchasing`](#purchasing) — Mua hàng | Chuỗi cung ứng | `master-data`, `inventory`, `quality`, `accounting`, `hrm` |
 | [`real-estate`](#real-estate) — Bất động sản | Module chuyên ngành | `master-data`, `accounting`, `contract` |
 | [`recruitment`](#recruitment) — Tuyển dụng | Nhân sự | `hrm` |
@@ -157,7 +157,7 @@ Tổng: **50 module**, **199 loại dữ liệu**, **903 sự kiện**.
 |---|---|
 | `pos_session` Ca bán hàng | `open` → **closed** (open→closed) |
 | `pos_order` Đơn POS | `open` → **completed** (open→completed), **refunded** (completed→refunded) |
-| `pos_return` Phiếu trả hàng POS | `draft` → **received** (draft→received; hỗ trợ hoàn một phần nhiều lần theo số lượng còn lại) |
+| `pos_return` Phiếu trả hàng POS | `draft` → **received** (draft→received) |
 | `cash_movement` Phiếu thu chi quỹ tiền mặt | `draft` → **posted** (draft→posted) |
 
 ### subscription
@@ -501,7 +501,7 @@ Tổng: **50 module**, **199 loại dữ liệu**, **903 sự kiện**.
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
 | `room_type` Loại phòng | — |
-| `room` Phòng | `vacant` → **cleaning** (occupied→cleaning), **occupied** (vacant→occupied), **ready** (cleaning→vacant) |
+| `room` Phòng | `vacant` → **cleaning** (occupied→cleaning), **maintenance** (vacant/cleaning→maintenance), **occupied** (vacant→occupied), **ready** (cleaning/maintenance→vacant) |
 | `reservation` Đặt phòng | `booked` → **cancelled** (booked→cancelled), **checked_in** (booked→checked_in), **checked_out** (checked_in→checked_out), **no_show** (booked→no_show) |
 | `folio_charge` Phí phát sinh | — |
 
@@ -527,6 +527,7 @@ Tổng: **50 module**, **199 loại dữ liệu**, **903 sự kiện**.
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
 | `prescription` Đơn thuốc | `draft` → **cancelled** (draft/verified→cancelled), **dispensed** (verified/partially_dispensed→dispensed), **partially_dispensed** (verified/partially_dispensed→partially_dispensed), **verified** (draft→verified) |
+| `return_disposition` Hủy thuốc khách trả | `draft` → **cancelled** (draft→cancelled), **posted** (draft→posted) |
 
 ### real-estate
 **Bất động sản** — Bất động sản, lịch xem, hợp đồng thuê. Bán xong tự lập hóa đơn; kích hoạt thuê tự tạo hợp đồng.
@@ -540,7 +541,7 @@ Tổng: **50 module**, **199 loại dữ liệu**, **903 sự kiện**.
 | `rent_cycle` Kỳ thu tiền thuê | — |
 
 ### restaurant
-**Nhà hàng / F&B** — Bàn, thực đơn, công thức, order tại bàn, màn hình bếp. Gửi bếp tự tạo phiếu bếp; thanh toán tự trừ kho và ghi thu.
+**Nhà hàng / F&B** — Bàn, đặt chỗ, thực đơn, công thức, order tại bàn, màn hình bếp. Gửi bếp tự tạo phiếu bếp; thanh toán tự trừ kho và ghi thu.
 
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
@@ -549,6 +550,7 @@ Tổng: **50 module**, **199 loại dữ liệu**, **903 sự kiện**.
 | `recipe` Công thức | — |
 | `table_order` Order bàn | `open` → **cancelled** (open/sent→cancelled), **completed** (served→completed), **sent** (open→sent), **served** (sent→served) |
 | `kitchen_ticket` Phiếu bếp | `queued` → **cancelled** (queued→cancelled), **preparing** (queued→preparing), **ready** (preparing→ready) |
+| `reservation` Đặt bàn | `requested` → **arrived** (confirmed→arrived), **cancelled** (requested/confirmed→cancelled), **completed** (arrived→completed), **confirmed** (requested→confirmed), **no_show** (confirmed→no_show) |
 
 ### school
 **Trường học / Trung tâm đào tạo** — Học viên, lớp học, ghi danh, điểm số, học phí. Phát hành học phí tự lập hóa đơn; thu tiền cập nhật ngược trạng thái học phí.

@@ -1,7 +1,7 @@
 {
  "id": "restaurant",
- "name": "NhÃ  hÃ ng / F&B",
- "description": "BÃ n, Ä‘áº·t chá»—, thá»±c Ä‘Æ¡n, cÃ´ng thá»©c, order táº¡i bÃ n, mÃ n hÃ¬nh báº¿p. Gá»­i báº¿p tá»± táº¡o phiáº¿u báº¿p; thanh toÃ¡n tá»± trá»« kho vÃ  ghi thu.",
+ "name": "Nhà hàng / F&B",
+ "description": "Bàn, đặt chỗ, thực đơn, công thức, order tại bàn, màn hình bếp. Gửi bếp tự tạo phiếu bếp; thanh toán tự trừ kho và ghi thu.",
  "category": "industry",
  "version": "0.2.0",
  "depends": [
@@ -13,7 +13,7 @@
  "entities": [
   {
    "name": "table",
-   "label": "BÃ n",
+   "label": "Bàn",
    "fields": [
     {
      "name": "name",
@@ -38,7 +38,7 @@
   },
   {
    "name": "menu_item",
-   "label": "MÃ³n",
+   "label": "Món",
    "fields": [
     {
      "name": "product",
@@ -67,7 +67,7 @@
   },
   {
    "name": "recipe",
-   "label": "CÃ´ng thá»©c",
+   "label": "Công thức",
    "fields": [
     {
      "name": "product",
@@ -92,7 +92,7 @@
   },
   {
    "name": "table_order",
-   "label": "Order bÃ n",
+   "label": "Order bàn",
    "fields": [
     {
      "name": "table",
@@ -102,7 +102,7 @@
     },
     {
      "name": "guest_count",
-     "label": "Sá»‘ khÃ¡ch",
+     "label": "Số khách",
      "type": "number",
      "required": false
     },
@@ -131,7 +131,7 @@
     },
     {
      "name": "cancellation_reason",
-     "label": "LÃ½ do há»§y sau khi gá»­i báº¿p",
+     "label": "Lý do hủy sau khi gửi bếp",
      "type": "text",
      "required": false
     },
@@ -207,7 +207,7 @@
   },
   {
    "name": "kitchen_ticket",
-   "label": "Phiáº¿u báº¿p",
+   "label": "Phiếu bếp",
    "fields": [
     {
      "name": "order",
@@ -270,48 +270,48 @@
   },
   {
    "name": "reservation",
-   "label": "Äáº·t bÃ n",
+   "label": "Đặt bàn",
    "fields": [
     {
      "name": "guest_name",
-     "label": "TÃªn khÃ¡ch",
+     "label": "Tên khách",
      "type": "string",
      "required": true
     },
     {
      "name": "phone",
-     "label": "Äiá»‡n thoáº¡i",
+     "label": "Điện thoại",
      "type": "string",
      "required": false
     },
     {
      "name": "table",
-     "label": "BÃ n",
+     "label": "Bàn",
      "type": "ref",
      "required": false,
      "ref": "restaurant.table"
     },
     {
      "name": "guest_count",
-     "label": "Sá»‘ khÃ¡ch",
+     "label": "Số khách",
      "type": "number",
      "required": true
     },
     {
      "name": "starts_at",
-     "label": "Báº¯t Ä‘áº§u",
+     "label": "Bắt đầu",
      "type": "datetime",
      "required": true
     },
     {
      "name": "ends_at",
-     "label": "Káº¿t thÃºc",
+     "label": "Kết thúc",
      "type": "datetime",
      "required": true
     },
     {
      "name": "note",
-     "label": "Ghi chÃº",
+     "label": "Ghi chú",
      "type": "text",
      "required": false
     }
