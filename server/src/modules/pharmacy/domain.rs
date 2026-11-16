@@ -3,7 +3,37 @@ use chrono::NaiveDate;
 use serde_json::Value;
 
 pub fn validate(entity: &str, document: &Value) -> Vec<String> {
+    if entity == "return_disposition" {
+        return validate_return_disposition(document);
+    }
     validate_at(entity, document, chrono::Utc::now().date_naive())
+}
+
+fn validate_return_disposition(document: &Value) -> Vec<String> {
+    let mut errors = Vec::new();
+    if document
+        .get("inspection")
+        .and_then(Value::as_str)
+        .and_then(|value| uuid::Uuid::parse_str(value).ok())
+        .is_none()
+    {
+        errors.push("Thuốc trả cần phiếu kiểm tra hợp lệ".into());
+    }
+    if !document
+        .get("qty")
+        .and_then(money::decimal)
+        .is_some_and(|qty| qty > rust_decimal::Decimal::ZERO)
+    {
+        errors.push("Số lượng hủy phải lớn hơn 0".into());
+    }
+    if !document
+        .get("note")
+        .and_then(Value::as_str)
+        .is_some_and(|note| (5..=500).contains(&note.trim().chars().count()))
+    {
+        errors.push("Ghi chú hủy thuốc cần từ 5 đến 500 ký tự".into());
+    }
+    errors
 }
 
 pub fn validate_at(entity: &str, document: &Value, today: chrono::NaiveDate) -> Vec<String> {
@@ -69,6 +99,13 @@ pub fn validate_at(entity: &str, document: &Value, today: chrono::NaiveDate) -> 
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
+    if entity == "return_disposition" {
+        return if action == "posted" {
+            validate_return_disposition(document)
+        } else {
+            Vec::new()
+        };
+    }
     if entity == "prescription" && action == "verified" {
         validate(entity, document)
     } else {
@@ -76,6 +113,12 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
     }
 }
 pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<String> {
+    if entity == "return_disposition" {
+        if current.get("status").and_then(Value::as_str) != Some("draft") {
+            return vec!["Phiếu hủy đã ghi sổ phải được giữ nguyên làm lịch sử".into()];
+        }
+        return Vec::new();
+    }
     if entity != "prescription" {
         return Vec::new();
     }
@@ -98,6 +141,13 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
     }
 }
 pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
+    if entity == "return_disposition" {
+        return if document.get("status").and_then(Value::as_str) == Some("draft") {
+            Vec::new()
+        } else {
+            vec!["Phiếu hủy đã ghi sổ phải được giữ làm dấu vết".into()]
+        };
+    }
     if entity != "prescription" {
         return Vec::new();
     }

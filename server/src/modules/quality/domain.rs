@@ -93,6 +93,14 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
 }
 
 pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
+    if entity == "inspection"
+        && document.get("source").and_then(Value::as_str) == Some("pharmacy_return")
+    {
+        return vec![
+            "Customer-returned medicine inspections must be retained for quarantine traceability"
+                .into(),
+        ];
+    }
     if entity == "inspection_disposition"
         && document
             .get("status")
@@ -118,6 +126,12 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
+    if entity == "inspection"
+        && document.get("source").and_then(Value::as_str) == Some("pharmacy_return")
+        && matches!(action, "passed" | "retest")
+    {
+        return vec!["Customer-returned medicine cannot be released back to sellable stock".into()];
+    }
     if entity == "inspection" && matches!(action, "passed" | "failed" | "retest") {
         if document.get("status").and_then(Value::as_str) == Some("passed")
             || (document.get("status").and_then(Value::as_str) == Some("failed")

@@ -61,11 +61,11 @@ async fn replenishment_rows(
                AND disposition.status = 'posted') dispositions ON TRUE \
            LEFT JOIN LATERAL (SELECT SUM(stock_move.qty::numeric) AS qty \
              FROM inventory__stock_move stock_move \
-             WHERE stock_move.tenant_id = inspection.tenant_id AND stock_move.source = 'quality_return' \
+             WHERE stock_move.tenant_id = inspection.tenant_id AND stock_move.source IN ('quality_return', 'pharmacy_disposal') \
                AND stock_move.source_id = inspection.id::text AND stock_move.product = inspection.product \
                AND stock_move.warehouse = inspection.warehouse AND stock_move.lot IS NOT DISTINCT FROM inspection.lot::text \
                AND stock_move.direction = 'out') returned ON TRUE \
-           WHERE inspection.tenant_id = $1 AND inspection.source IN ('purchase_order', 'purchase_receipt') \
+           WHERE inspection.tenant_id = $1 AND inspection.source IN ('purchase_order', 'purchase_receipt', 'pharmacy_return') \
            GROUP BY inspection.tenant_id, inspection.product, inspection.warehouse, inspection.lot \
          ), "
     } else {
@@ -263,8 +263,8 @@ impl Kernel {
                      FROM quality__inspection qi \
                      JOIN inventory__lot lot ON lot.tenant_id = qi.tenant_id AND lot.id = qi.lot \
                      LEFT JOIN LATERAL (SELECT SUM(qty::numeric) AS qty FROM quality__inspection_disposition WHERE tenant_id = qi.tenant_id AND inspection = qi.id AND status = 'posted') disposition ON true \
-                     LEFT JOIN LATERAL (SELECT SUM(qty::numeric) AS qty FROM inventory__stock_move WHERE tenant_id = qi.tenant_id AND source = 'quality_return' AND source_id = qi.id::text AND direction = 'out') returned ON true \
-                     WHERE qi.tenant_id = $1 AND qi.warehouse = $2 AND qi.source IN ('purchase_order', 'purchase_receipt') \
+                     LEFT JOIN LATERAL (SELECT SUM(qty::numeric) AS qty FROM inventory__stock_move WHERE tenant_id = qi.tenant_id AND source IN ('quality_return', 'pharmacy_disposal') AND source_id = qi.id::text AND direction = 'out') returned ON true \
+                     WHERE qi.tenant_id = $1 AND qi.warehouse = $2 AND qi.source IN ('purchase_order', 'purchase_receipt', 'pharmacy_return') \
                        AND qi.status IN ('pending', 'failed') AND lot.expiry < $3::date \
                      GROUP BY qi.lot \
                      HAVING SUM(GREATEST(qi.qty::numeric - COALESCE(disposition.qty, 0) - COALESCE(returned.qty, 0), 0::numeric)) > 0.000001",
@@ -466,6 +466,7 @@ impl Kernel {
                      WHEN 'purchase_receipt' THEN 'purchasing.purchase_receipt' \
                      WHEN 'purchase_return' THEN 'purchasing.purchase_return' \
                      WHEN 'quality_return' THEN 'quality.inspection' \
+                     WHEN 'pharmacy_disposal' THEN 'quality.inspection' \
                      WHEN 'pos_order' THEN 'pos.pos_order' \
                      WHEN 'pos_order_refund' THEN 'pos.pos_order' \
                      WHEN 'pos_return' THEN 'pos.pos_return' \
@@ -574,7 +575,7 @@ impl Kernel {
                 "WITH returned AS ( \
                    SELECT source_id, product, warehouse, lot, SUM(qty::numeric) AS returned_qty \
                    FROM inventory__stock_move \
-                   WHERE tenant_id = $1 AND source = 'quality_return' AND direction = 'out' \
+                   WHERE tenant_id = $1 AND source IN ('quality_return', 'pharmacy_disposal') AND direction = 'out' \
                    GROUP BY source_id, product, warehouse, lot \
                  ), held_inspections AS ( \
                    SELECT qi.*, GREATEST(qi.qty::numeric - COALESCE(disp.released_qty, 0) - COALESCE(ret.returned_qty, 0), 0) AS held_qty, \
@@ -592,7 +593,7 @@ impl Kernel {
                        round((COALESCE(sm.total_cost, 0)::numeric / NULLIF(sm.qty::numeric, 0)), 4), round(sm.qty::numeric, 6) \
                        ORDER BY sm.created_at, sm.id) AS layer_ordinal \
                    FROM inventory__stock_move sm \
-                   WHERE sm.tenant_id = $1 AND sm.direction = 'in' AND sm.source IN ('purchase_order', 'purchase_receipt') \
+                   WHERE sm.tenant_id = $1 AND sm.direction = 'in' AND sm.source IN ('purchase_order', 'purchase_receipt', 'pos_order_refund', 'pos_return') \
                  ) SELECT jsonb_build_object( \
                    'inspectionId', qi.id, 'inspectionStatus', qi.status, 'source', qi.source, 'sourceId', qi.source_id, \
                    'productId', p.id, 'sku', p.sku, 'product', p.name, 'uomId', p.uom, 'unit', u.name, \
@@ -607,7 +608,7 @@ impl Kernel {
                  LEFT JOIN master_data__uom u ON u.tenant_id = p.tenant_id AND u.id = p.uom \
                  JOIN inventory__warehouse w ON w.tenant_id = qi.tenant_id AND w.id = qi.warehouse \
                  LEFT JOIN inventory__lot lot ON lot.tenant_id = qi.tenant_id AND lot.id = qi.lot \
-                 LEFT JOIN source_layers layer ON layer.tenant_id = qi.tenant_id AND layer.source = qi.source \
+                 LEFT JOIN source_layers layer ON layer.tenant_id = qi.tenant_id AND (CASE WHEN layer.source IN ('pos_order_refund', 'pos_return') THEN 'pharmacy_return' ELSE layer.source END) = qi.source \
                    AND layer.source_id = qi.source_id AND layer.product = qi.product AND layer.warehouse = qi.warehouse \
                    AND layer.lot IS NOT DISTINCT FROM qi.lot::text \
                    AND layer.derived_unit_cost IS NOT DISTINCT FROM round(COALESCE(qi.unit_cost, 0)::numeric, 4) \

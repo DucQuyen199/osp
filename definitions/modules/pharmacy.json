@@ -4,7 +4,7 @@
   "description": "Quản lý đơn thuốc bán lẻ, xác minh dược sĩ và cấp phát gắn với giao dịch POS.",
   "category": "industry",
   "version": "0.1.0",
-  "depends": ["master-data", "inventory", "pos"],
+  "depends": ["master-data", "inventory", "pos", "quality"],
   "core": false,
   "entities": [
     {
@@ -30,6 +30,26 @@
           "partially_dispensed": { "from": ["verified", "partially_dispensed"], "to": "partially_dispensed" },
           "dispensed": { "from": ["verified", "partially_dispensed"], "to": "dispensed" },
           "cancelled": { "from": ["draft", "verified"], "to": "cancelled" }
+        }
+      },
+      "computed": {},
+      "constraints": []
+    },
+    {
+      "name": "return_disposition",
+      "label": "Hủy thuốc khách trả",
+      "fields": [
+        { "name": "inspection", "type": "ref", "required": true, "ref": "quality.inspection" },
+        { "name": "qty", "type": "number", "required": true },
+        { "name": "note", "type": "text", "required": true },
+        { "name": "status", "type": "enum", "required": false, "options": ["draft", "posted", "cancelled"] }
+      ],
+      "states": {
+        "field": "status",
+        "initial": "draft",
+        "actions": {
+          "posted": { "from": ["draft"], "to": "posted" },
+          "cancelled": { "from": ["draft"], "to": "cancelled" }
         }
       },
       "computed": {},

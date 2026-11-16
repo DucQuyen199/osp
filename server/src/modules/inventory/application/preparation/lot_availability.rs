@@ -38,7 +38,7 @@ pub(super) async fn validate(
         ]);
     }
 
-    if direction != "out" || source == "quality_return" {
+    if direction != "out" || matches!(source, "quality_return" | "pharmacy_disposal") {
         return Ok(Vec::new());
     }
 
@@ -49,7 +49,7 @@ pub(super) async fn validate(
 
     let unassigned_held = if tenant.has_module("quality") {
         tx.query_opt(
-            "SELECT COALESCE(SUM(CASE WHEN qi.status = 'passed' THEN 0::numeric ELSE GREATEST(qi.qty::numeric - COALESCE(disp.qty, 0) - COALESCE(ret.qty, 0), 0::numeric) END), 0)::text FROM quality__inspection qi LEFT JOIN LATERAL (SELECT SUM(qd.qty::numeric) AS qty FROM quality__inspection_disposition qd WHERE qd.tenant_id = qi.tenant_id AND qd.inspection = qi.id AND qd.status = 'posted') disp ON TRUE LEFT JOIN LATERAL (SELECT SUM(qr.qty::numeric) AS qty FROM inventory__stock_move qr WHERE qr.tenant_id = qi.tenant_id AND qr.source = 'quality_return' AND qr.source_id = qi.id::text AND qr.direction = 'out' AND qr.lot IS NOT DISTINCT FROM qi.lot::text) ret ON TRUE WHERE qi.tenant_id = $1 AND qi.product = $2 AND qi.warehouse = $3 AND qi.source IN ('purchase_order', 'purchase_receipt') AND qi.lot IS NULL",
+            "SELECT COALESCE(SUM(CASE WHEN qi.status = 'passed' THEN 0::numeric ELSE GREATEST(qi.qty::numeric - COALESCE(disp.qty, 0) - COALESCE(ret.qty, 0), 0::numeric) END), 0)::text FROM quality__inspection qi LEFT JOIN LATERAL (SELECT SUM(qd.qty::numeric) AS qty FROM quality__inspection_disposition qd WHERE qd.tenant_id = qi.tenant_id AND qd.inspection = qi.id AND qd.status = 'posted') disp ON TRUE LEFT JOIN LATERAL (SELECT SUM(qr.qty::numeric) AS qty FROM inventory__stock_move qr WHERE qr.tenant_id = qi.tenant_id AND qr.source IN ('quality_return', 'pharmacy_disposal') AND qr.source_id = qi.id::text AND qr.direction = 'out' AND qr.lot IS NOT DISTINCT FROM qi.lot::text) ret ON TRUE WHERE qi.tenant_id = $1 AND qi.product = $2 AND qi.warehouse = $3 AND qi.source IN ('purchase_order', 'purchase_receipt', 'pharmacy_return') AND qi.lot IS NULL",
             &[&tenant.id, &product_id, &warehouse_id],
         )
         .await?
@@ -77,7 +77,7 @@ pub(super) async fn validate(
         .unwrap_or(Decimal::ZERO);
     let held_by_lot = if tenant.has_module("quality") {
         tx.query_opt(
-            "SELECT COALESCE(SUM(CASE WHEN qi.status = 'passed' THEN 0::numeric ELSE GREATEST(qi.qty::numeric - COALESCE(disp.qty, 0) - COALESCE(ret.qty, 0), 0::numeric) END), 0)::text FROM quality__inspection qi LEFT JOIN LATERAL (SELECT SUM(qd.qty::numeric) AS qty FROM quality__inspection_disposition qd WHERE qd.tenant_id = qi.tenant_id AND qd.inspection = qi.id AND qd.status = 'posted') disp ON TRUE LEFT JOIN LATERAL (SELECT SUM(qr.qty::numeric) AS qty FROM inventory__stock_move qr WHERE qr.tenant_id = qi.tenant_id AND qr.source = 'quality_return' AND qr.source_id = qi.id::text AND qr.direction = 'out' AND qr.lot IS NOT DISTINCT FROM qi.lot::text) ret ON TRUE WHERE qi.tenant_id = $1 AND qi.product = $2 AND qi.warehouse = $3 AND qi.source IN ('purchase_order', 'purchase_receipt') AND qi.lot = $4",
+            "SELECT COALESCE(SUM(CASE WHEN qi.status = 'passed' THEN 0::numeric ELSE GREATEST(qi.qty::numeric - COALESCE(disp.qty, 0) - COALESCE(ret.qty, 0), 0::numeric) END), 0)::text FROM quality__inspection qi LEFT JOIN LATERAL (SELECT SUM(qd.qty::numeric) AS qty FROM quality__inspection_disposition qd WHERE qd.tenant_id = qi.tenant_id AND qd.inspection = qi.id AND qd.status = 'posted') disp ON TRUE LEFT JOIN LATERAL (SELECT SUM(qr.qty::numeric) AS qty FROM inventory__stock_move qr WHERE qr.tenant_id = qi.tenant_id AND qr.source IN ('quality_return', 'pharmacy_disposal') AND qr.source_id = qi.id::text AND qr.direction = 'out' AND qr.lot IS NOT DISTINCT FROM qi.lot::text) ret ON TRUE WHERE qi.tenant_id = $1 AND qi.product = $2 AND qi.warehouse = $3 AND qi.source IN ('purchase_order', 'purchase_receipt', 'pharmacy_return') AND qi.lot = $4",
             &[&tenant.id, &product_id, &warehouse_id, &lot_id],
         )
         .await?

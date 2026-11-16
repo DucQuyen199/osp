@@ -28,6 +28,22 @@ const pharmacyEnglish = {
   'Thuốc': 'Medicine', 'Trạng thái': 'Status', 'Thao tác': 'Actions', 'Xác minh': 'Verify', 'Hủy': 'Cancel',
   'kê': 'prescribed', 'tổng kê': 'total prescribed', 'đã kê': 'prescribed', 'đã cấp': 'dispensed', 'còn': 'remaining',
   'Xác minh là bước nghiệp vụ nội bộ sau khi dược sĩ đối chiếu đơn gốc. Hệ thống không thay thế việc thẩm định tính hợp lệ chuyên môn.': 'Verification is an internal workflow step after a pharmacist checks the original prescription. The system does not replace professional review of its validity.',
+  'Thuốc khách trả đang cách ly': 'Returned medicines in quarantine',
+  'Thuốc trả từ đơn thuốc được giữ ngoài tồn bán. Dược sĩ ghi nhận không đạt, sau đó ghi sổ hủy có lý do.': 'Returned prescription medicines stay outside sellable stock. A pharmacist records a failed inspection, then posts a documented disposal.',
+  'Cần quyền đọc phiếu chất lượng để xem thuốc trả đang cách ly.': 'Quality inspection read access is required to view quarantined returns.',
+  'Chưa có thuốc khách trả đang cách ly.': 'There are no returned medicines in quarantine.',
+  'Xác nhận thuốc trả không đạt': 'Confirm returned medicine failed inspection',
+  'Ghi rõ đánh giá tình trạng thuốc. Thuốc khách trả không được giải phóng để bán lại.': 'Describe the medicine condition. Customer returns cannot be released for resale.',
+  'Lý do không đạt': 'Reason for failure', 'Cách ly': 'Quarantine',
+  'Thuốc trả đã được ghi nhận không đạt và tiếp tục nằm trong khu cách ly.': 'The returned medicine was recorded as failed and remains quarantined.',
+  'Không thể ghi nhận kết quả kiểm tra thuốc trả.': 'Could not record the returned medicine inspection result.',
+  'Nhập số lượng hủy hợp lệ trong giới hạn còn cách ly và ghi lý do từ 5 đến 500 ký tự.': 'Enter a disposal quantity within the remaining quarantined amount and a reason between 5 and 500 characters.',
+  'Đã ghi sổ hủy thuốc và xuất khỏi tồn kho cách ly.': 'Medicine disposal was posted and removed from quarantined inventory.',
+  'Không thể ghi sổ hủy thuốc. Phiếu nháp được giữ để thử lại.': 'Could not post the medicine disposal. The draft was kept for retry.',
+  'Số lượng cách ly': 'Quarantined quantity', 'Mã truy xuất': 'Trace ID', 'Lô': 'Lot',
+  'Xác nhận không đạt': 'Record failed inspection', 'Số lượng hủy': 'Disposal quantity',
+  'Lý do / chứng từ hủy': 'Disposal reason / document', 'Ghi sổ hủy': 'Post disposal',
+  'Đã hủy hết số lượng cách ly.': 'All quarantined quantity has been disposed.',
 };
 
 export default pharmacyEnglish;

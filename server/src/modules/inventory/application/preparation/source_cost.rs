@@ -212,7 +212,7 @@ pub(super) async fn resolve_unit_cost(
                     unit_cost = decimal_column(&row, 0, "purchase return unit cost")?;
                 }
             }
-        } else if source == "quality_return" {
+        } else if matches!(source, "quality_return" | "pharmacy_disposal") {
             if let Some(cost) = document.get("unit_cost").and_then(money::decimal) {
                 unit_cost = cost;
             }

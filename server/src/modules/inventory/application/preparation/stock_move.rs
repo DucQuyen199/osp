@@ -305,7 +305,8 @@ pub async fn prepare_stock_move(
         ]);
     }
     if direction == "out" {
-        let insufficient = if source == "quality_return" {
+        let held_disposition = matches!(source.as_str(), "quality_return" | "pharmacy_disposal");
+        let insufficient = if held_disposition {
             qty > held.checked_add(Decimal::new(1, 6)).unwrap_or(held)
         } else if tenant.setting_bool("allowNegativeStock") && held <= Decimal::new(1, 6) {
             false
@@ -324,7 +325,7 @@ pub async fn prepare_stock_move(
                 .unwrap_or(available)
         };
         if insufficient {
-            return Ok(vec![if source == "quality_return" {
+            return Ok(vec![if held_disposition {
                 "Số lượng trả nhà cung cấp vượt lượng hàng đang bị giữ theo phiếu QC".into()
             } else {
                 "Không đủ tồn khả dụng sau khi loại trừ hàng đang chờ QC".into()

@@ -17,21 +17,6 @@ pub async fn validate_persistence(
             .and_then(Value::as_str)
             .and_then(|value| Uuid::parse_str(value).ok());
         if let Some(order_id) = order_id {
-            if tenant.has_module("pharmacy")
-                && tx
-                    .query_opt(
-                        "SELECT prescription FROM pos__pos_order WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
-                        &[&tenant.id, &order_id],
-                    )
-                    .await?
-                    .and_then(|row| row.get::<_, Option<String>>(0))
-                    .as_deref()
-                    .is_some_and(|prescription| !prescription.trim().is_empty())
-            {
-                return Ok(vec![
-                    "Prescription POS refunds require the pharmacy return and quarantine workflow".into(),
-                ]);
-            }
             if tx.query_opt("SELECT id FROM pos__pos_return WHERE tenant_id = $1 AND pos_order = $2 AND status = 'received' LIMIT 1 FOR UPDATE", &[&tenant.id, &order_id]).await?.is_some() {
                 return Ok(vec!["Giao dịch đã có phiếu trả một phần; không thể hoàn toàn bộ thêm lần nữa".into()]);
             }
@@ -47,25 +32,15 @@ pub async fn validate_persistence(
                 "Phiếu trả hàng cần tham chiếu giao dịch POS hợp lệ".into(),
             ]);
         };
-        let order = tx.query_opt("SELECT status, prescription, total::text FROM pos__pos_order WHERE tenant_id = $1 AND id = $2 FOR UPDATE", &[&tenant.id, &order_id]).await?;
+        let order = tx.query_opt("SELECT status, total::text FROM pos__pos_order WHERE tenant_id = $1 AND id = $2 FOR UPDATE", &[&tenant.id, &order_id]).await?;
         let Some(order) = order else {
             return Ok(vec!["Không tìm thấy giao dịch POS gốc trong tenant".into()]);
         };
         let status: String = order.get(0);
-        let prescription: Option<String> = order.get(1);
-        let original_total = money::decimal_str(&order.get::<_, String>(2)).unwrap_or_default();
+        let original_total = money::decimal_str(&order.get::<_, String>(1)).unwrap_or_default();
         if status != "completed" {
             return Ok(vec![
                 "Chỉ được trả hàng từ giao dịch POS đã hoàn tất và chưa hoàn hết".into(),
-            ]);
-        }
-        if prescription
-            .as_deref()
-            .is_some_and(|value| !value.trim().is_empty())
-        {
-            return Ok(vec![
-                "Giao dịch gắn với đơn thuốc cần được xử lý qua quy trình hoàn trả của nhà thuốc"
-                    .into(),
             ]);
         }
         let return_id = document

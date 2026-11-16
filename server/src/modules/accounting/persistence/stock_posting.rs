@@ -77,6 +77,7 @@ pub async fn post_stock_movement(
             ) => ("632", "156"),
             ("in", "sales_return" | "pos_order_refund" | "pos_return") => ("156", "632"),
             ("in", "purchase_receipt") => ("156", "GRNI"),
+            ("out", "pharmacy_disposal") => ("642", "156"),
             ("out", "production_order_bom") => ("154", "156"),
             ("in", "production_order" | "production_rework" | "production_concession") => {
                 ("156", "154")

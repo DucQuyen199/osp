@@ -11,6 +11,82 @@ pub async fn validate_persistence(
     action: &str,
     doc: &Value,
 ) -> R<Vec<String>> {
+    if entity == "return_disposition" && action == "posted" {
+        let Some(inspection_id) = id(doc, "inspection") else {
+            return Ok(vec![
+                "Return disposition requires a valid inspection".into(),
+            ]);
+        };
+        let Some(qty) = doc.get("qty").and_then(crate::money::decimal) else {
+            return Ok(vec!["Return disposition requires a valid quantity".into()]);
+        };
+        let inspection = tx
+            .query_opt(
+                "SELECT product, source, qty::text, warehouse, status FROM quality__inspection WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                &[&tenant.id, &inspection_id],
+            )
+            .await?;
+        let Some(inspection) = inspection else {
+            return Ok(vec!["Returned medicine inspection was not found".into()]);
+        };
+        let product: Uuid = inspection.get(0);
+        let source: String = inspection.get(1);
+        let inspected_qty = inspection
+            .get::<_, String>(2)
+            .parse::<Decimal>()
+            .unwrap_or_default();
+        let warehouse: Uuid = inspection.get(3);
+        let status: String = inspection.get(4);
+        if source != "pharmacy_return" || status != "failed" {
+            return Ok(vec![
+                "Returned medicine must be marked failed before it can be disposed".into(),
+            ]);
+        }
+        let disposed = tx
+            .query_opt(
+                "SELECT COALESCE(SUM(qty::numeric), 0)::text FROM inventory__stock_move WHERE tenant_id = $1 AND source = 'pharmacy_disposal' AND source_id = $2 AND direction = 'out'",
+                &[&tenant.id, &inspection_id.to_string()],
+            )
+            .await?;
+        let disposed = disposed
+            .map(|row| {
+                row.get::<_, String>(0)
+                    .parse::<Decimal>()
+                    .unwrap_or_default()
+            })
+            .unwrap_or_default();
+        if qty <= Decimal::ZERO
+            || disposed
+                .checked_add(qty)
+                .is_none_or(|value| value > inspected_qty + Decimal::new(1, 6))
+        {
+            return Ok(vec![
+                "Disposal quantity exceeds the quarantined quantity remaining".into(),
+            ]);
+        }
+        let lock_key = format!("inventory.stock:{}:{}:{}", tenant.id, product, warehouse);
+        tx.query_opt(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            &[&lock_key],
+        )
+        .await?;
+        let held = tx
+            .query_opt(
+                "SELECT held_qty::text FROM inventory__stock_level WHERE tenant_id = $1 AND product = $2 AND warehouse = $3 FOR UPDATE",
+                &[&tenant.id, &product, &warehouse],
+            )
+            .await?;
+        if !held.is_some_and(|row| {
+            row.get::<_, Option<String>>(0)
+                .and_then(|value| value.parse::<Decimal>().ok())
+                .is_some_and(|available| available + Decimal::new(1, 6) >= qty)
+        }) {
+            return Ok(vec![
+                "Insufficient quarantined stock to post disposal".into(),
+            ]);
+        }
+        return Ok(Vec::new());
+    }
     if tenant.has_module("pharmacy") && entity == "pos_order" && action == "completed" {
         let Some(prescription_id) = doc
             .get("prescription")

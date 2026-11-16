@@ -72,6 +72,18 @@ pub async fn validate_persistence(
     let source = document.get("source").and_then(Value::as_str);
     let source_id = id(document, "source_id");
     let product = id(document, "product");
+    if entity == "inspection"
+        && action == "failed"
+        && source == Some("pharmacy_return")
+        && !document
+            .get("note")
+            .and_then(Value::as_str)
+            .is_some_and(|note| (5..=500).contains(&note.trim().chars().count()))
+    {
+        errors.push(
+            "Returned medicine failure requires a 5 to 500 character disposition note".into(),
+        );
+    }
     if matches!(action, "created" | "passed")
         && matches!(
             source,

@@ -105,14 +105,48 @@ pub async fn apply_stock_move(
         .get("source")
         .and_then(Value::as_str)
         .unwrap_or_default();
+    let pharmacy_return = if direction == "in"
+        && tenant.has_module("pharmacy")
+        && matches!(source, "pos_order_refund" | "pos_return")
+    {
+        let source_id = movement
+            .get("source_id")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok());
+        if let Some(source_id) = source_id {
+            let prescription = if source == "pos_order_refund" {
+                tx.query_opt(
+                    "SELECT prescription FROM pos__pos_order WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                    &[&tenant.id, &source_id],
+                )
+                .await?
+            } else {
+                tx.query_opt(
+                    "SELECT po.prescription FROM pos__pos_return pr JOIN pos__pos_order po ON po.tenant_id = pr.tenant_id AND po.id = pr.pos_order WHERE pr.tenant_id = $1 AND pr.id = $2 FOR SHARE OF pr, po",
+                    &[&tenant.id, &source_id],
+                )
+                .await?
+            };
+            prescription
+                .and_then(|row| row.get::<_, Option<String>>(0))
+                .is_some_and(|prescription| !prescription.trim().is_empty())
+        } else {
+            false
+        }
+    } else {
+        false
+    };
     let held_delta = match (direction, source) {
         ("in", "purchase_order" | "purchase_receipt") => qty,
-        ("out", "quality_return") => Decimal::ZERO.checked_sub(qty).ok_or_else(|| {
-            crate::error::ApiError::validation(
-                "inventory.stock_move",
-                vec!["Held stock quantity exceeds the supported decimal range".into()],
-            )
-        })?,
+        ("in", "pos_order_refund" | "pos_return") if pharmacy_return => qty,
+        ("out", "quality_return" | "pharmacy_disposal") => {
+            Decimal::ZERO.checked_sub(qty).ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    "inventory.stock_move",
+                    vec!["Held stock quantity exceeds the supported decimal range".into()],
+                )
+            })?
+        }
         _ => Decimal::ZERO,
     };
     let lock_key = format!(
@@ -133,7 +167,7 @@ pub async fn apply_stock_move(
         &[&tenant.id, &product_id, &warehouse_id],
     ).await?;
     if direction == "out"
-        && source != "quality_return"
+        && !matches!(source, "quality_return" | "pharmacy_disposal")
         && tenant.has_module("logistics")
         && !tenant.setting_bool("allowNegativeStock")
     {

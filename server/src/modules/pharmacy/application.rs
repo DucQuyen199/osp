@@ -3,6 +3,7 @@ use crate::{
     db::Tx,
     error::{ApiError, R},
     kernel::{Actor, Kernel, Opts, Tenant},
+    money,
 };
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
@@ -225,6 +226,160 @@ async fn is_fully_dispensed(
         .all(|(product, qty)| dispensed.get(product).copied().unwrap_or_default() >= *qty))
 }
 
+async fn create_return_inspections(
+    kernel: &Kernel,
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    event_type: &str,
+    document: &Value,
+    event_id: Uuid,
+    depth: u32,
+) -> R<bool> {
+    let (order_id, movement_source, movement_source_id, reason) =
+        if event_type == "pos.pos_order.refunded" {
+            let Some(order_id) = document
+                .get("id")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+            else {
+                return Err(ApiError::validation(
+                    event_type,
+                    vec!["Refund requires a POS order id".into()],
+                ));
+            };
+            (
+                order_id,
+                "pos_order_refund",
+                order_id,
+                document
+                    .get("refund_reason")
+                    .and_then(Value::as_str)
+                    .unwrap_or(""),
+            )
+        } else {
+            let Some(order_id) = document
+                .get("pos_order")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+            else {
+                return Err(ApiError::validation(
+                    event_type,
+                    vec!["POS return requires its source order".into()],
+                ));
+            };
+            let Some(return_id) = document
+                .get("id")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+            else {
+                return Err(ApiError::validation(
+                    event_type,
+                    vec!["POS return requires its id".into()],
+                ));
+            };
+            (
+                order_id,
+                "pos_return",
+                return_id,
+                document.get("reason").and_then(Value::as_str).unwrap_or(""),
+            )
+        };
+    let prescription = tx
+        .query_opt(
+            "SELECT prescription FROM pos__pos_order WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+            &[&tenant.id, &order_id],
+        )
+        .await?;
+    if !prescription
+        .and_then(|row| row.get::<_, Option<String>>(0))
+        .as_deref()
+        .is_some_and(|value| !value.trim().is_empty())
+    {
+        return Ok(false);
+    }
+    let rows = tx
+        .query(
+            "SELECT product, warehouse, lot, SUM(qty::numeric)::text, SUM(total_cost::numeric)::text FROM inventory__stock_move WHERE tenant_id = $1 AND source = $2 AND source_id = $3 AND direction = 'in' GROUP BY product, warehouse, lot ORDER BY product, lot NULLS LAST",
+            &[&tenant.id, &movement_source, &movement_source_id.to_string()],
+        )
+        .await?;
+    if rows.is_empty() {
+        return Ok(false);
+    }
+    let entity = kernel.ent(tenant, "quality.inspection")?;
+    let opts = Opts {
+        depth: Some(depth + 1),
+        causation: Some(event_id),
+        silent: false,
+    };
+    for row in rows {
+        let product: Uuid = row.get(0);
+        let warehouse: Uuid = row.get(1);
+        let lot: Option<Uuid> = row.get(2);
+        let qty = row
+            .get::<_, String>(3)
+            .parse::<rust_decimal::Decimal>()
+            .unwrap_or_default();
+        let total_cost = row
+            .get::<_, String>(4)
+            .parse::<rust_decimal::Decimal>()
+            .unwrap_or_default();
+        if qty <= rust_decimal::Decimal::ZERO {
+            return Err(ApiError::validation(
+                event_type,
+                vec!["Returned medicine movement has an invalid quantity".into()],
+            ));
+        }
+        let unit_cost = total_cost.checked_div(qty).ok_or_else(|| {
+            ApiError::validation(event_type, vec!["Returned medicine cost is invalid".into()])
+        })?;
+        let duplicate = tx
+            .query_opt(
+                "SELECT id FROM quality__inspection WHERE tenant_id = $1 AND source = 'pharmacy_return' AND source_id = $2 AND product = $3 AND warehouse = $4 AND lot IS NOT DISTINCT FROM $5 AND abs(qty::numeric - $6::text::numeric) <= 0.000001 LIMIT 1",
+                &[&tenant.id, &movement_source_id.to_string(), &product, &warehouse, &lot, &qty.normalize().to_string()],
+            )
+            .await?
+            .is_some();
+        if duplicate {
+            continue;
+        }
+        let mut data = Map::new();
+        data.insert("product".into(), serde_json::json!(product));
+        data.insert("source".into(), Value::String("pharmacy_return".into()));
+        data.insert(
+            "source_id".into(),
+            Value::String(movement_source_id.to_string()),
+        );
+        data.insert(
+            "qty".into(),
+            money::json_number(qty).ok_or_else(|| {
+                ApiError::validation(event_type, vec!["Returned quantity is out of range".into()])
+            })?,
+        );
+        data.insert("warehouse".into(), serde_json::json!(warehouse));
+        if let Some(lot) = lot {
+            data.insert("lot".into(), serde_json::json!(lot));
+        }
+        data.insert(
+            "unit_cost".into(),
+            money::json_number(unit_cost).ok_or_else(|| {
+                ApiError::validation(event_type, vec!["Returned cost is out of range".into()])
+            })?,
+        );
+        data.insert(
+            "note".into(),
+            Value::String(format!(
+                "Customer return from prescription POS order {order_id}. Reason: {}. Quarantine; do not resell.",
+                reason.trim()
+            )),
+        );
+        kernel
+            .create_in(tx, &Actor::System, tenant, &entity, data, &opts)
+            .await?;
+    }
+    Ok(true)
+}
+
 pub async fn handle_source_event(
     kernel: &Kernel,
     tx: &Tx<'_>,
@@ -234,7 +389,104 @@ pub async fn handle_source_event(
     event_id: Uuid,
     depth: u32,
 ) -> R<bool> {
-    if event_type != "pos.pos_order.completed" || !tenant.has_module("pharmacy") {
+    if !tenant.has_module("pharmacy") {
+        return Ok(false);
+    }
+    if event_type == "pharmacy.return_disposition.posted" {
+        let Some(inspection_id) = document
+            .get("inspection")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+        else {
+            return Err(ApiError::validation(
+                event_type,
+                vec!["Pharmacy return disposal requires an inspection id".into()],
+            ));
+        };
+        let inspection = tx
+            .query_opt(
+                "SELECT product, warehouse, lot, unit_cost::text, source, status FROM quality__inspection WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                &[&tenant.id, &inspection_id],
+            )
+            .await?
+            .ok_or_else(|| ApiError::not_found("Returned medicine inspection was not found"))?;
+        let source: String = inspection.get(4);
+        let status: String = inspection.get(5);
+        if source != "pharmacy_return" || status != "failed" {
+            return Err(ApiError::validation(
+                event_type,
+                vec!["Only failed customer-returned medicine can be disposed".into()],
+            ));
+        }
+        let qty = document
+            .get("qty")
+            .and_then(money::decimal)
+            .filter(|qty| *qty > rust_decimal::Decimal::ZERO)
+            .ok_or_else(|| {
+                ApiError::validation(
+                    event_type,
+                    vec!["Disposal quantity must be positive".into()],
+                )
+            })?;
+        let unit_cost = inspection
+            .get::<_, Option<String>>(3)
+            .and_then(|value| money::decimal_str(&value))
+            .unwrap_or_default();
+        let entity = kernel.ent(tenant, "inventory.stock_move")?;
+        let mut movement = Map::new();
+        movement.insert(
+            "product".into(),
+            serde_json::json!(inspection.get::<_, Uuid>(0)),
+        );
+        movement.insert(
+            "warehouse".into(),
+            serde_json::json!(inspection.get::<_, Uuid>(1)),
+        );
+        if let Some(lot) = inspection.get::<_, Option<Uuid>>(2) {
+            movement.insert("lot".into(), serde_json::json!(lot));
+        }
+        movement.insert(
+            "qty".into(),
+            money::json_number(qty).ok_or_else(|| {
+                ApiError::validation(event_type, vec!["Disposal quantity is out of range".into()])
+            })?,
+        );
+        movement.insert("direction".into(), Value::String("out".into()));
+        movement.insert("source".into(), Value::String("pharmacy_disposal".into()));
+        movement.insert("source_id".into(), Value::String(inspection_id.to_string()));
+        movement.insert(
+            "unit_cost".into(),
+            money::json_number(unit_cost).ok_or_else(|| {
+                ApiError::validation(
+                    event_type,
+                    vec!["Disposal unit cost is out of range".into()],
+                )
+            })?,
+        );
+        movement.insert(
+            "note".into(),
+            document.get("note").cloned().unwrap_or(Value::Null),
+        );
+        let opts = Opts {
+            depth: Some(depth + 1),
+            causation: Some(event_id),
+            silent: false,
+        };
+        kernel
+            .create_in(tx, &Actor::System, tenant, &entity, movement, &opts)
+            .await?;
+        return Ok(true);
+    }
+    if matches!(
+        event_type,
+        "pos.pos_return.received" | "pos.pos_order.refunded"
+    ) {
+        return create_return_inspections(
+            kernel, tx, tenant, event_type, document, event_id, depth,
+        )
+        .await;
+    }
+    if event_type != "pos.pos_order.completed" {
         return Ok(false);
     }
     let Some(prescription_id) = document
