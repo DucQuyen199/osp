@@ -24,6 +24,7 @@ Feature-local English dictionaries are used for the authentication flow, lazy-lo
 6. Keep generated `client-dist/` output out of commits. `npm run build` copies the public assets and creates deployable output.
 
 For translations used only by a lazy-loaded feature, keep its English text map in that feature directory and use `uiTextWith()` to fall back to the shared dictionary. This keeps feature vocabulary out of the startup bundle.
+Wrap every user-visible literal with `uiText()` or the feature-local translator, including text chosen by conditional branches and fallback labels; raw Vietnamese JSX text will stay untranslated in `en-US`.
 
 ### Feature-local workflow components
 
