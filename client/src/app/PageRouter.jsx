@@ -1,4 +1,5 @@
 ﻿import { lazy, Suspense } from 'react';
+import RouteErrorBoundary from '../components/RouteErrorBoundary.jsx';
 const EntityListPage = lazy(() => import('../features/entities/EntityListPage.jsx'));
 const EntityDetailPage = lazy(() => import('../features/entities/EntityDetailPage.jsx'));
 const EventsPage = lazy(() => import('../features/events/EventsPage.jsx'));
@@ -169,7 +170,7 @@ const SETTINGS_ROUTES = Object.freeze({
   data: DataSettingsPage,
 });
 
-export default function PageRouter({ route, meta, summary }) {
+function ResolvedPage({ route, meta, summary }) {
   if (route.name === 'entity') {
     return <Suspense fallback={<div className="card-pad"><div className="skeleton" data-h="row" /></div>}>
       <EntityListPage key={route.qname} qname={route.qname} />
@@ -195,4 +196,10 @@ export default function PageRouter({ route, meta, summary }) {
   return <Suspense fallback={<div className="card-pad"><div className="skeleton" data-h="row" /></div>}>
     <Page {...props} />
   </Suspense>;
+}
+
+export default function PageRouter(props) {
+  const { route } = props;
+  const routeKey = [route.name, route.tab, route.module, route.qname, route.id, route.view, route.lotId].filter(Boolean).join(':');
+  return <RouteErrorBoundary key={routeKey}><ResolvedPage {...props} /></RouteErrorBoundary>;
 }

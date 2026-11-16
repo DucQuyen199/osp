@@ -4,6 +4,7 @@
 
 ## [Unreleased]
 ### Added
+- React routes now use a keyed error boundary so failed lazy-loaded screens show recovery actions and can reset when users navigate to another screen.
 - Automotive repair orders now require an integer intake odometer snapshot and the server prevents mileage from moving backward across workshop history or vehicle updates.
 - Retail demo orders now provide valid cash tender and CRM opportunities include the required warehouse and sales lines before converting into draft orders.
 - Moved 88 React screens and entity dialogs into 32 domain feature folders and rewrote local imports to preserve the existing route and page behavior.
