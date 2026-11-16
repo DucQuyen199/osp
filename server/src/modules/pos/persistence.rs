@@ -17,6 +17,21 @@ pub async fn validate_persistence(
             .and_then(Value::as_str)
             .and_then(|value| Uuid::parse_str(value).ok());
         if let Some(order_id) = order_id {
+            if tenant.has_module("pharmacy")
+                && tx
+                    .query_opt(
+                        "SELECT prescription FROM pos__pos_order WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                        &[&tenant.id, &order_id],
+                    )
+                    .await?
+                    .and_then(|row| row.get::<_, Option<String>>(0))
+                    .as_deref()
+                    .is_some_and(|prescription| !prescription.trim().is_empty())
+            {
+                return Ok(vec![
+                    "Prescription POS refunds require the pharmacy return and quarantine workflow".into(),
+                ]);
+            }
             if tx.query_opt("SELECT id FROM pos__pos_return WHERE tenant_id = $1 AND pos_order = $2 AND status = 'received' LIMIT 1 FOR UPDATE", &[&tenant.id, &order_id]).await?.is_some() {
                 return Ok(vec!["Giao dịch đã có phiếu trả một phần; không thể hoàn toàn bộ thêm lần nữa".into()]);
             }
