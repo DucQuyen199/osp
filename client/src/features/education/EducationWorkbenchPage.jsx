@@ -5,6 +5,7 @@ import { fmtDate, fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../l
 import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import educationEnglish from './education.en.js';
 import AttendanceRosterTable from './components/AttendanceRosterTable.jsx';
+import TuitionLedgerTable from './components/TuitionLedgerTable.jsx';
 
 const t = (text) => uiTextWith(text, educationEnglish);
 
@@ -321,7 +322,7 @@ export default function EducationWorkbenchPage() {
         <label className="field"><span className="label">{t("Nội dung thu")}</span><input className="input" maxLength="240" value={feeForm.note} onChange={(event) => setFeeForm((current) => ({ ...current, note: event.target.value }))} placeholder={feeForm.enrollment ? `Học phí ${selectedFeeClass?.name || 'lớp học'}` : 'Ví dụ: tài liệu học tập'} /></label>
         <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={busy || loading || !feeForm.student || (feeForm.enrollment && !selectedFeeClass?.tuition)}>{t("Tạo khoản học phí nháp")}</button></div>
       </form>}
-      {loading ? <div className="skeleton" data-h="row"/> : fees.length === 0 ? <div className="empty">{t("Chưa có khoản học phí. Tạo khoản nháp ở trên rồi phát hành để sinh hóa đơn.")}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t("Học viên")}</th><th>{t("Kỳ / nội dung")}</th><th>{t("Số tiền")}</th><th>{t("Hạn thu")}</th><th>{t("Trạng thái / hóa đơn")}</th><th>{t("Thao tác")}</th></tr></thead><tbody>{[...fees].sort((a, b) => String(b.due_date || b.created_at || '').localeCompare(String(a.due_date || a.created_at || ''))).map((fee) => { const student = studentById.get(fee.student); const party = parties.get(student?.party); const invoice = invoiceByFee.get(fee.id); return <tr key={fee.id}><td>{party ? recordLabel('master-data.party', party) : student?.student_code || t('Học viên')}<div className="small muted">{student?.student_code || ''}</div></td><td>{fee.period || fee.note || 'Khoản thu'}</td><td className="num">{fmtMoney(fee.amount || 0)}</td><td>{fee.due_date ? fmtDate(fee.due_date) : '—'}</td><td><span className={`badge ${fee.status === 'paid' ? 'success' : fee.status === 'issued' ? 'warning' : 'plain'}`}>{statusLabel(fee.status)}</span>{invoice && <div><a className="btn btn-ghost btn-sm" href={`#/e/accounting/invoice/${invoice.id}`}>{statusLabel(invoice.status)} · {t('mở hóa đơn')}</a></div>}</td><td>{fee.status === 'draft' && can('school.fee.issued') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy) || !fee.party || Number(fee.amount) <= 0} onClick={() => issueFee(fee)}>{t("Phát hành")}</button>}{fee.status === 'issued' && !invoice && <span className="small muted">{t("Đang tạo hóa đơn")}</span>}</td></tr>; })}</tbody></table></div>}
+      <TuitionLedgerTable fees={fees} loading={loading} studentById={studentById} parties={parties} invoiceByFee={invoiceByFee} busy={busy} canIssue={can('school.fee.issued')} onIssue={issueFee} recordLabel={recordLabel} t={t} />
     </section>}
   </div>;
 }

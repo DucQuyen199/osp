@@ -32,6 +32,7 @@ For translations used only by a lazy-loaded feature, keep its English text map i
 - Keep business rules, API calls, and cross-module coordination out of presentational line editors and panels. Promote a component to `components/` only when more than one domain uses it.
 - The ecommerce order desk follows this boundary: `EcommerceOrderDeskPage` owns loading, permissions, API actions and cart state; `WebOrderCreateForm` edits controlled values through callbacks, and `WebOrderCard` renders an order and emits requested actions.
 - The school workbench keeps attendance persistence and permission checks in `EducationWorkbenchPage`; `AttendanceRosterTable` renders the roster and requests marks through a callback.
+- The school workbench owns tuition issuance permissions and invoice actions; `TuitionLedgerTable` renders controlled fee and invoice records and emits issuance requests through a callback.
 - The manufacturing workbench keeps production commands and output drafts in `ManufacturingWipPage`; `ProductionOrderCard` renders the controlled output fields and emits requested transitions.
 - The purchasing workbench owns supplier-invoice state and validation; `SupplierInvoiceAdjustmentsEditor` edits controlled charge and landed-cost allocations through a callback.
 - The POS terminal owns cart, tender, permissions and checkout; `PosCheckoutPanel` displays controlled payment fields and emits the checkout request.
