@@ -110,7 +110,7 @@ export default function PharmacyWorkbenchPage() {
 
   return <div className="page">
     <div className="page-head"><div><h1>{t('Đơn thuốc nhà thuốc')}</h1><p className="sub">{t('Ghi nhận đơn, kiểm tra thông tin và xác minh trước khi bán thuốc kê đơn tại POS.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={load}>{t('Làm mới')}</button></div>
-    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     <section className="card card-pad">
       <h2>{t('Ghi nhận đơn mới')}</h2>
       <form className="form-grid" onSubmit={createPrescription}>

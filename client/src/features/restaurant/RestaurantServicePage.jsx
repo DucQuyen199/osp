@@ -137,7 +137,7 @@ export default function RestaurantServicePage() {
 
   return <div className="page-content restaurant-service-page">
     <header className="page-header"><div><h1>{t('Phục vụ nhà hàng')}</h1><p className="muted">{t('Mở bàn, ghi món, gửi bếp, theo dõi món sẵn sàng và thanh toán.')}</p></div><button className="button" onClick={() => load()} disabled={loading}>{t('Làm mới')}</button></header>
-    {error && <div className="alert error" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert error" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     {can('restaurant.recipe.read') && <section className="card restaurant-recipes"><header className="restaurant-order-card-head"><div><h2>{t('Công thức món')}</h2><p className="small muted">{t('Định lượng nguyên liệu trên một lần nấu; kho trừ theo đơn vị gốc.')}</p></div>{can('restaurant.recipe.create') && <button className="button" type="button" onClick={resetRecipe}>{t('Công thức mới')}</button>}</header>
       {(can('restaurant.recipe.create') || can('restaurant.recipe.update')) && <form onSubmit={saveRecipe} className="restaurant-recipe-form">
         <label className="field"><span>{t('Món trong thực đơn *')}</span><select className="select" required value={recipeProduct} disabled={Boolean(editingRecipe)} onChange={(event) => setRecipeProduct(event.target.value)}><option value="">{t('Chọn món')}</option>{recipeProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>

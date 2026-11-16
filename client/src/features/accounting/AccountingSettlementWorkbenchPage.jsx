@@ -103,7 +103,7 @@ export default function AccountingSettlementWorkbenchPage() {
 
   return <div className="page">
     <div className="page-head"><div><h1>{uiText("Thu/chi phân bổ công nợ")}</h1><p className="sub">{uiText("Gom một lần thu hoặc chi để phân bổ vào nhiều hóa đơn cùng đối tác và tiền tệ. Mỗi hóa đơn vẫn có payment riêng; sổ cái nhận một bút toán tổng hợp để đối soát giao dịch ngân hàng.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={load}>{uiText("Làm mới")}</button></div>
-    {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
     {can('accounting.settlement_batch.create') && <section className="card card-pad"><h2>{uiText("Lập phiếu thu/chi")}</h2><form className="form-grid" onSubmit={createDraft}>
       <label className="field"><span className="label">{uiText("Nghiệp vụ *")}</span><select className="select" value={form.direction} onChange={(event) => changeForm('direction', event.target.value)}><option value="receipt">{uiText("Thu khách hàng")}</option><option value="disbursement">{uiText("Chi nhà cung cấp")}</option></select></label>
       <label className="field"><span className="label">{uiText("Đối tác *")}</span><select className="select" required value={form.party} onChange={(event) => changeForm('party', event.target.value)}><option value="">{uiText("Chọn đối tác")}</option>{[...parties.values()].map((party) => <option key={party.id} value={party.id}>{recordLabel('master-data.party', party)}</option>)}</select></label>

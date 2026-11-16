@@ -151,7 +151,7 @@ export default function PerformanceWorkbenchPage() {
 
   return <div className="page">
     <div className="page-head"><div><h1>{t("Mục tiêu và đánh giá hiệu suất")}</h1><p className="sub">{t("Lập mục tiêu theo kỳ, theo dõi kết quả then chốt và quản lý quy trình đánh giá, chỉnh sửa, xác nhận của nhân viên.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t("Làm mới")}</button></div>
-    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     <div className="stats" style={{ marginBottom: 16 }}>
       <div className="card stat"><span className="stat-label">{t("Mục tiêu đang quản lý")}</span><strong className="stat-value">{objectives.length}</strong></div>
       <div className="card stat"><span className="stat-label">{t("Kết quả then chốt")}</span><strong className="stat-value">{keyResults.length}</strong></div>

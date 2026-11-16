@@ -102,7 +102,7 @@ export default function RecruitmentWorkbenchPage() {
 
   return <div className="page">
     <div className="page-head"><div><h1>{t('Tuyển dụng và quản lý ứng viên')}</h1><p className="sub">{t('Mở vị trí, lưu hồ sơ ứng viên, theo dõi từng vòng tuyển và chuyển ứng viên trúng tuyển thành nhân viên.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div>
-    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     <div className="stats" style={{ marginBottom: 16 }}><div className="card stat"><span className="stat-label">{t('Vị trí đang mở')}</span><strong className="stat-value">{openJobs.length}</strong></div><div className="card stat"><span className="stat-label">{t('Hồ sơ đang xét')}</span><strong className="stat-value">{activeApplications.length}</strong></div><div className="card stat"><span className="stat-label">{t('Đã tuyển')}</span><strong className="stat-value">{hiredApplications.length}</strong></div><div className="card stat"><span className="stat-label">{t('Đã từ chối')}</span><strong className="stat-value">{rejectedApplications.length}</strong></div></div>
 
     <div className="layout-split">

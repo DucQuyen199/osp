@@ -114,7 +114,7 @@ export default function EInvoiceWorkbenchPage() {
 
   return <div className="page">
     <div className="page-head"><div><h1>{uiText("Hóa đơn điện tử")}</h1><p className="sub">{uiText("Theo dõi yêu cầu phát hành từ hóa đơn kế toán đã ghi sổ, xử lý lỗi provider và lưu dấu vết hủy theo từng ngành hàng.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={load}>{uiText("Làm mới")}</button></div>
-    {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
     {!enabled && <div className="alert warning" role="status">{uiText("Module hóa đơn điện tử hiện không nằm trong gói ngành của tenant.")}</div>}
     <div className="stats" style={{ marginBottom: 16 }}>
       {filterOptions.map(([key, label]) => <button key={key} className="card stat" type="button" onClick={() => setFilter(key)} aria-pressed={filter === key} style={filter === key ? { borderColor: 'var(--accent)', background: 'var(--accent-soft)' } : undefined}><span className="stat-label">{uiText(label)}</span><strong className="stat-value">{counts[key] || 0}</strong></button>)}

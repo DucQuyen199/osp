@@ -124,7 +124,7 @@ export default function EventsOperationsPage() {
 
   return <div className="page">
     <div className="page-head"><div><h1>{t('Sự kiện và quầy vé')}</h1><p className="sub">{t('Quản lý công bố, sức chứa, giữ chỗ, thanh toán vé, check-in và hoàn vé.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={load}>{t('Làm mới')}</button></div>
-    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
 
     {can('events.event.create') && <section className="card card-pad"><h2>{t('Tạo sự kiện')}</h2><form className="form-grid" onSubmit={createEvent}>
       <label className="field"><span className="label">{t('Tên sự kiện *')}</span><input className="input" required value={eventForm.name} onChange={(e) => setEventForm((x) => ({ ...x, name: e.target.value }))} /></label>

@@ -81,7 +81,7 @@ export default function MfaSettingsPage() {
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Bảo mật tài khoản')}</h1><p className="sub">{uiText('Thêm mã xác thực cho lần đăng nhập bằng mật khẩu. Mã khôi phục chỉ dùng một lần.')}</p></div></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
-    {notice && <div className="alert success" role="status">{notice}</div>}
+    {notice && <div className="alert success" role="status">{uiText(notice)}</div>}
     <section className="card stack">
       <div className="card-head"><h2>{uiText('Phiên đăng nhập')}</h2><span className="badge plain">{sessions.length} {uiText('phiên')}</span></div>
       <p className="muted">{uiText('Xem các phiên trình duyệt đang hoạt động. Khi thu hồi, phiên khác sẽ bị đăng xuất ở yêu cầu tiếp theo.')}</p>

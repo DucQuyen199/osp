@@ -151,7 +151,7 @@ export default function DocumentWorkbenchPage() {
 
   return <div className="page">
     <div className="page-head"><div><h1>{t('Thư viện tài liệu')}</h1><p className="sub">{t('Lưu trữ tập trung theo thư mục, quản lý từng phiên bản tệp và theo dõi yêu cầu ký cùng hồ sơ.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div>
-    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     <div className="stats" style={{ marginBottom: 16 }}><div className="card stat"><span className="stat-label">{t('Hồ sơ tài liệu')}</span><strong className="stat-value">{documents.length}</strong></div><div className="card stat"><span className="stat-label">{t('Thư mục')}</span><strong className="stat-value">{folders.length}</strong></div><div className="card stat"><span className="stat-label">{t('Yêu cầu ký đang chờ')}</span><strong className="stat-value">{pendingCount}</strong></div><div className="card stat"><span className="stat-label">{t('Đã ký')}</span><strong className="stat-value">{signedCount}</strong></div></div>
 
     {(can('document.folder.create') || can('document.document.create')) && <div className="two-col">

@@ -140,7 +140,7 @@ export default function ProjectWorkbenchPage() {
   const activeEmployees = [...employees.values()].filter((employee) => employee.status === 'active');
   return <div className="page">
     <div className="page-head"><div><h1>{t("Quản lý dự án")}</h1><p className="sub">{t("Lập dự án, theo dõi công việc theo quan hệ tiên quyết và ghi nhận giờ công theo dự án.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t("Làm mới")}</button></div>
-    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     {can('project.project.create') && <section className="card card-pad"><h2>{t("Tạo dự án")}</h2><form className="form-grid" onSubmit={createProject}>
       <label className="field"><span className="label">{t("Tên dự án *")}</span><input className="input" required maxLength="160" value={projectForm.name} onChange={(event) => setProjectForm((current) => ({ ...current, name: event.target.value }))} /></label>
       {can('master-data.party.read') && <label className="field"><span className="label">{t("Khách hàng / đối tác")}</span><select className="select" value={projectForm.party} onChange={(event) => setProjectForm((current) => ({ ...current, party: event.target.value }))}><option value="">{t("Không gắn đối tác")}</option>{[...parties.values()].map((party) => <option key={party.id} value={party.id}>{recordLabel('master-data.party', party)}</option>)}</select></label>}

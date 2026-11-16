@@ -199,7 +199,7 @@ export default function AgricultureOperationsPage() {
   return <div className="page agriculture-page">
     <div className="page-head"><div><h1>{t('Điều hành mùa vụ')}</h1><p className="sub">{t('Quản lý trang trại, theo dõi vụ đang canh tác, ghi vật tư và nhập sản lượng thu hoạch vào kho.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{loading ? t('Đang tải…') : t('Làm mới')}</button></div>
     <div className="row wrap agriculture-summary"><span className="badge success">{t('Vụ đang canh tác')}: {activeCycles}</span><span className="badge warning">{t('Có ngày thu dự kiến')}: {upcomingCycles}</span><span className="badge plain">{t('Trang trại')}: {farms.length}</span></div>
-    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     {loading ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <>
       <div className="agriculture-setup">
         <details className="card agriculture-panel"><summary>{t('Tạo trang trại')}</summary><form className="agriculture-form" onSubmit={createFarm}>

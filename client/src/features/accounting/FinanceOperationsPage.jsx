@@ -172,7 +172,7 @@ export default function FinanceOperationsPage() {
 
   return <div className="page">
     <div className="page-head"><div><h1>{uiText("Điều hành cho vay và bảo hiểm")}</h1><p className="sub">{uiText("Theo dõi hồ sơ qua các bước tiếp nhận, thẩm định, giải ngân hoặc chi trả và thu nợ.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={load}>{uiText("Làm mới")}</button></div>
-    {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
 
     <LoanRepaymentPanel {...{ can, loans, loading, uiText, loanForm, setLoanForm, parties, recordLabel, createLoan, busy, repaymentsByLoan, statusLabel, today, loanAction, repaymentMethods, setRepaymentMethods, repaymentAction, money }} />
 

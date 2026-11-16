@@ -121,7 +121,7 @@ export default function HelpdeskWorkbenchPage() {
 
   return <div className="page">
     <div className="page-head"><div><h1>{t('Hộp thư hỗ trợ')}</h1><p className="sub">{t('Tiếp nhận, phân công, trao đổi với khách hàng, theo dõi SLA và lưu kết quả xử lý trong cùng hồ sơ.')}</p></div><div className="row wrap"><a className="btn btn-secondary" href="#/reports/helpdesk/sla">{t('Báo cáo SLA')}</a><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div></div>
-    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
+    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     {can('helpdesk.ticket.create') && <section className="card card-pad"><h2>{t('Tiếp nhận ticket')}</h2><form className="form-grid" onSubmit={createTicket}>
       <label className="field"><span className="label">{t('Tiêu đề *')}</span><input className="input" required maxLength="240" value={ticketForm.subject} onChange={(event) => setTicketForm((current) => ({ ...current, subject: event.target.value }))} /></label>
       <label className="field"><span className="label">{t('Khách hàng')}</span><select className="select" value={ticketForm.party} onChange={(event) => setTicketForm((current) => ({ ...current, party: event.target.value }))}><option value="">{t('Chưa gắn hồ sơ khách')}</option>{[...parties.values()].filter((party) => party.is_customer !== false).map((party) => <option key={party.id} value={party.id}>{recordLabel('master-data.party', party)}</option>)}</select></label>
