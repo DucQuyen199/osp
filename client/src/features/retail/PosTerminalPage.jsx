@@ -3,6 +3,7 @@ import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtMoney, fmtDateTime, statusLabel, uiText } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import PosReceipt from './components/PosReceipt.jsx';
 
 const readItems = (response) => Array.isArray(response?.items) ? response.items : [];
 const displayPrice = (product) => Number(product?.price) || 0;
@@ -324,30 +325,6 @@ export default function PosTerminalPage() {
         </aside>
       </div>}
     </>}
-    {printingOrder && <article className="pos-receipt is-printing" aria-hidden="true">
-      <header><strong>{app.meta?.name || t('Cửa hàng')}</strong><div>{t('BIÊN NHẬN BÁN HÀNG')}</div></header>
-      <hr />
-      <div>{t('Mã đơn:')} {String(printingOrder.id).slice(0, 8)}</div>
-      <div>{t('Thời gian:')} {fmtDateTime(printingOrder.created_at)}</div>
-      <div>{t('Khách hàng:')} {parties.get(printingOrder.party)?.name || t('Khách lẻ')}</div>
-      {printingOrder.status === 'refunded' && <strong>{t('ĐÃ HOÀN TIỀN')}</strong>}
-      <hr />
-      {(printingOrder.lines || []).map((line, index) => {
-        const qty = Number(line.qty) || 0;
-        const unitPrice = Number(line.price ?? line.unit_price) || 0;
-        return <div className="pos-receipt-line" key={`${line.product || 'line'}-${index}`}>
-          <strong>{line.product_name || products.get(line.product)?.name || t('Mặt hàng')}</strong>
-          <div>{qty}{line.uom_name ? ` ${line.uom_name}` : ''} × {fmtMoney(unitPrice)} <span>{fmtMoney(qty * unitPrice)}</span></div>
-        </div>;
-      })}
-      <hr />
-      {Number(printingOrder.voucher_discount) > 0 && <div className="pos-receipt-total"><span>{t('Chiết khấu')}</span><span>−{fmtMoney(printingOrder.voucher_discount)}</span></div>}
-      <div className="pos-receipt-total"><span>{t('Thuế')}</span><span>{fmtMoney(printingOrder.tax_total || 0)}</span></div>
-      <div className="pos-receipt-total pos-receipt-grand"><strong>{t('Tổng cộng')}</strong><strong>{fmtMoney(printingOrder.total || 0)}</strong></div>
-      <div>{t('Thanh toán:')} {t(printingOrder.method === 'cash' ? 'Tiền mặt' : printingOrder.method === 'card' ? 'Thẻ' : printingOrder.method === 'transfer' ? 'Chuyển khoản' : printingOrder.method === 'ewallet' ? 'Ví điện tử' : '—')}</div>
-      {printingOrder.method === 'cash' && <><div>{t('Khách đưa:')} {fmtMoney(printingOrder.cash_received || 0)}</div><div>{t('Tiền thối:')} {fmtMoney(printingOrder.change_due || 0)}</div></>}
-      {printingOrder.refund_reason && <div>{t('Lý do hoàn:')} {printingOrder.refund_reason}</div>}
-      <footer>{t('Cảm ơn quý khách!')}</footer>
-    </article>}
+    <PosReceipt order={printingOrder} storeName={app.meta?.name} partyName={parties.get(printingOrder?.party)?.name} products={products} t={t} />
   </div>;
 }
