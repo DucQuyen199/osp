@@ -191,6 +191,8 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   await page.goto(`${BASE}/#/purchasing`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Purchasing and receiving', 'màn hình mua hàng chưa được dịch');
+  const purchasingText = await page.$eval('#main', (main) => main.innerText);
+  must(purchasingText.includes('Internal purchase request') && purchasingText.includes('Create direct purchase order') && purchasingText.includes('Receiving warehouse *'), 'purchase requisition and purchase order workflow is not translated');
   await axe('purchasing workbench tiếng Anh');
   await page.goto(`${BASE}/#/reports/inventory/replenishment`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#main h1');
