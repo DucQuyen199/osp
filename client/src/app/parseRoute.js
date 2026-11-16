@@ -77,6 +77,6 @@
   if (a === 'reports' && b === 'helpdesk' && c === 'sla') return { name: 'helpdesk-sla' };
   if (a === 'settings') return { name: 'settings', tab: b || 'users' };
   if (a === 'account' && b === 'security') return { name: 'account-security' };
-  return { name: 'home' };
+  return { name: 'not-found' };
 }
 

@@ -4,6 +4,7 @@
 
 ## [Unreleased]
 ### Added
+- Unknown frontend routes now show a clear 404 page with a direct return to the workspace instead of silently opening the home dashboard.
 - Manufacturing work-center capacity now compares orders only when their finished products share the same base unit, and labels the daily limit in base units to prevent invalid mixed-unit scheduling.
 - Separated the React mount point from authentication, session, theme, and app-shell lifecycle logic.
 - Reorganized the React application into focused route, page resolver, navigation, search, and icon modules; all business screens now load on demand and the main JavaScript bundle is about 43% smaller.

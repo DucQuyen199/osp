@@ -3,6 +3,7 @@ const EntityListPage = lazy(() => import('../EntityListPage.jsx'));
 const EntityDetailPage = lazy(() => import('../EntityDetailPage.jsx'));
 const EventsPage = lazy(() => import('../EventsPage.jsx'));
 const HomePage = lazy(() => import('../HomePage.jsx'));
+const NotFoundPage = lazy(() => import('../NotFoundPage.jsx'));
 const ModuleOverviewPage = lazy(() => import('../ModuleOverviewPage.jsx'));
 const AccountingReportsPage = lazy(() => import('../AccountingReportsPage.jsx'));
 const InventoryReplenishmentPage = lazy(() => import('../InventoryReplenishmentPage.jsx'));
@@ -93,6 +94,7 @@ export default function PageRouter({ route, meta, summary }) {
     : route.name === 'account-security' ? <MfaSettingsPage />
     : route.name === 'events' ? <EventsPage />
     : route.name === 'home' ? <HomePage summary={summary} />
+    : route.name === 'not-found' ? <NotFoundPage />
     : route.name === 'module' ? <ModuleOverviewPage moduleId={route.module} summary={summary} />
     : route.name === 'accounting-reports' ? <AccountingReportsPage />
     : route.name === 'manufacturing-wip' ? <ManufacturingWipPage />
