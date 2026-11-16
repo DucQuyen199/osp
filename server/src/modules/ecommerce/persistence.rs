@@ -41,6 +41,23 @@ async fn validate_storefront(
             errors.push(format!("{label} không tồn tại trong doanh nghiệp"));
         }
     }
+    if let Some(code) = document
+        .get("currency")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|code| !code.is_empty())
+    {
+        if tx
+            .query_opt(
+                "SELECT id FROM master_data__currency WHERE tenant_id = $1 AND upper(code) = upper($2) FOR SHARE",
+                &[&tenant.id, &code],
+            )
+            .await?
+            .is_none()
+        {
+            errors.push(format!("Storefront currency {code} is missing from this tenant's currency catalog"));
+        }
+    }
     if let Some(domain) = document
         .get("domain")
         .and_then(Value::as_str)

@@ -4,6 +4,7 @@
 
 ## [Unreleased]
 ### Added
+- E-commerce storefront currency now has to exist in the tenant currency catalog and match its price list; carts snapshot that currency into the sales order, delivered-order invoices retain it for accounting FX posting, and the order desk formats totals in the order currency.
 - Restaurant orders now let staff add a per-item kitchen/bar note (up to 500 characters); the normalized note is retained on the order and copied to the station ticket for preparation and print.
 - Event tickets receive tenant-unique immutable scan codes; schema migration backfills existing tickets and enforces case-insensitive uniqueness. The event desk shows each code and supports keyboard-wedge scanner check-in for sold tickets, subject to server-side attendance-window and ticket-state checks.
 - CRM pipeline stages can now be configured per tenant with custom lowercase stage codes, names, and probabilities; custom stages appear in the board/report, and stages in use cannot be deleted.

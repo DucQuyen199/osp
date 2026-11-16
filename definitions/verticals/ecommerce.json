@@ -52,6 +52,7 @@
     "permissions": [
       "logistics.*",
       "ecommerce.web_order.read",
+      "master-data.currency.read",
       "inventory.*",
       "sales.sales_order.read"
     ]
@@ -64,6 +65,7 @@
       "ecommerce.web_order.placed",
       "ecommerce.web_order.cancelled",
       "ecommerce.storefront.read",
+      "master-data.currency.read",
       "master-data.party.read",
       "master-data.product.read",
       "sales.sales_order.read",
@@ -74,7 +76,8 @@
     "name": "CSKH",
     "permissions": [
       "helpdesk.*",
-      "ecommerce.web_order.read"
+      "ecommerce.web_order.read",
+      "master-data.currency.read"
     ]
   },
   "procurement_buyer": {

@@ -175,6 +175,11 @@ pub async fn handle_source_document_event(
             }
         }
     }
+    if event_type == "sales.sales_order.delivered"
+        && let Some(currency) = event.get("currency").filter(|value| !value.is_null())
+    {
+        data.insert("currency".into(), currency.clone());
+    }
     if event_type == "purchasing.supplier_invoice.approved" {
         if let Some(value) = event.get("id").filter(|value| !value.is_null()) {
             data.insert("supplier_invoice_id".into(), value.clone());

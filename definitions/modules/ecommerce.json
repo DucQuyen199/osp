@@ -81,6 +81,13 @@
     "system": true
     },
     {
+     "name": "currency",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.currency",
+     "system": true
+    },
+    {
      "name": "channel",
      "type": "enum",
      "required": false,

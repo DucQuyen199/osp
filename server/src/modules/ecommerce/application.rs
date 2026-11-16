@@ -31,7 +31,7 @@ pub async fn prepare_document(
         })?;
     let Some(storefront) = tx
         .query_opt(
-            "SELECT price_list, tax FROM ecommerce__storefront WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+            "SELECT price_list, tax, currency FROM ecommerce__storefront WHERE tenant_id = $1 AND id = $2 FOR SHARE",
             &[&tenant.id, &storefront_id],
         )
         .await?
@@ -40,6 +40,58 @@ pub async fn prepare_document(
     };
     let price_list: Option<Uuid> = storefront.get(0);
     let tax: Option<Uuid> = storefront.get(1);
+    let currency_code = storefront
+        .get::<_, Option<String>>(2)
+        .unwrap_or_else(|| {
+            tenant
+                .setting_str("baseCurrency")
+                .unwrap_or("VND")
+                .to_owned()
+        })
+        .trim()
+        .to_ascii_uppercase();
+    let Some(currency_id) = tx
+        .query_opt(
+            "SELECT id FROM master_data__currency WHERE tenant_id = $1 AND upper(code) = $2 FOR SHARE",
+            &[&tenant.id, &currency_code],
+        )
+        .await?
+        .map(|row| row.get::<_, Uuid>(0))
+    else {
+        return Ok(vec![format!("Storefront currency {currency_code} is missing from this tenant's currency catalog")]);
+    };
+    if let Some(price_list) = price_list {
+        let list_currency: Option<String> = tx
+            .query_opt(
+                "SELECT currency FROM sales__price_list WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                &[&tenant.id, &price_list],
+            )
+            .await?
+            .and_then(|row| row.get(0));
+        let list_currency = list_currency
+            .unwrap_or_else(|| {
+                tenant
+                    .setting_str("baseCurrency")
+                    .unwrap_or("VND")
+                    .to_owned()
+            })
+            .trim()
+            .to_ascii_uppercase();
+        if list_currency != currency_code {
+            return Ok(vec![format!(
+                "Storefront currency {currency_code} must match price list currency {list_currency}"
+            )]);
+        }
+    } else if currency_code
+        != tenant
+            .setting_str("baseCurrency")
+            .unwrap_or("VND")
+            .to_ascii_uppercase()
+    {
+        return Ok(vec![
+            "A storefront using a foreign currency must use a price list in that currency".into(),
+        ]);
+    }
     let normalized = price_lines(
         tx,
         tenant,
@@ -68,6 +120,7 @@ pub async fn prepare_document(
         "total".into(),
         priced.remove("total").expect("prepared sales total"),
     );
+    document.insert("currency".into(), json!(currency_id));
     Ok(Vec::new())
 }
 
@@ -200,6 +253,9 @@ pub async fn handle_source_event(
         document.get("party").cloned().unwrap_or(Value::Null),
     );
     data.insert("warehouse".into(), json!(warehouse));
+    if let Some(currency) = document.get("currency").filter(|value| !value.is_null()) {
+        data.insert("currency".into(), currency.clone());
+    }
     data.insert(
         "lines".into(),
         current_price

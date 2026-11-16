@@ -10,6 +10,7 @@ export default function EcommerceOrderDeskPage() {
   const [storefronts, setStorefronts] = useState(new Map());
   const [parties, setParties] = useState(new Map());
   const [products, setProducts] = useState(new Map());
+  const [currencies, setCurrencies] = useState(new Map());
   const [orders, setOrders] = useState([]);
   const [salesOrders, setSalesOrders] = useState([]);
   const [shipments, setShipments] = useState([]);
@@ -29,13 +30,14 @@ export default function EcommerceOrderDeskPage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const logisticsEnabled = app.meta?.modules?.some((module) => module.id === 'logistics') && can('logistics.shipment.read');
-      const [storefrontMap, partyMap, productMap, orderResponse, salesResponse, shipmentResponse, invoiceResponse] = await Promise.all([
+      const [storefrontMap, partyMap, productMap, currencyMap, orderResponse, salesResponse, shipmentResponse, invoiceResponse] = await Promise.all([
         loadRefs('ecommerce.storefront'), loadRefs('master-data.party'), loadRefs('master-data.product'),
+        can('master-data.currency.read') ? loadRefs('master-data.currency') : Promise.resolve(new Map()),
         loadAllResponse('ecommerce.web_order'), can('sales.sales_order.read') ? loadAllResponse('sales.sales_order') : Promise.resolve({ items: [] }),
         logisticsEnabled ? loadAllResponse('logistics.shipment') : Promise.resolve({ items: [] }),
         can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
       ]);
-      setStorefronts(storefrontMap); setParties(partyMap); setProducts(productMap);
+      setStorefronts(storefrontMap); setParties(partyMap); setProducts(productMap); setCurrencies(currencyMap);
       setOrders(itemsOf(orderResponse).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))));
       setSalesOrders(itemsOf(salesResponse)); setShipments(itemsOf(shipmentResponse)); setInvoices(itemsOf(invoiceResponse));
     } catch (reason) { setError(reason.message || 'Không tải được danh sách đơn online.'); }
@@ -91,19 +93,21 @@ export default function EcommerceOrderDeskPage() {
         lines: (order.lines || []).map((line) => ({ product: line.product, qty: line.qty })),
       } });
       await load(true);
-      setNotice(`Đã cập nhật giá giỏ hàng: ${fmtMoney(order.total || 0)} → ${fmtMoney(refreshed.total || 0)}. Hãy kiểm tra lại trước khi đặt đơn.`);
+      const currencyCode = currencies.get(order.currency)?.code;
+      setNotice(`Đã cập nhật giá giỏ hàng: ${fmtMoney(order.total || 0, currencyCode)} → ${fmtMoney(refreshed.total || 0, currencyCode)}. Hãy kiểm tra lại trước khi đặt đơn.`);
     } catch (reason) { setError(reason.message || 'Không cập nhật được giá giỏ hàng.'); await load(true); }
     finally { setBusy(''); }
   };
 
   const renderOrder = (order) => {
+    const currencyCode = currencies.get(order.currency)?.code;
     const sale = relatedSalesOrder(order.id);
     const orderShipments = sale ? relatedShipments(sale.id) : [];
     const invoice = sale && relatedInvoice(sale.id);
     return <article className="card ecommerce-order" key={order.id}>
       <header className="card-head"><div><strong>{recordLabel('master-data.party', parties.get(order.party))}</strong><div className="small muted">{storefronts.get(order.storefront)?.name || 'Gian hàng'} · {order.channel || 'web'} · {fmtDateTime(order.created_at)}</div></div><span className={`badge ${order.status === 'placed' ? 'success' : order.status === 'cancelled' ? 'plain' : 'warning'}`}>{statusLabel(order.status)}</span></header>
-      <ul className="ecommerce-order-lines">{(order.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{products.get(line.product)?.name || 'Sản phẩm'} × {line.qty}</span><strong className="num">{fmtMoney(line.line_total ?? (Number(line.price || 0) * Number(line.qty || 0)))}</strong></li>)}</ul>
-      <div className="ecommerce-order-total"><span>Tổng đơn</span><strong className="num">{fmtMoney(order.total || 0)}</strong></div>
+      <ul className="ecommerce-order-lines">{(order.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{products.get(line.product)?.name || 'Sản phẩm'} × {line.qty}</span><strong className="num">{fmtMoney(line.line_total ?? (Number(line.price || 0) * Number(line.qty || 0)), currencyCode)}</strong></li>)}</ul>
+      <div className="ecommerce-order-total"><span>Tổng đơn{currencyCode ? ` (${currencyCode})` : ''}</span><strong className="num">{fmtMoney(order.total || 0, currencyCode)}</strong></div>
       {order.shipping_address && <div className="small muted ecommerce-address">Giao đến: {order.shipping_address}</div>}
       <footer className="row wrap ecommerce-order-footer">
         {sale && can('sales.sales_order.read') && <a className="small" href={recordHref('sales.sales_order', sale.id)}>Đơn bán {sale.number || String(sale.id).slice(0, 8)} · {statusLabel(sale.status)}</a>}

@@ -5478,6 +5478,12 @@
             "readOnly": true,
             "type": "string"
           },
+          "currency": {
+            "description": "Tham chiếu tới master-data.currency",
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
           "id": {
             "format": "uuid",
             "readOnly": true,
@@ -5530,6 +5536,12 @@
               "app",
               "marketplace"
             ],
+            "type": "string"
+          },
+          "currency": {
+            "description": "Tham chiếu tới master-data.currency",
+            "format": "uuid",
+            "readOnly": true,
             "type": "string"
           },
           "lines": {
@@ -16158,6 +16170,11 @@
             "readOnly": true,
             "type": "string"
           },
+          "currency": {
+            "description": "Tham chiếu tới master-data.currency",
+            "format": "uuid",
+            "type": "string"
+          },
           "id": {
             "format": "uuid",
             "readOnly": true,
@@ -16232,6 +16249,11 @@
         "additionalProperties": false,
         "description": "Đơn bán hàng (dữ liệu gửi lên)",
         "properties": {
+          "currency": {
+            "description": "Tham chiếu tới master-data.currency",
+            "format": "uuid",
+            "type": "string"
+          },
           "lines": {
             "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
           },

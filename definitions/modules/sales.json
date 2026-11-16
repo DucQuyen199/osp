@@ -135,6 +135,12 @@
      "ref": "sales.price_list"
     },
     {
+     "name": "currency",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.currency"
+    },
+    {
      "name": "voucher_code",
      "type": "string",
      "required": false
