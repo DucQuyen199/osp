@@ -6,6 +6,7 @@ import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/stat
 import { recordHref } from '../../lib/routes.js';
 import hotelEnglish from './hotel.en.js';
 import ReservationCreateForm from './components/ReservationCreateForm.jsx';
+import ReservationDatesForm from './components/ReservationDatesForm.jsx';
 
 const t = (text) => uiTextWith(text, hotelEnglish);
 
@@ -38,6 +39,7 @@ export default function HotelFrontDeskPage() {
   const [chargeDescription, setChargeDescription] = useState('');
   const [chargeAmount, setChargeAmount] = useState('');
   const [extendedCheckout, setExtendedCheckout] = useState({});
+  const [reservationEdit, setReservationEdit] = useState(null);
   const [busy, setBusy] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -146,6 +148,35 @@ export default function HotelFrontDeskPage() {
     finally { setBusy(''); }
   };
 
+  const startReservationEdit = (reservation) => {
+    setReservationEdit({ reservationId: reservation.id, check_in: reservation.check_in, check_out: reservation.check_out, guest_count: String(reservation.guest_count || 1) });
+  };
+
+  const updateReservationEdit = (field, value) => {
+    setReservationEdit((current) => ({
+      ...current,
+      [field]: value,
+      ...(field === 'check_in' && current.check_out <= value ? { check_out: '' } : {}),
+    }));
+  };
+
+  const saveReservationEdit = async (event) => {
+    event.preventDefault();
+    if (!selected || reservationEdit?.reservationId !== selected.id || reservationEdit.check_out <= reservationEdit.check_in) return;
+    setBusy(`${selected.id}:edit`); setError(''); setNotice('');
+    try {
+      await api(dataPath('hotel.reservation', selected.id), {
+        method: 'PATCH',
+        body: { check_in: reservationEdit.check_in, check_out: reservationEdit.check_out, guest_count: Number(reservationEdit.guest_count) },
+      });
+      setReservationEdit(null);
+      await load(true);
+      setNotice(t('Đã cập nhật đặt phòng. Hệ thống đã kiểm tra sức chứa và lịch phòng.'));
+    } catch (reason) {
+      setError(t(reason.message || 'Không cập nhật được đặt phòng. Kiểm tra sức chứa và lịch phòng.'));
+    } finally { setBusy(''); }
+  };
+
   const reservationStatus = (status) => status === 'booked' ? 'warning' : status === 'checked_in' ? 'success' : status === 'checked_out' ? 'plain' : 'danger';
 
   return <div className="page hotel-frontdesk-page">
@@ -178,6 +209,8 @@ export default function HotelFrontDeskPage() {
         {visible.length ? <div className="hotel-reservation-cards">{visible.map((reservation) => <button className={`card hotel-reservation-card${selectedId === reservation.id ? ' selected' : ''}`} type="button" key={reservation.id} onClick={() => { setSelectedId(reservation.id); setAssignment(reservation.room || ''); }}><strong>{recordLabel('master-data.party', parties.get(reservation.party))}</strong><span>{fmtDate(reservation.check_in)} → {fmtDate(reservation.check_out)} · {reservation.nights || '—'} {t("đêm")} · {reservation.guest_count || 1} {t("khách")}</span><span className="small muted">{roomTypes.get(reservation.room_type)?.name || t('Chưa rõ loại phòng')}{reservation.room ? ` · ${t("Phòng")} ${rooms.get(reservation.room)?.number || ''}` : ` · ${t("Chưa phân phòng")}`}</span><span className={`badge ${reservationStatus(reservation.status)}`}>{statusLabel(reservation.status)}</span><strong className="num">{fmtMoney(reservation.total || 0)}</strong></button>)}</div> : <div className="empty">{t('Không có đặt phòng theo bộ lọc.')}</div>}
       </section>
       <section className="hotel-reservation-detail">{selected ? <>
+        {selected.status === 'booked' && can('hotel.reservation.update') && reservationEdit?.reservationId !== selected.id && <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => startReservationEdit(selected)}>{t('Chỉnh sửa đặt phòng')}</button>}
+        {selected.status === 'booked' && can('hotel.reservation.update') && reservationEdit?.reservationId === selected.id && <ReservationDatesForm values={reservationEdit} capacity={roomTypes.get(selected.room_type)?.capacity} minCheckIn={today()} busy={busy === `${selected.id}:edit`} t={t} onChange={updateReservationEdit} onSubmit={saveReservationEdit} onCancel={() => setReservationEdit(null)} />}
         <article className="card hotel-detail-card"><header className="hotel-detail-head"><div><h2>{recordLabel('master-data.party', parties.get(selected.party))}</h2><p className="small muted">{roomTypes.get(selected.room_type)?.name || 'Loại phòng'} · {selected.guest_count || 1} {t("khách")} · {selected.nights || '—'} {t("đêm")} · {fmtDate(selected.check_in)} {t("đến")} {fmtDate(selected.check_out)}</p></div><span className={`badge ${reservationStatus(selected.status)}`}>{statusLabel(selected.status)}</span></header>
           <div className="hotel-folio-total"><span>{t("Phòng")} {selected.room ? rooms.get(selected.room)?.number || '' : t("chưa phân")} · {fmtMoney(selected.nightly_rate || 0)} / {t("đêm")}</span><strong>{fmtMoney(selected.total || 0)}</strong></div>
           {selected.status === 'no_show' && selected.no_show_reason && <div className="alert warning" role="status">{t("Lý do khách vắng mặt:")} {selected.no_show_reason}</div>}
