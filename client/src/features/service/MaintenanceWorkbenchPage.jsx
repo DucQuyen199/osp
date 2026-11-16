@@ -3,6 +3,7 @@ import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import MaintenancePartsEditor from './components/MaintenancePartsEditor.jsx';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
@@ -145,8 +146,7 @@ export default function MaintenanceWorkbenchPage() {
       <label className="field"><span className="label">Kho xuất vật tư</span><select className="select" value={warehouse} onChange={(event) => setWarehouse(event.target.value)}><option value="">Chọn kho khi có vật tư</option>{[...warehouses.values()].map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
       {can('maintenance.maintenance_technician.read') && <label className="field"><span className="label">Kỹ thuật viên phụ trách</span><select className="select" value={technician} onChange={(event) => setTechnician(event.target.value)}><option value="">Chưa phân công</option>{[...technicians.values()].filter((row) => row.active !== false).map((row) => <option key={row.id} value={row.id}>{row.name}{row.specialty ? ` · ${row.specialty}` : ''}</option>)}</select></label>}
       </div><label className="field" style={{ marginTop: 10 }}><span className="label">Mô tả sự cố / công việc</span><textarea className="input" rows="2" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Triệu chứng, vị trí, điều kiện vận hành…"/></label>
-      <div className="row wrap" style={{ marginTop: 12 }}><strong>Vật tư dự kiến</strong><span className="grow"/><button className="btn btn-secondary btn-sm" type="button" disabled={!products.size} onClick={addPart}>Thêm vật tư</button></div>
-      {parts.map((line, index) => <div className="row wrap" key={index} style={{ marginTop: 8 }}><select className="select" required value={line.product} onChange={(event) => updatePart(index, 'product', event.target.value)}><option value="">Chọn vật tư</option>{[...products.values()].filter((row) => row.active !== false && (row.tracked ?? row.kind === 'goods')).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>{unitsFor(line.product).length > 0 && <select className="select" aria-label="Unit" value={line.uom || products.get(line.product)?.uom || ''} onChange={(event) => updatePart(index, 'uom', event.target.value)}>{unitsFor(line.product).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ' (' + unit.ratio + ' x base)' : ' (base)'}</option>)}</select>}<input className="input num" aria-label="Số lượng vật tư" type="number" min="0.000001" step="any" required value={line.qty} onChange={(event) => updatePart(index, 'qty', event.target.value)} style={{ maxWidth: 140 }}/><button className="btn btn-ghost btn-sm" type="button" onClick={() => setParts((current) => current.filter((_, i) => i !== index))}>Bỏ</button></div>)}
+      <MaintenancePartsEditor parts={parts} products={products} unitsFor={unitsFor} onAdd={addPart} onUpdate={updatePart} onRemove={(index) => setParts((current) => current.filter((_, i) => i !== index))} />
       <div className="row" style={{ marginTop: 12 }}><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !assetId}>Ghi nhận yêu cầu</button></div>
     </form></section>}
 
