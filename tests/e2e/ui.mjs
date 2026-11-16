@@ -172,6 +172,10 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   must(await page.$eval('label[for="entity-field-name"]', (label) => label.textContent.includes('Name')), 'biểu mẫu chưa dịch nhãn trường');
   await axe('biểu mẫu CRUD tiếng Anh');
   await page.keyboard.press('Escape');
+  await page.goto(`${BASE}/#/pos`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#main h1');
+  must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'POS terminal', 'POS workbench chưa được dịch');
+  await axe('POS workbench tiếng Anh');
   await page.goto(`${BASE}/#/`, { waitUntil: 'networkidle0' });
   await page.click('.menu > button');
   must(await clickText('Vietnamese', 'button'), 'không có lựa chọn tiếng Việt sau khi chuyển ngôn ngữ');
