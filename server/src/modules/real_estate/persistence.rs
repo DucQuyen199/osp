@@ -16,7 +16,11 @@ pub async fn validate_persistence(
             "created" | "updated" | "reserved" | "converted" | "cancelled" | "expired",
         ) => validate_reservation(tx, tenant, action, document).await,
         ("lease", "activated") => validate_lease_activation(tx, tenant, document).await,
-        ("lease", "updated") if document.get("amendment_in_progress").is_some() => {
+        ("lease", "updated")
+            if document
+                .get("amendment_in_progress")
+                .is_some_and(|value| !value.is_null()) =>
+        {
             validate_lease_amendment(tx, tenant, document).await
         }
         ("lease", "rent_due") => validate_rent_due(tx, tenant, document).await,

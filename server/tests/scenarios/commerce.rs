@@ -60,22 +60,18 @@ async fn purchase_returns(kernel: &Arc<Kernel>) {
     }
     assert_eq!(t.stock(&id(&product)).await, 4.0);
     let issue_date = kernel.tenant(&t.t.id).await.unwrap().business_today();
-    let supplier_invoice =
-        t.k.create(
-            &osp_server::kernel::Actor::System,
-            &t.t,
+    let supplier_invoice = t
+        .create(
             "purchasing.supplier_invoice",
-            o(json!({
+            json!({
                 "purchase_order": id(&order),
                 "supplier": id(&supplier),
                 "invoice_number": "SUP-RET-001",
                 "issue_date": issue_date.to_string(),
-                "total": 440,
                 "lines": [{ "product": id(&product), "qty": 4, "price": 100, "tax": id(&tax) }]
-            })),
+            }),
         )
-        .await
-        .unwrap();
+        .await;
     t.act(
         "purchasing.supplier_invoice",
         &id(&supplier_invoice),

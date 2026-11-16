@@ -84,7 +84,7 @@ pub fn validate_update(current: &Value, patch: &Value) -> Vec<String> {
         let reason = patch.get("refund_reason").and_then(Value::as_str);
         let can_add_refund_reason = current.get("status").and_then(Value::as_str)
             == Some("completed")
-            && current.get("refund_reason").is_none()
+            && current.get("refund_reason").is_none_or(Value::is_null)
             && patch.as_object().is_some_and(|fields| fields.len() == 1)
             && reason.is_some_and(|value| (5..=500).contains(&value.trim().chars().count()));
         if can_add_refund_reason {

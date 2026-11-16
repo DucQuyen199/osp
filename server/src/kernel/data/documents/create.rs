@@ -257,7 +257,14 @@ impl Kernel {
         if qname == "budget.budget_line" && !clean.contains_key("actual") {
             clean.insert("actual".into(), json!(0.0));
         }
+        let mut purchasing_prepare_errors = if qname == "purchasing.supplier_invoice" {
+            crate::modules::purchasing::prepare_document(tx, t, ent.def.name.as_str(), &mut clean)
+                .await?
+        } else {
+            Vec::new()
+        };
         let mut errors = self.validate(tx, t, ent, &clean, true).await?;
+        errors.append(&mut purchasing_prepare_errors);
         if !matches!(actor, Actor::System) && !user_supplied_system_fields.is_empty() {
             errors.push("Không được gửi trực tiếp trường dữ liệu do hệ thống tính".into());
         }
@@ -276,7 +283,10 @@ impl Kernel {
                     .await?,
             );
         }
-        if errors.is_empty() && qname.starts_with("purchasing.") {
+        if errors.is_empty()
+            && qname.starts_with("purchasing.")
+            && qname != "purchasing.supplier_invoice"
+        {
             errors.extend(
                 crate::modules::purchasing::prepare_document(
                     tx,

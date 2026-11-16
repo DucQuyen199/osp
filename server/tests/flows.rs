@@ -484,10 +484,14 @@ async fn run(k: Arc<Kernel>, url: String, defs: PathBuf) {
         let party = t
             .create("master-data.party", json!({ "name": "Công ty ABC" }))
             .await;
+        let warehouse = t.warehouse().await;
+        let service = t.create("master-data.product", json!({
+            "sku": "CRM-SERVICE", "name": "Dịch vụ hợp đồng", "kind": "service", "price": 5_000_000
+        })).await;
         let deal = t
             .create(
                 "crm.deal",
-                json!({ "title": "HĐ 1", "party": id(&party), "amount": 5_000_000 }),
+                json!({ "title": "HĐ 1", "party": id(&party), "amount": 5_000_000, "warehouse": warehouse, "lines": lines(&id(&service), 1, 5_000_000) }),
             )
             .await;
         t.act("crm.deal", &id(&deal), "won").await;
@@ -495,19 +499,8 @@ async fn run(k: Arc<Kernel>, url: String, defs: PathBuf) {
             .list("sales.sales_order", &[("source_id", &id(&deal))])
             .await[0];
         assert_eq!(f(&order["total"]), 5_000_000.0);
-        let warehouse = t.warehouse().await;
-        let service = t.create("master-data.product", json!({
-            "sku": "CRM-SERVICE", "name": "Dịch vụ hợp đồng", "kind": "service", "price": 5_000_000
-        })).await;
-        t.update(
-            "sales.sales_order",
-            &id(order),
-            json!({
-                "warehouse": warehouse, "lines": lines(&id(&service), 1, 5_000_000)
-            }),
-        )
-        .await;
         t.act("sales.sales_order", &id(order), "confirmed").await;
+        t.act("sales.sales_order", &id(order), "delivered").await;
         let inv = &t
             .list("accounting.invoice", &[("source_id", &id(order))])
             .await[0];
@@ -592,6 +585,25 @@ async fn run(k: Arc<Kernel>, url: String, defs: PathBuf) {
             t.act("quality.inspection", &id(&inspection), "passed")
                 .await;
         }
+        let issue_date = k.tenant(&t.t.id).await.unwrap().business_today();
+        let supplier_invoice = t
+            .create(
+                "purchasing.supplier_invoice",
+                json!({
+                    "purchase_order": id(&po),
+                    "supplier": id(&sup),
+                    "invoice_number": "SUP-TEST-001",
+                    "issue_date": issue_date.to_string(),
+                    "lines": [{ "product": pid, "qty": 50, "price": 60 }]
+                }),
+            )
+            .await;
+        t.act(
+            "purchasing.supplier_invoice",
+            &id(&supplier_invoice),
+            "approved",
+        )
+        .await;
         assert_eq!(t.stock(&pid).await, 50.0);
         assert_eq!(
             t.list("accounting.bill", &[("source_id", &id(&po))]).await[0]["status"],
@@ -661,6 +673,7 @@ async fn run(k: Arc<Kernel>, url: String, defs: PathBuf) {
         .await;
         t.act("sales.sales_order", &id(&so2), "confirmed").await;
         assert_eq!(t.stock(&pid).await, 38.0);
+        t.act("sales.sales_order", &id(&so2), "delivered").await;
         assert_eq!(
             t.list("accounting.invoice", &[("source_id", &id(&so2))])
                 .await
@@ -686,7 +699,10 @@ async fn run(k: Arc<Kernel>, url: String, defs: PathBuf) {
         let t = Ctx::new(&k, None, &["pos", "inventory", "accounting", "loyalty"]).await;
         let warehouse = t.warehouse().await;
         let session = t
-            .create("pos.pos_session", json!({ "opening_cash": 0 }))
+            .create(
+                "pos.pos_session",
+                json!({ "warehouse": warehouse, "opening_cash": 0 }),
+            )
             .await;
         let cust = t
             .create("master-data.party", json!({ "name": "Khách quen" }))
@@ -704,7 +720,7 @@ async fn run(k: Arc<Kernel>, url: String, defs: PathBuf) {
             json!({ "product": id(&prod), "warehouse": warehouse, "qty": 100, "direction": "in" }),
         )
         .await;
-        let order = t.create("pos.pos_order", json!({ "party": id(&cust), "warehouse": warehouse, "session": id(&session), "method": "cash", "lines": lines(&id(&prod), 4, 45000) })).await;
+        let order = t.create("pos.pos_order", json!({ "party": id(&cust), "warehouse": warehouse, "session": id(&session), "method": "cash", "cash_received": 180000, "lines": lines(&id(&prod), 4, 45000) })).await;
         assert_eq!(f(&order["total"]), 180000.0);
         t.act("pos.pos_order", &id(&order), "completed").await;
         assert_eq!(t.stock(&id(&prod)).await, 96.0);
@@ -717,6 +733,12 @@ async fn run(k: Arc<Kernel>, url: String, defs: PathBuf) {
             f(&t.list("loyalty.member", &[("party", &id(&cust))]).await[0]["points"]),
             18.0
         );
+        t.update(
+            "pos.pos_order",
+            &id(&order),
+            json!({ "refund_reason": "Customer returned purchase" }),
+        )
+        .await;
         t.act("pos.pos_order", &id(&order), "refunded").await;
         assert_eq!(
             f(&t.list("loyalty.member", &[("party", &id(&cust))]).await[0]["points"]),

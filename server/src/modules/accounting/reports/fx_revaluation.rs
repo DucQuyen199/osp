@@ -95,7 +95,12 @@ async fn fx_positions(
               WHERE d.tenant_id = $1 AND d.status NOT IN ('draft', 'void') AND COALESCE(d.issue_date, (d.created_at AT TIME ZONE 'UTC')::date) <= $3::date \
             ), currency_positions AS ( \
               SELECT side, currency_id, SUM(foreign_balance) AS foreign_balance, \
-                     SUM(carrying_base) + COALESCE(( \
+                     SUM(carrying_base) AS carrying_base, \
+                     jsonb_agg(jsonb_build_object('documentId', document_id, 'document', document_number, 'party', party, 'foreignBalance', foreign_balance, 'carryingBase', carrying_base) ORDER BY party, document_id) AS documents \
+              FROM open_docs WHERE foreign_balance > 0.005 GROUP BY side, currency_id \
+            ), revalued_positions AS ( \
+              SELECT cp.side, cp.currency_id, cp.foreign_balance, \
+                     cp.carrying_base + COALESCE(( \
                        SELECT SUM(CASE WHEN cp.side = 'receivable' THEN COALESCE((line->>'debit')::numeric, 0) - COALESCE((line->>'credit')::numeric, 0) ELSE COALESCE((line->>'credit')::numeric, 0) - COALESCE((line->>'debit')::numeric, 0) END) \
                        FROM accounting__journal_entry fx \
                        CROSS JOIN LATERAL jsonb_array_elements(COALESCE(fx.lines, '[]'::jsonb)) line \
@@ -103,9 +108,8 @@ async fn fx_positions(
                          AND COALESCE(fx.posting_date, (fx.created_at AT TIME ZONE 'UTC')::date) <= $3::date \
                          AND line->>'fx_currency_id' = cp.currency_id::text AND line->>'fx_side' = cp.side \
                          AND NOT EXISTS (SELECT 1 FROM accounting__journal_entry reversal WHERE reversal.tenant_id = fx.tenant_id AND reversal.source = 'reversal' AND reversal.source_id = fx.id::text AND reversal.status IN ('posted', 'reversed') AND COALESCE(reversal.posting_date, (reversal.created_at AT TIME ZONE 'UTC')::date) <= $3::date) \
-                     ), 0) AS carrying_base, \
-                     jsonb_agg(jsonb_build_object('documentId', document_id, 'document', document_number, 'party', party, 'foreignBalance', foreign_balance, 'carryingBase', carrying_base) ORDER BY party, document_id) AS documents \
-              FROM open_docs WHERE foreign_balance > 0.005 GROUP BY side, currency_id \
+                     ), 0) AS carrying_base, cp.documents \
+              FROM currency_positions cp \
             ) \
             SELECT jsonb_build_object( \
               'side', cp.side, 'currencyId', c.id, 'currency', c.code, 'currencyName', c.name, \
@@ -116,7 +120,7 @@ async fn fx_positions(
               'adjustment', CASE WHEN rate.rate IS NOT NULL OR upper(c.code) = $2 THEN round((cp.foreign_balance * COALESCE(rate.rate::numeric, 1) - cp.carrying_base) * CASE WHEN cp.side = 'receivable' THEN 1 ELSE -1 END, 2) END, \
               'documents', cp.documents \
             ) \
-            FROM currency_positions cp JOIN master_data__currency c ON c.tenant_id = $1 AND c.id = cp.currency_id \
+            FROM revalued_positions cp JOIN master_data__currency c ON c.tenant_id = $1 AND c.id = cp.currency_id \
             LEFT JOIN LATERAL (SELECT r.rate, r.effective_date FROM master_data__currency_rate r WHERE r.tenant_id = $1 AND r.from_currency = c.id AND r.to_currency = (SELECT id FROM base_currency) AND r.effective_date <= $3 ORDER BY r.effective_date DESC, r.created_at DESC LIMIT 1) rate ON true \
             ORDER BY c.code, cp.side";
     let sql = sql.replace("AT TIME ZONE 'UTC'", "AT TIME ZONE $4");
