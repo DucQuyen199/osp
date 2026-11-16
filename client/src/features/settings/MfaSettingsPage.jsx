@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, tenantPath } from '../../lib/api.js';
+import { confirmDialog } from '../../lib/feedback.js';
 import { fmtDateTime, uiText } from '../../lib/i18n.js';
 import { app } from '../../lib/state.js';
 
@@ -63,7 +64,7 @@ export default function MfaSettingsPage() {
   };
 
   const revokeOtherSessions = async () => {
-    if (!window.confirm(uiText('Đăng xuất các phiên trình duyệt khác của tài khoản này?'))) return;
+    if (!await confirmDialog({ title: uiText('Đăng xuất phiên khác'), message: uiText('Đăng xuất các phiên trình duyệt khác của tài khoản này?'), danger: true, confirmLabel: uiText('Đăng xuất') })) return;
     setBusy(true); setError(''); setNotice('');
     try {
       const result = await api(tenantPath('/auth/sessions/revoke-others'), { method: 'POST' });

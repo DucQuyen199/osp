@@ -4,7 +4,7 @@ import { uiText } from '../lib/i18n.js';
 
 function DialogView({ request }) {
   const dialogRef = useRef(null);
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState(request.initialValue || '');
   const titleId = `feedback-title-${request.id}`;
   const messageId = `feedback-message-${request.id}`;
   const respond = (answer) => resolveFeedbackDialog(request.id, answer);
@@ -29,7 +29,7 @@ function DialogView({ request }) {
         <p className="muted" id={messageId}>{uiText(request.message)}</p>
         {request.type === 'text' && <label className="field">
           <span className="label">{uiText(request.label)}</span>
-          <textarea className="textarea" required minLength={request.minLength} maxLength={request.maxLength}
+          <textarea className="textarea" rows="4" required={request.minLength > 0} minLength={request.minLength} maxLength={request.maxLength}
             value={value} onChange={(event) => setValue(event.target.value)} />
         </label>}
       </div>

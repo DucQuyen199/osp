@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, tenantPath } from '../../lib/api.js';
-import { toast } from '../../lib/feedback.js';
+import { confirmDialog, toast } from '../../lib/feedback.js';
 import { fmtDateTime, uiText } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
 import SettingsTabs from './SettingsTabs.jsx';
@@ -20,7 +20,7 @@ export default function FailuresSettingsPage() {
   useEffect(() => { document.title = `${uiText('Lỗi tích hợp')} · ${uiText('Cài đặt')} · OSP Suite`; reload(); }, [reload]);
 
   const act = async (entry, action) => {
-    if (action === 'dismiss' && !window.confirm(uiText('Bỏ qua cảnh báo này? Bạn vẫn có thể xem lại trong bộ lọc đã bỏ qua.'))) return;
+    if (action === 'dismiss' && !await confirmDialog({ title: uiText('Bỏ qua cảnh báo'), message: uiText('Bỏ qua cảnh báo này? Bạn vẫn có thể xem lại trong bộ lọc đã bỏ qua.'), confirmLabel: uiText('Bỏ qua') })) return;
     setBusy(entry.id);
     setError('');
     try {

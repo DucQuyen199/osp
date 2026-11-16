@@ -1,4 +1,12 @@
 const uiTextEnglish = {
+  'Mã giao dịch nhà cung cấp trả về': 'Provider transaction reference',
+  'Mã hoàn tiền nhà cung cấp trả về': 'Provider refund reference',
+  'Ghi nhận hoàn tiền thành công': 'Record successful refund',
+  'Xác nhận hoàn giao dịch': 'Confirm transaction refund',
+  'Hoàn giao dịch': 'Refund transaction',
+  'Nhập lý do để lưu cùng biên nhận và lịch sử hoàn tiền.': 'Enter a reason to keep with the receipt and refund history.',
+  'Xóa thư mục': 'Delete folder',
+  'Đăng xuất phiên khác': 'Sign out other sessions',
   'Ngày hạch toán': 'Posting date',
   'Dòng thuế': 'Tax lines',
   'Tiền thuế': 'Tax amount',

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, tenantPath } from '../../lib/api.js';
-import { toast } from '../../lib/feedback.js';
+import { confirmDialog, toast } from '../../lib/feedback.js';
 import { fmtDateTime, uiText } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
 import SettingsTabs from './SettingsTabs.jsx';
@@ -23,7 +23,7 @@ export default function OutboxSettingsPage() {
   useEffect(() => { document.title = `${uiText('Outbox tích hợp')} · ${uiText('Cài đặt')} · OSP Suite`; reload(); }, [reload]);
 
   const act = async (entry, action) => {
-    if (action === 'dismiss' && !window.confirm(uiText('Bỏ qua delivery này? Delivery sẽ bị hủy và không tự thử lại.'))) return;
+    if (action === 'dismiss' && !await confirmDialog({ title: uiText('Hủy delivery'), message: uiText('Bỏ qua delivery này? Delivery sẽ bị hủy và không tự thử lại.'), danger: true, confirmLabel: uiText('Hủy delivery') })) return;
     setBusy(entry.id);
     setError('');
     try {

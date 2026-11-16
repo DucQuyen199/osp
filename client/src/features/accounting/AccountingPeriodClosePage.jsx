@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
+import { confirmDialog } from '../../lib/feedback.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
@@ -83,7 +84,7 @@ export default function AccountingPeriodClosePage() {
   }
 
   async function reopenPeriod() {
-    if (!selected || !window.confirm(`${uiText('Mở lại kỳ')} ${selected.name}? ${uiText('Việc này cho phép ghi nhận lại bút toán trong kỳ.')}`)) return;
+    if (!selected || !await confirmDialog({ title: uiText('Mở lại kỳ'), message: `${selected.name}? ${uiText('Việc này cho phép ghi nhận lại bút toán trong kỳ.')}`, danger: true, confirmLabel: uiText('Mở lại kỳ') })) return;
     await run(`${selected.id}:reopened`, () => api(dataPath('accounting.period', selected.id, 'reopened'), { method: 'POST' }), uiText('Đã mở lại kỳ kế toán.'));
   }
 

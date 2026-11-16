@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from '../../lib/api.js';
+import { textDialog } from '../../lib/feedback.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
 
@@ -66,7 +67,7 @@ export default function PaymentsWorkbenchPage() {
   }
 
   async function recordOutcome(transaction, action) {
-    const reference = window.prompt(uiText(action === 'succeeded' ? 'Nhập mã giao dịch thành công do nhà cung cấp trả về:' : 'Mã tham chiếu (nếu đã có):'), transaction.reference || '');
+    const reference = await textDialog({ title: uiText(action === 'succeeded' ? 'Ghi nhận thanh toán thành công' : 'Ghi nhận giao dịch thất bại'), message: '', label: uiText(action === 'succeeded' ? 'Mã giao dịch nhà cung cấp trả về' : 'Mã tham chiếu (nếu đã có)'), initialValue: transaction.reference || '', minLength: 0, maxLength: 500, confirmLabel: uiText('Lưu') });
     if (reference === null) return;
     await run(`${transaction.id}:${action}`, async () => {
       const normalizedReference = reference.trim();
@@ -88,7 +89,7 @@ export default function PaymentsWorkbenchPage() {
   }
 
   async function recordRefund(refund, action) {
-    const reference = action === 'succeeded' ? window.prompt(uiText('Nhập mã hoàn tiền do nhà cung cấp trả về:'), refund.reference || '') : window.prompt(uiText('Ghi chú hoặc mã tham chiếu (nếu có):'), refund.reference || '');
+    const reference = await textDialog({ title: uiText(action === 'succeeded' ? 'Ghi nhận hoàn tiền thành công' : 'Ghi nhận hoàn tiền thất bại'), message: '', label: uiText(action === 'succeeded' ? 'Mã hoàn tiền nhà cung cấp trả về' : 'Ghi chú hoặc mã tham chiếu (nếu có)'), initialValue: refund.reference || '', minLength: 0, maxLength: 500, confirmLabel: uiText('Lưu') });
     if (reference === null) return;
     await run(`${refund.id}:${action}`, async () => {
       const normalizedReference = reference.trim();

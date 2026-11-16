@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api, tenantPath } from '../../lib/api.js';
-import { toast } from '../../lib/feedback.js';
+import { confirmDialog, toast } from '../../lib/feedback.js';
 import { fmtDateTime, uiText } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
 import SettingsTabs from './SettingsTabs.jsx';
@@ -49,7 +49,7 @@ export default function TokensSettingsPage() {
   };
 
   const revoke = async (token) => {
-    if (!window.confirm(`${uiText('Thu hồi token')} ${token.label || token.id}? ${uiText('Hệ thống đang dùng token này sẽ mất quyền truy cập ngay.')}`)) return;
+    if (!await confirmDialog({ title: uiText('Thu hồi token'), message: `${token.label || token.id}? ${uiText('Hệ thống đang dùng token này sẽ mất quyền truy cập ngay.')}`, danger: true, confirmLabel: uiText('Thu hồi token') })) return;
     setBusy(token.id);
     setError('');
     try {

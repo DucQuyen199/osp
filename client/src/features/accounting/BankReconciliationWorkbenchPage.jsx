@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
+import { confirmDialog } from '../../lib/feedback.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
@@ -209,7 +210,7 @@ export default function BankReconciliationWorkbenchPage() {
   }
 
   async function deleteLine(line) {
-    if (!window.confirm(uiText('Xóa dòng chưa đối chiếu này khỏi sao kê?'))) return;
+    if (!await confirmDialog({ title: uiText('Xóa dòng sao kê'), message: uiText('Xóa dòng chưa đối chiếu này khỏi sao kê?'), danger: true, confirmLabel: uiText('Xóa dòng') })) return;
     await run(`${line.id}:delete`, () => api(dataPath('accounting.bank_statement_line', line.id), { method: 'DELETE' }), uiText('Đã xóa dòng sao kê chưa đối chiếu.'));
   }
 
@@ -219,7 +220,7 @@ export default function BankReconciliationWorkbenchPage() {
   }
 
   async function cancelStatement() {
-    if (!selected || !window.confirm(uiText('Hủy sao kê {number}?').replace('{number}', selected.statement_number))) return;
+    if (!selected || !await confirmDialog({ title: uiText('Hủy sao kê'), message: uiText('Hủy sao kê {number}?').replace('{number}', selected.statement_number), danger: true, confirmLabel: uiText('Hủy sao kê') })) return;
     await run(`${selected.id}:cancelled`, () => action('accounting.bank_statement', selected, 'cancelled'), uiText('Đã hủy sao kê nháp.'));
   }
 

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath, session } from '../../lib/api.js';
+import { confirmDialog } from '../../lib/feedback.js';
 import { fmtDateTime, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadAllResponse } from '../../lib/state.js';
 import documentsEnglish from './documents.en.js';
@@ -135,7 +136,7 @@ export default function DocumentWorkbenchPage() {
   }
 
   async function removeFolder(folder) {
-    if (!window.confirm(`${t('Xóa thư mục “')}${folder.name}${t('”? Thư mục chỉ xóa được khi không còn dữ liệu bên trong.')}`)) return;
+    if (!await confirmDialog({ title: t('Xóa thư mục'), message: `${t('Xóa thư mục “')}${folder.name}${t('”? Thư mục chỉ xóa được khi không còn dữ liệu bên trong.')}`, danger: true, confirmLabel: t('Xóa thư mục') })) return;
     await run(`${folder.id}:remove`, () => api(dataPath('document.folder', folder.id), { method: 'DELETE' }), 'Đã xóa thư mục.');
   }
 

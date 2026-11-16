@@ -54,6 +54,6 @@ export function confirmDialog({ title, message, confirmLabel = 'Xác nhận', da
   return requestDialog({ type: 'confirm', title, message, confirmLabel, danger });
 }
 
-export function textDialog({ title, message, label, minLength = 1, maxLength = 1000, confirmLabel = 'Lưu', danger = false }) {
-  return requestDialog({ type: 'text', title, message, label, minLength, maxLength, confirmLabel, danger });
+export function textDialog({ title, message, label, initialValue = '', minLength = 1, maxLength = 1000, confirmLabel = 'Lưu', danger = false }) {
+  return requestDialog({ type: 'text', title, message, label, initialValue, minLength, maxLength, confirmLabel, danger });
 }

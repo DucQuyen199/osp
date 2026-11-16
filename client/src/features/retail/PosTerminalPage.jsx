@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
+import { confirmDialog, textDialog } from '../../lib/feedback.js';
 import { fmtMoney, fmtDateTime, statusLabel, uiText } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import PosReceipt from './components/PosReceipt.jsx';
@@ -231,13 +232,13 @@ export default function PosTerminalPage() {
   };
 
   const refundOrder = async (order) => {
-    const refundReason = window.prompt(t('Lý do hoàn đơn (5–500 ký tự):'))?.trim();
+    const refundReason = await textDialog({ title: t('Hoàn toàn bộ giao dịch'), message: t('Nhập lý do để lưu cùng biên nhận và lịch sử hoàn tiền.'), label: t('Lý do hoàn đơn'), minLength: 5, maxLength: 500, confirmLabel: t('Tiếp tục') });
     if (!refundReason) return;
     if (refundReason.length < 5 || refundReason.length > 500) {
       setError(t('Lý do hoàn đơn cần từ 5 đến 500 ký tự.'));
       return;
     }
-    if (!window.confirm(`${t('Hoàn toàn bộ giao dịch')} ${String(order.id).slice(0, 8)} ${t('trị giá')} ${fmtMoney(order.total || 0)}? ${t('Hàng hóa theo dõi tồn kho sẽ được nhập lại và chứng từ kế toán sẽ được đảo.')}`)) return;
+    if (!await confirmDialog({ title: t('Xác nhận hoàn giao dịch'), message: `${String(order.id).slice(0, 8)} · ${fmtMoney(order.total || 0)}. ${t('Hàng hóa theo dõi tồn kho sẽ được nhập lại và chứng từ kế toán sẽ được đảo.')}`, danger: true, confirmLabel: t('Hoàn giao dịch') })) return;
     setBusy(true); setError(''); setNotice('');
     try {
       await api(dataPath('pos.pos_order', order.id, 'refunded'), { method: 'POST', body: { refund_reason: refundReason } });
