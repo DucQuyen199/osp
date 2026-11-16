@@ -427,6 +427,12 @@ for (const [vertical, hash, label, summaryEntity, setupEntity] of verticalScreen
       const paymentText = await page.$eval('#main', (main) => main.innerText);
       must(paymentText.includes('Create pending transaction') && paymentText.includes('Transaction register'), 'payment workflow is not translated');
       await axe('payment transactions workbench tiếng Anh');
+      await page.goto(`${BASE}/#/refunds`, { waitUntil: 'networkidle0' });
+      await page.waitForSelector('#main h1');
+      must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Refunds and supplier credits', 'accounting adjustment refund title is not translated');
+      const refundText = await page.$eval('#main', (main) => main.innerText);
+      must(refundText.includes('Refundable amounts') && refundText.includes('Payment register'), 'accounting adjustment refund workflow is not translated');
+      await axe('accounting adjustment refunds tiếng Anh');
       await page.evaluate(() => localStorage.setItem('osp.uiLocale', 'vi-VN'));
       await page.reload({ waitUntil: 'networkidle0' });
       await page.goto(`${BASE}/${hash}`, { waitUntil: 'networkidle0' });

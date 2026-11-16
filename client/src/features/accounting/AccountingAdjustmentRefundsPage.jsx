@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath, session, tenantPath } from '../../lib/api.js';
-import { fmtDate, fmtMoney, statusLabel } from '../../lib/i18n.js';
+import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { can, loadRefs, recordLabel } from '../../lib/state.js';
 import { listHref, recordHref } from '../../lib/routes.js';
 
@@ -48,10 +48,10 @@ export default function AccountingAdjustmentRefundsPage() {
       ]);
       setNotes({ credit: creditRows.filter((row) => row.status === 'posted'), debit: debitRows.filter((row) => row.status === 'posted') });
       setInvoices(invoiceRows); setBills(billRows); setPayments(paymentRows); setParties(partyMap || new Map());
-    } catch (e) { setError(e.message || 'Không tải được danh sách phiếu điều chỉnh.'); }
+    } catch (e) { setError(e.message || uiText('Không tải được danh sách phiếu điều chỉnh.')); }
     finally { setLoading(false); }
   }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { document.title = `${uiText('Hoàn tiền và thu tiền hoàn')} · OSP Suite`; load(); }, [load]);
 
   const docs = useMemo(() => ({ invoice: new Map(invoices.map((row) => [row.id, row])), bill: new Map(bills.map((row) => [row.id, row])) }), [invoices, bills]);
   const rows = useMemo(() => [
@@ -79,28 +79,28 @@ export default function AccountingAdjustmentRefundsPage() {
     try { sessionStorage.setItem(storageKey, JSON.stringify(pendingRequests)); } catch { /* still safe for retries within this session */ }
     try {
       const payment = await api(tenantPath('/accounting/adjustment-refunds'), { method: 'POST', body: { kind: active.kind, adjustmentId: active.id, amount: Number(form.amount), method: form.method, paymentDate: form.paymentDate, requestId } });
-      setNotice(`Đã ghi nhận payment hoàn tiền${payment?.id ? ` ${String(payment.id).slice(0, 8)}` : ''} và tạo bút toán kế toán.`);
+      setNotice(uiText('Đã ghi nhận payment hoàn tiền{payment} và tạo bút toán kế toán.').replace('{payment}', payment?.id ? ` ${String(payment.id).slice(0, 8)}` : ''));
       setRequestIds((current) => { const next = { ...current }; delete next[active.id]; try { sessionStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* optional retry storage */ } return next; });
       setForm((current) => ({ ...current, amount: '' }));
       await load();
-    } catch (e) { setError(e.message || 'Không tạo được payment hoàn tiền. Có thể gửi lại an toàn.'); }
+    } catch (e) { setError(e.message || uiText('Không tạo được payment hoàn tiền. Có thể gửi lại an toàn.')); }
     finally { setBusy(false); }
   };
 
   return <div className="page">
-    <div className="page-head"><div><h1>Hoàn tiền và thu tiền hoàn</h1><p className="sub">Thực hiện chi tiền cho khách theo credit note hoặc nhận tiền nhà cung cấp theo debit note; hệ thống giới hạn số dư, ghi payment âm và tự tạo bút toán tiền mặt/ngân hàng.</p></div><button className="btn btn-secondary" onClick={load} disabled={loading || busy}>Làm mới</button></div>
+    <div className="page-head"><div><h1>{uiText("Hoàn tiền và thu tiền hoàn")}</h1><p className="sub">{uiText("Thực hiện chi tiền cho khách theo credit note hoặc nhận tiền nhà cung cấp theo debit note; hệ thống giới hạn số dư, ghi payment âm và tự tạo bút toán tiền mặt/ngân hàng.")}</p></div><button className="btn btn-secondary" onClick={load} disabled={loading || busy}>{uiText("Làm mới")}</button></div>
     {error && <div className="alert error">{error}</div>}{notice && <div className="alert success">{notice}</div>}
-    <div className="card card-pad"><div className="row wrap"><div><strong>{rows.length} phiếu điều chỉnh đã ghi sổ</strong><div className="small muted">Số tiền có thể hoàn được tính từ tổng thanh toán thực tế và các điều chỉnh đã ghi sổ.</div></div><span className="grow"/><a className="small" href={listHref('accounting.payment')}>Danh sách payment</a></div>
-      {loading ? <p className="muted">Đang tải công nợ và payment…</p> : <div className="table-wrap" style={{ marginTop: 12 }}><table className="table"><thead><tr><th>Nghiệp vụ</th><th>Đối tác</th><th>Chứng từ gốc</th><th>Giá trị phiếu</th><th>Đã hoàn</th><th>Còn được hoàn</th><th>Thao tác</th></tr></thead><tbody>
-        {rows.map((row) => <tr key={row.id} className={selected === row.id ? 'selected' : ''}><td><strong>{row.title}</strong><div className="small muted"><a href={recordHref(`accounting.${row.kind}`, row.id)}>{row.number || String(row.id).slice(0, 8)}</a> · {statusLabel(row.status)}</div></td><td>{parties.get(row.party) ? recordLabel('master-data.party', parties.get(row.party)) : '—'}</td><td>{row.sourceDoc ? <a href={recordHref(`accounting.${row.docKind}`, row.sourceDoc.id)}>{row.sourceDoc.number || String(row.sourceDoc.id).slice(0, 8)}</a> : 'Không tìm thấy hóa đơn gốc'}<div className="small muted">{fmtDate(row.sourceDoc?.issue_date)}</div></td><td>{fmtMoney(row.total)}</td><td>{fmtMoney(row.alreadyRefunded)}</td><td><strong>{fmtMoney(row.refundable)}</strong></td><td><button className="btn btn-secondary btn-sm" disabled={row.refundable <= .005 || !can('accounting.payment.create')} onClick={() => { setSelected(row.id); setForm((current) => ({ ...current, amount: row.refundable.toFixed(2) })); setNotice(''); }}>Lập payment</button></td></tr>)}
-        {!rows.length && <tr><td colSpan="7" className="muted">Chưa có credit note hoặc debit note đã ghi sổ.</td></tr>}
+    <div className="card card-pad"><div className="row wrap"><div><strong>{uiText('{count} phiếu điều chỉnh đã ghi sổ').replace('{count}', rows.length)}</strong><div className="small muted">{uiText("Số tiền có thể hoàn được tính từ tổng thanh toán thực tế và các điều chỉnh đã ghi sổ.")}</div></div><span className="grow"/><a className="small" href={listHref('accounting.payment')}>{uiText("Danh sách payment")}</a></div>
+      {loading ? <p className="muted">{uiText("Đang tải công nợ và payment…")}</p> : <div className="table-wrap" style={{ marginTop: 12 }}><table className="table"><thead><tr><th>{uiText("Nghiệp vụ")}</th><th>{uiText("Đối tác")}</th><th>{uiText("Chứng từ gốc")}</th><th>{uiText("Giá trị phiếu")}</th><th>{uiText("Đã hoàn")}</th><th>{uiText("Còn được hoàn")}</th><th>{uiText("Thao tác")}</th></tr></thead><tbody>
+        {rows.map((row) => <tr key={row.id} className={selected === row.id ? 'selected' : ''}><td><strong>{uiText(row.title)}</strong><div className="small muted"><a href={recordHref(`accounting.${row.kind}`, row.id)}>{row.number || String(row.id).slice(0, 8)}</a> · {statusLabel(row.status)}</div></td><td>{parties.get(row.party) ? recordLabel('master-data.party', parties.get(row.party)) : '—'}</td><td>{row.sourceDoc ? <a href={recordHref(`accounting.${row.docKind}`, row.sourceDoc.id)}>{row.sourceDoc.number || String(row.sourceDoc.id).slice(0, 8)}</a> : uiText('Không tìm thấy hóa đơn gốc')}<div className="small muted">{fmtDate(row.sourceDoc?.issue_date)}</div></td><td>{fmtMoney(row.total)}</td><td>{fmtMoney(row.alreadyRefunded)}</td><td><strong>{fmtMoney(row.refundable)}</strong></td><td><button className="btn btn-secondary btn-sm" disabled={row.refundable <= .005 || !can('accounting.payment.create')} onClick={() => { setSelected(row.id); setForm((current) => ({ ...current, amount: row.refundable.toFixed(2) })); setNotice(''); }}>{uiText("Lập payment")}</button></td></tr>)}
+        {!rows.length && <tr><td colSpan="7" className="muted">{uiText("Chưa có credit note hoặc debit note đã ghi sổ.")}</td></tr>}
       </tbody></table></div>}
     </div>
-    {active && <section className="card card-pad" style={{ marginTop: 16 }}><h2>{active.title}</h2><p className="small muted">Phiếu {active.number || String(active.id).slice(0, 8)} · Số dư tối đa {fmtMoney(active.refundable)} · Ngày chứng từ {fmtDate(active.issue_date)}</p><form className="form-grid" onSubmit={submit}>
-      <label className="field"><span className="label">Số tiền *</span><input className="input num" type="number" min="0.01" max={active.refundable} step="0.01" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })}/></label>
-      <label className="field"><span className="label">Phương thức *</span><select className="select" value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })}><option value="bank">Chuyển khoản ngân hàng</option><option value="cash">Tiền mặt</option><option value="card">Thẻ</option><option value="transfer">Chuyển khoản</option><option value="ewallet">Ví điện tử</option></select></label>
-      <label className="field"><span className="label">Ngày thanh toán *</span><input className="input" type="date" required value={form.paymentDate} onChange={(e) => setForm({ ...form, paymentDate: e.target.value })}/></label>
-      <div className="row"><span className="grow"/><button className="btn btn-primary" disabled={busy || !form.amount || Number(form.amount) > active.refundable + .005}>{busy ? 'Đang ghi sổ…' : 'Ghi nhận payment'}</button><button className="btn btn-ghost" type="button" disabled={busy} onClick={() => setSelected('')}>Đóng</button></div>
+    {active && <section className="card card-pad" style={{ marginTop: 16 }}><h2>{uiText(active.title)}</h2><p className="small muted">{uiText('Phiếu {number} · Số dư tối đa {amount} · Ngày chứng từ {date}').replace('{number}', active.number || String(active.id).slice(0, 8)).replace('{amount}', fmtMoney(active.refundable)).replace('{date}', fmtDate(active.issue_date))}</p><form className="form-grid" onSubmit={submit}>
+      <label className="field"><span className="label">{uiText("Số tiền *")}</span><input className="input num" type="number" min="0.01" max={active.refundable} step="0.01" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })}/></label>
+      <label className="field"><span className="label">{uiText("Phương thức *")}</span><select className="select" value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })}><option value="bank">{uiText("Chuyển khoản ngân hàng")}</option><option value="cash">{uiText("Tiền mặt")}</option><option value="card">{uiText("Thẻ")}</option><option value="transfer">{uiText("Chuyển khoản")}</option><option value="ewallet">{uiText("Ví điện tử")}</option></select></label>
+      <label className="field"><span className="label">{uiText("Ngày thanh toán *")}</span><input className="input" type="date" required value={form.paymentDate} onChange={(e) => setForm({ ...form, paymentDate: e.target.value })}/></label>
+      <div className="row"><span className="grow"/><button className="btn btn-primary" disabled={busy || !form.amount || Number(form.amount) > active.refundable + .005}>{busy ? uiText('Đang ghi sổ…') : uiText('Ghi nhận payment')}</button><button className="btn btn-ghost" type="button" disabled={busy} onClick={() => setSelected('')}>{uiText("Đóng")}</button></div>
     </form></section>}
   </div>;
 }
