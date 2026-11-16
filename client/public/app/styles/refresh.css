@@ -63,3 +63,62 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* Extracted JSX presentation styles required by the strict style-src policy. */
+[data-inline-style="inline-092af903b2"]{white-space:pre-wrap}
+[data-inline-style="inline-0d6046eefe"]{gap:5px}
+[data-inline-style="inline-0e001e227c"]{margin:12px 0}
+[data-inline-style="inline-0ee7f66ad9"]{margin-top:12px}
+[data-inline-style="inline-297096a428"]{gap:10px}
+[data-inline-style="inline-2bdf8e45fd"]{margin-top:18px}
+[data-inline-style="inline-301647f506"]{margin-top:6px}
+[data-inline-style="inline-408df8584c"]{overflow-wrap:anywhere}
+[data-inline-style="inline-41149aaf87"]{align-items:start}
+[data-inline-style="inline-42a6ced8b6"]{margin-bottom:14px}
+[data-inline-style="inline-43a97fe494"]{margin-top:8px}
+[data-inline-style="inline-4b17347c23"]{margin-left:6px}
+[data-inline-style="inline-5e96948257"]{max-width:150px}
+[data-inline-style="inline-63a66a1f1b"]{max-width:110px}
+[data-inline-style="inline-66ecfda797"]{max-width:260px}
+[data-inline-style="inline-75be3216d0"]{grid-column:1 / -1}
+[data-inline-style="inline-75c5924920"]{max-width:340px}
+[data-inline-style="inline-8e26c5f7a1"]{margin-bottom:8px}
+[data-inline-style="inline-92c18f6bda"]{margin-top:16px}
+[data-inline-style="inline-9463ff4798"]{cursor:pointer}
+[data-inline-style="inline-9d5367afed"]{margin-left:8px}
+[data-inline-style="inline-9f9b3e4d30"]{margin:14px 0 20px}
+[data-inline-style="inline-ab79ea2b85"]{margin:0}
+[data-inline-style="inline-b56987dbcb"]{margin-bottom:12px}
+[data-inline-style="inline-bf4a218e05"]{margin-bottom:16px}
+[data-inline-style="inline-c45e284a36"]{margin:10px 0}
+[data-inline-style="inline-c53ea1da23"]{margin-top:14px}
+[data-inline-style="inline-ce4214af00"]{max-width:180px}
+[data-inline-style="inline-d5a33b90d3"]{gap:12px}
+[data-inline-style="inline-df928149c5"]{margin-top:10px}
+[data-inline-style="inline-e0e3ddd79d"]{max-width:140px}
+[data-inline-style="inline-eb2cdaa55e"]{margin-top:4px}
+[data-inline-style="inline-eb9e070a2e"]{max-width:160px}
+[data-inline-style="inline-ebb13c75de"]{max-width:120px}
+[data-inline-style="inline-eee3f850c9"]{margin-top:20px}
+[data-inline-style="inline-f452aa85dd"]{margin:18px 0 10px}
+[data-inline-style="inline-f6b5c7f77c"]{max-width:130px}
+[data-inline-style="inline-f85c702c68"]{margin-bottom:6px}
+[data-inline-style="inline-fa769ae035"]{margin-bottom:0}
+[data-inline-style="inline-fad2fc210e"]{margin:16px 0 8px}
+[data-inline-style="inline-063ffaec67"]{margin:0;overflow-wrap:anywhere}
+[data-inline-style="inline-1dcaf1af29"]{white-space:pre-wrap;overflow-wrap:anywhere}
+[data-inline-style="inline-29e4f6d361"]{margin-top:12px;margin-left:6px}
+[data-inline-style="inline-40b11694ec"]{height:8px;margin-top:8px;overflow:hidden;border-radius:var(--r-pill);background:var(--surface-2)}
+[data-inline-style="inline-41bc5191db"]{justify-content:flex-end;margin-bottom:10px}
+[data-inline-style="inline-4bbc9f7d70"]{text-align:left;width:100%}
+[data-inline-style="inline-5720d41a6b"]{display:grid;grid-template-columns:repeat(auto-fit, minmax(12rem, 1fr));gap:var(--sp-4);margin-top:12px}
+[data-inline-style="inline-731a3e1794"]{margin-top:10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+[data-inline-style="inline-82be9cd172"]{display:inline-flex;cursor:pointer}
+[data-inline-style="inline-8b15cfdb35"]{padding:8px 0;border-bottom:1px solid var(--border)}
+[data-inline-style="inline-a1f0ee6f62"]{padding:8px 0;border-bottom:1px solid var(--border)}
+[data-inline-style="inline-b1279b10ef"]{margin-top:8px;gap:12px}
+[data-inline-style="inline-c662271093"]{display:block;overflow-wrap:anywhere}
+[data-inline-style="inline-d865c2ed50"]{border:0;padding:0;margin:0}
+[data-inline-style="inline-dead288792"]{margin-top:12px;max-width:360px}
+[data-inline-style="inline-eee80941ee"]{align-self:end;padding-bottom:10px}
+[data-inline-style="inline-feda73366f"]{margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}

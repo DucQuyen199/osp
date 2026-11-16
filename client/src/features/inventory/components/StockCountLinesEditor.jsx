@@ -19,9 +19,9 @@ export default function StockCountLinesEditor({
   const activeLocations = [...locations.values()].filter((row) => row.warehouse === warehouse && row.active !== false);
 
   return <>
-    <div className="row wrap" style={{ margin: '16px 0 8px' }}>
+    <div className="row wrap" data-inline-style="inline-fad2fc210e">
       <h3>{uiText('Dòng đếm thực tế')}</h3><span className="grow" />
-      <input className="input" style={{ maxWidth: 260 }} type="search" value={productSearch}
+      <input className="input" data-inline-style="inline-66ecfda797" type="search" value={productSearch}
         onChange={(event) => onProductSearchChange(event.target.value)}
         placeholder={uiText('Tìm SKU hoặc sản phẩm')} aria-label={uiText('Tìm sản phẩm')} />
       <button className="btn btn-secondary btn-sm" type="button" onClick={onAddLine}>{uiText('Thêm dòng')}</button>

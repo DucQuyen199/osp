@@ -121,7 +121,7 @@ export default function PharmacyWorkbenchPage() {
         <label className="field"><span className="label">{t('Ngày kê *')}</span><input className="input" type="date" required value={form.issued_at} onChange={(e) => updateForm('issued_at', e.target.value)} /></label>
         <label className="field"><span className="label">{t('Có hiệu lực đến *')}</span><input className="input" type="date" min={form.issued_at} required value={form.valid_until} onChange={(e) => updateForm('valid_until', e.target.value)} /></label>
         <div className="field full"><span className="label">{t('Thuốc kê trong đơn *')}</span>
-          {lines.map((line, index) => <div className="row wrap" key={index} style={{ marginBottom: 8 }}>
+          {lines.map((line, index) => <div className="row wrap" key={index} data-inline-style="inline-8e26c5f7a1">
             <select className="select" required aria-label={`${t('Thuốc dòng')} ${index + 1}`} value={line.product} onChange={(e) => updateLine(index, 'product', e.target.value)}><option value="">{t('Chọn thuốc')}</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name}{product.sku ? ` · ${product.sku}` : ''}</option>)}</select>{unitsFor(line.product).length > 0 && <select className="select" aria-label={`${t('Đơn vị thuốc dòng')} ${index + 1}`} value={line.uom || products.find((product) => product.id === line.product)?.uom || ''} onChange={(event) => updateLine(index, 'uom', event.target.value)}>{unitsFor(line.product).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` (${unit.ratio} × ${t('đơn vị gốc')})` : ` (${t('đơn vị gốc')})`}</option>)}</select>}
             <input className="input" aria-label={`${t('Hướng dẫn sử dụng dòng')} ${index + 1}`} required placeholder={t('Liều dùng / cách dùng')} value={line.dosage} onChange={(e) => updateLine(index, 'dosage', e.target.value)} />
             <button className="btn btn-ghost btn-sm" type="button" aria-label={`${t('Xóa thuốc dòng')} ${index + 1}`} disabled={lines.length === 1} onClick={() => setLines((current) => current.filter((_, i) => i !== index))}>{t('Bỏ')}</button>
@@ -134,7 +134,7 @@ export default function PharmacyWorkbenchPage() {
       </form>
     </section>
 
-    <section className="card card-pad" style={{ marginTop: 20 }}><div className="row wrap"><h2>{t('Danh sách đơn thuốc')}</h2><span className="grow" /><a className="btn btn-secondary" href="#/pos">{t('Mở quầy POS')}</a></div>
+    <section className="card card-pad" data-inline-style="inline-eee3f850c9"><div className="row wrap"><h2>{t('Danh sách đơn thuốc')}</h2><span className="grow" /><a className="btn btn-secondary" href="#/pos">{t('Mở quầy POS')}</a></div>
       {loading ? <div className="skeleton" data-h="row" /> : prescriptions.length === 0 ? <div className="empty">{t('Chưa có đơn thuốc.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Số đơn')}</th><th>{t('Khách hàng')}</th><th>{t('Ngày kê')}</th><th>{t('Hiệu lực đến')}</th><th>{t('Thuốc')}</th><th>{t('Trạng thái')}</th><th>{t('Thao tác')}</th></tr></thead><tbody>{prescriptions.map((rx) => <tr key={rx.id}>
         <td><strong>{rx.prescription_no}</strong><div className="small muted">{rx.prescriber}{rx.prescriber_license ? ` · ${rx.prescriber_license}` : ''}</div></td>
         <td>{parties.get(rx.party)?.name || t('Khách hàng')}</td><td>{rx.issued_at}</td><td>{rx.valid_until}</td>

@@ -5,8 +5,8 @@ import { recordLabel } from '../../../lib/state.js';
 export default function GradebookSection({ canRead, canCreate, canUpdate, classes, gradeClass, gradeTerm, gradeSubject, gradeRoster, gradeMap, parties, busy, onGradeClassChange, onGradeTermChange, onGradeSubjectChange, onSave, t }) {
   if (!canRead) return null;
   return (
-<section className="card card-pad" style={{ marginTop: 20 }}><div className="row wrap"><div><h2>{t("Sổ điểm")}</h2><p className="small muted">{t("Quản lý điểm theo lớp, học kỳ và môn; mỗi học viên có một điểm cho từng môn trong mỗi kỳ.")}</p></div></div>
-      <div className="form-grid" style={{ marginBottom: 14 }}>
+<section className="card card-pad" data-inline-style="inline-eee3f850c9"><div className="row wrap"><div><h2>{t("Sổ điểm")}</h2><p className="small muted">{t("Quản lý điểm theo lớp, học kỳ và môn; mỗi học viên có một điểm cho từng môn trong mỗi kỳ.")}</p></div></div>
+      <div className="form-grid" data-inline-style="inline-42a6ced8b6">
         <label className="field"><span className="label">{t("Lớp *")}</span><select className="select" value={gradeClass} onChange={(event) => onGradeClassChange(event.target.value)}><option value="">{t("Chọn lớp")}</option>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}{item.subject ? ` · ${item.subject}` : ''}</option>)}</select></label>
         <label className="field"><span className="label">{t("Học kỳ *")}</span><input className="input" required value={gradeTerm} onChange={(event) => onGradeTermChange(event.target.value)} placeholder={t('Ví dụ: 2026-2027 / HK1')} /></label>
         <label className="field"><span className="label">{t("Môn học *")}</span><input className="input" required value={gradeSubject} onChange={(event) => onGradeSubjectChange(event.target.value)} placeholder={t('Ví dụ: Toán')} /></label>

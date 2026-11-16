@@ -311,3 +311,17 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .bi-bar-fill rect{fill:var(--accent)}
 .bi-bar-row{display:grid;grid-template-columns:minmax(8rem,1fr) minmax(5rem,2fr) auto;align-items:center;gap:var(--sp-3)}
 @media(max-width:600px){.bi-pie-wrap{grid-template-columns:1fr;justify-items:center}.bi-legend{width:100%}.bi-bar-row{grid-template-columns:minmax(6rem,1fr) minmax(4rem,1fr) auto;gap:.5rem}}
+.crm-kanban.is-hidden{display:none}
+.einvoice-filter.is-active{border-color:var(--accent);background:var(--accent-soft)}
+.einvoice-row{cursor:pointer}
+.einvoice-row.selected{background:var(--surface-2)}
+.performance-progress-fill{display:block;width:100%;height:100%;transition:width .2s ease}
+.performance-progress-fill rect{fill:var(--accent)}
+.document-folder-label{display:inline-block;overflow-wrap:anywhere}
+.document-folder-label.depth-0{padding-left:0}
+.document-folder-label.depth-1{padding-left:18px}
+.document-folder-label.depth-2{padding-left:36px}
+.document-folder-label.depth-3{padding-left:54px}
+.document-folder-label.depth-4{padding-left:72px}
+.document-folder-label.depth-5{padding-left:90px}
+.document-folder-label.depth-6{padding-left:108px}

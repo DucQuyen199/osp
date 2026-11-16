@@ -5,7 +5,7 @@ export default function InsuranceClaimsPanel(props) {
   const { can, claims, loading, uiText, claimForm, setClaimForm, activePolicies, today, createClaim, policies, parties, money, claimPay, claimApprovalAmounts, setClaimApprovalAmounts, claimAction, claimRejectionReasons, setClaimRejectionReasons, busy, payClaim, accounts, fmtDate } = props;
   return (
     <>
-    {can('insurance.claim.read') && <section className="card card-pad" style={{ marginTop: 20 }}><h2>{uiText("Hồ sơ bồi thường")}</h2>
+    {can('insurance.claim.read') && <section className="card card-pad" data-inline-style="inline-eee3f850c9"><h2>{uiText("Hồ sơ bồi thường")}</h2>
       {can('insurance.claim.create') && <form className="form-grid" onSubmit={createClaim}>
         <label className="field"><span className="label">{uiText("Mã hồ sơ *")}</span><input className="input" required value={claimForm.number} onChange={(e) => setClaimForm((x) => ({ ...x, number: e.target.value }))} /></label>
         <label className="field"><span className="label">{uiText("Hợp đồng còn hiệu lực *")}</span><select className="select" required value={claimForm.policy} onChange={(e) => setClaimForm((x) => ({ ...x, policy: e.target.value }))}><option value="">{uiText("Chọn hợp đồng")}</option>{activePolicies.map((policy) => <option key={policy.id} value={policy.id}>{policy.number} · {parties.get(policy.party)?.name || policy.product}</option>)}</select></label>
@@ -14,7 +14,7 @@ export default function InsuranceClaimsPanel(props) {
         <label className="field full"><span className="label">{uiText("Mô tả sự cố")}</span><textarea className="textarea" value={claimForm.description} onChange={(e) => setClaimForm((x) => ({ ...x, description: e.target.value }))} /></label>
         <div className="row full"><span className="grow" /><button className="btn btn-primary" disabled={busy || loading || !activePolicies.length}>{uiText("Tiếp nhận hồ sơ")}</button></div>
       </form>}
-      {!claims.length && !loading ? <div className="empty">{uiText("Chưa có hồ sơ bồi thường.")}</div> : <div className="table-wrap" style={{ marginTop: 12 }}><table className="table"><thead><tr><th>{uiText("Mã hồ sơ")}</th><th>{uiText("Hợp đồng")}</th><th>{uiText('Sự cố')}</th><th>{uiText("Yêu cầu / duyệt")}</th><th>{uiText("Trạng thái")}</th><th>{uiText("Thẩm định / chi trả")}</th></tr></thead><tbody>{claims.map((claim) => {
+      {!claims.length && !loading ? <div className="empty">{uiText("Chưa có hồ sơ bồi thường.")}</div> : <div className="table-wrap" data-inline-style="inline-0ee7f66ad9"><table className="table"><thead><tr><th>{uiText("Mã hồ sơ")}</th><th>{uiText("Hợp đồng")}</th><th>{uiText('Sự cố')}</th><th>{uiText("Yêu cầu / duyệt")}</th><th>{uiText("Trạng thái")}</th><th>{uiText("Thẩm định / chi trả")}</th></tr></thead><tbody>{claims.map((claim) => {
         const policy = policies.find((item) => item.id === claim.policy); const pay = claimPay[claim.id] || {};
         const canApprove = can('insurance.claim.approved') && can('insurance.claim.update');
         const canReject = can('insurance.claim.rejected') && can('insurance.claim.update');

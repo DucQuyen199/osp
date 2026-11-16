@@ -117,7 +117,7 @@ export default function CrmPipelinePage() {
         <button ref={boardTabRef} className="tab" id="crm-pipeline-board-tab" type="button" role="tab" aria-controls="crm-pipeline-board-panel" aria-selected={view === 'board'} tabIndex={view === 'board' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setView('board')}>Kanban</button>
         <button ref={listTabRef} className="tab" id="crm-pipeline-list-tab" type="button" role="tab" aria-controls="crm-pipeline-list-panel" aria-selected={view === 'list'} tabIndex={view === 'list' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setView('list')}>{t('Danh sách')}</button>
       </div>
-      <div role="tabpanel" id="crm-pipeline-board-panel" aria-labelledby="crm-pipeline-board-tab" tabIndex={0} style={view === 'board' ? undefined : { display: 'none' }} className="crm-kanban" aria-label={t("Cơ hội theo giai đoạn bán hàng")}>
+      <div role="tabpanel" id="crm-pipeline-board-panel" aria-labelledby="crm-pipeline-board-tab" tabIndex={0} className={`crm-kanban${view === 'board' ? '' : ' is-hidden'}`} aria-label={t("Cơ hội theo giai đoạn bán hàng")}>
         {(report.stages || []).map((summary) => {
           const stageName = summary.stage;
           const deals = report.deals.filter((deal) => deal.pipelineStage === stageName);
