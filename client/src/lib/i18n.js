@@ -517,6 +517,17 @@ const UI_TEXT_EN = {
   'Khi tắt (mặc định), hệ thống từ chối phiếu xuất nếu số lượng vượt tồn sau khi trừ hàng đang giữ chờ kiểm tra chất lượng. Khi bật, nghiệp vụ xuất kho có thể ghi nhận tồn âm; chỉ dùng khi doanh nghiệp cho phép xuất trước, nhập sau.': 'When off (the default), the system rejects issues that exceed stock after quantities held for quality inspection are deducted. When on, issues can create negative stock; use this only when the business allows shipping before receiving.',
   'Tồn kho âm đang được cho phép cho toàn doanh nghiệp.': 'Negative inventory is allowed for the entire company.',
   'Tồn kho âm đang bị chặn cho toàn doanh nghiệp.': 'Negative inventory is blocked for the entire company.',
+  'Nhẹ': 'Minor', 'Nghiêm trọng': 'Major', 'Tới hạn': 'Critical', 'Không tải được sổ sự không phù hợp.': 'Could not load the nonconformance register.',
+  'Sổ sự không phù hợp': 'Nonconformance register', 'Thao tác không thành công.': 'The action failed.', 'Đã ghi nhận sự không phù hợp.': 'Nonconformance recorded.',
+  'Đã đóng hồ sơ NCR.': 'NCR record closed.', 'Theo dõi nguyên nhân, mức độ và trạng thái xử lý của các vấn đề chất lượng; NCR từ phiếu QC không đạt được ghi nhận tự động.': 'Track the cause, severity, and resolution status of quality issues. Failed quality inspections automatically create an NCR.',
+  'NCR đang mở': 'Open NCRs', 'NCR tới hạn đang mở': 'Open critical NCRs', 'Tổng hồ sơ': 'Total records',
+  'Ghi nhận vấn đề chất lượng': 'Record a quality issue', 'Tiêu đề': 'Title', 'Mức độ': 'Severity', 'Phiếu kiểm tra liên quan': 'Related inspection',
+  'Không gắn phiếu kiểm tra': 'No inspection linked', 'Mô tả / nguyên nhân': 'Description / cause', 'Ghi nhận NCR': 'Record NCR',
+  'Bạn chưa có quyền xem hồ sơ NCR.': 'You do not have permission to view NCR records.', 'Danh sách NCR': 'NCR list',
+  'NCR được tạo khi phiếu kiểm tra chuyển sang không đạt và đóng tự động khi phiếu được thông qua.': 'NCRs are created when an inspection fails and close automatically when it passes.',
+  'Lọc trạng thái': 'Filter by status', 'Đang mở': 'Open', 'Đã đóng': 'Closed', 'Tất cả': 'All', 'Không có hồ sơ NCR trong bộ lọc này.': 'No NCR records match this filter.',
+  'Tiêu đề / thời điểm': 'Title / date', 'Phiếu QC / sản phẩm': 'Inspection / product', 'Mô tả': 'Description', 'Trạng thái': 'Status', 'Thao tác': 'Actions',
+  'Phiếu kiểm tra': 'Inspection', 'Không liên kết': 'Not linked', 'Đóng NCR': 'Close NCR',
 };
 
 const storedUiLocale = () => {
