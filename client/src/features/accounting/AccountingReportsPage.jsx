@@ -168,7 +168,7 @@ export default function AccountingReportsPage() {
         <p className="muted small">{uiText("Sổ nội bộ tổng hợp theo ngày bút toán, gồm hóa đơn bán, credit note, bill mua và debit note đã ghi sổ. Đối chiếu thuế đầu vào với chứng từ và quy định trước khi kê khai.")}</p>
       </>}
       {(mode === 'receivables' || mode === 'payables') && <>
-        <div className="stats"><Stat label={uiText(mode === 'receivables' ? 'Tổng phải thu còn lại' : 'Tổng phải trả còn lại')} value={report.totals?.total} /><Stat label="Quá hạn trên 90 ngày" value={report.totals?.over90Days} /></div>
+        <div className="stats"><Stat label={uiText(mode === 'receivables' ? 'Tổng phải thu còn lại' : 'Tổng phải trả còn lại')} value={report.totals?.total} /><Stat label={uiText('Quá hạn trên 90 ngày')} value={report.totals?.over90Days} /></div>
         <section className="card report-section"><div className="card-head"><h2>{uiText(mode === 'receivables' ? 'Theo khách hàng' : 'Theo nhà cung cấp')}</h2><span className="muted small">{uiText('Số dư tại {date}').replace('{date}', report.asOf)}</span></div><div className="card-pad"><ReportTable headers={[mode === 'receivables' ? 'Khách hàng' : 'Nhà cung cấp', 'Chứng từ', 'Chưa đến hạn', 'Đến hạn hôm nay', '1–30 ngày', '31–60 ngày', '61–90 ngày', 'Trên 90 ngày', 'Còn lại']} rows={(report.parties || []).map((row) => [row.party, String(row.documents), num(row.notDue), num(row.dueToday), num(row.days1To30), num(row.days31To60), num(row.days61To90), num(row.over90Days), num(row.total)])} /></div></section>
       </>}
       {mode === 'fx' && <>

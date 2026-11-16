@@ -8,6 +8,8 @@ const constructionEnglish = {
   'Diễn biến, nhân lực, thiết bị': 'Progress, workforce, and equipment', 'Thời tiết': 'Weather', 'Ngày': 'Date', 'Ngày *': 'Date *',
   'Dự án': 'Project', 'Phạm vi': 'Scope', 'Phạm vi công việc': 'Work scope', 'Thao tác': 'Actions', 'Thao tác / chứng từ': 'Actions / documents', 'Trạng thái': 'Status',
   'Mã BOQ': 'BOQ code', 'Phiên bản': 'Version', 'Phiên bản cho công trình': 'Site version', 'Tổng dự toán': 'Estimated total',
+  'Mô tả hạng mục': 'Line item description', 'Mô tả công tác / vật tư': 'Work or material description', 'Đơn vị tính': 'Unit of measure',
+  'm², m³, m, kg, ngày công': 'm², m³, m, kg, labor-day', 'Khối lượng': 'Quantity', 'Đơn giá': 'Unit price', 'Xóa hạng mục': 'Remove line item',
   'Hạng mục': 'Line item', 'Thêm hạng mục': 'Add line item', 'Giá trị': 'Value', 'Điều chỉnh baseline': 'Revise baseline', 'Lý do điều chỉnh *': 'Revision reason *',
   'Lập phiên bản điều chỉnh': 'Create revised version', 'Duyệt baseline': 'Approve baseline', 'Lưu BOQ nháp': 'Save draft BOQ', 'Hoàn thành': 'Complete',
   'Hồ sơ': 'Claims', 'Nghiệm thu và thanh toán theo đợt': 'Progress claims and milestone payments', 'Giá trị đề nghị thanh toán *': 'Payment claim amount *', 'Ngày nghiệm thu *': 'Acceptance date *',
