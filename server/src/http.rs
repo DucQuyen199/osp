@@ -12,7 +12,7 @@ use axum::response::{IntoResponse, Response};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use serde_json::{Value, json};
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -175,11 +175,116 @@ impl RateLimiter {
 pub struct AppState {
     pub kernel: Arc<Kernel>,
     pub cfg: AppConfig,
+    pub(crate) trusted_proxies: Vec<IpNetwork>,
     pub api_limiter: RateLimiter,
     pub auth_limiter: RateLimiter,
     pub create_limiter: RateLimiter,
     pub metrics: HttpMetrics,
     pub metrics_token: Option<String>,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct IpNetwork {
+    address: IpAddr,
+    prefix: u8,
+}
+
+impl IpNetwork {
+    fn parse(value: &str) -> Result<Self, String> {
+        let (address, prefix) = value
+            .trim()
+            .split_once('/')
+            .map_or((value.trim(), None), |(address, prefix)| {
+                (address.trim(), Some(prefix.trim()))
+            });
+        let address = address
+            .parse::<IpAddr>()
+            .map_err(|_| format!("invalid IP address in trusted proxy entry {value:?}"))?;
+        let max_prefix = if address.is_ipv4() { 32 } else { 128 };
+        let prefix = match prefix {
+            Some(prefix) => prefix
+                .parse::<u8>()
+                .ok()
+                .filter(|prefix| *prefix <= max_prefix)
+                .ok_or_else(|| format!("invalid prefix length in trusted proxy entry {value:?}"))?,
+            None => max_prefix,
+        };
+        if prefix == 0 {
+            return Err(format!(
+                "trusted proxy entry {value:?} cannot trust an entire IP address family"
+            ));
+        }
+        Ok(Self { address, prefix })
+    }
+
+    fn contains(self, address: IpAddr) -> bool {
+        match (self.address, address) {
+            (IpAddr::V4(network), IpAddr::V4(address)) => {
+                let mask = u32::MAX << (32 - self.prefix);
+                u32::from(network) & mask == u32::from(address) & mask
+            }
+            (IpAddr::V6(network), IpAddr::V6(address)) => {
+                let mask = u128::MAX << (128 - self.prefix);
+                u128::from(network) & mask == u128::from(address) & mask
+            }
+            _ => false,
+        }
+    }
+}
+
+fn trusted_client_ip(
+    peer: IpAddr,
+    headers: &axum::http::HeaderMap,
+    proxies: &[IpNetwork],
+) -> IpAddr {
+    if !proxies.iter().any(|proxy| proxy.contains(peer)) {
+        return peer;
+    }
+    let values = headers.get_all("x-forwarded-for");
+    let mut chain = Vec::new();
+    for value in values.iter() {
+        let Ok(value) = value.to_str() else {
+            return peer;
+        };
+        if value.len() > 1024 {
+            return peer;
+        }
+        for hop in value.split(',') {
+            let Ok(address) = hop.trim().parse::<IpAddr>() else {
+                return peer;
+            };
+            chain.push(address);
+            if chain.len() > 32 {
+                return peer;
+            }
+        }
+    }
+    let mut client = peer;
+    for hop in chain.into_iter().rev() {
+        if !proxies.iter().any(|proxy| proxy.contains(client)) {
+            break;
+        }
+        client = hop;
+    }
+    client
+}
+
+pub(crate) fn load_trusted_proxies() -> Vec<IpNetwork> {
+    let Ok(value) = std::env::var("OSP_TRUSTED_PROXIES") else {
+        return Vec::new();
+    };
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|entry| !entry.is_empty())
+        .filter_map(|entry| match IpNetwork::parse(entry) {
+            Ok(network) => Some(network),
+            Err(error) => {
+                tracing::warn!(%error, "ignoring invalid OSP_TRUSTED_PROXIES entry");
+                None
+            }
+        })
+        .collect()
 }
 
 enum Reply {
@@ -308,7 +413,7 @@ pub async fn handle(
     if req.method() == Method::HEAD {
         *req.method_mut() = Method::GET;
     }
-    let ip = addr.ip().to_string();
+    let ip = trusted_client_ip(addr.ip(), req.headers(), &st.trusted_proxies).to_string();
     let response = match route(&st, req, &ip).await {
         Ok(reply) => reply_to_response(reply),
         Err(error) => error.into_response(),

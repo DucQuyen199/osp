@@ -82,6 +82,7 @@ pub fn app_state(k: Arc<kernel::Kernel>, cfg: http::AppConfig) -> Arc<http::AppS
     Arc::new(http::AppState {
         kernel: k,
         cfg,
+        trusted_proxies: http::load_trusted_proxies(),
         api_limiter: http::RateLimiter::new(limit, Duration::from_secs(60)),
         auth_limiter: http::RateLimiter::new(30, Duration::from_secs(60)),
         create_limiter: http::RateLimiter::new(20, Duration::from_secs(60)),

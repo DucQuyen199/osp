@@ -71,6 +71,8 @@ Doanh nghiệp tạo ra chỉ chọn được trong số module đã cài; modul
 |---|---|---|
 | `OSP_PORT` / `PORT` / `--port=` | `3000` | Cổng lắng nghe |
 | `OSP_PROCESS_ROLE` | `all` | `api` chỉ phục vụ HTTP, `worker` chỉ chạy tác vụ nền, `all` chạy cả hai; Compose đặt riêng role cho từng service |
+| `OSP_RATE_LIMIT` | `600` | Hạn mức API theo IP hiệu dụng mỗi phút; bộ đếm hiện giữ trong bộ nhớ của từng tiến trình |
+| `OSP_TRUSTED_PROXIES` | rỗng | Danh sách IP/CIDR reverse proxy tin cậy, phân cách bằng dấu phẩy. Chỉ khi peer trực tiếp thuộc danh sách, ứng dụng mới đọc `X-Forwarded-For` từ phải sang trái để xác định IP client và bỏ qua các hop proxy đã tin cậy. Ví dụ: `127.0.0.1/32,10.0.0.0/8`. Không đưa IP client hoặc mạng Internet vào danh sách này. |
 | `DATABASE_URL` | — | Chuỗi kết nối PostgreSQL bắt buộc khi chạy Rust production |
 | `OSP_MODULES` / `--modules=` | tất cả | Danh sách module cần cài |
 | `OSP_JOBS_INTERVAL_SEC` | `60` | Chu kỳ scheduler; đặt `0` để tắt |
