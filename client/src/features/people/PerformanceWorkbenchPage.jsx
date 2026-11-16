@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath } from '../../lib/api.js';
-import { fmtDateTime, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
+import { fmtDateTime, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
 import performanceEnglish from './performance.en.js';
+import KeyResultProgressCard from './components/KeyResultProgressCard.jsx';
 
 const emptyObjective = { title: '', owner: '', period: '' };
 const emptyKeyResult = { title: '', target: '', unit: '' };
@@ -168,7 +169,9 @@ export default function PerformanceWorkbenchPage() {
         {selectedObjective && <section className="card card-pad"><div className="row wrap"><div><h3>{selectedObjective.title}</h3><div className="small muted">{employeeName(selectedObjective.owner)} · {selectedObjective.period || t('Không giới hạn kỳ')}</div></div><span className="grow"/><span className="badge plain">{objectiveResults.length} {t('kết quả')}</span></div>
           {!can('performance.key_result.read') ? <div className="empty">{t("Bạn chưa có quyền xem kết quả then chốt.")}</div> : !objectiveResults.length ? <div className="empty">{t("Mục tiêu chưa có kết quả then chốt.")}</div> : <div className="stack-sm u-legacy-0ee7f66ad9" >{objectiveResults.map((result) => {
             const target = Number(result.target); const current = Number(result.current || 0); const percent = target > 0 ? Math.max(0, Math.min(100, current / target * 100)) : 0;
-            return <article className="card card-pad" key={result.id}><div className="row wrap"><strong>{result.title}</strong><span className="grow"/><span className="small muted">{fmtNumber(current)} / {fmtNumber(target)} {result.unit || ''} · {fmtNumber(percent, { maximumFractionDigits: 0 })}%</span></div><div role="meter" aria-label={`${t('Tiến độ')} ${result.title}`} aria-valuemin="0" aria-valuemax="100" aria-valuenow={percent} className="u-legacy-40b11694ec"><svg className="performance-progress-fill" viewBox="0 0 100 1" preserveAspectRatio="none" aria-hidden="true"><rect width={percent} height="1" /></svg></div>{can('performance.key_result.update') && <form className="row wrap u-legacy-43a97fe494"  onSubmit={(event) => updateProgress(event, result)}><label className="field grow"><span className="label">{t('Giá trị hiện tại')} {result.unit ? `(${result.unit})` : ''}</span><input className="input" type="number" min="0" step="any" required value={progress[result.id] ?? result.current ?? 0} onChange={(event) => setProgress((values) => ({ ...values, [result.id]: event.target.value }))}/></label><button className="btn btn-secondary btn-sm" disabled={Boolean(busy)}>{t("Cập nhật tiến độ")}</button></form>}</article>;
+            return <KeyResultProgressCard key={result.id} result={result} current={current} target={target} percent={percent}
+              progressValue={progress[result.id] ?? result.current ?? 0} canUpdate={can('performance.key_result.update')} busy={busy}
+              onProgressChange={(id, value) => setProgress((values) => ({ ...values, [id]: value }))} onSubmit={updateProgress} t={t} />;
           })}</div>}
           {can('performance.key_result.create') && <form className="form-grid u-legacy-c53ea1da23"  onSubmit={createKeyResult}><label className="field"><span className="label">{t("Kết quả then chốt *")}</span><input className="input" required maxLength="240" value={keyResultForm.title} onChange={(event) => setKeyResultForm((form) => ({ ...form, title: event.target.value }))} placeholder={t('Ví dụ: Rút thời gian xử lý đơn')}/></label><label className="field"><span className="label">{t("Mục tiêu đo lường *")}</span><input className="input" type="number" min="0.000001" step="any" required value={keyResultForm.target} onChange={(event) => setKeyResultForm((form) => ({ ...form, target: event.target.value }))}/></label><label className="field"><span className="label">{t("Đơn vị")}</span><input className="input" maxLength="40" placeholder={t('đơn, %, giờ, VND…')} value={keyResultForm.unit} onChange={(event) => setKeyResultForm((form) => ({ ...form, unit: event.target.value }))}/></label><div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy)}>{t("Thêm kết quả then chốt")}</button></div></form>}
         </section>}

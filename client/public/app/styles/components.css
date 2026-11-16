@@ -315,6 +315,8 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .einvoice-filter.is-active{border-color:var(--accent);background:var(--accent-soft)}
 .einvoice-row{cursor:pointer}
 .einvoice-row.selected{background:var(--surface-2)}
+.performance-progress-meter{height:8px;margin-top:8px;overflow:hidden;border-radius:var(--r-pill);background:var(--surface-2)}
+.performance-progress-form{margin-top:var(--sp-2)}
 .performance-progress-fill{display:block;width:100%;height:100%;transition:width .2s ease}
 .performance-progress-fill rect{fill:var(--accent)}
 .document-folder-label{display:inline-block;overflow-wrap:anywhere}
