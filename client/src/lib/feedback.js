@@ -1,3 +1,5 @@
+import { uiText } from './i18n.js';
+
 export function toast(message, kind = '') {
   const urgent = kind === 'danger' || kind === 'error';
   const toastHost = document.getElementById(urgent ? 'osp-toast-alert' : 'osp-toast-status');
@@ -20,10 +22,10 @@ export function confirmDialog({ title, message, confirmLabel = 'Xác nhận', da
     body.className = 'modal-body stack-sm';
     const heading = document.createElement('h2');
     heading.id = 'osp-confirm-title';
-    heading.textContent = title;
+    heading.textContent = uiText(title);
     const copy = document.createElement('p');
     copy.className = 'muted';
-    copy.textContent = message;
+    copy.textContent = uiText(message);
     body.append(heading, copy);
 
     const footer = document.createElement('div');
@@ -31,12 +33,12 @@ export function confirmDialog({ title, message, confirmLabel = 'Xác nhận', da
     const cancel = document.createElement('button');
     cancel.className = 'btn';
     cancel.type = 'button';
-    cancel.textContent = 'Hủy';
+    cancel.textContent = uiText('Hủy');
     cancel.addEventListener('click', () => dialog.close());
     const accept = document.createElement('button');
     accept.className = `btn ${danger ? 'btn-danger' : 'btn-primary'}`;
     accept.type = 'button';
-    accept.textContent = confirmLabel;
+    accept.textContent = uiText(confirmLabel);
     accept.addEventListener('click', () => { confirmed = true; dialog.close(); });
     footer.append(cancel, accept);
     dialog.append(body, footer);
@@ -62,15 +64,15 @@ export function textDialog({ title, message, label, minLength = 1, maxLength = 1
     body.className = 'modal-body stack-sm';
     const heading = document.createElement('h2');
     heading.id = 'osp-text-title';
-    heading.textContent = title;
+    heading.textContent = uiText(title);
     const copy = document.createElement('p');
     copy.className = 'muted';
-    copy.textContent = message;
+    copy.textContent = uiText(message);
     const field = document.createElement('label');
     field.className = 'field';
     const fieldLabel = document.createElement('span');
     fieldLabel.className = 'label';
-    fieldLabel.textContent = label;
+    fieldLabel.textContent = uiText(label);
     const input = document.createElement('textarea');
     input.className = 'textarea';
     input.required = true;
@@ -84,12 +86,12 @@ export function textDialog({ title, message, label, minLength = 1, maxLength = 1
     const cancel = document.createElement('button');
     cancel.className = 'btn';
     cancel.type = 'button';
-    cancel.textContent = 'Hủy';
+    cancel.textContent = uiText('Hủy');
     cancel.addEventListener('click', () => dialog.close());
     const accept = document.createElement('button');
     accept.className = `btn ${danger ? 'btn-danger' : 'btn-primary'}`;
     accept.type = 'button';
-    accept.textContent = confirmLabel;
+    accept.textContent = uiText(confirmLabel);
     accept.disabled = true;
     input.addEventListener('input', () => { accept.disabled = input.value.trim().length < minLength; });
     accept.addEventListener('click', () => {
