@@ -1,0 +1,28 @@
+const integrationEnglish = {
+  'Không tải được cấu hình tích hợp.': 'Could not load integration settings.', 'Thao tác không thành công.': 'The operation could not be completed.',
+  'Cấu hình connector phải là JSON hợp lệ.': 'Connector configuration must be valid JSON.',
+  'Cấu hình connector phải là một đối tượng JSON.': 'Connector configuration must be a JSON object.',
+  'Hãy nhập ít nhất một loại sự kiện webhook nhận.': 'Enter at least one event for the webhook to receive.',
+  'Đã thêm connector.': 'Connector added.', 'Đã tạo webhook. Bí mật ký chỉ được nhập lúc tạo và không hiển thị trong danh sách.': 'Webhook created. The signing secret is only entered at creation and is not shown in the list.',
+  'Đã bật cấu hình.': 'Configuration enabled.', 'Đã tạm ngưng cấu hình.': 'Configuration paused.', 'Đã kết nối thử thành công.': 'Connection test succeeded.', 'Đã gửi thử thành công.': 'Test delivery succeeded.',
+  'Cổng tích hợp': 'Integration hub',
+  'Quản lý connector và webhook để kết nối OSP với dịch vụ bên ngoài. Giao nhận webhook được theo dõi riêng trong Cài đặt → Outbox.': 'Manage connectors and webhooks that connect OSP to external services. Track webhook delivery in Settings → Outbox.',
+  'Làm mới': 'Refresh', 'Thêm connector HTTP': 'Add an HTTP connector',
+  'Adapter HTTP gửi payload JSON của sự kiện đến API nhà cung cấp, hỗ trợ header xác thực và chữ ký HMAC. Giao nhận có retry và theo dõi trong Outbox.': 'The HTTP adapter sends event JSON payloads to a provider API, supports authentication headers and HMAC signatures, and retries and tracks delivery in Outbox.',
+  'Tên hiển thị *': 'Display name *', 'Nhà cung cấp / mục đích *': 'Provider / purpose *', 'Loại connector *': 'Connector type *', 'Cấu hình adapter HTTP (JSON)': 'HTTP adapter configuration (JSON)',
+  'Cần adapter=http_event_sink, URL HTTPS công khai, events là danh sách sự kiện hoặc wildcard; headers là object tên/giá trị. Có thể đặt secret để ký X-OSP-Signature. Bí mật sẽ không được trả lại qua API.': 'Requires adapter=http_event_sink, a public HTTPS URL, events as a list of event keys or wildcards, and headers as a name/value object. Optionally set a secret to sign X-OSP-Signature. The API will not return the secret.',
+  'Thêm connector': 'Add connector', 'Đăng ký webhook': 'Register a webhook',
+  'OSP sẽ gửi payload sự kiện đã đăng ký qua HTTPS và ký payload bằng HMAC SHA-256 nếu có bí mật.': 'OSP sends subscribed event payloads over HTTPS and signs them with HMAC SHA-256 when a secret is configured.',
+  'URL HTTPS *': 'HTTPS URL *', 'Chọn sự kiện từ danh mục': 'Select events from the catalog',
+  'Tìm tên sự kiện, ví dụ sales.sales_order.confirmed': 'Search event names, for example sales.sales_order.confirmed', 'Thêm sự kiện': 'Add event',
+  'Danh mục chỉ gồm sự kiện của module đang bật trong doanh nghiệp này.': 'The catalog only includes events from modules enabled for this business.',
+  'Sự kiện nhận *': 'Events to receive *', 'Phân cách bằng dấu phẩy hoặc xuống dòng; hỗ trợ wildcard như sales.*': 'Separate with commas or new lines; wildcards such as sales.* are supported.',
+  'Bí mật ký (tùy chọn)': 'Signing secret (optional)', 'Tạo webhook': 'Create webhook', 'Connectors': 'Connectors',
+  'Chưa có connector.': 'No connectors yet.', 'Tên': 'Name', 'Loại': 'Type', 'Trạng thái': 'Status', 'Cập nhật': 'Updated',
+  'Đang gửi': 'Sending', 'Thiếu adapter': 'Adapter missing', 'Đã tắt': 'Disabled', 'Gửi thử': 'Send test', 'Tạm ngưng': 'Pause', 'Bật lại': 'Enable',
+  'Webhook gửi sự kiện': 'Event webhooks', 'Chưa đăng ký webhook.': 'No webhooks registered.', 'Endpoint': 'Endpoint', 'Sự kiện': 'Events',
+  'Chưa chọn sự kiện': 'No events selected', 'Ví dụ sự kiện:': 'Example events:', 'Theo dõi và thử lại lần gửi tới webhook hoặc connector trong': 'Monitor and retry webhook or connector deliveries in',
+  'Outbox tích hợp': 'Integration Outbox', 'Tạo token tích hợp giới hạn quyền tại': 'Create a scoped integration token in', 'Thao tác': 'Actions',
+};
+
+export default integrationEnglish;
