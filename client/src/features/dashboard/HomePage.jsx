@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { api, tenantPath } from '../../lib/api.js';
 import { fetchEvents } from '../../lib/events.js';
 import { fmtNumber } from '../../lib/i18n.js';
-import { app, can, entityLabel, isAdmin } from '../../lib/state.js';
+import { app, can, entity, entityLabel, isAdmin } from '../../lib/state.js';
 import { listHref } from '../../lib/routes.js';
 import { EventTimeline } from '../entities/EntityDetailPage.jsx';
 
@@ -23,6 +23,12 @@ export default function HomePage({ summary }) {
       .filter((qname) => app.entities.has(qname) && can(`${qname}.read`))
       .slice(0, 8);
   }, [app.meta.vertical]);
+  const setupEntities = useMemo(() => [...new Set([
+    ...(app.meta.setupEntities || []), 'master-data.party', 'master-data.product',
+  ])].filter((qname) => {
+    const definition = entity(qname);
+    return definition && !definition.systemManaged && can(`${qname}.create`);
+  }).slice(0, 2), [app.meta.vertical]);
   const total = Object.entries(summary || {}).filter(([qname]) => !EXCLUDED.has(qname)).reduce((sum, [, count]) => sum + Number(count || 0), 0);
   const firstName = (app.user?.name || '').split(' ').slice(-1)[0];
 
@@ -56,10 +62,9 @@ export default function HomePage({ summary }) {
     </div>}
     {total === 0
       ? <section className="card"><div className="empty">
-        <h3>Doanh nghiệp của bạn còn trống</h3><p>Bắt đầu bằng cách thêm khách hàng và sản phẩm hoặc nhập dữ liệu CSV.</p>
+        <h3>Doanh nghiệp của bạn còn trống</h3><p>{app.meta.verticalName ? `Bắt đầu quy trình ${app.meta.verticalName} bằng các hồ sơ nền tảng bên dưới.` : 'Tạo hồ sơ đầu tiên cho doanh nghiệp hoặc nhập dữ liệu CSV.'}</p>
         <div className="row wrap">
-          {can('master-data.party.create') && <a className="btn btn-primary" href={listHref('master-data.party')}>Thêm {entityLabel('master-data.party').toLowerCase()}</a>}
-          {can('master-data.product.create') && <a className="btn" href={listHref('master-data.product')}>Thêm {entityLabel('master-data.product').toLowerCase()}</a>}
+          {setupEntities.map((qname, index) => <a key={qname} className={`btn${index === 0 ? ' btn-primary' : ''}`} href={listHref(qname)}>Thêm {entityLabel(qname).toLowerCase()}</a>)}
           {isAdmin() && <a className="btn" href="#/settings/data">Nhập từ CSV</a>}
         </div>
       </div></section>

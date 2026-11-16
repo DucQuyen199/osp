@@ -371,6 +371,7 @@
   }
 },
  "summaryEntities": ["lending.loan", "insurance.policy", "insurance.claim", "accounting.invoice", "accounting.payment"],
+ "setupEntities": ["master-data.party", "lending.loan"],
  "kpis": [
   "Dư nợ",
   "Tỷ lệ nợ xấu (NPL)",

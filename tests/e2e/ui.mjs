@@ -218,21 +218,21 @@ for (const [hash, label] of retailScreens) {
 }
 
 const verticalScreens = [
-  ['agriculture', '#/agriculture', 'Agriculture', 'agriculture.crop_cycle'], ['automotive', '#/workshop', 'Automotive', 'auto-service.repair_order'],
-  ['beauty-wellness', '#/wellness', 'Beauty and wellness', 'booking.booking'], ['construction', '#/construction', 'Construction', 'construction.site'],
-  ['ecommerce', '#/ecommerce', 'Ecommerce', 'ecommerce.web_order'], ['education', '#/education', 'Education', 'school.student'],
-  ['events-media', '#/event-ops', 'Events and media', 'events.event'], ['finance', '#/finance', 'Finance', 'lending.loan'],
-  ['fnb', '#/restaurant', 'Food and beverage', 'restaurant.table_order'], ['healthcare', '#/clinic', 'Healthcare', 'clinic.encounter'],
-  ['home-services', '#/field-service', 'Home services', 'field-service.work_order'], ['hospitality', '#/hotel', 'Hospitality', 'hotel.reservation'],
-  ['logistics', '#/reports/logistics/delivery-board', 'Logistics', 'logistics.shipment'],
-  ['manufacturing', '#/reports/manufacturing/wip', 'Manufacturing', 'manufacturing.production_order'],
-  ['ngo-government', '#/charity', 'Nonprofit', 'charity.program'], ['pharmacy', '#/pharmacy', 'Pharmacy', 'pharmacy.prescription'],
-  ['professional-services', '#/cases', 'Professional services', 'case-management.case'], ['real-estate', '#/real-estate', 'Real estate', 'real-estate.property'],
-  ['retail', '#/pos', 'Retail', 'pos.pos_order'], ['saas-technology', '#/subscriptions', 'SaaS', 'subscription.subscription'],
-  ['utilities-isp', '#/utilities', 'Utilities', 'utilities.meter'], ['wholesale', '#/wholesale', 'Wholesale', 'crm.deal'],
+  ['agriculture', '#/agriculture', 'Agriculture', 'agriculture.crop_cycle', 'agriculture.farm'], ['automotive', '#/workshop', 'Automotive', 'auto-service.repair_order', 'master-data.party'],
+  ['beauty-wellness', '#/wellness', 'Beauty and wellness', 'booking.booking', 'booking.service'], ['construction', '#/construction', 'Construction', 'construction.site', 'project.project'],
+  ['ecommerce', '#/ecommerce', 'Ecommerce', 'ecommerce.web_order', 'master-data.party'], ['education', '#/education', 'Education', 'school.student', 'master-data.party'],
+  ['events-media', '#/event-ops', 'Events and media', 'events.event', 'events.event'], ['finance', '#/finance', 'Finance', 'lending.loan', 'master-data.party'],
+  ['fnb', '#/restaurant', 'Food and beverage', 'restaurant.table_order', 'restaurant.table'], ['healthcare', '#/clinic', 'Healthcare', 'clinic.encounter', 'master-data.party'],
+  ['home-services', '#/field-service', 'Home services', 'field-service.work_order', 'booking.service'], ['hospitality', '#/hotel', 'Hospitality', 'hotel.reservation', 'hotel.room_type'],
+  ['logistics', '#/reports/logistics/delivery-board', 'Logistics', 'logistics.shipment', 'master-data.party'],
+  ['manufacturing', '#/reports/manufacturing/wip', 'Manufacturing', 'manufacturing.production_order', 'master-data.product'],
+  ['ngo-government', '#/charity', 'Nonprofit', 'charity.program', 'charity.program'], ['pharmacy', '#/pharmacy', 'Pharmacy', 'pharmacy.prescription', 'master-data.party'],
+  ['professional-services', '#/cases', 'Professional services', 'case-management.case', 'master-data.party'], ['real-estate', '#/real-estate', 'Real estate', 'real-estate.property', 'real-estate.property'],
+  ['retail', '#/pos', 'Retail', 'pos.pos_order', 'master-data.party'], ['saas-technology', '#/subscriptions', 'SaaS', 'subscription.subscription', 'subscription.plan'],
+  ['utilities-isp', '#/utilities', 'Utilities', 'utilities.meter', 'master-data.party'], ['wholesale', '#/wholesale', 'Wholesale', 'crm.deal', 'master-data.party'],
 ];
 const requestedVerticals = new Set((process.env.E2E_VERTICALS || '').split(',').map((name) => name.trim()).filter(Boolean));
-for (const [vertical, hash, label, summaryEntity] of verticalScreens.filter(([name]) => !requestedVerticals.size || requestedVerticals.has(name))) {
+for (const [vertical, hash, label, summaryEntity, setupEntity] of verticalScreens.filter(([name]) => !requestedVerticals.size || requestedVerticals.has(name))) {
   await step(`${label} vertical: route and accessibility`, async () => {
     await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
     await page.goto(`${BASE}/?demo=${encodeURIComponent(vertical)}&go=${encodeURIComponent(hash.slice(1))}`, { waitUntil: 'networkidle0' });
@@ -247,6 +247,14 @@ for (const [vertical, hash, label, summaryEntity] of verticalScreens.filter(([na
     const href = `#/e/${summaryEntity.replace('.', '/')}`;
     const visible = await page.$$eval('.stats a', (links, expected) => links.some((link) => link.getAttribute('href') === expected), href);
     must(visible, `${label} dashboard is missing ${summaryEntity}`);
+  });
+  await step(`${label} exposes vertical onboarding entities`, async () => {
+    const setupEntities = await page.evaluate(async () => {
+      const session = JSON.parse(sessionStorage.getItem('osp.session') || localStorage.getItem('osp.session') || '{}');
+      const response = await fetch(`/api/t/${encodeURIComponent(session.tenantId)}/meta`, { headers: { authorization: `Bearer ${session.token}` } });
+      return (await response.json()).setupEntities || [];
+    });
+    must(setupEntities.includes(setupEntity), `${label} onboarding is missing ${setupEntity}`);
   });
   if (process.env.E2E_ALL_NAV === '1') {
     const navigationRoutes = await page.$$eval('.sidebar a.nav-link', (links) => [...new Set(links

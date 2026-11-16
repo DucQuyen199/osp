@@ -496,6 +496,7 @@
   }
 },
  "summaryEntities": ["manufacturing.production_order", "manufacturing.rework_order", "quality.inspection", "inventory.stock_level", "purchasing.purchase_order"],
+ "setupEntities": ["master-data.product", "manufacturing.bom"],
  "kpis": [
   "OEE",
   "Tỷ lệ phế phẩm",

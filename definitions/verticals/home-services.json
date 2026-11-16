@@ -347,6 +347,7 @@
   }
 },
  "summaryEntities": ["field-service.work_order", "booking.booking", "helpdesk.ticket", "inventory.stock_level", "accounting.invoice"],
+ "setupEntities": ["master-data.party", "booking.service"],
  "kpis": [
   "Tỷ lệ xử lý lần đầu",
   "Thời gian đến hiện trường",

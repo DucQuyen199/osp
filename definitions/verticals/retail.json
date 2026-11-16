@@ -438,6 +438,7 @@
   }
 },
  "summaryEntities": ["pos.pos_order", "sales.sales_order", "inventory.stock_level", "ecommerce.web_order", "crm.deal", "accounting.invoice"],
+ "setupEntities": ["master-data.party", "master-data.product"],
  "kpis": [
   "Doanh thu theo cửa hàng",
   "Giá trị đơn trung bình",

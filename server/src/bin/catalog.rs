@@ -706,6 +706,19 @@ fn lint(
                 Some(_) => {}
             }
         }
+        for qname in &vertical.setup_entities {
+            match registry.entities.get(qname) {
+                None => issues.push(format!(
+                    "[vertical:{}] setup entity {qname} khÃ´ng tá»“n táº¡i",
+                    vertical.id
+                )),
+                Some(entity) if !vertical_modules.contains(&entity.module) => issues.push(format!(
+                    "[vertical:{}] setup entity {qname} khÃ´ng thuá»™c gÃ³i module Ä‘Ã£ báº­t",
+                    vertical.id
+                )),
+                Some(_) => {}
+            }
+        }
     }
     let _ = modules;
     issues
@@ -949,6 +962,10 @@ fn run_docs() -> Result<(), String> {
                 .map(|role| role.name.as_str())
                 .collect::<Vec<_>>()
                 .join(", ")
+        ));
+        vm.push_str(&format!(
+            "- **Dashboard setup entities:** {}\n",
+            vertical.setup_entities.join(", ")
         ));
         vm.push_str(&format!(
             "- **Dashboard summary entities:** {}\n",

@@ -397,6 +397,7 @@
   }
 },
  "summaryEntities": ["auto-service.repair_order", "auto-service.vehicle", "booking.booking", "inventory.stock_level", "accounting.invoice"],
+ "setupEntities": ["master-data.party", "auto-service.vehicle"],
  "kpis": [
   "Số xe vào xưởng",
   "Thời gian sửa chữa trung bình",

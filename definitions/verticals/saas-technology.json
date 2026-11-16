@@ -322,6 +322,7 @@
   }
 },
  "summaryEntities": ["subscription.subscription", "helpdesk.ticket", "payments.payment_txn", "project.project", "accounting.invoice"],
+ "setupEntities": ["subscription.plan", "master-data.party"],
  "kpis": [
   "MRR / ARR",
   "Churn",

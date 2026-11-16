@@ -338,6 +338,7 @@
   }
 },
  "summaryEntities": ["hotel.reservation", "hotel.room", "restaurant.table_order", "pos.pos_order", "accounting.invoice"],
+ "setupEntities": ["hotel.room_type", "hotel.room"],
  "kpis": [
   "Công suất phòng (OCC)",
   "ADR",

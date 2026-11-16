@@ -451,6 +451,7 @@
   }
 },
  "summaryEntities": ["crm.deal", "sales.sales_order", "purchasing.purchase_order", "logistics.shipment", "inventory.stock_level"],
+ "setupEntities": ["master-data.party", "master-data.product"],
  "kpis": [
   "Doanh số theo khu vực/NVKD",
   "Công nợ quá hạn",

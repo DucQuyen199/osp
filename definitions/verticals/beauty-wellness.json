@@ -349,6 +349,7 @@
   }
 },
  "summaryEntities": ["booking.booking", "subscription.subscription", "pos.pos_order", "loyalty.member", "marketing.campaign"],
+ "setupEntities": ["booking.service", "booking.resource"],
  "kpis": [
   "Tỷ lệ lấp đầy lịch",
   "Tỷ lệ hội viên gia hạn",

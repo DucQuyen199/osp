@@ -338,6 +338,7 @@
   }
 },
  "summaryEntities": ["charity.program", "charity.donation", "charity.disbursement", "case-management.case", "budget.budget"],
+ "setupEntities": ["charity.program", "master-data.party"],
  "kpis": [
   "Tỷ lệ giải ngân ngân sách",
   "Số người thụ hưởng",

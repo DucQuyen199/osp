@@ -448,6 +448,7 @@
   }
 },
  "summaryEntities": ["ecommerce.web_order", "sales.sales_order", "inventory.stock_level", "purchasing.purchase_order", "accounting.invoice"],
+ "setupEntities": ["master-data.party", "ecommerce.storefront"],
  "kpis": [
   "Tỷ lệ chuyển đổi",
   "AOV",

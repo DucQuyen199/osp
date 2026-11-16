@@ -442,7 +442,8 @@ impl Kernel {
             "id": t.id, "name": t.name, "vertical": t.vertical, "verticalName": vertical.map(|v| v.name.clone()),
             "terminology": t.terminology, "roles": t.roles, "extensions": t.extensions, "settings": t.settings,
             "kpis": vertical.map(|v| v.kpis.clone()).unwrap_or_default(),
-            "summaryEntities": vertical.map(|v| v.summary_entities.clone()).unwrap_or_default(), "events": events,
+            "summaryEntities": vertical.map(|v| v.summary_entities.clone()).unwrap_or_default(),
+            "setupEntities": vertical.map(|v| v.setup_entities.clone()).unwrap_or_default(), "events": events,
             "allModules": all, "modules": modules,
         }))
     }

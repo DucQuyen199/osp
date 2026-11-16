@@ -199,6 +199,8 @@ pub struct Vertical {
     pub roles: BTreeMap<String, RoleDef>,
     #[serde(default, rename = "summaryEntities")]
     pub summary_entities: Vec<String>,
+    #[serde(default, rename = "setupEntities")]
+    pub setup_entities: Vec<String>,
     #[serde(default)]
     pub kpis: Vec<String>,
     #[serde(default)]

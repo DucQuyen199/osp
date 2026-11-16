@@ -452,6 +452,7 @@
   }
 },
  "summaryEntities": ["construction.site", "construction.boq", "construction.progress_claim", "project.project", "purchasing.purchase_order"],
+ "setupEntities": ["project.project", "construction.site"],
  "kpis": [
   "Tiến độ so với kế hoạch",
   "Chi phí thực tế vs dự toán",
