@@ -6,7 +6,7 @@ export function toast(message, kind = '') {
   if (!toastHost) return;
   const item = document.createElement('div');
   item.className = `toast ${kind}`;
-  item.textContent = message;
+  item.textContent = uiText(message);
   toastHost.append(item);
   setTimeout(() => item.remove(), kind === 'danger' ? 7000 : 3800);
 }

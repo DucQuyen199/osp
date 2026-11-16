@@ -143,7 +143,7 @@ const uiTextEnglish = {
   'Thêm dòng': 'Add line', 'Tạm tính': 'Subtotal', 'Vị trí kiểm kê': 'Count location', 'Không chỉ định vị trí xuất': 'No source location specified',
   'Không chỉ định vị trí nhận': 'No destination location specified', 'Tài khoản': 'Account', 'Chọn tài khoản': 'Select an account',
   'Chưa phân bổ': 'Unallocated', 'Chọn': 'Select', 'Không chọn': 'Do not select', 'Quản lý': 'Manage',
-  'Chưa lưu được': 'Could not save', 'Tự tính': 'Calculated automatically', 'Hủy': 'Cancel', 'Đang lưu…': 'Saving…',
+  'Chưa lưu được': 'Could not save', 'Tự tính': 'Calculated automatically', 'Hủy': 'Cancel', 'Xác nhận': 'Confirm', 'Đang lưu…': 'Saving…',
   'Lưu thay đổi': 'Save changes', 'Tạo mới': 'Create', 'Đã lưu thay đổi.': 'Changes saved.', 'Không lưu được dữ liệu.': 'Could not save data.',
   'Tệp sao kê CSV hoặc CAMT.053': 'CSV or CAMT.053 statement file', 'Đang nhập…': 'Importing…', 'Nhập': 'Import',
   'Số lượng dòng': 'Line quantity', 'Đơn giá dòng': 'Line unit price', 'Chiết khấu dòng': 'Line discount', 'Thuế dòng': 'Line tax',
