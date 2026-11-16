@@ -594,6 +594,18 @@ const UI_TEXT_EN = {
   'Múi giờ nghiệp vụ': 'Business time zone', 'Múi giờ IANA': 'IANA time zone',
   'Múi giờ này được dùng cho quy tắc nghiệp vụ theo ngày và ngày mặc định trên lịch. Ví dụ: Asia/Ho_Chi_Minh, Europe/London, America/New_York. Đổi cài đặt không ghi lại ngày hoặc dấu thời gian đã lưu.': 'This time zone is used for date-only business rules and default calendar dates. Examples: Asia/Ho_Chi_Minh, Europe/London, America/New_York. Changing this setting does not rewrite stored dates or timestamps.',
   'Đang lưu…': 'Saving…', 'Lưu múi giờ': 'Save time zone',
+  'Không tạo được trường mở rộng.': 'Could not create the custom field.', 'Đã thêm trường mở rộng.': 'Custom field added.',
+  'Chỉ quản trị viên mới được thêm trường mở rộng.': 'Only administrators can add custom fields.', 'Trường mở rộng của doanh nghiệp': 'Company custom fields',
+  'Thêm trường cho một loại dữ liệu': 'Add a field to a data type', 'Loại dữ liệu': 'Data type', 'Khai báo trường': 'Field definition',
+  'ngay_sinh:date | xep_hang:enum:A|B|C | ghi_chu:text': 'birth_date:date | rank:enum:A|B|C | note:text',
+  'Cú pháp: tên[!]:kiểu[:tham số]. Kiểu: string, text, number, money, date, datetime, bool, json, enum hoặc ref (module.dữ_liệu). Dấu ! = bắt buộc. Tên chỉ gồm chữ không dấu, số, gạch dưới.': 'Syntax: name[!]:type[:params]. Types: string, text, number, money, date, datetime, bool, json, enum, or ref (module.entity). ! means required. Names use lowercase ASCII letters, digits, and underscores.',
+  'Thêm trường': 'Add field', 'Trường đã thêm': 'Added fields', 'Chưa có trường nào do bạn thêm. Các trường đặc thù ngành đã được áp dụng sẵn.': 'You have not added any fields. Industry-specific fields are already applied.', 'Trường': 'Field',
+  'Không lưu được vai trò.': 'Could not save the role.', 'Đã lưu vai trò.': 'Role saved.', 'Chỉ quản trị viên mới được quản lý vai trò.': 'Only administrators can manage roles.',
+  'Vai trò và quyền của doanh nghiệp': 'Company roles and permissions', 'Cập nhật vai trò': 'Update role', 'Tạo vai trò': 'Create role', 'Vai trò mới': 'New role',
+  'Mã vai trò': 'Role ID', 'Chữ thường, số và dấu gạch dưới. Dùng lại mã để cập nhật.': 'Use lowercase letters, numbers, and underscores. Reuse the ID to update a role.',
+  'Tên hiển thị': 'Display name', 'Quyền, mỗi dòng một quyền': 'Permissions, one per line',
+  'Dạng module.dữ_liệu.hành_động. Dấu * khớp mọi giá trị, ví dụ crm.* hoặc *.*.read.': 'Format: module.entity.action. An asterisk matches any value, for example crm.* or *.*.read.',
+  'Lưu vai trò': 'Save role', 'Vai trò hiện có': 'Existing roles', 'Vai trò': 'Role', 'Quyền': 'Permissions', 'Hệ thống': 'System', 'Sửa': 'Edit',
 };
 
 const storedUiLocale = () => {
