@@ -4,6 +4,7 @@ import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import pharmacyEnglish from './pharmacy.en.js';
+import PrescriptionForm from './components/PrescriptionForm.jsx';
 
 const t = (text) => uiTextWith(text, pharmacyEnglish);
 
@@ -16,6 +17,7 @@ export default function PharmacyWorkbenchPage() {
   const [parties, setParties] = useState(new Map());
   const [prescriptions, setPrescriptions] = useState([]);
   const [dispensedByPrescription, setDispensedByPrescription] = useState(new Map());
+  const [editingId, setEditingId] = useState('');
   const [form, setForm] = useState({ prescription_no: '', party: '', prescriber: '', prescriber_license: '', issued_at: today(), valid_until: today(), notes: '' });
   const [lines, setLines] = useState([newLine()]);
   const [busy, setBusy] = useState(false);
@@ -62,11 +64,37 @@ export default function PharmacyWorkbenchPage() {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
       const items = activeLines.map((line) => ({ product: line.product, qty: Number(line.qty), ...(line.uom ? { uom: line.uom } : {}), dosage: line.dosage.trim() }));
-      await api(dataPath('pharmacy.prescription'), { method: 'POST', body: { ...form, items, status: 'draft' } });
+      if (editingId) {
+        await api(dataPath('pharmacy.prescription', editingId), { method: 'PATCH', body: { ...form, items } });
+      } else {
+        await api(dataPath('pharmacy.prescription'), { method: 'POST', body: { ...form, items, status: 'draft' } });
+      }
+      const wasEditing = Boolean(editingId);
+      setEditingId('');
       setForm({ prescription_no: '', party: '', prescriber: '', prescriber_license: '', issued_at: today(), valid_until: today(), notes: '' });
-      setLines([newLine()]); setNotice(t('Đã lưu đơn thuốc ở trạng thái nháp. Hãy đối chiếu bản gốc rồi xác minh.')); await load();
+      setLines([newLine()]);
+      setNotice(t(wasEditing ? 'Đã cập nhật đơn thuốc nháp. Hãy đối chiếu lại bản gốc trước khi xác minh.' : 'Đã lưu đơn thuốc ở trạng thái nháp. Hãy đối chiếu bản gốc rồi xác minh.'));
+      await load();
     } catch (reason) { setError(t(reason.message || 'Không lưu được đơn thuốc.')); }
     finally { setBusy(false); }
+  };
+
+  const editPrescription = (prescription) => {
+    setEditingId(prescription.id);
+    setForm({
+      prescription_no: prescription.prescription_no || '', party: prescription.party || '', prescriber: prescription.prescriber || '',
+      prescriber_license: prescription.prescriber_license || '', issued_at: prescription.issued_at || today(),
+      valid_until: prescription.valid_until || today(), notes: prescription.notes || '',
+    });
+    setLines((prescription.items || []).map((item) => ({ product: item.product || '', uom: item.uom || '', qty: String(item.qty ?? ''), dosage: item.dosage || '' })));
+    setError(''); setNotice('');
+    document.getElementById('pharmacy-prescription-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('pharmacy-prescription-number')?.focus({ preventScroll: true });
+  };
+  const cancelEdit = () => {
+    setEditingId('');
+    setForm({ prescription_no: '', party: '', prescriber: '', prescriber_license: '', issued_at: today(), valid_until: today(), notes: '' });
+    setLines([newLine()]); setError(''); setNotice('');
   };
 
   const transition = async (prescription, action) => {
@@ -111,28 +139,25 @@ export default function PharmacyWorkbenchPage() {
   return <div className="page">
     <div className="page-head"><div><h1>{t('Đơn thuốc nhà thuốc')}</h1><p className="sub">{t('Ghi nhận đơn, kiểm tra thông tin và xác minh trước khi bán thuốc kê đơn tại POS.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={load}>{t('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
-    <section className="card card-pad">
-      <h2>{t('Ghi nhận đơn mới')}</h2>
-      <form className="form-grid" onSubmit={createPrescription}>
-        <label className="field"><span className="label">{t('Số đơn thuốc *')}</span><input className="input" required value={form.prescription_no} onChange={(e) => updateForm('prescription_no', e.target.value)} /></label>
-        <label className="field"><span className="label">{t('Khách hàng *')}</span><select className="select" required value={form.party} onChange={(e) => updateForm('party', e.target.value)}><option value="">{t('Chọn khách hàng')}</option>{[...parties.values()].filter((party) => party.active !== false).map((party) => <option key={party.id} value={party.id}>{recordLabel('master-data.party', party)}</option>)}</select></label>
-        <label className="field"><span className="label">{t('Người kê đơn *')}</span><input className="input" required value={form.prescriber} onChange={(e) => updateForm('prescriber', e.target.value)} /></label>
-        <label className="field"><span className="label">{t('Số chứng chỉ hành nghề')}</span><input className="input" value={form.prescriber_license} onChange={(e) => updateForm('prescriber_license', e.target.value)} /></label>
-        <label className="field"><span className="label">{t('Ngày kê *')}</span><input className="input" type="date" required value={form.issued_at} onChange={(e) => updateForm('issued_at', e.target.value)} /></label>
-        <label className="field"><span className="label">{t('Có hiệu lực đến *')}</span><input className="input" type="date" min={form.issued_at} required value={form.valid_until} onChange={(e) => updateForm('valid_until', e.target.value)} /></label>
-        <div className="field full"><span className="label">{t('Thuốc kê trong đơn *')}</span>
-          {lines.map((line, index) => <div className="row wrap u-legacy-8e26c5f7a1" key={index} >
-            <select className="select" required aria-label={`${t('Thuốc dòng')} ${index + 1}`} value={line.product} onChange={(e) => updateLine(index, 'product', e.target.value)}><option value="">{t('Chọn thuốc')}</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name}{product.sku ? ` · ${product.sku}` : ''}</option>)}</select>{unitsFor(line.product).length > 0 && <select className="select" aria-label={`${t('Đơn vị thuốc dòng')} ${index + 1}`} value={line.uom || products.find((product) => product.id === line.product)?.uom || ''} onChange={(event) => updateLine(index, 'uom', event.target.value)}>{unitsFor(line.product).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` (${unit.ratio} × ${t('đơn vị gốc')})` : ` (${t('đơn vị gốc')})`}</option>)}</select>}
-            <input className="input" aria-label={`${t('Hướng dẫn sử dụng dòng')} ${index + 1}`} required placeholder={t('Liều dùng / cách dùng')} value={line.dosage} onChange={(e) => updateLine(index, 'dosage', e.target.value)} />
-            <button className="btn btn-ghost btn-sm" type="button" aria-label={`${t('Xóa thuốc dòng')} ${index + 1}`} disabled={lines.length === 1} onClick={() => setLines((current) => current.filter((_, i) => i !== index))}>{t('Bỏ')}</button>
-          </div>)}
-          <button className="btn btn-secondary btn-sm" type="button" onClick={() => setLines((current) => [...current, newLine()])}>{t('Thêm thuốc')}</button>
-          {!products.length && <p className="small muted">{t('Chưa có sản phẩm nào được đánh dấu “cần đơn thuốc” trong danh mục.')}</p>}
-        </div>
-        <label className="field full"><span className="label">{t('Ghi chú')}</span><textarea className="textarea" value={form.notes} onChange={(e) => updateForm('notes', e.target.value)} /></label>
-        <div className="row full"><span className="grow" /><button className="btn btn-primary" type="submit" disabled={busy || !can('pharmacy.prescription.create') || !products.length}>{busy ? t('Đang lưu…') : t('Lưu đơn nháp')}</button></div>
-      </form>
-    </section>
+    <PrescriptionForm
+      form={form}
+      parties={parties}
+      lines={lines}
+      products={products}
+      unitsFor={unitsFor}
+      recordLabel={recordLabel}
+      busy={busy}
+      editing={Boolean(editingId)}
+      canSubmit={editingId ? can('pharmacy.prescription.update') : can('pharmacy.prescription.create')}
+      today={today()}
+      t={t}
+      onFormChange={updateForm}
+      onLineChange={updateLine}
+      onAddLine={() => setLines((current) => [...current, newLine()])}
+      onRemoveLine={(index) => setLines((current) => current.filter((_, row) => row !== index))}
+      onSubmit={createPrescription}
+      onCancel={cancelEdit}
+    />
 
     <section className="card card-pad u-legacy-eee3f850c9" ><div className="row wrap"><h2>{t('Danh sách đơn thuốc')}</h2><span className="grow" /><a className="btn btn-secondary" href="#/pos">{t('Mở quầy POS')}</a></div>
       {loading ? <div className="skeleton" data-h="row" /> : prescriptions.length === 0 ? <div className="empty">{t('Chưa có đơn thuốc.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Số đơn')}</th><th>{t('Khách hàng')}</th><th>{t('Ngày kê')}</th><th>{t('Hiệu lực đến')}</th><th>{t('Thuốc')}</th><th>{t('Trạng thái')}</th><th>{t('Thao tác')}</th></tr></thead><tbody>{prescriptions.map((rx) => <tr key={rx.id}>
@@ -140,7 +165,7 @@ export default function PharmacyWorkbenchPage() {
         <td>{parties.get(rx.party)?.name || t('Khách hàng')}</td><td>{rx.issued_at}</td><td>{rx.valid_until}</td>
         <td>{prescriptionLines(rx).map((item, index) => <div key={`${item.product}-${item.dosage}-${index}`}>{productName(item.product)} · {t('kê')} {item.qty} {item.unitName}{item.balance && <span className="small muted"> · {t('tổng kê')} {fmtNumber(item.balance.prescribed)} {item.balance.unit} · {t('đã cấp')} {fmtNumber(item.balance.dispensed)} {item.balance.unit} · {t('còn')} {fmtNumber(item.balance.remaining)} {item.balance.unit}</span>}<div className="small muted">{item.dosage}</div></div>)}</td>
         <td>{statusLabel(rx.status)}{rx.dispensed_at && <div className="small muted">{fmtDateTime(rx.dispensed_at)}</div>}</td>
-        <td className="row wrap">{rx.status === 'draft' && <button className="btn btn-primary btn-sm" type="button" disabled={busy || !can('pharmacy.prescription.verified')} onClick={() => transition(rx, 'verified')}>{t('Xác minh')}</button>}{['draft', 'verified'].includes(rx.status) && <button className="btn btn-ghost btn-sm" type="button" disabled={busy || !can('pharmacy.prescription.cancelled')} onClick={() => transition(rx, 'cancelled')}>{t('Hủy')}</button>}</td>
+        <td className="row wrap">{rx.status === 'draft' && can('pharmacy.prescription.update') && <button className="btn btn-secondary btn-sm" type="button" disabled={busy} onClick={() => editPrescription(rx)}>{t('S\u1eeda nh\u00e1p')}</button>}{rx.status === 'draft' && <button className="btn btn-primary btn-sm" type="button" disabled={busy || !can('pharmacy.prescription.verified')} onClick={() => transition(rx, 'verified')}>{t('Xác minh')}</button>}{['draft', 'verified'].includes(rx.status) && <button className="btn btn-ghost btn-sm" type="button" disabled={busy || !can('pharmacy.prescription.cancelled')} onClick={() => transition(rx, 'cancelled')}>{t('Hủy')}</button>}</td>
       </tr>)}</tbody></table></div>}
       <p className="small muted">{t('Xác minh là bước nghiệp vụ nội bộ sau khi dược sĩ đối chiếu đơn gốc. Hệ thống không thay thế việc thẩm định tính hợp lệ chuyên môn.')}</p>
     </section>

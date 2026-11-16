@@ -4,6 +4,8 @@ const pharmacyEnglish = {
   'Không tải được danh sách đơn thuốc.': 'Could not load prescriptions.',
   'Quản lý đơn thuốc': 'Prescription management',
   'Đã lưu đơn thuốc ở trạng thái nháp. Hãy đối chiếu bản gốc rồi xác minh.': 'Prescription saved as a draft. Compare it with the original before verification.',
+  'Chỉnh sửa đơn nháp': 'Edit draft prescription', 'Sửa nháp': 'Edit draft', 'Cập nhật đơn nháp': 'Update draft prescription', 'Hủy chỉnh sửa': 'Cancel editing',
+  'Đã cập nhật đơn thuốc nháp. Hãy đối chiếu lại bản gốc trước khi xác minh.': 'Draft prescription updated. Compare it with the original again before verification.',
   'Không lưu được đơn thuốc.': 'Could not save the prescription.',
   'Đã xác minh đơn': 'Prescription verified',
   '. Có thể chọn đơn này tại quầy POS.': '. This prescription can now be selected at the POS.',
