@@ -108,8 +108,13 @@ const page = await browser.newPage();
 await page.setViewport({ width: 1440, height: 900 });
 
 const problems = [];
+let expectedRouteFailure = false;
 page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
-page.on('console', (m) => { if (m.type() === 'error' && !/status of 4/.test(m.text())) problems.push(`console.error: ${m.text()}`); });
+page.on('console', (m) => {
+  if (m.type() !== 'error' || /status of 4/.test(m.text())) return;
+  if (expectedRouteFailure && (/Failed to load resource/.test(m.text()) || /Failed to fetch dynamically imported module/.test(m.text()) || /Route failed to render/.test(m.text()))) return;
+  problems.push(`console.error: ${m.text()}`);
+});
 page.on('response', (r) => { if (r.status() >= 400 && r.status() !== 422 && !r.url().includes('/auth/login')) problems.push(`http ${r.status()} ${r.url()}`); });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -190,6 +195,36 @@ await step('cài đặt, dòng sự kiện: accessibility', async () => {
   }
   await page.goto(`${BASE}/#/settings/audit`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('table.table');
+});
+
+await step('lazy route load failure: recovery boundary', async () => {
+  let blocked = false;
+  const intercept = (request) => {
+    if (!blocked && /PharmacyWorkbenchPage-[^/]+\.js(?:\?|$)/.test(request.url())) {
+      blocked = true;
+      request.abort('failed');
+    } else {
+      request.continue();
+    }
+  };
+  expectedRouteFailure = true;
+  await page.setBypassServiceWorker(true);
+  await page.setRequestInterception(true);
+  page.on('request', intercept);
+  try {
+    await page.goto(`${BASE}/#/pharmacy`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.route-error', { timeout: 10000 });
+    must(blocked, 'Pharmacy lazy chunk was not intercepted');
+    await axe('lazy route error fallback');
+    must(await page.$eval('.route-error h1', (heading) => heading.textContent.includes('Không thể tải màn hình')), 'recovery message is missing');
+    await page.click('.route-error a[href="#/"]');
+    await page.waitForFunction(() => location.hash === '#/' && document.querySelector('#main h1')?.textContent.includes('Xin chào'));
+  } finally {
+    expectedRouteFailure = false;
+    page.off('request', intercept);
+    await page.setRequestInterception(false);
+    await page.setBypassServiceWorker(false);
+  }
 });
 
 await step('giao diện tối: accessibility', async () => {
