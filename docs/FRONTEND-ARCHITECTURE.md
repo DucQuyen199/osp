@@ -38,6 +38,7 @@ For translations used only by a lazy-loaded feature, keep its English text map i
 - The manufacturing workbench keeps QC permissions and inspection actions in `ManufacturingWipPage`; `ProductionInspectionQueue` renders pending production inspections and emits pass/fail decisions through callbacks.
 - The manufacturing workbench owns WIP report filters and reconciliation actions; `ManufacturingWipReport` renders the order level WIP table and its reconciliation context.
 - The purchasing workbench owns supplier-invoice state and validation; `SupplierInvoiceAdjustmentsEditor` edits controlled charge and landed-cost allocations through a callback.
+- The purchasing workbench owns invoice permissions, FX validation and persistence; `SupplierInvoiceDraftForm` renders controlled invoice quantities, tax, currency and reference fields.
 - The POS terminal owns cart, tender, permissions and checkout; `PosCheckoutPanel` displays controlled payment fields and emits the checkout request.
 - The HR workbench owns attendance-date rules and punch actions; `AttendanceEntriesTable` renders the controlled daily records and emits punch-out requests.
 - The inventory stock-count workbench owns the count draft, validation and persistence; `StockCountLinesEditor` renders controlled product, lot, location and quantity fields and emits line edits through callbacks.
