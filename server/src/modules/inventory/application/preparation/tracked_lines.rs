@@ -25,7 +25,7 @@ pub async fn prepare_tracked_lines(
             errors.push(format!("{key}[{}] phải là một dòng hàng", index + 1));
             continue;
         };
-        if key == "parts" && editable {
+        if matches!(key, "parts" | "items") && editable {
             for field in ["base_qty", "uom_name", "uom_ratio", "base_uom"] {
                 line.remove(field);
             }
@@ -77,7 +77,7 @@ pub async fn prepare_tracked_lines(
         }
         line.insert("tracked".into(), json!(is_tracked));
         line.insert("kind".into(), json!(kind));
-        if key == "parts" && editable {
+        if matches!(key, "parts" | "items") && editable {
             let selected_unit = match line.get("uom") {
                 Some(Value::String(value)) => match Uuid::parse_str(value) {
                     Ok(unit) => Some(unit),
