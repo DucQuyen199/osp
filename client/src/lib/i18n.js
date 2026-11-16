@@ -561,6 +561,9 @@ const UI_TEXT_EN = {
   'Mở lại kỳ': 'Reopen period', 'Việc này cho phép ghi nhận lại bút toán trong kỳ.': 'This allows journal entries in the period to be changed again.',
   'Đã mở lại kỳ kế toán.': 'Accounting period reopened.', 'Rà soát chứng từ nháp, xác nhận ngày kết thúc và khóa kỳ bằng quy tắc kiểm tra của hệ thống.': 'Review draft documents, confirm the end date, and close the period using the system checks.',
   'Tạo kỳ kế toán': 'Create accounting period', 'Tên kỳ': 'Period name', 'Tạo kỳ mở': 'Create open period',
+  'Dòng sự kiện': 'Event stream', 'Không tải được dòng sự kiện.': 'Could not load the event stream.',
+  'Các thay đổi và phản ứng tự động giữa các mô-đun được ghi trong cùng giao dịch nghiệp vụ.': 'Changes and automatic reactions across modules are recorded in the same business transaction.',
+  'Chỉ hiện sự kiện gốc': 'Show root events only', 'Chuỗi sự kiện': 'Event sequence', 'Đang tải sự kiện': 'Loading events',
 };
 
 const storedUiLocale = () => {
