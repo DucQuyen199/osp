@@ -1,6 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ApiError, api, tenantPath } from '../../lib/api.js';
+import { uiTextWith } from '../../lib/i18n.js';
 import { entityLabel } from '../../lib/state.js';
+import importEnglish from './import.en.js';
+
+const t = (text) => uiTextWith(text, importEnglish);
 
 export default function EntityImportDialog({ qname, onClose, onDone }) {
   const dialog = useRef(null);
@@ -25,7 +29,7 @@ export default function EntityImportDialog({ qname, onClose, onDone }) {
     setMessage('');
     setSuccess(false);
     if (!file) {
-      setMessage('Chọn một tệp CSV trước.');
+      setMessage(t('Chọn một tệp CSV trước.'));
       return;
     }
     setSaving(true);
@@ -35,7 +39,7 @@ export default function EntityImportDialog({ qname, onClose, onDone }) {
         method: 'POST', body: csv, headers: { 'content-type': 'text/csv' },
       });
       setSuccess(true);
-      setMessage(`Đã nhập ${result.imported} dòng.`);
+      setMessage(`${t('Đã nhập')} ${result.imported} ${t('dòng.')}`);
       onDone?.(result);
     } catch (reason) {
       const rowErrors = reason instanceof ApiError && Array.isArray(reason.details?.errors)
@@ -43,8 +47,8 @@ export default function EntityImportDialog({ qname, onClose, onDone }) {
         : [];
       setErrors(rowErrors.slice(0, 20));
       setMessage(rowErrors.length
-        ? `Không nhập được — chưa ghi dòng nào${rowErrors.length > 20 ? ` (${rowErrors.length - 20} lỗi khác chưa hiển thị)` : ''}.`
-        : reason.message || 'Không nhập được tệp CSV.');
+        ? `${t('Không nhập được — chưa ghi dòng nào')}${rowErrors.length > 20 ? ` (${rowErrors.length - 20} ${t('lỗi khác chưa hiển thị')})` : ''}.`
+        : t(reason.message || 'Không nhập được tệp CSV.'));
     } finally {
       setSaving(false);
     }
@@ -53,18 +57,18 @@ export default function EntityImportDialog({ qname, onClose, onDone }) {
   return <dialog ref={dialog} className="modal" aria-labelledby="entity-import-title" onCancel={(event) => { event.preventDefault(); close(); }}>
     <form onSubmit={upload} noValidate>
       <div className="modal-body stack">
-        <h2 id="entity-import-title">Nhập {entityLabel(qname).toLowerCase()} từ CSV</h2>
-        <p className="muted small">Dòng đầu là tên cột (khớp tên trường, ví dụ name, phone). Nhập theo kiểu tất-cả-hoặc-không: có lỗi thì không dòng nào được ghi. Dữ liệu nhập không kích hoạt các bước tự động.</p>
+        <h2 id="entity-import-title">{t('Nhập {entity} từ CSV').replace('{entity}', t(entityLabel(qname).toLowerCase()))}</h2>
+        <p className="muted small">{t('Dòng đầu là tên cột (khớp tên trường, ví dụ name, phone). Nhập theo kiểu tất-cả-hoặc-không: có lỗi thì không dòng nào được ghi. Dữ liệu nhập không kích hoạt các bước tự động.')}</p>
         <div className="field">
-          <label htmlFor="entity-import-file">Tệp CSV (UTF-8)</label>
+          <label htmlFor="entity-import-file">{t('Tệp CSV (UTF-8)')}</label>
           <input ref={fileInput} id="entity-import-file" className="input" type="file" accept=".csv,text/csv" onChange={(event) => setFile(event.target.files?.[0] || null)} />
         </div>
         {message && <div className={`alert ${success ? 'success' : 'danger'}`} role={success ? 'status' : 'alert'}>{message}</div>}
-        {errors.length > 0 && <ul className="error-list">{errors.map((error, index) => <li key={`${error.row}:${index}`}>Dòng {error.row}: {error.message}</li>)}</ul>}
+        {errors.length > 0 && <ul className="error-list">{errors.map((error, index) => <li key={`${error.row}:${index}`}>{t('Dòng')} {error.row}: {error.message}</li>)}</ul>}
       </div>
       <div className="modal-foot">
-        <button className="btn" type="button" disabled={saving} onClick={close}>Đóng</button>
-        <button className="btn btn-primary" type="submit" disabled={saving}>{saving ? 'Đang nhập…' : 'Nhập'}</button>
+        <button className="btn" type="button" disabled={saving} onClick={close}>{t('Đóng')}</button>
+        <button className="btn btn-primary" type="submit" disabled={saving}>{saving ? t('Đang nhập…') : t('Nhập')}</button>
       </div>
     </form>
   </dialog>;
