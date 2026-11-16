@@ -88,7 +88,7 @@ export default function Sidebar({ meta, route, onNavigate, open, mobile }) {
         </div>
       </details>)}
     </div>)}
-    {isAdmin() && <div className="nav-group"><div className="nav-title">Quản trị</div>{link('#/settings', 'Cài đặt', route.name === 'settings', 'settings')}</div>}
+    {isAdmin() && <div className="nav-group"><div className="nav-title">{uiText('Quản trị')}</div>{link('#/settings', 'Cài đặt', route.name === 'settings', 'settings')}</div>}
   </nav>;
 }
 

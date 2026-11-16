@@ -38,12 +38,6 @@ export default function EntityImportDialog({ qname, onClose, onDone }) {
       const result = await api(tenantPath(`/import/${qname.replace('.', '/')}`), {
         method: 'POST', body: csv, headers: { 'content-type': 'text/csv' },
       });
-      const rowErrors = Array.isArray(result?.errors) ? result.errors : [];
-      if (rowErrors.length) {
-        setErrors(rowErrors.slice(0, 20));
-        setMessage(`${t('Không nhập được — chưa ghi dòng nào')}${rowErrors.length > 20 ? ` (${rowErrors.length - 20} ${t('lỗi khác chưa hiển thị')})` : ''}.`);
-        return;
-      }
       setSuccess(true);
       setMessage(`${t('Đã nhập')} ${result.imported} ${t('dòng.')}`);
       onDone?.(result);

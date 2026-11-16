@@ -26,7 +26,7 @@ Feature-local English dictionaries are used for the authentication flow, lazy-lo
 For translations used only by a lazy-loaded feature, keep its English text map in that feature directory and use `uiTextWith()` to fall back to the shared dictionary. This keeps feature vocabulary out of the startup bundle.
 Wrap every user-visible literal with `uiText()` or the feature-local translator, including text chosen by conditional branches and fallback labels; raw Vietnamese JSX text will stay untranslated in `en-US`.
 
-Run `npm run lint:translations` while changing a screen or dictionary. The check verifies that literal `uiText()` and feature `t()` calls resolve through the shared or feature-local English dictionary, and catches raw Vietnamese in accessible text attributes and static page titles. It is part of `npm run check`.
+Run `npm run lint:translations` while changing a screen or dictionary. The check verifies that literal `uiText()` and feature `t()` calls resolve through the shared or feature-local English dictionary, and catches raw Vietnamese JSX text, accessible text attributes, and static page titles. It is part of `npm run check`.
 
 ### Feature-local workflow components
 

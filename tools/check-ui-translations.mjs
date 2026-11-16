@@ -54,7 +54,15 @@ for (const file of walk(sourceRoot).filter((candidate) => candidate.endsWith('.j
   for (const key of callStrings(source, 'uiText')) addMissing(missing, file, key, [globalKeys]);
 
   const relative = path.relative(root, file).replaceAll(path.sep, '/');
-  const hasVietnamese = (value) => /[À-ỹĐđ]/u.test(value);
+  const hasVietnamese = (value) => /[ÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚÝàáâãèéêìíòóôõùúýĂăĐđĨĩŨũƠơƯưẠ-ỹ]/u.test(value);
+  for (const match of source.matchAll(/>([^\r\n<>{}]+)</g)) {
+    const text = match[1].trim();
+    if (text && hasVietnamese(decodeString(text))) {
+      const entries = missing.get(relative) || new Set();
+      entries.add(`Untranslated JSX text: ${decodeString(text)}`);
+      missing.set(relative, entries);
+    }
+  }
   for (const match of source.matchAll(/\b(?:placeholder|aria-label|title|alt)\s*=\s*(['"])((?:\\.|(?!\1)[\s\S])*)\1/g)) {
     if (hasVietnamese(decodeString(match[2]))) {
       const entries = missing.get(relative) || new Set();
