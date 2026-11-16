@@ -48,7 +48,7 @@ const FIELDS = {
   approved_amount: 'Số tiền bồi thường được duyệt',
   principal: 'Gốc vay', term_months: 'Kỳ hạn (tháng)', loan: 'Khoản vay', premium: 'Phí bảo hiểm', policy: 'Hợp đồng BH', case: 'Vụ việc', opened_on: 'Ngày mở', who: 'Người thực hiện',
   meter: 'Công tơ', reading: 'Chỉ số', make: 'Hãng', model: 'Dòng xe', vin: 'Số khung', odometer: 'Số km', vehicle_: 'Xe', program: 'Chương trình', venue: 'Địa điểm', event: 'Sự kiện',
-  id: 'Mã', createdAt: 'Ngày tạo', updatedAt: 'Cập nhật',
+  id: 'Mã', createdAt: 'Ngày tạo', updatedAt: 'Cập nhật', debit: 'Nợ', credit: 'Có',
 };
 
 const STATUS = {
@@ -111,14 +111,147 @@ const CATEGORY = {
 };
 export const CATEGORY_ORDER = ['core', 'sales', 'supply', 'finance', 'people', 'operations', 'platform', 'industry'];
 
+const UI_TEXT_EN = {
+  'Bỏ qua điều hướng': 'Skip navigation', 'Đóng menu': 'Close menu', 'Mở menu': 'Open menu',
+  'Điều hướng chính': 'Main navigation', 'Trang chủ': 'Home', 'Dòng sự kiện': 'Activity feed',
+  'Quy trình & báo cáo': 'Workflows & reports', 'Báo cáo & phân tích': 'Reports & analytics',
+  'Phê duyệt': 'Approvals', 'Sổ hợp đồng': 'Contract register', 'Thư viện tài liệu': 'Document library',
+  'Cổng tích hợp': 'Integration hub', 'Khách hàng thân thiết': 'Loyalty', 'Báo cáo kế toán': 'Accounting reports',
+  'WIP sản xuất': 'Manufacturing WIP', 'Sổ tài sản cố định': 'Fixed assets', 'Lịch khấu hao tài sản': 'Depreciation schedule',
+  'Bổ sung tồn kho': 'Inventory replenishment', 'Tồn theo vị trí': 'Stock by location', 'Lô sắp hết hạn': 'Expiring lots',
+  'Kiểm kê kho': 'Stock counts', 'Màn hình bếp': 'Kitchen display', 'Điều phối giao hàng': 'Delivery dispatch',
+  'Buồng phòng': 'Housekeeping', 'Quầy bán hàng POS': 'POS terminal', 'Điều phối phòng khám': 'Clinic desk',
+  'Đơn thuốc nhà thuốc': 'Pharmacy prescriptions', 'Lịch lớp và học phí': 'Class schedule & fees',
+  'Đào tạo trực tuyến': 'Learning management', 'Sổ sự không phù hợp': 'Nonconformance register',
+  'Lịch nhắc và nhật ký gửi': 'Reminders & message log', 'Giao dịch thanh toán': 'Payment transactions',
+  'Công tơ và hóa đơn tiện ích': 'Meters & utility bills', 'Cho vay và bảo hiểm': 'Lending & insurance',
+  'Sự kiện và quầy vé': 'Events & ticket desk', 'Điều phối hiện trường': 'Field service dispatch',
+  'Sàn bất động sản': 'Real estate', 'Điều hành công trường': 'Construction operations',
+  'Quản lý dự án': 'Project management', 'Thuê bao và gia hạn': 'Subscriptions & renewals',
+  'Chương trình và quỹ': 'Programs & funds', 'Hồ sơ dịch vụ': 'Service cases', 'Lịch hẹn khám': 'Clinic appointments',
+  'Lịch dịch vụ': 'Service bookings', 'Mua hàng và nhận hàng': 'Purchasing & receiving',
+  'RFQ và so sánh báo giá': 'RFQs & quote comparison', 'Bảo trì tài sản': 'Asset maintenance',
+  'Tuyển dụng': 'Recruitment', 'Điều hành bảng lương': 'Payroll operations', 'Nhân sự và chấm công': 'People & attendance',
+  'Mục tiêu & đánh giá': 'Goals & reviews', 'Chi phí nhân viên': 'Employee expenses', 'Trả hàng bán': 'Sales returns',
+  'Đối soát ngân hàng': 'Bank reconciliation', 'Hoàn tiền điều chỉnh': 'Refund adjustments',
+  'Thu/chi phân bổ công nợ': 'Receivables & payables settlement', 'Hóa đơn điện tử': 'E-invoices',
+  'Khóa sổ kế toán': 'Accounting period close', 'Đơn hàng online': 'Online orders', 'Điều hành mùa vụ': 'Crop operations',
+  'Lễ tân khách sạn': 'Hotel front desk', 'Xưởng sửa chữa': 'Repair workshop', 'Order nhà hàng': 'Restaurant orders',
+  'Bán hàng và báo giá': 'Sales & quotations', 'Hàng giữ QC': 'Quality holds', 'Thực hiện ngân sách': 'Budget variance',
+  'Pipeline bán hàng': 'Sales pipeline', 'Hiệu quả chiến dịch': 'Campaign performance', 'SLA hỗ trợ': 'Support SLA',
+  'Hộp thư hỗ trợ': 'Support inbox', 'Dữ liệu gốc': 'Master data', 'Quản trị': 'Administration', 'Cài đặt': 'Settings',
+  'Tổng quan': 'Overview', 'Tìm module hoặc dữ liệu…': 'Search modules or records…',
+  'Tìm module hoặc dữ liệu': 'Search modules or records', 'Kết quả tìm kiếm': 'Search results',
+  'loại dữ liệu': 'data types', 'Không tìm thấy module hoặc dữ liệu phù hợp.': 'No matching modules or records found.',
+  'Định dạng ngày và số': 'Date and number format', 'Ngôn ngữ giao diện': 'Interface language',
+  'Tiếng Việt': 'Vietnamese', 'Tiếng Anh': 'English', 'Bảo mật tài khoản': 'Account security',
+  'Việt Nam · ngày/tháng/năm': 'Vietnam · day/month/year', 'Hoa Kỳ · tháng/ngày/năm': 'United States · month/day/year',
+  'Đăng xuất': 'Sign out', 'Chuyển sang giao diện sáng': 'Switch to light theme',
+  'Chuyển sang giao diện tối': 'Switch to dark theme', 'Giao diện sáng': 'Light theme', 'Giao diện tối': 'Dark theme',
+  'Lõi': 'Core', 'Bán hàng & khách hàng': 'Sales & customers', 'Chuỗi cung ứng': 'Supply chain', 'Tài chính': 'Finance',
+  'Nhân sự': 'People', 'Vận hành': 'Operations', 'Nền tảng dùng chung': 'Shared platform', 'Chuyên ngành': 'Industry',
+  'Bán hàng': 'Sales', 'Báo cáo & phân tích': 'Reports & analytics', 'Bảo hiểm': 'Insurance', 'Bảo trì': 'Maintenance',
+  'Bất động sản': 'Real estate', 'Chăm sóc khách hàng': 'Customer service', 'Chi phí nhân viên': 'Employee expenses',
+  'Cho vay / Tài chính vi mô': 'Lending / Microfinance', 'Cổng thanh toán': 'Payment gateway', 'Cổng tích hợp': 'Integration hub',
+  'CRM - Quan hệ khách hàng': 'CRM - Customer relations', 'Đánh giá hiệu suất (OKR)': 'Performance reviews (OKR)',
+  'Đào tạo (LMS)': 'Learning management (LMS)', 'Đặt lịch & tài nguyên': 'Bookings & resources',
+  'Dịch vụ hiện trường': 'Field service', 'Điện nước / Viễn thông': 'Utilities / Telecom', 'Dữ liệu gốc': 'Master data',
+  'Garage / Dịch vụ ô tô-xe máy': 'Garage / Automotive service', 'Gói thuê bao & thu phí định kỳ': 'Subscriptions & recurring billing',
+  'Hóa đơn điện tử': 'E-invoicing', 'Hợp đồng': 'Contracts', 'Kế toán': 'Accounting', 'Khách hàng thân thiết': 'Loyalty',
+  'Khách sạn / Lưu trú': 'Hotels / Hospitality', 'Kho': 'Inventory', 'Marketing': 'Marketing', 'Mua hàng': 'Purchasing',
+  'Ngân sách': 'Budgeting', 'Nhà hàng / F&B': 'Restaurant / Food service', 'Nhà thuốc': 'Pharmacy', 'Nông nghiệp': 'Agriculture',
+  'Phê duyệt': 'Approvals', 'Phòng khám / Y tế': 'Clinic / Healthcare', 'POS - Bán lẻ tại quầy': 'POS - Retail',
+  'Quản lý chất lượng': 'Quality management', 'Quản lý dự án': 'Project management', 'Quản lý hồ sơ vụ việc': 'Case management',
+  'Quản lý tài liệu': 'Document management', 'Sản xuất': 'Manufacturing', 'Sự kiện & bán vé': 'Events & ticketing',
+  'Tài sản cố định': 'Fixed assets', 'Thương mại điện tử': 'E-commerce', 'Tính lương': 'Payroll',
+  'Trường học / Trung tâm đào tạo': 'Schools / Training centers', 'Truyền thông & thông báo': 'Communications & notifications',
+  'Từ thiện / Phi lợi nhuận': 'Charity / Nonprofit', 'Tuyển dụng': 'Recruitment', 'Vận tải & giao hàng': 'Logistics & delivery',
+  'Xây dựng': 'Construction',
+  'Xin chào': 'Hello', 'Hoạt động gần đây': 'Recent activity', 'Xem tất cả': 'View all', 'Module của bạn': 'Your modules',
+  'Gợi ý KPI cho': 'Suggested KPIs for', 'Thêm': 'Add', 'Nhập từ CSV': 'Import CSV',
+  'Doanh nghiệp của bạn còn trống': 'Your workspace is empty',
+  'Đây là các chỉ tiêu tham khảo. Để xem số liệu thực tế, hãy cấu hình KPI từ báo cáo tổng hợp trong module BI.': 'These are suggested metrics. To see actual values, configure KPIs from aggregate reports in the BI module.',
+  'Chưa có hoạt động': 'No activity yet', 'Các bước tự động sẽ hiện ở đây khi phát sinh dữ liệu.': 'Automated steps will appear here when business data is created.',
+  'module đang bật': 'modules enabled', 'Bắt đầu quy trình': 'Start the', 'bằng các hồ sơ nền tảng bên dưới.': 'workflow by adding the foundational records below.',
+  'doanh nghiệp': 'business', 'Tạo hồ sơ đầu tiên cho doanh nghiệp hoặc nhập dữ liệu CSV.': 'Create the first company record or import a CSV file.',
+  'Tác vụ tích hợp cần xử lý': 'Integration tasks need attention', 'Mở danh sách tương ứng để xem chi tiết và xử lý.': 'Open the relevant queue to review and resolve them.',
+  'luồng lỗi cần xử lý': 'failed flows need attention', 'giao nhận tích hợp lỗi': 'failed integration deliveries',
+  'Mở báo cáo & phân tích': 'Open reports & analytics',
+  'Không tải được dữ liệu doanh nghiệp. Vui lòng tải lại trang.': 'Could not load company data. Please reload the page.',
+  'Đang ngoại tuyến. Dữ liệu nghiệp vụ không được lưu trên thiết bị; không thể ghi giao dịch cho đến khi kết nối lại.': 'You are offline. Business data is not stored on this device; transactions cannot be saved until you reconnect.',
+  'Đã đăng xuất': 'Signed out', 'Phòng ban': 'Department', 'Nhân viên': 'Employee', 'Trạng thái': 'Status',
+  'Ngày tạo': 'Created at', 'Cập nhật': 'Updated at', 'Mã': 'Code', 'Tên': 'Name', 'Mô tả': 'Description',
+  'Địa chỉ': 'Address', 'Điện thoại': 'Phone', 'Số tiền': 'Amount', 'Ngày': 'Date', 'Bắt đầu': 'Start', 'Kết thúc': 'End',
+  'Nháp': 'Draft', 'Mới': 'New', 'Đang hoạt động': 'Active', 'Đã gửi': 'Submitted', 'Chờ xử lý': 'Pending',
+  'Đã xác nhận': 'Confirmed', 'Đã duyệt': 'Approved', 'Bị từ chối': 'Rejected', 'Đã hoàn tất': 'Completed',
+  'Đã hủy': 'Cancelled', 'Đang thực hiện': 'In progress', 'Đã thanh toán': 'Paid', 'Thất bại': 'Failed',
+  'Tiêu đề': 'Title', 'Chủ đề': 'Subject', 'Mã SKU': 'SKU', 'Số': 'Number', 'Ghi chú': 'Notes', 'Loại': 'Type',
+  'Đối tác': 'Party', 'Khách hàng': 'Customer', 'Nhà cung cấp': 'Supplier', 'Nhà thầu': 'Contractor', 'Người mua': 'Buyer', 'Sản phẩm': 'Product',
+  'Đơn giá': 'Unit price', 'Giá vé (đã gồm thuế)': 'Ticket price (tax included)', 'Giá vốn': 'Cost', 'Tổng tiền': 'Total',
+  'Số lượng': 'Quantity', 'Dòng hàng': 'Line items', 'Xác suất (%)': 'Probability (%)', 'Ngày dự kiến chốt': 'Expected close date',
+  'Giai đoạn bán hàng': 'Sales stage', 'Đơn vị tính': 'Unit of measure', 'Nhóm': 'Category', 'Đang dùng': 'Active',
+  'Mã số thuế': 'Tax ID', 'Chi nhánh': 'Branch', 'Kho': 'Warehouse', 'Nguồn': 'Source', 'Phụ trách': 'Owner',
+  'Giai đoạn': 'Stage', 'Công ty': 'Company', 'Hạn': 'Due date', 'Ngày đặt': 'Order date', 'Địa chỉ giao hàng': 'Shipping address',
+  'Hình thức': 'Method', 'Phương thức chi': 'Payment method', 'Ngày chi': 'Payment date', 'Ca bán': 'Shift', 'Thu ngân': 'Cashier',
+  'Kênh': 'Channel', 'Tiền tệ': 'Currency', 'Ngân sách': 'Budget', 'Từ ngày': 'Start date', 'Đến ngày': 'End date',
+  'Hạn thanh toán': 'Due date', 'Người xử lý': 'Assignee', 'Mức ưu tiên': 'Priority', 'Ngày vào làm': 'Hire date',
+  'Lương cơ bản': 'Base salary', 'Năm': 'Year', 'Kỳ': 'Period', 'Bảng lương': 'Payroll run', 'Lương gộp': 'Gross pay',
+  'Khấu trừ': 'Deductions', 'Thực nhận': 'Net pay', 'Vị trí': 'Position', 'Ứng viên': 'Candidate', 'Học viên': 'Learner',
+  'Tiến độ (%)': 'Progress (%)', 'Điểm': 'Score', 'Dự án': 'Project', 'Công việc': 'Task', 'Số giờ': 'Hours',
+  'Bắt đầu lúc': 'Starts at', 'Kết thúc lúc': 'Ends at', 'Lý do': 'Reason', 'Lô': 'Lot', 'Hạn dùng': 'Expiry date',
+  'Tài sản': 'Asset', 'Vị trí': 'Location', 'Nhân viên': 'Employee', 'Phòng ban': 'Department', 'Chức danh': 'Job title',
+  'Không tìm thấy dữ liệu này': 'Record type not found', 'Module có thể chưa được bật cho doanh nghiệp của bạn.': 'This module may not be enabled for your company.',
+  'Về trang chủ': 'Back to home', 'Trang chủ': 'Home', 'Xuất CSV': 'Export CSV', 'Nhập CSV': 'Import CSV',
+  'Tạo': 'Create',
+  'Danh sách': 'List', 'Đang tải danh sách': 'Loading records', 'Chọn': 'Select',
+  'Tìm': 'Search', 'Lọc theo trạng thái': 'Filter by status', 'Mọi trạng thái': 'All statuses',
+  'Thao tác hàng loạt': 'Bulk actions', 'Đã chọn': 'Selected', 'bản ghi': 'records', 'Đang xử lý…': 'Processing…',
+  'Không có kết quả khớp': 'No matching results', 'Chưa có dữ liệu': 'No data yet', 'Thử từ khóa khác hoặc bỏ bộ lọc.': 'Try another search term or clear the filters.',
+  'Chưa có bản ghi nào trong trang này.': 'There are no records on this page.', 'Tạo bản ghi': 'Create record',
+  'Chọn tất cả bản ghi trên trang': 'Select all records on this page', 'trang': 'page', 'Trước': 'Previous', 'Sau': 'Next',
+  'Không xuất được dữ liệu.': 'Could not export data.', 'Không xử lý được các bản ghi đã chọn.': 'Could not process the selected records.',
+  'Có': 'Yes', 'Không': 'No', 'Đóng': 'Close', 'Đang tải…': 'Loading…', 'Không mở được bản ghi': 'Could not open record',
+  'Thông tin': 'Details', 'Hệ quả liên mô-đun': 'Cross-module effects', 'Sửa': 'Edit', 'Xóa': 'Delete',
+  'Chưa có sự kiện': 'No events yet', 'Các bước liên mô-đun sẽ xuất hiện tại đây.': 'Cross-module activity will appear here.',
+  'Chuỗi sự kiện': 'Event timeline', 'Mở bản ghi': 'Open record', 'Thông tin bản ghi': 'Record details',
+  'Các bước đã chạy từ bản ghi này, gồm cả phản ứng tự động ở những mô-đun khác.': 'Actions triggered by this record, including automated responses in other modules.',
+  'Số lượng thực tế': 'Counted quantity', 'Lô hàng': 'Lot', 'Vị trí xuất': 'Source location',
+  'Vị trí nhận': 'Destination location', 'Nợ': 'Debit', 'CK (%)': 'Discount (%)',
+  'Thuế': 'Tax', 'Chọn sản phẩm': 'Select a product', 'Không thuế': 'No tax', 'Không chọn lô': 'No lot selected',
+  'Thêm dòng': 'Add line', 'Tạm tính': 'Subtotal', 'Vị trí kiểm kê': 'Count location', 'Không chỉ định vị trí xuất': 'No source location specified',
+  'Không chỉ định vị trí nhận': 'No destination location specified', 'Tài khoản': 'Account', 'Chọn tài khoản': 'Select an account',
+  'Chưa phân bổ': 'Unallocated', 'Chọn': 'Select', 'Không chọn': 'Do not select', 'Quản lý': 'Manage',
+  'Chưa lưu được': 'Could not save', 'Tự tính': 'Calculated automatically', 'Hủy': 'Cancel', 'Đang lưu…': 'Saving…',
+  'Lưu thay đổi': 'Save changes', 'Tạo mới': 'Create', 'Đã lưu thay đổi.': 'Changes saved.', 'Không lưu được dữ liệu.': 'Could not save data.',
+  'Tệp sao kê CSV hoặc CAMT.053': 'CSV or CAMT.053 statement file', 'Đang nhập…': 'Importing…', 'Nhập': 'Import',
+  'Số lượng dòng': 'Line quantity', 'Đơn giá dòng': 'Line unit price', 'Chiết khấu dòng': 'Line discount', 'Thuế dòng': 'Line tax',
+  'Lô hàng dòng': 'Line lot', 'Xóa dòng': 'Remove line', 'Sản phẩm dòng': 'Line product', 'Tài khoản dòng': 'Line account',
+  'Phòng ban dòng': 'Line department', 'Nợ dòng': 'Line debit', 'Có dòng': 'Line credit',
+  'dòng': 'line', 'Bin chưa gán': 'Unassigned bin', 'Select product': 'Select a product', 'No lot': 'No lot',
+  'No lot selected': 'No lot selected', '— Chọn sản phẩm —': '— Select a product —', '— Chọn tài khoản —': '— Select an account —',
+  '— Chọn —': '— Select —', '— Không chọn —': '— None —', 'Không chỉ định vị trí xuất': 'No source location specified',
+  'Không chỉ định vị trí nhận': 'No destination location specified', 'bắt buộc': 'required',
+};
+
+const storedUiLocale = () => {
+  try { return localStorage.getItem('osp.uiLocale') === 'en-US' ? 'en-US' : 'vi-VN'; }
+  catch { return 'vi-VN'; }
+};
+export let uiLocale = storedUiLocale();
+export const setUiLocale = (locale) => {
+  if (locale === 'vi-VN' || locale === 'en-US') uiLocale = locale;
+};
+export const uiText = (text) => uiLocale === 'en-US' ? (UI_TEXT_EN[text] || text) : text;
+
 const humanize = (s) => {
   const t = String(s).replace(/[_-]+/g, ' ').trim();
   return t.charAt(0).toUpperCase() + t.slice(1);
 };
 
-export const fieldLabel = (name) => FIELDS[name] || humanize(name);
-export const statusLabel = (v) => STATUS[v] || humanize(v);
-export const actionLabel = (v) => ACTIONS[v] || STATUS[v] || humanize(v);
+const FIELD_LABEL_EN = { debit: 'Debit', credit: 'Credit' };
+export const fieldLabel = (name) => uiLocale === 'en-US' ? (FIELD_LABEL_EN[name] || uiText(FIELDS[name] || humanize(name))) : (FIELDS[name] || humanize(name));
+export const statusLabel = (v) => uiText(STATUS[v] || humanize(v));
+export const actionLabel = (v) => uiText(ACTIONS[v] || STATUS[v] || humanize(v));
 export const tone = (v) => TONE_LOOKUP[v] || '';
 export const categoryLabel = (c) => CATEGORY[c] || humanize(c);
 
@@ -174,16 +307,16 @@ export function fmtTime(s) {
 export function fmtAgo(s) {
   const sec = Math.round((Date.now() - new Date(s).getTime()) / 1000);
   if (!Number.isFinite(sec)) return '';
-  if (Math.abs(sec) < 45) return formatLocale === 'vi-VN' ? 'vừa xong' : 'just now';
+  if (Math.abs(sec) < 45) return uiLocale === 'vi-VN' ? 'vừa xong' : 'just now';
   const absoluteSeconds = Math.abs(sec);
   const [value, unit] = absoluteSeconds < 3600
     ? [Math.round(absoluteSeconds / 60), 'minute']
     : absoluteSeconds < 86400
       ? [Math.round(absoluteSeconds / 3600), 'hour']
       : [Math.round(absoluteSeconds / 86400), 'day'];
-  if (formatLocale === 'vi-VN') {
+  if (uiLocale === 'vi-VN') {
     const unitVi = { minute: 'phút', hour: 'giờ', day: 'ngày' }[unit];
     return `${value} ${unitVi} ${sec > 0 ? 'trước' : 'sau'}`;
   }
-  return new Intl.RelativeTimeFormat(formatLocale, { numeric: 'auto' }).format(sec > 0 ? -value : value, unit);
+  return new Intl.RelativeTimeFormat(uiLocale, { numeric: 'auto' }).format(sec > 0 ? -value : value, unit);
 }

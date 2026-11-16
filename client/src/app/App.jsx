@@ -7,7 +7,7 @@ import Icon from '../components/Icon.jsx';
 import Sidebar from '../components/Sidebar.jsx';
 import { api, onUnauthorized, session } from '../lib/api.js';
 import { setBusinessTimezone } from '../lib/dates.js';
-import { formatLocale, setFormatLocale } from '../lib/i18n.js';
+import { formatLocale, setFormatLocale, setUiLocale, uiLocale, uiText } from '../lib/i18n.js';
 import { app, loadMeta, loadSummary, resetCaches } from '../lib/state.js';
 export default function App() {
   const [route, setRoute] = useState(() => parseRoute());
@@ -21,6 +21,7 @@ export default function App() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [theme, setTheme] = useState(() => { try { return localStorage.getItem('osp.theme') || ''; } catch { return ''; } });
   const [numberLocale, setNumberLocale] = useState(formatLocale);
+  const [interfaceLanguage, setInterfaceLanguage] = useState(uiLocale);
   const [, setEpoch] = useState(0);
 
   useEffect(() => {
@@ -33,6 +34,10 @@ export default function App() {
     media.addEventListener('change', update);
     return () => media.removeEventListener('change', update);
   }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = interfaceLanguage === 'en-US' ? 'en' : 'vi';
+  }, [interfaceLanguage]);
 
   useEffect(() => {
     if (!mobileNav || !navOpen) return;
@@ -124,6 +129,12 @@ export default function App() {
     try { localStorage.setItem('osp.formatLocale', next); } catch { /* preference remains active in memory */ }
   };
 
+  const changeInterfaceLanguage = (next) => {
+    setUiLocale(next);
+    setInterfaceLanguage(next);
+    try { localStorage.setItem('osp.uiLocale', next); } catch { /* preference remains active in memory */ }
+  };
+
   const logout = async () => {
     try { await api('/api/auth/logout', { method: 'POST' }); } catch { /* session may have expired */ }
     session.clear();
@@ -185,26 +196,31 @@ export default function App() {
 
   const initials = (user.name || '?').split(' ').slice(-2).map((part) => part[0]).join('').toUpperCase();
   return <>
-    <a className="skip-link" href="#main">Bỏ qua điều hướng</a>
+    <a className="skip-link" href="#main">{uiText('Bỏ qua điều hướng')}</a>
     <div className="app">
       <header className="topbar">
-        <button ref={navToggleRef} className="btn btn-ghost btn-icon nav-toggle" type="button" aria-label={navOpen ? 'Đóng menu' : 'Mở menu'} aria-expanded={navOpen} aria-controls="nav" onClick={() => setNavOpen((open) => !open)}><Icon name="menu" /></button>
+        <button ref={navToggleRef} className="btn btn-ghost btn-icon nav-toggle" type="button" aria-label={uiText(navOpen ? 'Đóng menu' : 'Mở menu')} aria-expanded={navOpen} aria-controls="nav" onClick={() => setNavOpen((open) => !open)}><Icon name="menu" /></button>
         <a className="brand" href="#/"><span className="brand-mark">O</span>OSP</a>
         <span className="tenant-chip">{meta.name}</span>
         <span className="grow" />
         <GlobalSearch meta={meta} onNavigate={() => setNavOpen(false)} />
-        <button className="btn btn-ghost btn-icon" type="button" aria-label={theme === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'} title={theme === 'dark' ? 'Giao diện sáng' : 'Giao diện tối'} onClick={toggleTheme}><Icon name={theme === 'dark' ? 'sun' : 'moon'} /></button>
+        <button className="btn btn-ghost btn-icon" type="button" aria-label={uiText(theme === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối')} title={uiText(theme === 'dark' ? 'Giao diện sáng' : 'Giao diện tối')} onClick={toggleTheme}><Icon name={theme === 'dark' ? 'sun' : 'moon'} /></button>
         <div className="menu">
           <button className="btn btn-ghost" type="button" aria-haspopup="menu" aria-expanded={accountOpen} aria-label={`Tài khoản ${user.name}`} onClick={() => setAccountOpen((open) => !open)}><span className="avatar">{initials}</span></button>
           {accountOpen && <div className="menu-pop" role="menu">
             <div className="menu-item" role="none"><div><strong>{user.name}</strong><div className="faint">{user.email || 'Tài khoản máy'}</div></div></div>
-            <div className="menu-item" role="none"><strong>Định dạng ngày và số</strong></div>
-            <div role="group" aria-label="Định dạng ngày và số">
-              <button className="menu-item" role="menuitemradio" aria-checked={numberLocale === 'vi-VN'} type="button" onClick={() => changeNumberLocale('vi-VN')}>Việt Nam · ngày/tháng/năm</button>
-              <button className="menu-item" role="menuitemradio" aria-checked={numberLocale === 'en-US'} type="button" onClick={() => changeNumberLocale('en-US')}>Hoa Kỳ · tháng/ngày/năm</button>
+            <div className="menu-item" role="none"><strong>{uiText('Ngôn ngữ giao diện')}</strong></div>
+            <div role="group" aria-label={uiText('Ngôn ngữ giao diện')}>
+              <button className="menu-item" role="menuitemradio" aria-checked={interfaceLanguage === 'vi-VN'} type="button" onClick={() => changeInterfaceLanguage('vi-VN')}>{uiText('Tiếng Việt')}</button>
+              <button className="menu-item" role="menuitemradio" aria-checked={interfaceLanguage === 'en-US'} type="button" onClick={() => changeInterfaceLanguage('en-US')}>{uiText('Tiếng Anh')}</button>
             </div>
-            <a className="menu-item" role="menuitem" href="#/account/security" onClick={() => setAccountOpen(false)}>Bảo mật tài khoản</a>
-            <button className="menu-item" role="menuitem" type="button" onClick={logout}><Icon name="logout" />Đăng xuất</button>
+            <div className="menu-item" role="none"><strong>{uiText('Định dạng ngày và số')}</strong></div>
+            <div role="group" aria-label={uiText('Định dạng ngày và số')}>
+              <button className="menu-item" role="menuitemradio" aria-checked={numberLocale === 'vi-VN'} type="button" onClick={() => changeNumberLocale('vi-VN')}>{uiText('Việt Nam · ngày/tháng/năm')}</button>
+              <button className="menu-item" role="menuitemradio" aria-checked={numberLocale === 'en-US'} type="button" onClick={() => changeNumberLocale('en-US')}>{uiText('Hoa Kỳ · tháng/ngày/năm')}</button>
+            </div>
+            <a className="menu-item" role="menuitem" href="#/account/security" onClick={() => setAccountOpen(false)}>{uiText('Bảo mật tài khoản')}</a>
+            <button className="menu-item" role="menuitem" type="button" onClick={logout}><Icon name="logout" />{uiText('Đăng xuất')}</button>
           </div>}
         </div>
       </header>
@@ -229,7 +245,7 @@ export function OfflineNotice() {
     };
   }, []);
   return online ? null : <div className="offline-notice" role="status" aria-live="polite">
-    Đang ngoại tuyến. Dữ liệu nghiệp vụ không được lưu trên thiết bị; không thể ghi giao dịch cho đến khi kết nối lại.
+    {uiText('Đang ngoại tuyến. Dữ liệu nghiệp vụ không được lưu trên thiết bị; không thể ghi giao dịch cho đến khi kết nối lại.')}
   </div>;
 }
 

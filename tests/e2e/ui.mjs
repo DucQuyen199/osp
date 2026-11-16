@@ -155,6 +155,29 @@ await step('dùng thử -> trang chủ có số liệu', async () => {
   await shot('home');
 });
 
+await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', async () => {
+  await page.click('.menu > button');
+  must(await clickText('Tiếng Anh', 'button'), 'không có lựa chọn tiếng Anh');
+  await page.waitForFunction(() => document.querySelector('#main h1')?.textContent.startsWith('Hello'));
+  must(await page.$eval('#nav', (nav) => nav.getAttribute('aria-label') === 'Main navigation'), 'điều hướng chưa chuyển sang tiếng Anh');
+  await axe('trang chủ tiếng Anh');
+  await page.reload({ waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => document.querySelector('#main h1')?.textContent.startsWith('Hello'));
+  await page.goto(`${BASE}/#/e/master-data/party`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('table.table');
+  must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Customer', 'danh sách CRUD chưa dịch đúng thuật ngữ ngành');
+  must(await clickText('Create customer', 'button'), 'nút tạo hồ sơ chưa dịch');
+  await page.waitForSelector('dialog.drawer[open] form');
+  must((await page.$eval('#entity-form-title', (heading) => heading.textContent)).startsWith('Create customer'), 'biểu mẫu chưa dịch tiêu đề');
+  must(await page.$eval('label[for="entity-field-name"]', (label) => label.textContent.includes('Name')), 'biểu mẫu chưa dịch nhãn trường');
+  await axe('biểu mẫu CRUD tiếng Anh');
+  await page.keyboard.press('Escape');
+  await page.goto(`${BASE}/#/`, { waitUntil: 'networkidle0' });
+  await page.click('.menu > button');
+  must(await clickText('Vietnamese', 'button'), 'không có lựa chọn tiếng Việt sau khi chuyển ngôn ngữ');
+  await page.waitForFunction(() => document.querySelector('#main h1')?.textContent.startsWith('Xin chào'));
+});
+
 await step('danh sách -> chi tiết -> xác nhận kéo theo luồng liên module', async () => {
   await page.goto(`${BASE}/#/e/sales/sales_order`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('table.table');

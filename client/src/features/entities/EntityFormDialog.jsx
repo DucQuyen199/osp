@@ -2,7 +2,7 @@
 import { localDateTime as businessDateTime, localDateTimeToIso } from '../../lib/dates.js';
 import { ApiError, api, dataPath, tenantPath } from '../../lib/api.js';
 import { toast } from '../../lib/feedback.js';
-import { fmtMoney, statusLabel } from '../../lib/i18n.js';
+import { fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import {
   entity, entityLabel, fieldLabelOf, invalidateRefs, loadRefs, recordLabel,
 } from '../../lib/state.js';
@@ -73,43 +73,43 @@ function FieldLines({ qname, value, onChange, priceList, salesOrder, purchaseOrd
     : lotEnabled ? ['Sản phẩm', 'Số lượng', 'Đơn giá', 'Lô', ''] : ['Sản phẩm', 'Số lượng', 'Đơn giá', ''];
 
   return <div className="lines">
-    <div className={`lines-row lines-head${rowClass ? ` ${rowClass}` : ''}`} aria-hidden="true">{headers.map((header) => <span key={header}>{header}</span>)}</div>
+    <div className={`lines-row lines-head${rowClass ? ` ${rowClass}` : ''}`} aria-hidden="true">{headers.map((header) => <span key={header}>{uiText(header)}</span>)}</div>
     {rows.map((row, index) => {
       const productLots = [...lots.values()].filter((lot) => !row.product || lot.product === row.product);
       return <div key={row.id || index} className={`lines-row${rowClass ? ` ${rowClass}` : ''}`}>
-        <select className="select" aria-label={`Sản phẩm dòng ${index + 1}`} value={row.product || ''}
+        <select className="select" aria-label={`${uiText('Sản phẩm')} ${uiText('dòng')} ${index + 1}`} value={row.product || ''}
           onChange={(event) => {
             const product = event.target.value || undefined;
             const selected = products.get(product);
             update(index, { product, ...(!row.price && selected?.price ? { price: Number(selected.price) } : {}) });
           }}>
-          <option value="">— Chọn sản phẩm —</option>
+          <option value="">{uiText('— Chọn sản phẩm —')}</option>
           {[...products.values()].map((product) => <option key={product.id} value={product.id}>{product.name}{product.sku ? ` (${product.sku})` : ''}</option>)}
         </select>
-        <input className="input num" type="number" min="0" step="any" value={row.qty ?? ''} aria-label={`Số lượng dòng ${index + 1}`}
+        <input className="input num" type="number" min="0" step="any" value={row.qty ?? ''} aria-label={`${uiText('Số lượng')} ${uiText('dòng')} ${index + 1}`}
           onChange={(event) => update(index, { qty: event.target.value === '' ? undefined : Number(event.target.value) })} />
-        <input className="input num" type="number" min="0" step="any" value={row.price ?? ''} aria-label={`Đơn giá dòng ${index + 1}`}
+        <input className="input num" type="number" min="0" step="any" value={row.price ?? ''} aria-label={`${uiText('Đơn giá')} ${uiText('dòng')} ${index + 1}`}
           onChange={(event) => update(index, { price: event.target.value === '' ? undefined : Number(event.target.value) })} />
         {discountEnabled && <>
-          <input className="input num" type="number" min="0" max="100" step="0.01" value={row.discount_pct ?? 0} aria-label={`Chiết khấu dòng ${index + 1}`}
+          <input className="input num" type="number" min="0" max="100" step="0.01" value={row.discount_pct ?? 0} aria-label={`${uiText('Chiết khấu (%)')} ${uiText('dòng')} ${index + 1}`}
             onChange={(event) => update(index, { discount_pct: event.target.value === '' ? 0 : Number(event.target.value) })} />
-          <select className="select" aria-label={`Thuế dòng ${index + 1}`} value={row.tax || ''}
+          <select className="select" aria-label={`${uiText('Thuế')} ${uiText('dòng')} ${index + 1}`} value={row.tax || ''}
             onChange={(event) => update(index, { tax: event.target.value || undefined })}>
-            <option value="">Không thuế</option>
+            <option value="">{uiText('Không thuế')}</option>
             {[...taxes.values()].map((tax) => <option key={tax.id} value={tax.id}>{tax.name} ({Number(tax.rate) || 0}%)</option>)}
           </select>
         </>}
-        {lotEnabled && <select className="select" aria-label={`Lô hàng dòng ${index + 1}`} value={row.lot || ''}
+        {lotEnabled && <select className="select" aria-label={`${uiText('Lô hàng')} ${uiText('dòng')} ${index + 1}`} value={row.lot || ''}
           onChange={(event) => update(index, { lot: event.target.value || undefined })}>
-          <option value="">Không chọn lô</option>
+          <option value="">{uiText('Không chọn lô')}</option>
           {productLots.map((lot) => <option key={lot.id} value={lot.id}>{lot.code}{lot.expiry ? ` · ${lot.expiry}` : ''}</option>)}
         </select>}
-        <button className="btn btn-ghost btn-icon btn-sm" type="button" aria-label={`Xóa dòng ${index + 1}`} onClick={() => remove(index)}>×</button>
+        <button className="btn btn-ghost btn-icon btn-sm" type="button" aria-label={`${uiText('Xóa')} ${uiText('dòng')} ${index + 1}`} onClick={() => remove(index)}>×</button>
       </div>;
     })}
     <div className="lines-foot">
-      <button className="btn btn-sm" type="button" onClick={() => onChange([...rows, {}])}>Thêm dòng</button>
-      <span>Tạm tính: <strong className="num">{preview ? fmtMoney(preview.total) : '—'}</strong></span>
+      <button className="btn btn-sm" type="button" onClick={() => onChange([...rows, {}])}>{uiText('Thêm dòng')}</button>
+      <span>{uiText('Tạm tính')}: <strong className="num">{preview ? fmtMoney(preview.total) : '—'}</strong></span>
     </div>
   </div>;
 }
@@ -135,31 +135,31 @@ function InventoryLines({ value, countMode, onChange, fromWarehouse, toWarehouse
   };
   return <div className="lines">
     <div className={`lines-row lines-head ${countMode ? 'inventory-count-row' : 'inventory-transfer-row'}`} aria-hidden="true">
-      {(countMode ? ['Sản phẩm', 'Số lượng thực tế', 'Lô hàng', 'Vị trí', ''] : ['Sản phẩm', 'Số lượng', 'Lô hàng', 'Vị trí xuất', 'Vị trí nhận', '']).map((header) => <span key={header}>{header}</span>)}
+      {(countMode ? ['Sản phẩm', 'Số lượng thực tế', 'Lô hàng', 'Vị trí', ''] : ['Sản phẩm', 'Số lượng', 'Lô hàng', 'Vị trí xuất', 'Vị trí nhận', '']).map((header) => <span key={header}>{uiText(header)}</span>)}
     </div>
     {rows.map((row, index) => <div key={row.id || index} className={`lines-row ${countMode ? 'inventory-count-row' : 'inventory-transfer-row'}`}>
-      <select className="select" aria-label={`Sản phẩm dòng ${index + 1}`} value={row.product || ''} onChange={(event) => update(index, { product: event.target.value || undefined })}>
-        <option value="">— Select product —</option>
+      <select className="select" aria-label={`${uiText('Sản phẩm')} ${uiText('dòng')} ${index + 1}`} value={row.product || ''} onChange={(event) => update(index, { product: event.target.value || undefined })}>
+        <option value="">{uiText('Select product')}</option>
         {[...products.values()].map((product) => <option key={product.id} value={product.id}>{product.name}{product.sku ? ` (${product.sku})` : ''}</option>)}
       </select>
       <input className="input num" type="number" min="0" step="any" value={countMode ? (row.counted_qty ?? row.qty ?? '') : (row.qty ?? '')}
-        aria-label={`${countMode ? 'Số lượng thực tế' : 'Số lượng'} dòng ${index + 1}`}
+        aria-label={`${uiText(countMode ? 'Số lượng thực tế' : 'Số lượng')} ${uiText('dòng')} ${index + 1}`}
         onChange={(event) => update(index, { [countMode ? 'counted_qty' : 'qty']: event.target.value === '' ? undefined : Number(event.target.value) })} />
-      <select className="select" aria-label={`Lô hàng dòng ${index + 1}`} value={row.lot || ''} onChange={(event) => update(index, { lot: event.target.value || undefined })}>
-        <option value="">No lot</option>
+      <select className="select" aria-label={`${uiText('Lô hàng')} ${uiText('dòng')} ${index + 1}`} value={row.lot || ''} onChange={(event) => update(index, { lot: event.target.value || undefined })}>
+        <option value="">{uiText('No lot')}</option>
         {[...lots.values()].filter((lot) => !row.product || lot.product === row.product).map((lot) => <option key={lot.id} value={lot.id}>{lot.code}{lot.expiry ? ` · ${lot.expiry}` : ''}</option>)}
       </select>
       {countMode && <select className="select" aria-label={`Vị trí kiểm kê dòng ${index + 1}`} value={row.location || ''} disabled={!fromWarehouse} onChange={(event) => update(index, { location: event.target.value || undefined })}>
-        <option value="">Bin chưa gán</option>
+        <option value="">{uiText('Bin chưa gán')}</option>
         {[...locations.values()].filter((location) => location.warehouse === fromWarehouse && location.active !== false).map((location) => <option key={location.id} value={location.id}>{location.code} · {location.name}</option>)}
       </select>}
       {!countMode && <>
         <select className="select" aria-label={`Vị trí xuất dòng ${index + 1}`} value={row.from_location || ''} disabled={!fromWarehouse} onChange={(event) => update(index, { from_location: event.target.value || undefined })}>
-          <option value="">Không chỉ định vị trí xuất</option>
+          <option value="">{uiText('Không chỉ định vị trí xuất')}</option>
           {[...locations.values()].filter((location) => location.warehouse === fromWarehouse && location.active !== false).map((location) => <option key={location.id} value={location.id}>{location.code} · {location.name}</option>)}
         </select>
         <select className="select" aria-label={`Vị trí nhận dòng ${index + 1}`} value={row.to_location || ''} disabled={!toWarehouse} onChange={(event) => update(index, { to_location: event.target.value || undefined })}>
-          <option value="">Không chỉ định vị trí nhận</option>
+          <option value="">{uiText('Không chỉ định vị trí nhận')}</option>
           {[...locations.values()].filter((location) => location.warehouse === toWarehouse && location.active !== false).map((location) => <option key={location.id} value={location.id}>{location.code} · {location.name}</option>)}
         </select>
       </>}
@@ -187,13 +187,13 @@ function AccountingJournalLines({ value, onChange }) {
     const next = rows.filter((_, rowIndex) => rowIndex !== index);
     onChange(next.length ? next : [{}]);
   };
-  const headers = ['Tài khoản', 'Phòng ban', 'Nợ', 'Có', ''];
+  const headers = ['account', 'department', 'debit', 'credit'].map((name) => fieldLabelOf('accounting.journal_entry', name));
   return <div className="lines">
     <div className="lines-row lines-head accounting-journal-row" aria-hidden="true">{headers.map((header) => <span key={header}>{header}</span>)}</div>
     {rows.map((row, index) => <div key={row.id || index} className="lines-row accounting-journal-row">
-      <select className="select" aria-label={`Tài khoản dòng ${index + 1}`} value={row.account || ''}
+      <select className="select" aria-label={`${uiText('Tài khoản')} ${uiText('dòng')} ${index + 1}`} value={row.account || ''}
         onChange={(event) => update(index, { account: event.target.value || undefined })}>
-        <option value="">— Chọn tài khoản —</option>
+        <option value="">{uiText('— Chọn tài khoản —')}</option>
         {[...accounts.values()].map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}
       </select>
       <select className="select" aria-label={`Phòng ban dòng ${index + 1}`} value={row.department || ''}
@@ -373,29 +373,29 @@ export default function EntityFormDialog({ qname, record, onClose, onSaved }) {
       value={fieldValue(field)} onChange={(event) => setValue(field.name, event.target.value)} />;
   };
 
-  const title = `${editing ? 'Sửa' : 'Tạo'} ${entityLabel(qname).toLowerCase()}`;
+  const title = `${uiText(editing ? 'Sửa' : 'Tạo')} ${uiText(entityLabel(qname)).toLowerCase()}`;
   return <dialog ref={dialog} className="drawer" aria-labelledby="entity-form-title" onCancel={(event) => { event.preventDefault(); close(); }}>
     <form className="drawer-form" noValidate onSubmit={save}>
       <header className="drawer-head">
-        <div><h2 id="entity-form-title">{title}</h2><p className="faint">{definition.label}</p></div>
-        <button className="btn btn-ghost btn-icon" type="button" aria-label="Đóng" onClick={close}>×</button>
+        <div><h2 id="entity-form-title">{title}</h2><p className="faint">{uiText(definition.label)}</p></div>
+        <button className="btn btn-ghost btn-icon" type="button" aria-label={uiText('Đóng')} onClick={close}>×</button>
       </header>
       <div className="drawer-body stack">
-        {generalErrors.length > 0 && <div className="alert danger" role="alert"><strong>Chưa lưu được</strong><ul>{generalErrors.map((message, index) => <li key={index}>{message}</li>)}</ul></div>}
+        {generalErrors.length > 0 && <div className="alert danger" role="alert"><strong>{uiText('Chưa lưu được')}</strong><ul>{generalErrors.map((message, index) => <li key={index}>{uiText(message)}</li>)}</ul></div>}
         <div className="form-grid">
           {fields.filter((field) => !SYSTEM_MANAGED_FIELDS[qname]?.includes(field.name)).map((field) => <div key={field.name} className={`field${['text', 'json'].includes(field.type) ? ' full' : ''}`}>
             {field.type === 'bool' ? renderControl(field) : <>
-              <label htmlFor={`entity-field-${field.name}`}>{fieldLabelOf(qname, field.name)}{field.required && <><span className="req" aria-hidden="true">*</span><span className="sr-only"> (bắt buộc)</span></>}</label>
+              <label htmlFor={`entity-field-${field.name}`}>{uiText(fieldLabelOf(qname, field.name))}{field.required && <><span className="req" aria-hidden="true">*</span><span className="sr-only"> ({uiText('bắt buộc')})</span></>}</label>
               {renderControl(field)}
             </>}
-            {errors[field.name] && <div className="error-text" id={`entity-field-${field.name}-error`}>{errors[field.name]}</div>}
+            {errors[field.name] && <div className="error-text" id={`entity-field-${field.name}-error`}>{uiText(errors[field.name])}</div>}
           </div>)}
         </div>
-        {computed.length > 0 && <p className="hint">Tự tính: {computed.map((field) => fieldLabelOf(qname, field.name)).join(', ')}.</p>}
+        {computed.length > 0 && <p className="hint">{uiText('Tự tính')}: {computed.map((field) => uiText(fieldLabelOf(qname, field.name))).join(', ')}.</p>}
       </div>
       <footer className="drawer-foot">
-        <button className="btn" type="button" disabled={saving} onClick={close}>Hủy</button>
-        <button className="btn btn-primary" type="submit" disabled={saving}>{saving ? 'Đang lưu…' : editing ? 'Lưu thay đổi' : 'Tạo mới'}</button>
+        <button className="btn" type="button" disabled={saving} onClick={close}>{uiText('Hủy')}</button>
+        <button className="btn btn-primary" type="submit" disabled={saving}>{saving ? uiText('Đang lưu…') : editing ? uiText('Lưu thay đổi') : uiText('Tạo mới')}</button>
       </footer>
     </form>
   </dialog>;

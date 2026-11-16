@@ -7,7 +7,7 @@ import {
   can, entity, entityLabel, fieldLabelOf, invalidateRefs, listColumns, loadRefs, moduleOf, recordLabel,
 } from '../../lib/state.js';
 import {
-  actionLabel, fmtDate, fmtDateTime, fmtMoney, fmtNumber, statusLabel, tone,
+  actionLabel, fmtDate, fmtDateTime, fmtMoney, fmtNumber, statusLabel, tone, uiText,
 } from '../../lib/i18n.js';
 import { recordHref } from '../../lib/routes.js';
 
@@ -24,7 +24,7 @@ function FieldValue({ qname, field, record, definition, refs }) {
   if (field.type === 'number') return <span className="num">{fmtNumber(value)}</span>;
   if (field.type === 'date') return fmtDate(value);
   if (field.type === 'datetime') return fmtDateTime(value);
-  if (field.type === 'bool') return <span className={`badge plain ${value ? 'success' : ''}`}>{value ? 'Có' : 'Không'}</span>;
+  if (field.type === 'bool') return <span className={`badge plain ${value ? 'success' : ''}`}>{uiText(value ? 'Có' : 'Không')}</span>;
   if (field.type === 'enum') {
     const label = definition.states?.field === field.name || field.name === 'status'
       ? statusLabel(value)
@@ -121,9 +121,9 @@ export default function EntityListPage({ qname }) {
   }, [definition, qname, columns, page, status, debouncedQuery, reloadKey]);
 
   if (!definition) return <div className="page"><div className="empty">
-    <h3>Không tìm thấy dữ liệu này</h3>
-    <p>Module có thể chưa được bật cho doanh nghiệp của bạn.</p>
-    <a className="btn" href="#/">Về trang chủ</a>
+    <h3>{uiText('Không tìm thấy dữ liệu này')}</h3>
+    <p>{uiText('Module có thể chưa được bật cho doanh nghiệp của bạn.')}</p>
+    <a className="btn" href="#/">{uiText('Về trang chủ')}</a>
   </div></div>;
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -201,49 +201,49 @@ export default function EntityListPage({ qname }) {
   <div className="page">
     <div className="page-head">
       <div>
-        <div className="crumbs"><a href="#/">Trang chủ</a> / {module?.name}</div>
-        <h1>{entityLabel(qname)}</h1>
+        <div className="crumbs"><a href="#/">{uiText('Trang chủ')}</a> / {uiText(module?.name || '')}</div>
+        <h1>{uiText(entityLabel(qname))}</h1>
         <p className="sub">{definition.states
           ? `Quy trình: ${statusLabel(definition.states.initial)} → ${[...new Set(Object.values(definition.states.actions).map((action) => statusLabel(action.to)))].join(', ')}`
-          : definition.label}</p>
+          : uiText(definition.label)}</p>
       </div>
       <div className="row wrap">
-        {can('tenant.export') && <button className="btn" type="button" onClick={exportCsv}>Xuất CSV</button>}
-        {can('tenant.import') && canCreate && <button className="btn" type="button" onClick={() => setImportOpen(true)}>Nhập CSV</button>}
-        {canCreate && <button className="btn btn-primary" type="button" onClick={create}>＋ Tạo {entityLabel(qname).toLowerCase()}</button>}
+        {can('tenant.export') && <button className="btn" type="button" onClick={exportCsv}>{uiText('Xuất CSV')}</button>}
+        {can('tenant.import') && canCreate && <button className="btn" type="button" onClick={() => setImportOpen(true)}>{uiText('Nhập CSV')}</button>}
+        {canCreate && <button className="btn btn-primary" type="button" onClick={create}>＋ {uiText('Tạo')} {uiText(entityLabel(qname)).toLowerCase()}</button>}
       </div>
     </div>
-    <section className="card" aria-label={`Danh sách ${entityLabel(qname).toLowerCase()}`}>
+    <section className="card" aria-label={`${uiText('Danh sách')} ${uiText(entityLabel(qname)).toLowerCase()}`}>
       <div className="toolbar">
         <label className="search">
-          <span className="sr-only">Tìm {entityLabel(qname).toLowerCase()}</span>
-          <input className="input" type="search" value={query} onChange={(event) => { setQuery(event.target.value); setPage(0); }} placeholder={`Tìm ${entityLabel(qname).toLowerCase()}…`} />
+          <span className="sr-only">{uiText('Tìm')} {uiText(entityLabel(qname)).toLowerCase()}</span>
+          <input className="input" type="search" value={query} onChange={(event) => { setQuery(event.target.value); setPage(0); }} placeholder={`${uiText('Tìm')} ${uiText(entityLabel(qname)).toLowerCase()}…`} />
         </label>
         {definition.states && <label>
-          <span className="sr-only">Lọc theo trạng thái</span>
+          <span className="sr-only">{uiText('Lọc theo trạng thái')}</span>
           <select className="select" value={status} onChange={(event) => { setStatus(event.target.value); setPage(0); }}>
-            <option value="">Mọi trạng thái</option>
+            <option value="">{uiText('Mọi trạng thái')}</option>
             {states.map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}
           </select>
         </label>}
       </div>
-      {selectable && selectedRows.length > 0 && <div className="toolbar" aria-label="Thao tác hàng loạt">
-        <span className="muted">Đã chọn {fmtNumber(selectedRows.length)} bản ghi</span>
+      {selectable && selectedRows.length > 0 && <div className="toolbar" aria-label={uiText('Thao tác hàng loạt')}>
+        <span className="muted">{uiText('Đã chọn')} {fmtNumber(selectedRows.length)} {uiText('bản ghi')}</span>
         {bulkActions.map(([action, transition]) => <button key={action} className="btn btn-sm" type="button" disabled={Boolean(bulkAction)} onClick={() => runBulkAction(action, transition)}>
-          {bulkAction === action ? 'Đang xử lý…' : actionLabel(action)}
+          {bulkAction === action ? uiText('Đang xử lý…') : actionLabel(action)}
         </button>)}
       </div>}
       {error && <div className="alert danger" role="alert">{error}</div>}
-      {loading ? <div className="skeleton" data-h="row" aria-label="Đang tải danh sách" />
+      {loading ? <div className="skeleton" data-h="row" aria-label={uiText('Đang tải danh sách')} />
         : rows.length === 0 ? <div className="empty">
-          <h3>{total ? 'Không có kết quả khớp' : 'Chưa có dữ liệu'}</h3>
-          <p>{total ? 'Thử từ khóa khác hoặc bỏ bộ lọc.' : 'Chưa có bản ghi nào trong trang này.'}</p>
-          {!total && canCreate && <button className="btn btn-primary" type="button" onClick={create}>＋ Tạo bản ghi</button>}
+          <h3>{uiText(total ? 'Không có kết quả khớp' : 'Chưa có dữ liệu')}</h3>
+          <p>{uiText(total ? 'Thử từ khóa khác hoặc bỏ bộ lọc.' : 'Chưa có bản ghi nào trong trang này.')}</p>
+          {!total && canCreate && <button className="btn btn-primary" type="button" onClick={create}>＋ {uiText('Tạo bản ghi')}</button>}
         </div> : <div className="table-wrap">
           <table className="table">
-            <thead><tr>{selectable && <th scope="col"><input className="bulk-select" type="checkbox" aria-label="Chọn tất cả bản ghi trên trang" checked={allRowsSelected} disabled={Boolean(bulkAction)} onChange={togglePage} /></th>}{columns.map((field) => <th key={field.name} scope="col" className={['money', 'number'].includes(field.type) ? 'right' : ''}>{fieldLabelOf(qname, field.name)}</th>)}</tr></thead>
+            <thead><tr>{selectable && <th scope="col"><input className="bulk-select" type="checkbox" aria-label={uiText('Chọn tất cả bản ghi trên trang')} checked={allRowsSelected} disabled={Boolean(bulkAction)} onChange={togglePage} /></th>}{columns.map((field) => <th key={field.name} scope="col" className={['money', 'number'].includes(field.type) ? 'right' : ''}>{uiText(fieldLabelOf(qname, field.name))}</th>)}</tr></thead>
             <tbody>{rows.map((record) => <tr key={record.id} className="clickable" onClick={() => { location.hash = recordHref(qname, record.id); }}>
-              {selectable && <td><input className="bulk-select" type="checkbox" aria-label={`Chọn ${recordLabel(qname, record)}`} checked={selectedIds.has(record.id)} disabled={Boolean(bulkAction)} onClick={(event) => event.stopPropagation()} onChange={() => toggleRow(record.id)} /></td>}
+              {selectable && <td><input className="bulk-select" type="checkbox" aria-label={`${uiText('Chọn')} ${uiText(recordLabel(qname, record))}`} checked={selectedIds.has(record.id)} disabled={Boolean(bulkAction)} onClick={(event) => event.stopPropagation()} onChange={() => toggleRow(record.id)} /></td>}
               {columns.map((field, index) => <td key={field.name} className={['money', 'number'].includes(field.type) ? 'right' : ''}>
                 {index === 0 && field.type !== 'ref'
                   ? <a href={recordHref(qname, record.id)} onClick={(event) => event.stopPropagation()}><FieldValue qname={qname} field={field} record={record} definition={definition} refs={refs} /></a>
@@ -253,10 +253,10 @@ export default function EntityListPage({ qname }) {
           </table>
         </div>}
       <div className="pager">
-        <span aria-live="polite">{fmtNumber(total)} bản ghi · trang {page + 1}/{pages}</span>
+        <span aria-live="polite">{fmtNumber(total)} {uiText('bản ghi')} · {uiText('trang')} {page + 1}/{pages}</span>
         <div className="row">
-          <button className="btn btn-sm" type="button" disabled={loading || page === 0} onClick={() => setPage((value) => Math.max(0, value - 1))}>Trước</button>
-          <button className="btn btn-sm" type="button" disabled={loading || page >= pages - 1} onClick={() => setPage((value) => value + 1)}>Sau</button>
+          <button className="btn btn-sm" type="button" disabled={loading || page === 0} onClick={() => setPage((value) => Math.max(0, value - 1))}>{uiText('Trước')}</button>
+          <button className="btn btn-sm" type="button" disabled={loading || page >= pages - 1} onClick={() => setPage((value) => value + 1)}>{uiText('Sau')}</button>
         </div>
       </div>
     </section>

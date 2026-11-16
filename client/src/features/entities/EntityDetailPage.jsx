@@ -3,7 +3,7 @@ import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { confirmDialog, textDialog, toast } from '../../lib/feedback.js';
 import { descendants, eventTitle, fetchEvents, moduleName } from '../../lib/events.js';
 import {
-  actionLabel, fmtAgo, fmtDate, fmtDateTime, fmtMoney, fmtNumber, fmtTime, statusLabel, tone,
+  actionLabel, fmtAgo, fmtDate, fmtDateTime, fmtMoney, fmtNumber, fmtTime, statusLabel, tone, uiText,
 } from '../../lib/i18n.js';
 import {
   can, entity, entityLabel, fieldLabelOf, invalidateRefs, loadRefs, recordLabel,
@@ -22,7 +22,7 @@ function FieldValue({ qname, field, value, refs, definition, record }) {
   if (field.type === 'number') return <span className="num">{fmtNumber(value)}</span>;
   if (field.type === 'date') return fmtDate(value);
   if (field.type === 'datetime') return fmtDateTime(value);
-  if (field.type === 'bool') return <span className={`badge plain ${value ? 'success' : ''}`}>{value ? 'Có' : 'Không'}</span>;
+  if (field.type === 'bool') return <span className={`badge plain ${value ? 'success' : ''}`}>{uiText(value ? 'Có' : 'Không')}</span>;
   if (field.type === 'enum') {
     return field.name === 'status' || definition.states?.field === field.name
       ? <span className={`badge ${tone(value)}`}>{statusLabel(value)}</span>
@@ -38,24 +38,24 @@ function FieldValue({ qname, field, value, refs, definition, record }) {
 }
 
 export function EventTimeline({ events, currentId }) {
-  if (!events.length) return <div className="empty"><h3>Chưa có sự kiện</h3><p>Các bước liên mô-đun sẽ xuất hiện tại đây.</p></div>;
-  return <ol className="timeline" aria-label="Chuỗi sự kiện">
+  if (!events.length) return <div className="empty"><h3>{uiText('Chưa có sự kiện')}</h3><p>{uiText('Các bước liên mô-đun sẽ xuất hiện tại đây.')}</p></div>;
+  return <ol className="timeline" aria-label={uiText('Chuỗi sự kiện')}>
     {events.map((event) => {
       const title = eventTitle(event.type);
       const failed = event.handled.some((effect) => effect.outcome === 'error');
       const effects = event.handled.filter((effect) => effect.outcome !== 'skipped');
       return <li key={event.id} className={`tl-item depth-${Math.min(event.depth, 3)}${failed ? ' err' : ''}`}>
         <span className="tl-dot" />
-        <div className="tl-title">{title.entity} · {title.verb}</div>
+      <div className="tl-title">{uiText(title.entity)} · {uiText(title.verb)}</div>
         <div className="tl-meta">
           {fmtTime(event.at)} · {fmtAgo(event.at)}{event.depth > 0 ? ` · bước ${event.depth + 1} của chuỗi` : ''}
           {event.recordId && event.recordId !== currentId && entity(title.qname) && <>
-            {' · '}<a href={recordHref(title.qname, event.recordId)}>Mở bản ghi</a>
+            {' · '}<a href={recordHref(title.qname, event.recordId)}>{uiText('Mở bản ghi')}</a>
           </>}
         </div>
         {effects.length > 0 && <div className="tl-effects">{effects.map((effect, index) =>
           <span key={`${event.id}:${index}`} className={`effect ${effect.outcome === 'ok' ? 'ok' : 'error'}`} title={effect.detail || ''}>
-            {effect.outcome === 'ok' ? '✓' : '×'} {moduleName(effect.module)}{effect.outcome === 'error' ? `: ${effect.detail}` : ''}
+            {effect.outcome === 'ok' ? '✓' : '×'} {uiText(moduleName(effect.module))}{effect.outcome === 'error' ? `: ${uiText(effect.detail)}` : ''}
           </span>)}
         </div>}
       </li>;
@@ -217,46 +217,46 @@ export default function EntityDetailPage({ qname, id }) {
     <div className="drawer-form">
       <header className="drawer-head">
         <div className="stack-sm">
-          {record && <div className="faint">{entityLabel(qname)}</div>}
-          <h2 id="detail-title">{loading ? 'Đang tải…' : error ? 'Không mở được bản ghi' : recordLabel(qname, record)}</h2>
+          {record && <div className="faint">{uiText(entityLabel(qname))}</div>}
+          <h2 id="detail-title">{loading ? uiText('Đang tải…') : error ? uiText('Không mở được bản ghi') : uiText(recordLabel(qname, record))}</h2>
           {state && <span className={`badge ${tone(state)}`}>{statusLabel(state)}</span>}
         </div>
-        <button className="btn btn-ghost btn-icon" type="button" aria-label="Đóng" onClick={closeToList}>×</button>
+        <button className="btn btn-ghost btn-icon" type="button" aria-label={uiText('Đóng')} onClick={closeToList}>×</button>
       </header>
       <div className="drawer-body">
-        {loading ? <div className="skeleton" data-h="row" aria-label="Đang tải bản ghi" /> : error
+        {loading ? <div className="skeleton" data-h="row" aria-label={uiText('Đang tải bản ghi')} /> : error
           ? <div className="alert danger" role="alert">{error}</div>
           : <div className="stack">
             <div className="row wrap">
               {actions.map(([action, transition], index) => <button key={action} className={`btn btn-sm${index === 0 && tone(transition.to) !== 'danger' ? ' btn-primary' : ''}`} type="button" disabled={Boolean(working)} onClick={() => runAction(action, transition.to)}>
-                {working === action ? 'Đang xử lý…' : actionLabel(action)}
+                {working === action ? uiText('Đang xử lý…') : actionLabel(action)}
               </button>)}
-              {qname === 'inventory.lot' && can('inventory.lot.read') && can('inventory.stock_move.read') && <a className="btn btn-sm" href={`#/reports/inventory/lots/${encodeURIComponent(id)}/traceability`}>Truy xuất lô</a>}
+              {qname === 'inventory.lot' && can('inventory.lot.read') && can('inventory.stock_move.read') && <a className="btn btn-sm" href={`#/reports/inventory/lots/${encodeURIComponent(id)}/traceability`}>{uiText('Truy xuất lô')}</a>}
               <span className="grow" />
-              {can(`${qname}.update`) && <button className="btn btn-sm" type="button" disabled={Boolean(working)} onClick={edit}>Sửa</button>}
+              {can(`${qname}.update`) && <button className="btn btn-sm" type="button" disabled={Boolean(working)} onClick={edit}>{uiText('Sửa')}</button>}
               {qname === 'accounting.bank_statement' && record?.status === 'draft' && can('accounting.bank_statement_line.create') && <>
-                <input className="input" type="file" accept=".csv,.xml,.camt,text/csv,application/xml,text/xml" aria-label="Tệp sao kê CSV hoặc CAMT.053" disabled={Boolean(working)} onChange={(event) => setStatementFile(event.target.files?.[0] || null)} />
-                <button className="btn btn-sm" type="button" disabled={!statementFile || Boolean(working)} onClick={importStatementFile}>{working === 'import' ? 'Đang nhập…' : `Nhập ${statementFile && /\.(xml|camt)$/i.test(statementFile.name) ? 'CAMT.053' : 'CSV'}`}</button>
+                <input className="input" type="file" accept=".csv,.xml,.camt,text/csv,application/xml,text/xml" aria-label={uiText('Tệp sao kê CSV hoặc CAMT.053')} disabled={Boolean(working)} onChange={(event) => setStatementFile(event.target.files?.[0] || null)} />
+                <button className="btn btn-sm" type="button" disabled={!statementFile || Boolean(working)} onClick={importStatementFile}>{working === 'import' ? uiText('Đang nhập…') : `${uiText('Nhập')} ${statementFile && /\.(xml|camt)$/i.test(statementFile.name) ? 'CAMT.053' : 'CSV'}`}</button>
               </>}
-              {can(`${qname}.delete`) && <button className="btn btn-sm btn-danger" type="button" disabled={Boolean(working)} onClick={remove}>Xóa</button>}
+              {can(`${qname}.delete`) && <button className="btn btn-sm btn-danger" type="button" disabled={Boolean(working)} onClick={remove}>{uiText('Xóa')}</button>}
             </div>
-            <div className="tabs" role="tablist" aria-label="Chi tiết bản ghi">
-              <button className="tab" type="button" role="tab" aria-selected={tab === 'info'} onClick={() => setTab('info')}>Thông tin</button>
-              <button className="tab" type="button" role="tab" aria-selected={tab === 'flow'} onClick={() => setTab('flow')}>Hệ quả liên mô-đun</button>
+            <div className="tabs" role="tablist" aria-label={uiText('Thông tin bản ghi')}>
+              <button className="tab" type="button" role="tab" aria-selected={tab === 'info'} onClick={() => setTab('info')}>{uiText('Thông tin')}</button>
+              <button className="tab" type="button" role="tab" aria-selected={tab === 'flow'} onClick={() => setTab('flow')}>{uiText('Hệ quả liên mô-đun')}</button>
             </div>
             {error && <div className="alert danger" role="alert">{error}</div>}
             {tab === 'info' ? <>
               <dl className="dl">{fields.map((field) => <React.Fragment key={field.name}>
-                <dt>{fieldLabelOf(qname, field.name)}</dt>
+                <dt>{uiText(fieldLabelOf(qname, field.name))}</dt>
                 <dd><FieldValue qname={qname} field={field} value={record[field.name]} refs={refs} definition={definition} record={record} /></dd>
               </React.Fragment>)}
-                <dt>Ngày tạo</dt><dd>{fmtDateTime(record.createdAt)}</dd>
-                <dt>Cập nhật</dt><dd>{fmtDateTime(record.updatedAt)}</dd>
-                <dt>Mã</dt><dd className="mono small">{record.id}</dd>
+                <dt>{uiText('Ngày tạo')}</dt><dd>{fmtDateTime(record.createdAt)}</dd>
+                <dt>{uiText('Cập nhật')}</dt><dd>{fmtDateTime(record.updatedAt)}</dd>
+                <dt>{uiText('Mã')}</dt><dd className="mono small">{record.id}</dd>
               </dl>
             </> : <div className="stack">
-              <p className="muted">Các bước đã chạy từ bản ghi này, gồm cả phản ứng tự động ở những mô-đun khác.</p>
-              {events ? <EventTimeline events={events} currentId={id} /> : <div className="skeleton" data-h="row" aria-label="Đang tải chuỗi sự kiện" />}
+              <p className="muted">{uiText('Các bước đã chạy từ bản ghi này, gồm cả phản ứng tự động ở những mô-đun khác.')}</p>
+              {events ? <EventTimeline events={events} currentId={id} /> : <div className="skeleton" data-h="row" aria-label={uiText('Đang tải chuỗi sự kiện')} />}
             </div>}
           </div>}
       </div>
