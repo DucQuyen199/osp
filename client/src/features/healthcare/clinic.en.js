@@ -1,4 +1,5 @@
 const clinicEnglish = {
+  'Nam': 'Male',
   'Đơn vị thuốc': 'Medicine unit', 'Kết quả': 'Result', 'Thuốc dòng': 'Medicine row', 'Xóa thuốc': 'Remove medicine',
   'đơn vị gốc': 'base unit', 'Liều dùng': 'Dosage', 'Liều dùng / hướng dẫn': 'Dosage / instructions', 'Nhập kết quả xét nghiệm': 'Enter test result', 'Số lượng': 'Quantity',
   'Thuốc dòng 1': 'Medicine row 1', 'Đơn vị thuốc 1': 'Medicine unit 1', 'Xóa thuốc 1': 'Remove medicine 1',
