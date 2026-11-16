@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { confirmDialog, toast } from '../../lib/feedback.js';
 import EntityFormDialog from './EntityFormDialog.jsx';
@@ -242,7 +243,7 @@ export default function EntityListPage({ qname }) {
         </div> : <div className="table-wrap">
           <table className="table">
             <thead><tr>{selectable && <th scope="col"><input className="bulk-select" type="checkbox" aria-label={uiText('Chọn tất cả bản ghi trên trang')} checked={allRowsSelected} disabled={Boolean(bulkAction)} onChange={togglePage} /></th>}{columns.map((field) => <th key={field.name} scope="col" className={['money', 'number'].includes(field.type) ? 'right' : ''}>{uiText(fieldLabelOf(qname, field.name))}</th>)}</tr></thead>
-            <tbody>{rows.map((record) => <tr key={record.id} className="clickable" onClick={() => { location.hash = recordHref(qname, record.id); }}>
+            <tbody>{rows.map((record) => <tr {...selectableTableRowProps} key={record.id} className="clickable" onClick={() => { location.hash = recordHref(qname, record.id); }}>
               {selectable && <td><input className="bulk-select" type="checkbox" aria-label={`${uiText('Chọn')} ${uiText(recordLabel(qname, record))}`} checked={selectedIds.has(record.id)} disabled={Boolean(bulkAction)} onClick={(event) => event.stopPropagation()} onChange={() => toggleRow(record.id)} /></td>}
               {columns.map((field, index) => <td key={field.name} className={['money', 'number'].includes(field.type) ? 'right' : ''}>
                 {index === 0 && field.type !== 'ref'

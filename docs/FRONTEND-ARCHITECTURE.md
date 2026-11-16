@@ -18,7 +18,7 @@ The client is a React 19 application built with Vite. It uses JavaScript and the
 2. Add a lazy import to the screen registry in `app/PageRouter.jsx`; add its URL mapping in `app/parseRoute.js`.
 3. Add navigation only where the feature is enabled and the current user has permission.
 4. Use the shared API/state/date/format helpers rather than recreating tenant or money rules in a screen.
-5. Use semantic headings, labels, accessible names, visible focus, and the existing CSS tokens. Add reusable styles to shared components only when more than one screen needs them.
+5. Use semantic headings, labels, accessible names, visible focus, and the existing CSS tokens. Clickable table rows use `selectableTableRowProps` so Enter and Space activate them without changing table semantics. Add reusable styles to shared components only when more than one screen needs them.
 6. Keep generated `client-dist/` output out of commits. `npm run build` copies the public assets and creates deployable output.
 
 ### Feature-local workflow components

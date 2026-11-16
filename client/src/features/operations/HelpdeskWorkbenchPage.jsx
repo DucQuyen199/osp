@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, statusLabel } from '../../lib/i18n.js';
 import { app, can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
@@ -133,7 +134,7 @@ export default function HelpdeskWorkbenchPage() {
       {['active','resolved','closed','all'].map((value) => <button className="tab" key={value} type="button" role="tab" aria-selected={filter === value} onClick={() => setFilter(value)}>{({active:'Đang xử lý',resolved:'Đã giải quyết',closed:'Đã đóng',all:'Tất cả'})[value]}</button>)}
     </div>
     {loading ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : !visibleTickets.length ? <div className="card card-pad empty">Không có ticket trong bộ lọc này.</div> : <div className="layout-split">
-      <section className="card card-pad"><div className="table-wrap"><table className="table"><thead><tr><th>Ticket</th><th>Ưu tiên</th><th>Trạng thái</th></tr></thead><tbody>{visibleTickets.map((ticket) => <tr key={ticket.id} className={selectedId === ticket.id ? 'selected' : ''} onClick={() => setSelectedId(ticket.id)} style={{ cursor: 'pointer' }}><td><strong>{ticket.subject}</strong><div className="small muted">{partyName(ticket)} · {fmtDateTime(ticket.createdAt)}</div></td><td>{statusLabel(ticket.priority)}</td><td>{statusLabel(ticket.status)}</td></tr>)}</tbody></table></div></section>
+      <section className="card card-pad"><div className="table-wrap"><table className="table"><thead><tr><th>Ticket</th><th>Ưu tiên</th><th>Trạng thái</th></tr></thead><tbody>{visibleTickets.map((ticket) => <tr {...selectableTableRowProps} key={ticket.id} className={selectedId === ticket.id ? 'selected' : ''} onClick={() => setSelectedId(ticket.id)} style={{ cursor: 'pointer' }}><td><strong>{ticket.subject}</strong><div className="small muted">{partyName(ticket)} · {fmtDateTime(ticket.createdAt)}</div></td><td>{statusLabel(ticket.priority)}</td><td>{statusLabel(ticket.status)}</td></tr>)}</tbody></table></div></section>
       {selected && <section className="card card-pad"><div className="row wrap"><div><h2>{selected.subject}</h2><div className="small muted">{partyName(selected)} · {statusLabel(selected.channel)} · {fmtDateTime(selected.createdAt)}</div></div><span className="grow"/><span className="badge warning">{statusLabel(selected.status)}</span></div>
         <div className="row wrap small muted" style={{ marginTop: 8 }}><span>Ưu tiên: {statusLabel(selected.priority)}</span><span>· Phụ trách: {selected.assignee || 'Chưa phân công'}</span><span>· SLA: {policies.get(selected.sla_policy)?.name || 'Chưa gắn'}</span></div>
         {selected.description && <div className="card card-pad" style={{ marginTop: 12 }}><strong>Yêu cầu ban đầu</strong><p className="pre-wrap">{selected.description}</p></div>}

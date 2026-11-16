@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath } from '../../lib/api.js';
 import { statusLabel, fmtDateTime, uiText, uiLocale } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
@@ -123,7 +124,7 @@ export default function EInvoiceWorkbenchPage() {
       {loading ? <div className="skeleton" data-h="row"/> : !visibleRows.length ? <div className="empty">{rows.length ? uiText('Không có yêu cầu phù hợp bộ lọc.') : uiText('Chưa có yêu cầu. Hệ thống tạo yêu cầu sau khi hóa đơn kế toán được ghi sổ.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{uiText("Hóa đơn điện tử")}</th><th>{uiText("Hóa đơn kế toán")}</th><th>{uiText("Provider")}</th><th>{uiText("Trạng thái")}</th><th>{uiText("Lần thử / cập nhật")}</th><th>{uiText("Thao tác")}</th></tr></thead><tbody>{visibleRows.map((row) => {
         const invoice = invoices.get(row.invoice);
         const retryAction = row.operation === 'cancel' ? 'retry_cancellation' : 'retry';
-        return <tr key={row.id} onClick={() => setSelectedId(row.id)} style={{ cursor: 'pointer', background: selectedId === row.id ? 'var(--surface-2)' : undefined }}>
+        return <tr {...selectableTableRowProps} key={row.id} onClick={() => setSelectedId(row.id)} style={{ cursor: 'pointer', background: selectedId === row.id ? 'var(--surface-2)' : undefined }}>
           <td><strong>{row.number || row.serial || `${uiText('Yêu cầu')} ${String(row.id).slice(0, 8)}`}</strong><div className="small muted">{row.lookup_code ? `${uiText('Mã tra cứu')} ${row.lookup_code}` : row.provider_reference || uiText('Chưa có mã từ nhà cung cấp')}</div></td>
           <td>{invoice ? <a href={recordHref('accounting.invoice', invoice.id)} onClick={(event) => event.stopPropagation()}>{invoice.number || String(invoice.id).slice(0, 8)}</a> : <span className="small muted">{row.invoice ? `#${String(row.invoice).slice(0, 8)}` : '—'}</span>}{invoice?.party && <div className="small muted">{uiText('Đối tác')} #{String(invoice.party).slice(0, 8)}</div>}</td>
           <td>{row.provider || uiText('Chưa cấu hình')}{row.serial && <div className="small muted">{uiText('Ký hiệu')} {row.serial}</div>}</td>

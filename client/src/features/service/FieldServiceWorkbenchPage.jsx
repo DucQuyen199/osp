@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDateTime as businessDateTime, localDateTimeToIso } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel } from '../../lib/i18n.js';
@@ -170,7 +171,7 @@ export default function FieldServiceWorkbenchPage() {
 
     <div className="row wrap" style={{ margin: '18px 0 10px' }}><h2>Lệnh công việc</h2><span className="badge warning">{openCount} đang xử lý</span></div>
     {loading ? <div className="skeleton" data-h="row" /> : !orders.length ? <div className="card card-pad empty">Chưa có lệnh công việc.</div> : <div className="layout-split">
-      <section className="card card-pad"><div className="table-wrap"><table className="table"><thead><tr><th>Công việc</th><th>Lịch</th><th>Kỹ thuật viên</th><th>Trạng thái</th></tr></thead><tbody>{orders.map((order) => <tr key={order.id} className={selectedId === order.id ? 'selected' : ''} onClick={() => setSelectedId(order.id)} style={{ cursor: 'pointer' }}><td><strong>{order.title}</strong><div className="small muted">{parties.get(order.party) ? recordLabel('master-data.party', parties.get(order.party)) : 'Khách hàng'}{order.address ? ` · ${order.address}` : ''}</div></td><td>{order.scheduled_at ? fmtDateTime(order.scheduled_at) : 'Chưa xếp lịch'}</td><td>{assignedTechnician(order)}</td><td>{statusLabel(order.status)}</td></tr>)}</tbody></table></div></section>
+      <section className="card card-pad"><div className="table-wrap"><table className="table"><thead><tr><th>Công việc</th><th>Lịch</th><th>Kỹ thuật viên</th><th>Trạng thái</th></tr></thead><tbody>{orders.map((order) => <tr {...selectableTableRowProps} key={order.id} className={selectedId === order.id ? 'selected' : ''} onClick={() => setSelectedId(order.id)} style={{ cursor: 'pointer' }}><td><strong>{order.title}</strong><div className="small muted">{parties.get(order.party) ? recordLabel('master-data.party', parties.get(order.party)) : 'Khách hàng'}{order.address ? ` · ${order.address}` : ''}</div></td><td>{order.scheduled_at ? fmtDateTime(order.scheduled_at) : 'Chưa xếp lịch'}</td><td>{assignedTechnician(order)}</td><td>{statusLabel(order.status)}</td></tr>)}</tbody></table></div></section>
       {selected && <section className="card card-pad"><div className="row wrap"><div><h2>{selected.title}</h2><div className="small muted">{parties.get(selected.party) ? recordLabel('master-data.party', parties.get(selected.party)) : 'Khách hàng'} · {selected.address || 'Chưa có địa chỉ'}</div></div><span className="grow" /><span className="badge warning">{statusLabel(selected.status)}</span></div>
         {selectedTicket && <p className="small muted">Ticket nguồn: {selectedTicket.subject || selectedTicket.id}</p>}
         {selected.status === 'open' && canManage ? <>
