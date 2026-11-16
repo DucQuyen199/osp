@@ -483,6 +483,11 @@ const UI_TEXT_EN = {
   'Lô chưa có phiếu kho.': 'This lot has no inventory transactions.', 'Thời điểm': 'Date and time', 'Kho · vị trí': 'Warehouse · location',
   'Chứng từ nguồn': 'Source document', 'Phiếu kho': 'Inventory transaction', 'Thành tiền': 'Total amount', 'Xuất': 'Issue',
   'Không có chứng từ nguồn': 'No source document', 'Chi tiết': 'Details',
+  'Không tải được tồn theo vị trí.': 'Could not load stock by location.', 'Tồn kho theo vị trí': 'Stock by location',
+  'Số lượng và giá trị được tổng hợp từ phiếu kho theo từng bin.': 'Quantities and values are aggregated from inventory transactions for each bin.',
+  'Tất cả kho': 'All warehouses', 'dòng tồn': 'stock lines', 'Chưa có phiếu kho theo vị trí': 'No inventory transactions have locations yet.',
+  'Chọn bin khi điều chuyển hàng để bắt đầu theo dõi tồn theo vị trí.': 'Assign a bin when transferring goods to start tracking stock by location.',
+  'Mã vị trí': 'Location code', 'Chưa gán vị trí': 'No location assigned',
   'Thực tế (đơn vị gốc)': 'Counted (base unit)', 'Theo sổ (đơn vị gốc)': 'Book (base unit)', 'Chênh lệch (đơn vị gốc)': 'Variance (base unit)',
   'Chênh lệch đã chuyển thành biến động kho theo FIFO/lô và vị trí tương ứng.': 'The variance was posted to inventory using FIFO, lot, and location tracking.',
 };
