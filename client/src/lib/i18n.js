@@ -564,6 +564,13 @@ const UI_TEXT_EN = {
   'Dòng sự kiện': 'Event stream', 'Không tải được dòng sự kiện.': 'Could not load the event stream.',
   'Các thay đổi và phản ứng tự động giữa các mô-đun được ghi trong cùng giao dịch nghiệp vụ.': 'Changes and automatic reactions across modules are recorded in the same business transaction.',
   'Chỉ hiện sự kiện gốc': 'Show root events only', 'Chuỗi sự kiện': 'Event sequence', 'Đang tải sự kiện': 'Loading events',
+  'Hiệu quả chiến dịch': 'Campaign performance', 'Không tải được hiệu quả chiến dịch.': 'Could not load campaign performance.',
+  'Đo lead, chuyển đổi và doanh thu theo mô hình quy nguồn đã chọn.': 'Measure leads, conversions, and revenue using the selected attribution model.',
+  'Mô hình ghi nhận': 'Attribution model', 'Chạm đầu tiên': 'First touch', 'Chạm cuối cùng': 'Last touch', 'Chia đều các lần chạm': 'Linear attribution',
+  'Chiến dịch': 'Campaigns', 'Lead được ghi nhận': 'Attributed leads', 'Đã chuyển đổi': 'Converted', 'Tỷ lệ chuyển đổi': 'Conversion rate',
+  'Chi thực tế': 'Actual spend', 'Doanh thu cơ hội thắng': 'Won opportunity revenue', 'Doanh thu / chi phí': 'Revenue / spend',
+  'Chưa có chiến dịch': 'No campaigns yet', 'Tạo chiến dịch, khởi chạy rồi gắn lead để bắt đầu đo hiệu quả.': 'Create and launch a campaign, then associate leads to measure performance.',
+  'Kênh': 'Channel', 'Ngân sách kế hoạch': 'Planned budget', 'Chuyển đổi': 'Conversions', 'Tỷ lệ': 'Rate', 'Cơ hội thắng': 'Won opportunities', 'Doanh thu gắn nguồn': 'Attributed revenue', 'Doanh thu / chi': 'Revenue / spend',
 };
 
 const storedUiLocale = () => {

@@ -229,6 +229,10 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   await page.goto(`${BASE}/#/m/inventory`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#main h1');
   await axe('inventory module overview tiếng Anh');
+  await page.goto(`${BASE}/#/reports/marketing/campaign-performance`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#main h1');
+  must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Campaign performance', 'campaign performance report is not translated');
+  await axe('marketing campaign report tiếng Anh');
   await page.goto(`${BASE}/#/events`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Event stream', 'event stream title is not translated');
