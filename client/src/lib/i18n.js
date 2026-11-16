@@ -538,6 +538,13 @@ const UI_TEXT_EN = {
   'Lỗi tích hợp': 'Integration failures', 'Hàng đợi tích hợp': 'Integration outbox', 'Mục cài đặt': 'Settings sections',
   'Module chưa được bật': 'Module is not enabled', 'Quản trị viên có thể bật module trong Cài đặt.': 'An administrator can enable this module in Settings.',
   'Trang chủ': 'Home', 'hành động': 'actions', 'Danh mục': 'Catalog',
+  'Đã bật kiểm soát hạn mức ngân sách khi ghi sổ.': 'Budget limit enforcement is enabled for posting.', 'Đã tắt kiểm soát hạn mức ngân sách.': 'Budget limit enforcement is disabled.',
+  'Không cập nhật được chính sách ngân sách.': 'Could not update budget policy.', 'Chỉ quản trị viên mới được đổi chính sách ngân sách.': 'Only administrators can change budget policy.',
+  'Kiểm soát ngân sách của doanh nghiệp': 'Company budget controls', 'Kiểm soát ngân sách': 'Budget controls',
+  'Hãy bật module Ngân sách trước khi cấu hình kiểm soát hạn mức.': 'Enable the Budgets module before configuring limit enforcement.',
+  'Chặn ghi sổ vượt ngân sách': 'Block postings over budget', 'Bắt buộc có ngân sách đã duyệt và còn hạn mức cho chi phí': 'Require an approved budget with remaining expense capacity',
+  'Khi bật, hệ thống kiểm tra phát sinh Nợ ròng trên từng tài khoản chi phí tại bước ghi sổ. Ngân sách tháng và năm cùng áp dụng nếu cả hai có dòng tương ứng; khoản chi chưa được phân bổ hoặc vượt kế hoạch sẽ bị từ chối. Nếu chưa có ngân sách được duyệt cho kỳ, chi phí không thể ghi sổ. Mặc định chính sách này tắt.': 'When enabled, the system checks net debits on each expense account before posting. Monthly and annual budgets both apply when matching lines exist; unallocated expenses or expenses over plan are rejected. Expenses cannot be posted without an approved budget for the period. This policy is off by default.',
+  'Kiểm soát ngân sách đang bật cho toàn doanh nghiệp.': 'Budget enforcement is enabled for the entire company.', 'Kiểm soát ngân sách đang tắt.': 'Budget enforcement is off.',
 };
 
 const storedUiLocale = () => {
