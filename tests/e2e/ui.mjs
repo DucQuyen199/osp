@@ -204,6 +204,18 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Expiring lots', 'màn hình lô cận hạn chưa được dịch');
   await axe('inventory lot expiry workbench tiếng Anh');
+  await step('lot traceability: tiếng Anh và accessibility', async () => {
+    const lotId = await page.evaluate(async () => {
+      const session = JSON.parse(sessionStorage.getItem('osp.session') || localStorage.getItem('osp.session') || '{}');
+      const response = await fetch(`/api/t/${encodeURIComponent(session.tenantId)}/data/inventory/lot?limit=1`, { headers: { authorization: `Bearer ${session.token}` } });
+      return (await response.json()).items?.[0]?.id || '';
+    });
+    if (!lotId) return;
+    await page.goto(`${BASE}/#/reports/inventory/lots/${encodeURIComponent(lotId)}/traceability`, { waitUntil: 'networkidle0' });
+    await page.waitForSelector('#main h1');
+    must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Lot traceability', 'màn hình truy xuất lô chưa được dịch');
+    await axe('lot traceability tiếng Anh');
+  });
   await page.goto(`${BASE}/#/`, { waitUntil: 'networkidle0' });
   await page.click('.menu > button');
   must(await clickText('Vietnamese', 'button'), 'không có lựa chọn tiếng Việt sau khi chuyển ngôn ngữ');
