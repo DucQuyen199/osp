@@ -263,6 +263,12 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Accounts receivable/payable settlement', 'accounting settlement workbench is not translated');
   await axe('accounting settlement workbench tiếng Anh');
+  await page.goto(`${BASE}/#/einvoices`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#main h1');
+  must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'E-invoicing', 'e-invoice workbench is not translated');
+  const einvoiceText = await page.$eval('#main', (main) => main.innerText);
+  must(einvoiceText.includes('Pending issuance') && einvoiceText.includes('Cancellation pending') && einvoiceText.includes('Withdrawn'), 'e-invoice status filters are not translated');
+  await axe('e-invoice workbench tiếng Anh');
   await page.goto(`${BASE}/#/quality`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Nonconformance register', 'quality workbench title is not translated');
