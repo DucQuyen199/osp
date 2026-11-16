@@ -445,6 +445,12 @@ for (const [vertical, hash, label, summaryEntity, setupEntity] of verticalScreen
       must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Employee expenses and reimbursements', 'employee expenses workbench is not translated');
       must((await page.$eval('#main', (main) => main.innerText)).includes('Create expense claim'), 'employee expense workflow is not translated');
       await axe('employee expenses tiếng Anh');
+      await page.goto(`${BASE}/#/assets`, { waitUntil: 'networkidle0' });
+      await page.waitForSelector('#main h1');
+      must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Fixed assets', 'asset workbench is not translated');
+      const assetWorkbenchText = await page.$eval('#main', (main) => main.innerText);
+      must(assetWorkbenchText.includes('Register asset') && assetWorkbenchText.includes('Periodic depreciation'), 'asset registration and depreciation workflow is not translated');
+      await axe('asset workbench tiếng Anh');
       await page.goto(`${BASE}/#/reports/asset/depreciation-schedule`, { waitUntil: 'networkidle0' });
       await page.waitForSelector('#main h1');
       must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Depreciation schedule', 'asset depreciation schedule is not translated');
