@@ -108,9 +108,6 @@
 - Split accounting payment persistence validation behind its existing facade into invoice/bill settlement, refunds, source payments, and default-account checks while retaining Decimal validation and kernel transaction ownership.
 
 ### Added
-- Separated the React mount point from authentication, session, theme, and app-shell lifecycle logic.
-- Reorganized the React application into focused route, page resolver, navigation, search, and icon modules; all business screens now load on demand and the main JavaScript bundle is about 43% smaller.
-- Refreshed the shared workspace shell with a consistent responsive navigation system, denser business workspace, updated cards and controls, and reduced-motion support.
 - Shipment delivery now requires a server-timestamped proof record (recipient or carrier POD reference) and commits that evidence with fulfillment. A delivered carrier tracking event completes the active shipment through the same stock, sales-order, and accounting event chain.
 - Sending a sales quotation now queues a customer email with quoted products, line totals, tax, total including tax, and validity date when the communication module is enabled; the shared sales desk reports the queued state accurately.
 - Added database-independent HTTP and Decimal/domain regression suites. Updated PostgreSQL flows for receipt/QC inventory, POS sessions, production acceptance, subscription renewal, strict HTTP import/bulk actions, and list contracts for all 177 entities across 49 modules and 22 industry packs.
@@ -279,9 +276,6 @@
 - Corrected POS cash-session reconciliation so a fully refunded cash order is excluded from expected cash instead of being subtracted a second time after its status leaves `completed`.
 
 ### Added
-- Separated the React mount point from authentication, session, theme, and app-shell lifecycle logic.
-- Reorganized the React application into focused route, page resolver, navigation, search, and icon modules; all business screens now load on demand and the main JavaScript bundle is about 43% smaller.
-- Refreshed the shared workspace shell with a consistent responsive navigation system, denser business workspace, updated cards and controls, and reduced-motion support.
 - Added a permission-gated WIP reconciliation draft workflow: the server recalculates the WIP/154 variance in a tenant write transaction, validates the selected contra account and accounting period, creates balanced idempotent journal drafts, and leaves posting to the standard accounting review flow.
 - Extended the manufacturing WIP report to compare the net operational balance per production order with posted account 154 at the selected cutoff date, including negative order balances for variance investigation and permission-gated ledger detail.
 - Added a tenant-authorized inventory quality-hold report and React page with warehouse/status filters, remaining held quantity after returns, held value, lot and source-layer traceability, and time in hold.
