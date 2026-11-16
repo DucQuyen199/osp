@@ -4,9 +4,9 @@ import { fmtDateTime, statusLabel, uiText } from '../../lib/i18n.js';
 import { can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
 
 const rows = (response) => Array.isArray(response?.items) ? response.items : [];
-const severityLabels = { minor: uiText('Nhẹ'), major: uiText('Nghiêm trọng'), critical: uiText('Tới hạn') };
 
 export default function QualityWorkbenchPage() {
+  const severityLabels = { minor: uiText('Nhẹ'), major: uiText('Nghiêm trọng'), critical: uiText('Tới hạn') };
   const [records, setRecords] = useState([]);
   const [inspections, setInspections] = useState(new Map());
   const [products, setProducts] = useState(new Map());

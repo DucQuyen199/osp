@@ -11,7 +11,6 @@ const itemsOf = (response) => Array.isArray(response?.items) ? response.items : 
 const fmtTime = (value) => value ? localTime(new Date(value)) : '--';
 const rotationEmployees = (row) => Array.isArray(row?.employees) ? row.employees : row?.employee ? [row.employee] : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
-const weekdayOptions = [[1, uiText('T2')], [2, uiText('T3')], [3, uiText('T4')], [4, uiText('T5')], [5, uiText('T6')], [6, uiText('T7')], [7, uiText('CN')]];
 const MAX_ROTATION_DAYS = 3653;
 const MAX_GENERATED_SCHEDULE_ROWS = 40_000;
 const rotationDayLimit = (employeeCount) => Math.min(MAX_ROTATION_DAYS, Math.floor(MAX_GENERATED_SCHEDULE_ROWS / Math.max(employeeCount, 1)));
@@ -35,6 +34,7 @@ async function listAllRows(entity, filters = {}) {
 }
 
 export default function HrmOperationsPage() {
+  const weekdayOptions = [[1, uiText('T2')], [2, uiText('T3')], [3, uiText('T4')], [4, uiText('T5')], [5, uiText('T6')], [6, uiText('T7')], [7, uiText('CN')]];
   const [employees, setEmployees] = useState([]);
   const [employeeMap, setEmployeeMap] = useState(new Map());
   const [departments, setDepartments] = useState(new Map());
