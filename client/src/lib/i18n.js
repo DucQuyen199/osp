@@ -112,7 +112,7 @@ const CATEGORY = {
 export const CATEGORY_ORDER = ['core', 'sales', 'supply', 'finance', 'people', 'operations', 'platform', 'industry'];
 
 const UI_TEXT_EN = {
-  'Bỏ qua điều hướng': 'Skip navigation', 'Đóng menu': 'Close menu', 'Mở menu': 'Open menu',
+  'Bỏ qua điều hướng': 'Skip navigation', 'Đóng menu': 'Close menu', 'Mở menu': 'Open menu', 'Tài khoản máy': 'Local account',
   'Điều hướng chính': 'Main navigation', 'Trang chủ': 'Home', 'Dòng sự kiện': 'Activity feed',
   'Quy trình & báo cáo': 'Workflows & reports', 'Báo cáo & phân tích': 'Reports & analytics',
   'Phê duyệt': 'Approvals', 'Sổ hợp đồng': 'Contract register', 'Thư viện tài liệu': 'Document library',

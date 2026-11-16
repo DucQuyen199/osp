@@ -189,10 +189,10 @@ export default function App() {
 
   if (!ready) return <div className="landing-panel"><div className="skeleton" data-h="row" /></div>;
   if (!session.current()) return <>
-    {error && <div className="toast toast-danger" role="alert">{error}</div>}
+    {error && <div className="toast toast-danger" role="alert">{uiText(error)}</div>}
     <AuthPage route={route} onSignedIn={signedIn} />
   </>;
-  if (!meta || !user) return <div className="page"><div className="alert danger">Không tải được dữ liệu doanh nghiệp. Vui lòng tải lại trang.</div></div>;
+  if (!meta || !user) return <div className="page"><div className="alert danger">{uiText('Không tải được dữ liệu doanh nghiệp. Vui lòng tải lại trang.')}</div></div>;
 
   const initials = (user.name || '?').split(' ').slice(-2).map((part) => part[0]).join('').toUpperCase();
   return <>
@@ -206,9 +206,9 @@ export default function App() {
         <GlobalSearch meta={meta} onNavigate={() => setNavOpen(false)} />
         <button className="btn btn-ghost btn-icon" type="button" aria-label={uiText(theme === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối')} title={uiText(theme === 'dark' ? 'Giao diện sáng' : 'Giao diện tối')} onClick={toggleTheme}><Icon name={theme === 'dark' ? 'sun' : 'moon'} /></button>
         <div className="menu">
-          <button className="btn btn-ghost" type="button" aria-haspopup="menu" aria-expanded={accountOpen} aria-label={`Tài khoản ${user.name}`} onClick={() => setAccountOpen((open) => !open)}><span className="avatar">{initials}</span></button>
+          <button className="btn btn-ghost" type="button" aria-haspopup="menu" aria-expanded={accountOpen} aria-label={`${uiText('Tài khoản')} ${user.name}`} onClick={() => setAccountOpen((open) => !open)}><span className="avatar">{initials}</span></button>
           {accountOpen && <div className="menu-pop" role="menu">
-            <div className="menu-item" role="none"><div><strong>{user.name}</strong><div className="faint">{user.email || 'Tài khoản máy'}</div></div></div>
+            <div className="menu-item" role="none"><div><strong>{user.name}</strong><div className="faint">{user.email || uiText('Tài khoản máy')}</div></div></div>
             <div className="menu-item" role="none"><strong>{uiText('Ngôn ngữ giao diện')}</strong></div>
             <div role="group" aria-label={uiText('Ngôn ngữ giao diện')}>
               <button className="menu-item" role="menuitemradio" aria-checked={interfaceLanguage === 'vi-VN'} type="button" onClick={() => changeInterfaceLanguage('vi-VN')}>{uiText('Tiếng Việt')}</button>
@@ -229,7 +229,7 @@ export default function App() {
       <PageRouter route={route} meta={meta} summary={app.summary} />
       </main>
     </div>
-    {navOpen && <button className="scrim" type="button" aria-label="Đóng menu" onClick={() => { setNavOpen(false); navToggleRef.current?.focus(); }} />}
+    {navOpen && <button className="scrim" type="button" aria-label={uiText('Đóng menu')} onClick={() => { setNavOpen(false); navToggleRef.current?.focus(); }} />}
   </>;
 }
 
