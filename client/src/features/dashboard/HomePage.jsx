@@ -33,7 +33,7 @@ export default function HomePage({ summary }) {
   const firstName = (app.user?.name || '').split(' ').slice(-1)[0];
 
   useEffect(() => {
-    document.title = 'Trang chủ · OSP Suite';
+    document.title = uiText('Trang chủ · OSP Suite');
     let active = true;
     fetchEvents(60).then((items) => { if (active) setEvents(items); }).catch(() => { if (active) setEvents([]); });
     if (isAdmin()) api(tenantPath('/alerts')).then((result) => {

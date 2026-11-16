@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const featureRoot = path.join(root, 'client', 'src', 'features');
+const sourceRoot = path.join(root, 'client', 'src');
 const globalDictionaryPath = path.join(root, 'client', 'src', 'lib', 'ui.en.js');
 
 function walk(directory) {
@@ -49,9 +49,26 @@ const globalSource = fs.readFileSync(globalDictionaryPath, 'utf8');
 const globalKeys = dictionaryKeys(globalSource);
 const missing = new Map();
 
-for (const file of walk(featureRoot).filter((candidate) => candidate.endsWith('.jsx'))) {
+for (const file of walk(sourceRoot).filter((candidate) => candidate.endsWith('.jsx'))) {
   const source = fs.readFileSync(file, 'utf8');
   for (const key of callStrings(source, 'uiText')) addMissing(missing, file, key, [globalKeys]);
+
+  const relative = path.relative(root, file).replaceAll(path.sep, '/');
+  const hasVietnamese = (value) => /[À-ỹĐđ]/u.test(value);
+  for (const match of source.matchAll(/\b(?:placeholder|aria-label|title|alt)\s*=\s*(['"])((?:\\.|(?!\1)[\s\S])*)\1/g)) {
+    if (hasVietnamese(decodeString(match[2]))) {
+      const entries = missing.get(relative) || new Set();
+      entries.add(`Untranslated literal attribute: ${decodeString(match[2])}`);
+      missing.set(relative, entries);
+    }
+  }
+  for (const match of source.matchAll(/document\.title\s*=\s*(['"])((?:\\.|(?!\1)[\s\S])*)\1/g)) {
+    if (hasVietnamese(decodeString(match[2]))) {
+      const entries = missing.get(relative) || new Set();
+      entries.add(`Untranslated document title: ${decodeString(match[2])}`);
+      missing.set(relative, entries);
+    }
+  }
 
   const imports = [...source.matchAll(/import\s+(\w+)\s+from\s+['"](\.\/[^'"]+\.en\.js)['"]/g)];
   for (const [, name, relativePath] of imports) {

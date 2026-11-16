@@ -173,7 +173,7 @@ export default function EntityFormDialog({ qname, record, onClose, onSaved }) {
       </select>
       <div className="hint"><a href={listHref(field.ref)}>Quản lý {entityLabel(field.ref).toLowerCase()}</a></div>
     </>;
-    if (field.type === 'json') return <textarea {...common} className="textarea mono" value={fieldValue(field)} placeholder="[] hoặc {}" spellCheck="false" onChange={(event) => setValue(field.name, event.target.value)} />;
+    if (field.type === 'json') return <textarea {...common} className="textarea mono" value={fieldValue(field)} placeholder={uiText('[] hoặc {}')} spellCheck="false" onChange={(event) => setValue(field.name, event.target.value)} />;
     if (field.type === 'text') return <textarea {...common} className="textarea" value={values[field.name] ?? ''} onChange={(event) => setValue(field.name, event.target.value)} />;
     const types = { date: 'date', datetime: 'datetime-local', number: 'number', money: 'number' };
     return <input {...common} className={['number', 'money'].includes(field.type) ? 'input num' : 'input'}
