@@ -323,6 +323,7 @@ pub async fn handle_source_stock_event(
     } else {
         None
     };
+    let mut refunded_lot_quantities = std::collections::HashMap::<(Uuid, Uuid), Decimal>::new();
     for mut line in lines {
         if let Some(base_qty) = line.get("base_qty").cloned() {
             line["qty"] = base_qty;
@@ -461,6 +462,125 @@ pub async fn handle_source_stock_event(
                     .collect::<R<Vec<_>>>()?
             } else {
                 vec![line]
+            }
+        } else if line_direction == "in" && source == "pos_order_refund" {
+            let product_id = Uuid::parse_str(&product).map_err(|_| {
+                crate::error::ApiError::validation(
+                    event_type,
+                    vec!["POS refund line requires a valid product id".into()],
+                )
+            })?;
+            let lot_tracked = tx
+                .query_opt(
+                    "SELECT COALESCE(lot_tracked, false) FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                    &[&tenant.id, &product_id],
+                )
+                .await?
+                .is_some_and(|row| row.get::<_, bool>(0));
+            if !lot_tracked {
+                vec![line]
+            } else {
+                let order_id = movement_source_id.as_str().ok_or_else(|| {
+                    crate::error::ApiError::validation(
+                        event_type,
+                        vec!["Full POS refund requires its original order id".into()],
+                    )
+                })?;
+                let Some(mut remaining) = line
+                    .get("qty")
+                    .and_then(money::decimal)
+                    .filter(|qty| *qty > Decimal::ZERO)
+                else {
+                    return Err(crate::error::ApiError::validation(
+                        event_type,
+                        vec!["Full POS refund requires a positive base quantity".into()],
+                    ));
+                };
+                let sold_lots = tx
+                    .query(
+                        "SELECT lot::text, SUM(qty::numeric)::text FROM inventory__stock_move WHERE tenant_id = $1 AND source = 'pos_order' AND source_id = $2 AND product = $3 AND direction = 'out' GROUP BY lot ORDER BY lot NULLS LAST",
+                        &[&tenant.id, &order_id, &product_id],
+                    )
+                    .await?;
+                let mut restored = Vec::new();
+                for row in sold_lots {
+                    let lot = row
+                        .get::<_, Option<String>>(0)
+                        .and_then(|value| Uuid::parse_str(&value).ok())
+                        .ok_or_else(|| {
+                            crate::error::ApiError::validation(
+                                event_type,
+                                vec!["Lot-tracked POS refund has a sale line without a valid original lot".into()],
+                            )
+                        })?;
+                    let sold = row
+                        .get::<_, String>(1)
+                        .parse::<Decimal>()
+                        .unwrap_or_default();
+                    let key = (product_id, lot);
+                    let already_restored = refunded_lot_quantities
+                        .get(&key)
+                        .copied()
+                        .unwrap_or_default();
+                    let available = sold.checked_sub(already_restored).ok_or_else(|| {
+                        crate::error::ApiError::validation(
+                            event_type,
+                            vec![
+                                "Refunded quantity by lot exceeds its original sale quantity"
+                                    .into(),
+                            ],
+                        )
+                    })?;
+                    if available < Decimal::ZERO {
+                        return Err(crate::error::ApiError::validation(
+                            event_type,
+                            vec![
+                                "Refunded quantity by lot exceeds its original sale quantity"
+                                    .into(),
+                            ],
+                        ));
+                    }
+                    let allocated = remaining.min(available);
+                    if allocated <= Decimal::ZERO {
+                        continue;
+                    }
+                    let updated = already_restored.checked_add(allocated).ok_or_else(|| {
+                        crate::error::ApiError::validation(
+                            event_type,
+                            vec!["POS refund lot quantity exceeds the supported range".into()],
+                        )
+                    })?;
+                    refunded_lot_quantities.insert(key, updated);
+                    remaining = remaining.checked_sub(allocated).ok_or_else(|| {
+                        crate::error::ApiError::validation(
+                            event_type,
+                            vec!["POS refund lot allocation exceeds the supported range".into()],
+                        )
+                    })?;
+                    let mut allocation = line.clone();
+                    let quantity = money::json_number(allocated).ok_or_else(|| {
+                        crate::error::ApiError::validation(
+                            event_type,
+                            vec!["POS refund lot quantity cannot be serialized".into()],
+                        )
+                    })?;
+                    allocation["qty"] = quantity.clone();
+                    allocation["base_qty"] = quantity;
+                    allocation["lot"] = json!(lot);
+                    restored.push(allocation);
+                    if remaining == Decimal::ZERO {
+                        break;
+                    }
+                }
+                if remaining > Decimal::ZERO {
+                    return Err(crate::error::ApiError::validation(
+                        event_type,
+                        vec![
+                            "Full POS refund quantity exceeds the original lot-tracked sale".into(),
+                        ],
+                    ));
+                }
+                restored
             }
         } else if line_direction == "out" && source != "quality_return" {
             if let Some(warehouse_id) = warehouse

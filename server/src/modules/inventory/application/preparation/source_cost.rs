@@ -149,10 +149,14 @@ pub(super) async fn resolve_unit_cost(
             }
             "pos_order_refund" => {
                 if let Some(source_id) = source_id {
+                    let lot_id = document
+                        .get("lot")
+                        .and_then(Value::as_str)
+                        .and_then(|value| Uuid::parse_str(value).ok());
                     if let Some(row) = tx
                         .query_opt(
-                            "SELECT (SUM(sm.total_cost::numeric) / NULLIF(SUM(sm.qty::numeric), 0))::text FROM inventory__stock_move sm LEFT JOIN pos__pos_return pr ON pr.tenant_id = sm.tenant_id AND pr.id::text = $2 WHERE sm.tenant_id = $1 AND sm.source = 'pos_order' AND sm.source_id = COALESCE(pr.pos_order::text, $2) AND sm.product = $3 AND sm.direction = 'out'",
-                            &[&tenant.id, &source_id.to_string(), &product_id],
+                            "SELECT (SUM(sm.total_cost::numeric) / NULLIF(SUM(sm.qty::numeric), 0))::text FROM inventory__stock_move sm LEFT JOIN pos__pos_return pr ON pr.tenant_id = sm.tenant_id AND pr.id::text = $2 WHERE sm.tenant_id = $1 AND sm.source = 'pos_order' AND sm.source_id = COALESCE(pr.pos_order::text, $2) AND sm.product = $3 AND sm.direction = 'out' AND sm.lot IS NOT DISTINCT FROM $4",
+                            &[&tenant.id, &source_id.to_string(), &product_id, &lot_id],
                         )
                         .await?
                     {
