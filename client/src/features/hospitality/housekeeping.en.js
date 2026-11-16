@@ -27,6 +27,14 @@ const housekeepingEnglish = {
   'Đang cập nhật…': 'Updating…',
   'Đánh dấu sẵn sàng': 'Mark ready',
   'Không có phòng chờ dọn. Kiểm tra danh sách đặt phòng trong ngày trước khi nhận khách.': 'No rooms are awaiting cleaning. Check today’s reservations before checking guests in.',
+  '\u0110ang b\u1ea3o tr\u00ec:': 'Under maintenance:',
+  'B\u1ea3o tr\u00ec': 'Maintenance',
+  'L\u00fd do b\u1ea3o tr\u00ec': 'Maintenance reason',
+  'Ghi nh\u1eadn h\u01b0 h\u1ecfng / c\u1ea7n b\u1ea3o tr\u00ec': 'Record damage or maintenance',
+  'M\u00f4 t\u1ea3 v\u1ea5n \u0111\u1ec1 c\u1ea7n x\u1eed l\u00fd': 'Describe the issue to resolve',
+  '\u0110\u01b0a v\u00e0o b\u1ea3o tr\u00ec': 'Place under maintenance',
+  'Ch\u1ec9 \u0111\u00e1nh d\u1ea5u s\u1eb5n s\u00e0ng sau khi s\u1eeda ch\u1eefa v\u00e0 ki\u1ec3m tra': 'Mark ready after repair and inspection',
+  'Kh\u00f4ng th\u1ec3 chuy\u1ec3n ph\u00f2ng sang b\u1ea3o tr\u00ec.': 'Could not place the room under maintenance.',
 };
 
 export default housekeepingEnglish;

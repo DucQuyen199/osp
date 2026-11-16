@@ -67,7 +67,7 @@ export default function HotelFrontDeskPage() {
   const selectedInvoice = invoices.find((item) => item.source === 'reservation' && item.source_id === selectedId);
   const visible = reservations.filter((item) => filter === 'all' || item.status === filter || (filter === 'arrivals' && item.check_in === today() && item.status === 'booked') || (filter === 'departures' && item.check_out === today() && item.status === 'checked_in'));
   const assignmentRoomType = selected?.room_type || roomType;
-  const typeRooms = [...rooms.values()].filter((room) => room.room_type === assignmentRoomType);
+  const typeRooms = [...rooms.values()].filter((room) => room.room_type === assignmentRoomType && room.status !== 'maintenance');
   const overlappingStays = selected?.check_in && selected?.check_out
     ? reservations.filter((reservation) => reservation.id !== selected.id
       && activeStay(reservation)

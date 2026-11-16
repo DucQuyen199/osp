@@ -50,6 +50,78 @@ pub async fn validate_persistence(
     action: &str,
     document: &Value,
 ) -> R<Vec<String>> {
+    if entity == "room" && action == "maintenance" {
+        let Some(room_id) = document
+            .get("id")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+        else {
+            return Ok(vec!["Room maintenance requires a valid room id".into()]);
+        };
+        let Some(room_type) = tx
+            .query_opt(
+                "SELECT room_type FROM hotel__room WHERE tenant_id = $1 AND id = $2",
+                &[&tenant.id, &room_id],
+            )
+            .await?
+            .map(|row| row.get::<_, Uuid>(0))
+        else {
+            return Ok(vec!["Room was not found in this tenant".into()]);
+        };
+        tx.query_opt(
+            "SELECT id FROM hotel__room_type WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+            &[&tenant.id, &room_type],
+        )
+        .await?;
+        let Some(room) = tx
+            .query_opt(
+                "SELECT status FROM hotel__room WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                &[&tenant.id, &room_id],
+            )
+            .await?
+        else {
+            return Ok(vec!["Room was not found in this tenant".into()]);
+        };
+        if room.get::<_, String>(0) != "cleaning" {
+            return Ok(vec![
+                "Only a room awaiting cleaning can be placed into maintenance".into(),
+            ]);
+        }
+        if tx
+            .query_opt(
+                "SELECT id FROM hotel__reservation WHERE tenant_id = $1 AND room = $2 AND status IN ('booked', 'checked_in') LIMIT 1",
+                &[&tenant.id, &room_id],
+            )
+            .await?
+            .is_some()
+        {
+            return Ok(vec!["Reassign active reservations before taking this room out of service".into()]);
+        }
+        let would_overbook: bool = tx
+            .query_one_row(
+                "WITH active AS ( \
+                   SELECT reservation.check_in, reservation.check_out \
+                   FROM hotel__reservation reservation \
+                   LEFT JOIN hotel__room assigned ON assigned.tenant_id = reservation.tenant_id AND assigned.id = reservation.room \
+                   WHERE reservation.tenant_id = $1 AND COALESCE(assigned.room_type, reservation.room_type) = $2 \
+                     AND reservation.status IN ('booked', 'checked_in') \
+                 ), capacity AS ( \
+                   SELECT COUNT(*)::bigint AS rooms FROM hotel__room \
+                   WHERE tenant_id = $1 AND room_type = $2 AND id <> $3 AND status <> 'maintenance' \
+                 ) \
+                 SELECT EXISTS ( \
+                   SELECT 1 FROM (SELECT DISTINCT check_in AS day FROM active) dates CROSS JOIN capacity \
+                   WHERE (SELECT COUNT(*) FROM active WHERE check_in <= dates.day AND check_out > dates.day) > capacity.rooms \
+                 )",
+                &[&tenant.id, &room_type, &room_id],
+            )
+            .await?
+            .get(0);
+        if would_overbook {
+            return Ok(vec!["Reassign reservations or resolve the room-type capacity conflict before maintenance".into()]);
+        }
+        return Ok(Vec::new());
+    }
     if entity == "room" && matches!(action, "occupied" | "cleaning" | "ready") {
         let Some(room_id) = document
             .get("id")
@@ -277,7 +349,7 @@ pub async fn validate_persistence(
         let room_type = if let Some(room_id) = assigned_room {
             let Some(row) = tx
                 .query_opt(
-                    "SELECT room_type FROM hotel__room WHERE tenant_id = $1 AND id = $2",
+                    "SELECT room_type, status FROM hotel__room WHERE tenant_id = $1 AND id = $2",
                     &[&tenant.id, &room_id],
                 )
                 .await?
@@ -285,6 +357,12 @@ pub async fn validate_persistence(
                 return Ok(vec!["Assigned room was not found in this tenant".into()]);
             };
             let actual_type: Uuid = row.get(0);
+            let room_status: String = row.get(1);
+            if room_status == "maintenance" {
+                return Ok(vec![
+                    "A room under maintenance cannot be assigned to a reservation".into(),
+                ]);
+            }
             if document
                 .get("room_type")
                 .and_then(Value::as_str)
@@ -333,7 +411,7 @@ pub async fn validate_persistence(
         }
         let room_count: i64 = tx
             .query_one_row(
-                "SELECT COUNT(*)::bigint FROM hotel__room WHERE tenant_id = $1 AND room_type = $2",
+                "SELECT COUNT(*)::bigint FROM hotel__room WHERE tenant_id = $1 AND room_type = $2 AND status <> 'maintenance'",
                 &[&tenant.id, &room_type],
             )
             .await?
@@ -357,13 +435,18 @@ pub async fn validate_persistence(
         }
         if let Some(room_id) = assigned_room {
             let locked_room = tx.query_opt(
-                "SELECT id FROM hotel__room WHERE tenant_id = $1 AND id = $2 AND room_type = $3 FOR UPDATE",
+                "SELECT status FROM hotel__room WHERE tenant_id = $1 AND id = $2 AND room_type = $3 FOR UPDATE",
                 &[&tenant.id, &room_id, &room_type],
             )
             .await?;
-            if locked_room.is_none() {
+            let Some(locked_room) = locked_room else {
                 return Ok(vec![
                     "Assigned room no longer matches the selected room type".into(),
+                ]);
+            };
+            if locked_room.get::<_, String>(0) == "maintenance" {
+                return Ok(vec![
+                    "A room under maintenance cannot be assigned to a reservation".into(),
                 ]);
             }
             if tx

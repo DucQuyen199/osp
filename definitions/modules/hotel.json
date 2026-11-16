@@ -61,8 +61,15 @@
      "options": [
       "vacant",
       "occupied",
-      "cleaning"
+      "cleaning",
+      "maintenance"
      ]
+    },
+    {
+     "name": "maintenance_reason",
+     "label": "Lý do bảo trì",
+     "type": "text",
+     "required": false
     }
    ],
    "states": {
@@ -83,9 +90,16 @@
      },
      "ready": {
       "from": [
-       "cleaning"
+       "cleaning",
+       "maintenance"
       ],
       "to": "vacant"
+     },
+     "maintenance": {
+      "from": [
+       "cleaning"
+      ],
+      "to": "maintenance"
      }
     }
    },

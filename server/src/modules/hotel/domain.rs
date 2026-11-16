@@ -144,6 +144,14 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
     if entity == "room" && patch.get("room_type").is_some() {
         return vec!["A room cannot change room type after it is created".into()];
     }
+    if entity == "room" && patch.get("status").is_some() {
+        return vec!["Room status can only change through a valid room action".into()];
+    }
+    if entity == "room" && patch.get("maintenance_reason").is_some() {
+        return vec![
+            "Maintenance reason can only be recorded through the maintenance action".into(),
+        ];
+    }
     if entity == "folio_charge" && patch.as_object().is_some_and(|fields| !fields.is_empty()) {
         return vec!["Folio charges are immutable financial audit history".into()];
     }
@@ -161,6 +169,21 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
 }
 
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
+    if entity == "room" && action == "maintenance" {
+        let reason = document
+            .get("maintenance_reason")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .unwrap_or_default();
+        if reason.is_empty() {
+            return vec![
+                "Record a maintenance reason before taking the room out of service".into(),
+            ];
+        }
+        if reason.chars().count() > 500 {
+            return vec!["Maintenance reason cannot exceed 500 characters".into()];
+        }
+    }
     if entity == "reservation" && action == "no_show" {
         let reason = document
             .get("no_show_reason")

@@ -23,6 +23,7 @@ impl Kernel {
             .query_json(
                 "SELECT jsonb_build_object( \
                    'id', room.id, 'number', room.number, 'floor', room.floor, \
+                   'status', room.status, 'maintenanceReason', room.maintenance_reason, \
                    'roomTypeId', room_type.id, 'roomType', room_type.name, \
                    'dirtySince', room.updated_at, 'lastCheckout', previous.check_out, \
                    'nextArrival', next.check_in, \
@@ -35,8 +36,8 @@ impl Kernel {
                  LEFT JOIN LATERAL (SELECT reservation.check_in FROM hotel__reservation reservation \
                    WHERE reservation.tenant_id = room.tenant_id AND reservation.room = room.id AND reservation.status = 'booked' AND reservation.check_in >= $2::date \
                    ORDER BY reservation.check_in, reservation.created_at, reservation.id LIMIT 1) next ON true \
-                 WHERE room.tenant_id = $1 AND room.status = 'cleaning' \
-                 ORDER BY (next.check_in = $2::date) DESC NULLS LAST, next.check_in NULLS LAST, room.floor, room.number, room.id \
+                 WHERE room.tenant_id = $1 AND room.status IN ('cleaning', 'maintenance') \
+                 ORDER BY (room.status = 'maintenance') DESC, (next.check_in = $2::date) DESC NULLS LAST, next.check_in NULLS LAST, room.floor, room.number, room.id \
                  LIMIT 500",
                 &[&tenant.id, &tenant.business_today()],
             )
@@ -51,7 +52,8 @@ impl Kernel {
                        AND reservation.status = 'booked' AND reservation.check_in = $2::date \
                    )), \
                    COUNT(*) FILTER (WHERE room.status = 'vacant'), \
-                   COUNT(*) FILTER (WHERE room.status = 'occupied') \
+                   COUNT(*) FILTER (WHERE room.status = 'occupied'), \
+                   COUNT(*) FILTER (WHERE room.status = 'maintenance') \
                  FROM hotel__room room WHERE room.tenant_id = $1",
                 &[&tenant.id, &tenant.business_today()],
             )
@@ -60,6 +62,7 @@ impl Kernel {
         let due_today: i64 = counts.get(1);
         let ready_count: i64 = counts.get(2);
         let occupied_count: i64 = counts.get(3);
+        let maintenance_count: i64 = counts.get(4);
         let truncated = items.len() == 500;
         Ok(json!({
             "items": items,
@@ -67,6 +70,7 @@ impl Kernel {
             "dueToday": due_today,
             "readyCount": ready_count,
             "occupiedCount": occupied_count,
+            "maintenanceCount": maintenance_count,
             "truncated": truncated
         }))
     }

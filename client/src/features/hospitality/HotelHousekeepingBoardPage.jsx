@@ -9,11 +9,12 @@ const t = (text) => uiTextWith(text, housekeepingEnglish);
 
 export default function HotelHousekeepingBoardPage() {
   const [items, setItems] = useState([]);
-  const [totals, setTotals] = useState({ cleaningCount: 0, dueToday: 0, readyCount: 0, occupiedCount: 0 });
+  const [totals, setTotals] = useState({ cleaningCount: 0, dueToday: 0, readyCount: 0, occupiedCount: 0, maintenanceCount: 0 });
   const [truncated, setTruncated] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState('');
+  const [maintenanceReasons, setMaintenanceReasons] = useState({});
   const [lastUpdated, setLastUpdated] = useState(null);
 
   const load = useCallback(async (quiet = false) => {
@@ -26,6 +27,7 @@ export default function HotelHousekeepingBoardPage() {
         dueToday: result.dueToday || 0,
         readyCount: result.readyCount || 0,
         occupiedCount: result.occupiedCount || 0,
+        maintenanceCount: result.maintenanceCount || 0,
       });
       setTruncated(Boolean(result.truncated));
       setLastUpdated(new Date().toISOString());
@@ -43,14 +45,17 @@ export default function HotelHousekeepingBoardPage() {
     return () => window.clearInterval(timer);
   }, [load]);
 
-  const markReady = async (room) => {
+  const roomAction = async (room, action) => {
+    const maintenanceReason = maintenanceReasons[room.id]?.trim() || '';
+    if (action === 'maintenance' && !maintenanceReason) return;
     setBusy(room.id);
     setError('');
     try {
-      await api(dataPath('hotel.room', room.id, 'ready'), { method: 'POST' });
+      await api(dataPath('hotel.room', room.id, action), { method: 'POST', body: action === 'maintenance' ? { maintenance_reason: maintenanceReason } : undefined });
+      if (action === 'maintenance') setMaintenanceReasons((current) => ({ ...current, [room.id]: '' }));
       await load(true);
     } catch (reason) {
-      setError(t(reason.message || 'Không thể chuyển phòng sang trạng thái sẵn sàng.'));
+      setError(t(reason.message || (action === 'maintenance' ? 'Không thể chuyển phòng sang bảo trì.' : 'Không thể chuyển phòng sang trạng thái sẵn sàng.')));
       await load(true);
     } finally {
       setBusy('');
@@ -62,6 +67,7 @@ export default function HotelHousekeepingBoardPage() {
     <div className="row wrap housekeeping-summary">
       <span className="badge warning">{t('Chờ dọn:')} {totals.cleaningCount}</span>
       <span className="badge danger">{t('Khách đến hôm nay:')} {totals.dueToday}</span>
+      <span className="badge danger">{t('\u0110ang b\u1ea3o tr\u00ec:')} {totals.maintenanceCount}</span>
       <span className="badge success">{t('Sẵn sàng:')} {totals.readyCount}</span>
       <span className="badge plain">{t('Đang có khách:')} {totals.occupiedCount}</span>
       {lastUpdated && <span className="small muted">{t('Cập nhật lúc')} {fmtDateTime(lastUpdated)}</span>}
@@ -72,13 +78,14 @@ export default function HotelHousekeepingBoardPage() {
       {items.map((room) => <article className={`card housekeeping-card${room.priority === 'today' ? ' due-today' : ''}`} key={room.id}>
         <header className="card-head">
           <div><a href={recordHref('hotel.room', room.id)}><strong>{t('Phòng')} {room.number}</strong></a><div className="small muted">{room.roomType || t('Chưa rõ loại phòng')}{room.floor ? ` · ${t('Tầng')} ${room.floor}` : ''}</div></div>
-          {room.priority === 'today' && <span className="badge danger">{t('Ưu tiên hôm nay')}</span>}
+          {room.status === 'maintenance' ? <span className="badge danger">{t('B\u1ea3o tr\u00ec')}</span> : room.priority === 'today' && <span className="badge danger">{t('\u01afu ti\u00ean h\u00f4m nay')}</span>}
         </header>
         <div className="housekeeping-detail">
-          <div><span className="small muted">{t('Trả phòng gần nhất')}</span><strong>{room.lastCheckout ? fmtDate(room.lastCheckout) : t('Chưa có lịch sử trả phòng')}</strong><span className="small muted">{room.dirtySince ? `${t('Chờ dọn')} ${fmtAgo(room.dirtySince)}` : ''}</span></div>
+          <div><span className="small muted">{room.status === 'maintenance' ? t('L\u00fd do b\u1ea3o tr\u00ec') : t('Tr\u1ea3 ph\u00f2ng g\u1ea7n nh\u1ea5t')}</span><strong>{room.status === 'maintenance' ? room.maintenanceReason : room.lastCheckout ? fmtDate(room.lastCheckout) : t('Ch\u01b0a c\u00f3 l\u1ecbch s\u1eed tr\u1ea3 ph\u00f2ng')}</strong><span className="small muted">{room.dirtySince && room.status === 'cleaning' ? `${t('Ch\u1edd d\u1ecdn')} ${fmtAgo(room.dirtySince)}` : ''}</span></div>
           <div><span className="small muted">{t('Lượt đến tiếp theo')}</span><strong>{room.nextArrival ? fmtDate(room.nextArrival) : t('Chưa xếp khách vào phòng này')}</strong><span className="small muted">{room.priority === 'today' ? t('Khách đến hôm nay') : t('Kiểm tra lịch nhận phòng')}</span></div>
         </div>
-        {can('hotel.room.ready') && <footer className="row housekeeping-footer"><span className="small muted">{t('Xác nhận sau khi đã dọn và kiểm tra')}</span><span className="grow" /><button className="btn btn-primary" type="button" disabled={Boolean(busy)} onClick={() => markReady(room)}>{busy === room.id ? t('Đang cập nhật…') : t('Đánh dấu sẵn sàng')}</button></footer>}
+        {room.status === 'cleaning' && can('hotel.room.maintenance') && <div className="row wrap housekeeping-footer"><label className="field"><span className="label">{t('Ghi nh\u1eadn h\u01b0 h\u1ecfng / c\u1ea7n b\u1ea3o tr\u00ec')}</span><input className="input" maxLength="500" value={maintenanceReasons[room.id] || ''} onChange={(event) => setMaintenanceReasons((current) => ({ ...current, [room.id]: event.target.value }))} placeholder={t('M\u00f4 t\u1ea3 v\u1ea5n \u0111\u1ec1 c\u1ea7n x\u1eed l\u00fd')} /></label><button className="btn btn-secondary" type="button" disabled={Boolean(busy) || !maintenanceReasons[room.id]?.trim()} onClick={() => roomAction(room, 'maintenance')}>{t('\u0110\u01b0a v\u00e0o b\u1ea3o tr\u00ec')}</button></div>}
+        {can('hotel.room.ready') && <footer className="row housekeeping-footer"><span className="small muted">{room.status === 'maintenance' ? t('Ch\u1ec9 \u0111\u00e1nh d\u1ea5u s\u1eb5n s\u00e0ng sau khi s\u1eeda ch\u1eefa v\u00e0 ki\u1ec3m tra') : t('X\u00e1c nh\u1eadn sau khi \u0111\u00e3 d\u1ecdn v\u00e0 ki\u1ec3m tra')}</span><span className="grow" /><button className="btn btn-primary" type="button" disabled={Boolean(busy)} onClick={() => roomAction(room, 'ready')}>{busy === room.id ? t('\u0110ang c\u1eadp nh\u1eadt\u2026') : t('\u0110\u00e1nh d\u1ea5u s\u1eb5n s\u00e0ng')}</button></footer>}
       </article>)}
     </div> : <div className="empty housekeeping-empty">{t('Không có phòng chờ dọn. Kiểm tra danh sách đặt phòng trong ngày trước khi nhận khách.')}</div>}
   </div>;
