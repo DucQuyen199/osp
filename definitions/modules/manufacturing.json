@@ -233,6 +233,8 @@
     },
     {
      "name": "capacity_per_day",
+      "label": "Công suất theo đơn vị gốc mỗi ngày",
+      "description": "Sản lượng tối đa/ngày theo đơn vị gốc của thành phẩm. Các lệnh cùng trung tâm và ngày phải dùng chung đơn vị cơ sở để cộng công suất.",
      "type": "number",
      "required": false
     }

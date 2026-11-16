@@ -4,6 +4,7 @@
 
 ## [Unreleased]
 ### Added
+- Manufacturing work-center capacity now compares orders only when their finished products share the same base unit, and labels the daily limit in base units to prevent invalid mixed-unit scheduling.
 - Separated the React mount point from authentication, session, theme, and app-shell lifecycle logic.
 - Reorganized the React application into focused route, page resolver, navigation, search, and icon modules; all business screens now load on demand and the main JavaScript bundle is about 43% smaller.
 - Refreshed the shared workspace shell with a consistent responsive navigation system, denser business workspace, updated cards and controls, and reduced-motion support.

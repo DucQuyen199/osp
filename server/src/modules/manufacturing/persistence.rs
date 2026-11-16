@@ -88,7 +88,32 @@ async fn validate_work_center_schedule(
             .filter(|quantity| *quantity > Decimal::ZERO)
             .unwrap_or_default();
         if let Some(capacity) = capacity {
+            let Some(product_id) = id(document, "product") else {
+                return Ok(vec![
+                    "A valid finished product is required for work-center capacity planning".into(),
+                ]);
+            };
+            let Some(product) = tx
+                .query_opt(
+                    "SELECT uom FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                    &[&tenant.id, &product_id],
+                )
+                .await?
+            else {
+                return Ok(vec!["Finished product does not belong to this tenant".into()]);
+            };
+            let product_uom: Option<Uuid> = product.get(0);
             let order_id = id(document, "id");
+            if tx
+                .query_opt(
+                    "SELECT 1 FROM manufacturing__production_order scheduled JOIN master_data__product scheduled_product ON scheduled_product.tenant_id = scheduled.tenant_id AND scheduled_product.id = scheduled.product WHERE scheduled.tenant_id = $1 AND scheduled.work_center = $2 AND scheduled.planned_start = $3 AND scheduled.status IN ('planned', 'in_progress') AND ($4::uuid IS NULL OR scheduled.id <> $4) AND scheduled_product.uom IS DISTINCT FROM $5 LIMIT 1",
+                    &[&tenant.id, &center_id, &planned_start, &order_id, &product_uom],
+                )
+                .await?
+                .is_some()
+            {
+                return Ok(vec!["Orders scheduled on the same work center and day must use products with the same base unit before their quantities can be compared to capacity".into()]);
+            }
             let scheduled = tx
                 .query_one_row(
                     "SELECT COALESCE(SUM(qty::numeric), 0)::text FROM manufacturing__production_order WHERE tenant_id = $1 AND work_center = $2 AND planned_start = $3 AND status IN ('planned', 'in_progress') AND ($4::uuid IS NULL OR id <> $4)",
