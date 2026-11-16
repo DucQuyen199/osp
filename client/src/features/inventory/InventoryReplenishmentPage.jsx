@@ -1,4 +1,4 @@
-import { fmtNumber } from '../../lib/i18n.js';
+import { fmtNumber, uiText } from '../../lib/i18n.js';
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, tenantPath } from '../../lib/api.js';
 import { can } from '../../lib/state.js';
@@ -19,13 +19,13 @@ export default function InventoryReplenishmentPage() {
       setReport(await api(tenantPath('/reports/inventory/replenishment')));
     } catch (reason) {
       setReport(null);
-      setError(reason.message || 'Không tải được đề xuất bổ sung tồn kho.');
+      setError(reason.message || uiText('Không tải được đề xuất bổ sung tồn kho.'));
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { document.title = 'Bổ sung tồn kho · OSP Suite'; load(); }, [load]);
+  useEffect(() => { document.title = `${uiText('Đề xuất bổ sung tồn kho')} · OSP Suite`; load(); }, [load]);
 
   const createRequisition = async (warehouseId) => {
     setCreatingWarehouse(warehouseId);
@@ -37,12 +37,12 @@ export default function InventoryReplenishmentPage() {
       });
       setNotice(requisition?.id ? {
         id: requisition.id,
-        message: `Đã tạo đề nghị mua nháp ${requisition.id}. Hãy bổ sung nhà cung cấp và đơn giá trước khi gửi duyệt.`,
-      } : { message: 'Đã tạo đề nghị mua nháp.' });
+        message: `${uiText('Đã tạo đề nghị mua nháp')} ${requisition.id}. ${uiText('Hãy bổ sung nhà cung cấp và đơn giá trước khi gửi duyệt.')}`,
+      } : { message: uiText('Đã tạo đề nghị mua nháp.') });
       await load();
     } catch (reason) {
       await load();
-      setError(reason.message || 'Không tạo được đề nghị mua.');
+      setError(reason.message || uiText('Không tạo được đề nghị mua.'));
     } finally {
       setCreatingWarehouse('');
     }
@@ -58,22 +58,22 @@ export default function InventoryReplenishmentPage() {
   }, new Map());
 
   return <div className="page">
-    <div className="page-head"><div><h1>Đề xuất bổ sung tồn kho</h1><p className="sub">Tồn khả dụng loại trừ lô hết hạn và hàng giữ để kiểm tra chất lượng; tồn dự kiến tính thêm đơn bán còn phải giao, đơn mua chờ nhận và đề nghị mua mở.</p></div><a className="btn btn-secondary" href="#/e/inventory/reorder_rule">Định mức bổ sung</a></div>
+    <div className="page-head"><div><h1>{uiText('Đề xuất bổ sung tồn kho')}</h1><p className="sub">{uiText('Tồn khả dụng loại trừ lô hết hạn và hàng giữ để kiểm tra chất lượng; tồn dự kiến tính thêm đơn bán còn phải giao, đơn mua chờ nhận và đề nghị mua mở.')}</p></div><a className="btn btn-secondary" href="#/e/inventory/reorder_rule">{uiText('Định mức bổ sung')}</a></div>
     {error && <div className="alert danger" role="alert">{error}</div>}
-    {notice && <div className="alert success" role="status">{notice.message} {notice.id && <a href={`#/e/purchasing/purchase_requisition/${encodeURIComponent(notice.id)}`}>Mở đề nghị mua</a>}</div>}
+    {notice && <div className="alert success" role="status">{notice.message} {notice.id && <a href={`#/e/purchasing/purchase_requisition/${encodeURIComponent(notice.id)}`}>{uiText('Mở đề nghị mua')}</a>}</div>}
     {loading && !report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : report && <div className="stack">
       <div className="stats">
-        <div className="card stat"><span className="stat-label">Sản phẩm cần xử lý</span><strong className="stat-value num">{fmtNumber(Number(report.itemCount || 0))}</strong></div>
-        <div className="card stat"><span className="stat-label">Dòng cần đặt hàng</span><strong className="stat-value num">{fmtNumber(Number(report.purchaseLines || 0))}</strong></div>
+        <div className="card stat"><span className="stat-label">{uiText('Sản phẩm cần xử lý')}</span><strong className="stat-value num">{fmtNumber(Number(report.itemCount || 0))}</strong></div>
+        <div className="card stat"><span className="stat-label">{uiText('Dòng cần đặt hàng')}</span><strong className="stat-value num">{fmtNumber(Number(report.purchaseLines || 0))}</strong></div>
       </div>
       {can('purchasing.purchase_requisition.create') && suggestedByWarehouse.size > 0 && <section className="card card-pad" aria-labelledby="replenishment-create-title">
-        <div className="card-head"><h2 id="replenishment-create-title">Tạo đề nghị mua nháp</h2><span className="faint">Máy chủ tính lại số lượng trước khi tạo</span></div>
+        <div className="card-head"><h2 id="replenishment-create-title">{uiText('Tạo đề nghị mua nháp')}</h2><span className="faint">{uiText('Máy chủ tính lại số lượng trước khi tạo')}</span></div>
         <div className="row wrap">{[...suggestedByWarehouse.values()].map((warehouse) => <button className="btn btn-primary" key={warehouse.id} type="button" disabled={Boolean(creatingWarehouse)} onClick={() => createRequisition(warehouse.id)}>
-          {creatingWarehouse === warehouse.id ? 'Đang tạo…' : `Tạo cho ${warehouse.name} · ${warehouse.count} dòng`}
+          {creatingWarehouse === warehouse.id ? uiText('Đang tạo…') : `${uiText('Tạo cho')} ${warehouse.name} · ${warehouse.count} ${uiText('dòng')}`}
         </button>)}</div>
       </section>}
-      {!report.items?.length ? <div className="empty"><h2>Không có đề xuất bổ sung</h2><p>Tồn dự kiến ở các định mức đã cấu hình đang trên ngưỡng tối thiểu.</p></div> : <div className="card table-wrap"><table className="table">
-        <thead><tr><th scope="col">SKU</th><th scope="col">Sản phẩm</th><th scope="col">Kho</th><th scope="col" className="right">Tồn khả dụng</th><th scope="col" className="right">Đơn bán chưa giao</th><th scope="col" className="right">Tồn dự kiến</th><th scope="col" className="right">Đơn mua chờ nhận</th><th scope="col" className="right">Đề nghị mua mở</th><th scope="col" className="right">Tối thiểu</th><th scope="col" className="right">Mục tiêu</th><th scope="col" className="right">Đề xuất mua</th></tr></thead>
+      {!report.items?.length ? <div className="empty"><h2>{uiText('Không có đề xuất bổ sung')}</h2><p>{uiText('Tồn dự kiến ở các định mức đã cấu hình đang trên ngưỡng tối thiểu.')}</p></div> : <div className="card table-wrap"><table className="table">
+        <thead><tr><th scope="col">SKU</th><th scope="col">{uiText('Sản phẩm')}</th><th scope="col">{uiText('Kho')}</th><th scope="col" className="right">{uiText('Tồn khả dụng')}</th><th scope="col" className="right">{uiText('Đơn bán chưa giao')}</th><th scope="col" className="right">{uiText('Tồn dự kiến')}</th><th scope="col" className="right">{uiText('Đơn mua chờ nhận')}</th><th scope="col" className="right">{uiText('Đề nghị mua mở')}</th><th scope="col" className="right">{uiText('Tối thiểu')}</th><th scope="col" className="right">{uiText('Mục tiêu')}</th><th scope="col" className="right">{uiText('Đề xuất mua')}</th></tr></thead>
         <tbody>{report.items.map((item) => <tr key={item.id}>
           <td>{item.sku}</td><td>{item.product}</td><td>{item.warehouse}</td>
           <td className="right">{quantity(item.availableQty)}{item.unit ? ` ${item.unit}` : ''}</td>

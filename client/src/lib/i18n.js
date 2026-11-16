@@ -425,6 +425,18 @@ const UI_TEXT_EN = {
   'Đã gửi phiếu trả nhà cung cấp để phê duyệt.': 'Supplier return submitted for approval.', 'Đã duyệt phiếu trả nhà cung cấp.': 'Supplier return approved.',
   'Đã từ chối phiếu trả.': 'Return rejected.', 'Đã xuất hàng trả lại nhà cung cấp.': 'Goods dispatched back to the supplier.',
   'Đã hủy phiếu trả nhà cung cấp.': 'Supplier return cancelled.', 'Đã cập nhật phiếu trả nhà cung cấp.': 'Supplier return updated.',
+  'Đề xuất bổ sung tồn kho': 'Inventory replenishment suggestions',
+  'Tồn khả dụng loại trừ lô hết hạn và hàng giữ để kiểm tra chất lượng; tồn dự kiến tính thêm đơn bán còn phải giao, đơn mua chờ nhận và đề nghị mua mở.': 'Available stock excludes expired lots and quality holds. Projected stock also accounts for undelivered sales orders, purchase orders awaiting receipt, and open purchase requests.',
+  'Không tải được đề xuất bổ sung tồn kho.': 'Could not load inventory replenishment suggestions.', 'Định mức bổ sung': 'Reorder rules',
+  'Đã tạo đề nghị mua nháp': 'Draft purchase request created', 'Hãy bổ sung nhà cung cấp và đơn giá trước khi gửi duyệt.': 'Add a supplier and unit prices before submitting for approval.',
+  'Không tạo được đề nghị mua.': 'Could not create the purchase request.', 'Mở đề nghị mua': 'Open purchase request',
+  'Sản phẩm cần xử lý': 'Products to review', 'Dòng cần đặt hàng': 'Lines to order',
+  'Tạo đề nghị mua nháp': 'Create draft purchase request', 'Máy chủ tính lại số lượng trước khi tạo': 'The server recalculates quantities before creation',
+  'Tạo cho': 'Create for', 'Không có đề xuất bổ sung': 'No replenishment suggestions',
+  'Tồn dự kiến ở các định mức đã cấu hình đang trên ngưỡng tối thiểu.': 'Projected stock for configured reorder rules is above the minimum threshold.',
+  'Sản phẩm': 'Product', 'Kho': 'Warehouse', 'Tồn khả dụng': 'Available stock', 'Đơn bán chưa giao': 'Undelivered sales orders',
+  'Tồn dự kiến': 'Projected stock', 'Đơn mua chờ nhận': 'Purchase orders awaiting receipt', 'Đề nghị mua mở': 'Open purchase requests',
+  'Tối thiểu': 'Minimum', 'Mục tiêu': 'Target', 'Đề xuất mua': 'Suggested order',
 };
 
 const storedUiLocale = () => {
