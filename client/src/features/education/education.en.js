@@ -21,6 +21,8 @@ const educationEnglish = {
   'Tạo lớp': 'Create class', 'Tạo lớp học': 'Create class', 'Tên lớp *': 'Class name *', 'Thao tác': 'Actions', 'Tiếp nhận học viên': 'Enroll learner', 'Trạng thái': 'Status', 'Trạng thái / hóa đơn': 'Status / invoice', 'Trạng thái điểm danh': 'Attendance status', 'Trạng thái ghi danh': 'Enrollment status', 'Vắng': 'Absent',
   'Student enrolled in the selected class.': 'Student enrolled in the selected class.', 'Could not enroll this student.': 'Could not enroll this student.', 'Could not update this enrollment.': 'Could not update this enrollment.',
   'Enrollment withdrawn.': 'Enrollment withdrawn.', 'Enrollment completed.': 'Enrollment completed.', 'Đã chốt buổi học.': 'Class session closed.', 'Lớp': 'Class', 'Lớp học': 'Class', 'Chưa điểm danh': 'Not marked', 'Hoàn tất hồ sơ': 'Complete profile', 'Lưu điểm': 'Save grade', 'mở hóa đơn': 'open invoice',
+  'Ví dụ: 2026-2027 / HK1': 'Example: 2026-2027 / Term 1', 'Ví dụ: Toán': 'Example: Mathematics', 'chưa thu đủ': 'not fully paid',
+  'học viên': 'learners', 'Ví dụ: 2026-HK1 hoặc 2026-11': 'Example: 2026-Term 1 or 2026-11',
 };
 
 export default educationEnglish;

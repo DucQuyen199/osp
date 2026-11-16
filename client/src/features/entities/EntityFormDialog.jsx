@@ -163,9 +163,9 @@ function InventoryLines({ value, countMode, onChange, fromWarehouse, toWarehouse
           {[...locations.values()].filter((location) => location.warehouse === toWarehouse && location.active !== false).map((location) => <option key={location.id} value={location.id}>{location.code} · {location.name}</option>)}
         </select>
       </>}
-      <button className="btn btn-ghost btn-icon btn-sm" type="button" aria-label={`Remove row ${index + 1}`} onClick={() => remove(index)}>×</button>
+      <button className="btn btn-ghost btn-icon btn-sm" type="button" aria-label={`${uiText('Xóa dòng')} ${index + 1}`} onClick={() => remove(index)}>×</button>
     </div>)}
-    <div className="lines-foot"><button className="btn btn-sm" type="button" onClick={() => onChange([...rows, {}])}>Thêm dòng</button></div>
+    <div className="lines-foot"><button className="btn btn-sm" type="button" onClick={() => onChange([...rows, {}])}>{uiText('Thêm dòng')}</button></div>
   </div>;
 }
 
@@ -196,18 +196,18 @@ function AccountingJournalLines({ value, onChange }) {
         <option value="">{uiText('— Chọn tài khoản —')}</option>
         {[...accounts.values()].map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}
       </select>
-      <select className="select" aria-label={`Phòng ban dòng ${index + 1}`} value={row.department || ''}
+      <select className="select" aria-label={`${uiText('Phòng ban dòng')} ${index + 1}`} value={row.department || ''}
         onChange={(event) => update(index, { department: event.target.value || undefined })}>
-        <option value="">Chưa phân bổ</option>
+        <option value="">{uiText('Chưa phân bổ')}</option>
         {[...departments.values()].map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
       </select>
-      <input className="input num" type="number" min="0" step="any" value={row.debit ?? ''} aria-label={`Nợ dòng ${index + 1}`}
+      <input className="input num" type="number" min="0" step="any" value={row.debit ?? ''} aria-label={`${uiText('Nợ dòng')} ${index + 1}`}
         onChange={(event) => update(index, { debit: event.target.value === '' ? undefined : Number(event.target.value) })} />
-      <input className="input num" type="number" min="0" step="any" value={row.credit ?? ''} aria-label={`Có dòng ${index + 1}`}
+      <input className="input num" type="number" min="0" step="any" value={row.credit ?? ''} aria-label={`${uiText('Có dòng')} ${index + 1}`}
         onChange={(event) => update(index, { credit: event.target.value === '' ? undefined : Number(event.target.value) })} />
-      <button className="btn btn-ghost btn-icon btn-sm" type="button" aria-label={`Xóa dòng ${index + 1}`} onClick={() => remove(index)}>×</button>
+      <button className="btn btn-ghost btn-icon btn-sm" type="button" aria-label={`${uiText('Xóa dòng')} ${index + 1}`} onClick={() => remove(index)}>×</button>
     </div>)}
-    <div className="lines-foot"><button className="btn btn-sm" type="button" onClick={() => onChange([...rows, {}])}>Thêm dòng</button></div>
+    <div className="lines-foot"><button className="btn btn-sm" type="button" onClick={() => onChange([...rows, {}])}>{uiText('Thêm dòng')}</button></div>
   </div>;
 }
 
