@@ -418,6 +418,19 @@ for (const [vertical, hash, label, summaryEntity, setupEntity] of verticalScreen
     must(!(await page.$('.route-error')), `${label} vertical route failed to render`);
     must(!(await page.$('.not-found-page')), `${label} vertical route resolved to not found`);
     await axe(`${label} vertical`);
+    if (vertical === 'ecommerce') {
+      await page.evaluate(() => localStorage.setItem('osp.uiLocale', 'en-US'));
+      await page.reload({ waitUntil: 'networkidle0' });
+      await page.goto(`${BASE}/#/payments`, { waitUntil: 'networkidle0' });
+      await page.waitForSelector('#main h1');
+      must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Payment transactions', 'payment transactions workbench title is not translated');
+      const paymentText = await page.$eval('#main', (main) => main.innerText);
+      must(paymentText.includes('Create pending transaction') && paymentText.includes('Transaction register'), 'payment workflow is not translated');
+      await axe('payment transactions workbench tiếng Anh');
+      await page.evaluate(() => localStorage.setItem('osp.uiLocale', 'vi-VN'));
+      await page.reload({ waitUntil: 'networkidle0' });
+      await page.goto(`${BASE}/${hash}`, { waitUntil: 'networkidle0' });
+    }
     if (vertical === 'ngo-government') {
       await page.evaluate(() => localStorage.setItem('osp.uiLocale', 'en-US'));
       await page.reload({ waitUntil: 'networkidle0' });
