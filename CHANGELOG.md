@@ -4,6 +4,7 @@
 
 ## [Unreleased]
 ### Added
+- Agriculture yield and harvest totals now group output by product and use converted base units, so mixed units and products are not added together as if they were comparable.
 - Utility meter readings now validate future billing periods against the tenant's business date, avoiding incorrect month-boundary decisions based on the server's UTC date.
 - Sales returns now keep separate quantities and pricing terms for same-product lines with different discounts or tax snapshots, so the credit value follows the original order line.
 - POS prescription selection appears only when the cart contains prescription medicine, clears if those items are removed, and lists only verified, partially dispensed, unexpired prescriptions.
