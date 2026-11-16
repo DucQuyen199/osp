@@ -5,7 +5,16 @@ use serde_json::json;
 #[test]
 fn crm_optional_probability_allows_win_but_invalid_values_do_not() {
     let party = uuid::Uuid::new_v4().to_string();
-    let document = json!({ "title": "Service contract", "party": party, "amount": 5000000, "probability": null });
+    let warehouse = uuid::Uuid::new_v4().to_string();
+    let product = uuid::Uuid::new_v4().to_string();
+    let document = json!({
+        "title": "Service contract",
+        "party": party,
+        "amount": 5000000,
+        "probability": null,
+        "warehouse": warehouse,
+        "lines": [{ "product": product, "qty": 1, "price": 5000000 }]
+    });
     assert!(modules::validate_action("crm.deal", "won", &document).is_empty());
     for probability in [json!(-1), json!(101), json!("50"), json!(true)] {
         let mut invalid = document.clone();

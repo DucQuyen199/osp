@@ -35,11 +35,15 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
             }) {
                 errors.push("Deal amount must be non-negative".into());
             }
-            if document.get("probability").is_some_and(|value| {
-                !money::decimal(value).is_some_and(|probability| {
-                    (Decimal::ZERO..=Decimal::ONE_HUNDRED).contains(&probability)
+            if document
+                .get("probability")
+                .filter(|value| !value.is_null())
+                .is_some_and(|value| {
+                    !money::decimal(value).is_some_and(|probability| {
+                        (Decimal::ZERO..=Decimal::ONE_HUNDRED).contains(&probability)
+                    })
                 })
-            }) {
+            {
                 errors.push("Deal probability must be between 0 and 100".into());
             }
             if let Some(stage) = document
@@ -62,11 +66,15 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
             {
                 errors.push("Mã giai đoạn phải bắt đầu bằng chữ thường và chỉ dùng chữ thường, số, dấu gạch dưới".into());
             }
-            if document.get("probability").is_some_and(|value| {
-                !money::decimal(value).is_some_and(|probability| {
-                    (Decimal::ZERO..=Decimal::ONE_HUNDRED).contains(&probability)
+            if document
+                .get("probability")
+                .filter(|value| !value.is_null())
+                .is_some_and(|value| {
+                    !money::decimal(value).is_some_and(|probability| {
+                        (Decimal::ZERO..=Decimal::ONE_HUNDRED).contains(&probability)
+                    })
                 })
-            }) {
+            {
                 errors.push("Stage probability must be between 0 and 100".into());
             }
             if document
