@@ -115,38 +115,10 @@ pub async fn seed(k: &Kernel, t: &Tenant) {
             json!({ "name": "Công ty Bình Minh", "source": "Giới thiệu" }),
         )
         .await;
-        let d1 = mk(k, t, "crm.deal", json!({ "title": "Hợp đồng cung cấp quý 4", "party": cid(0), "amount": 1_200_000, "stage": "Thương lượng" })).await;
+        let d1 = mk(k, t, "crm.deal", json!({ "title": "Hợp đồng cung cấp quý 4", "party": cid(0), "amount": 1_200_000, "warehouse": warehouse, "lines": [{ "product": pid(0), "qty": 10, "price": 120000 }], "stage": "Thương lượng" })).await;
         mk(k, t, "crm.deal", json!({ "title": "Đơn hàng quà tặng cuối năm", "party": cid(3), "amount": 18_500_000, "stage": "Báo giá" })).await;
-        act(k, t, "crm.deal", &d1, "won").await;
-        // CRM creates a draft; finish its commercial lines just as a salesperson
-        // does before confirmation. Keep it ready for the interactive demo.
-        if let Some(deal) = &d1 {
-            let query = crate::kernel::data::ListQuery {
-                filter: vec![("source_id".into(), deal.clone())],
-                limit: 1,
-                offset: 0,
-                q: None,
-                sort: None,
-                desc: false,
-            };
-            if let Ok(orders) = k.list(&Actor::System, t, "sales.sales_order", &query).await
-                && let Some(order) = orders["items"].as_array().and_then(|items| items.first())
-                && let Some(order_id) = order["id"].as_str()
-            {
-                let patch = json!({ "warehouse": warehouse, "lines": [{ "product": pid(0), "qty": 10, "price": 120000 }] });
-                if let Err(error) = k
-                    .update(
-                        &Actor::System,
-                        t,
-                        "sales.sales_order",
-                        order_id,
-                        patch.as_object().unwrap().clone(),
-                    )
-                    .await
-                {
-                    tracing::warn!(error = %error, "demo CRM order preparation failed");
-                }
-            }
+        if warehouse.is_some() {
+            act(k, t, "crm.deal", &d1, "won").await;
         }
     }
     if has("sales") {
@@ -184,8 +156,11 @@ pub async fn seed(k: &Kernel, t: &Tenant) {
                 json!({ "warehouse": warehouse_id, "cashier": "Demo", "opening_cash": 500000 }),
             )
             .await;
+            let prices = [120000_i64, 95000, 250000, 80000, 65000, 45000];
             for (c, p, q) in [(0, 0, 2), (1, 1, 1), (2, 4, 3)] {
-                let o = mk(k, t, "pos.pos_order", json!({ "party": cid(c), "warehouse": warehouse_id, "session": session, "method": "cash", "lines": [{ "product": pid(p), "qty": q, "price": 100000 }] })).await;
+                let price = prices[p];
+                let cash_received = price * q;
+                let o = mk(k, t, "pos.pos_order", json!({ "party": cid(c), "warehouse": warehouse_id, "session": session, "method": "cash", "cash_received": cash_received, "lines": [{ "product": pid(p), "qty": q, "price": price }] })).await;
                 act(k, t, "pos.pos_order", &o, "completed").await;
             }
         }
