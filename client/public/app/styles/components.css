@@ -327,3 +327,5 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .document-folder-label.depth-4{padding-left:72px}
 .document-folder-label.depth-5{padding-left:90px}
 .document-folder-label.depth-6{padding-left:108px}
+.pos-return-overlay{position:fixed;inset:0;z-index:80;display:grid;place-items:center;overflow:auto;padding:1rem;background:var(--overlay)}
+.pos-return-dialog{width:min(52rem,100%);max-height:min(90vh,52rem);overflow:auto}

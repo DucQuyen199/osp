@@ -348,6 +348,105 @@ pub(super) async fn handle_event(
             }
             Ok(Some(true))
         }
+        "pos.pos_return.received" => {
+            let return_id = event.get("id").and_then(Value::as_str).unwrap_or_default();
+            let order_id = event
+                .get("pos_order")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            if tx.query_opt("SELECT id FROM accounting__journal_entry WHERE tenant_id = $1 AND source = 'pos_refund' AND source_id = $2 AND status = 'posted' FOR UPDATE", &[&tenant.id, &return_id]).await?.is_some() { return Ok(Some(true)); }
+            let original = tx.query_opt("SELECT id, amount::text FROM accounting__payment WHERE tenant_id = $1 AND source = 'pos_order' AND source_id = $2 FOR UPDATE", &[&tenant.id, &order_id]).await?.ok_or_else(|| crate::error::ApiError::validation(event_type, vec!["POS order has no original accounting payment".into()]))?;
+            let payment_id: Uuid = original.get(0);
+            let original_amount = decimal_column(&original, 1, event_type)?;
+            let refund_amount = event
+                .get("total")
+                .and_then(crate::money::decimal)
+                .ok_or_else(|| {
+                    crate::error::ApiError::validation(
+                        event_type,
+                        vec!["POS return has no valid amount".into()],
+                    )
+                })?;
+            let ratio = refund_amount
+                .checked_div(original_amount)
+                .filter(|ratio| *ratio > Decimal::ZERO && *ratio <= Decimal::ONE)
+                .ok_or_else(|| {
+                    crate::error::ApiError::validation(
+                        event_type,
+                        vec!["POS return amount exceeds the original payment".into()],
+                    )
+                })?;
+            let journal = tx.query_opt("SELECT lines FROM accounting__journal_entry WHERE tenant_id = $1 AND source = 'payment' AND source_id = $2 AND status = 'posted' FOR SHARE", &[&tenant.id, &payment_id.to_string()]).await?.ok_or_else(|| crate::error::ApiError::validation(event_type, vec!["POS order payment has no posted journal to reverse".into()]))?;
+            let mut reversal_lines = reversal::lines_to_reverse(&journal.get(0), event_type)?;
+            scale_reversal_lines(&mut reversal_lines, ratio, event_type)?;
+            create_posted_journal_decimal(
+                kernel,
+                tx,
+                tenant,
+                event_id,
+                depth,
+                "POS partial return",
+                refund_amount,
+                "pos_refund",
+                return_id,
+                reversal_lines,
+            )
+            .await?;
+            let original_data = tx.query_opt("SELECT party, method FROM accounting__payment WHERE tenant_id = $1 AND id = $2", &[&tenant.id, &payment_id]).await?.ok_or_else(|| crate::error::ApiError::internal("Original POS payment disappeared during return posting"))?;
+            let party: Option<Uuid> = original_data.get(0);
+            let method: Option<String> = original_data.get(1);
+            let mut data = Map::new();
+            data.insert(
+                "amount".into(),
+                decimal_value(
+                    Decimal::ZERO.checked_sub(refund_amount).ok_or_else(|| {
+                        crate::error::ApiError::validation(
+                            event_type,
+                            vec!["Refund amount exceeds the supported range".into()],
+                        )
+                    })?,
+                    event_type,
+                )?,
+            );
+            if let Some(party) = party {
+                data.insert("party".into(), Value::String(party.to_string()));
+            }
+            if let Some(method) = method {
+                data.insert("method".into(), Value::String(method));
+            }
+            if let Some(tax) = event.get("tax_total").and_then(crate::money::decimal) {
+                data.insert(
+                    "tax_amount".into(),
+                    decimal_value(
+                        Decimal::ZERO.checked_sub(tax).ok_or_else(|| {
+                            crate::error::ApiError::validation(
+                                event_type,
+                                vec!["Refund tax exceeds the supported range".into()],
+                            )
+                        })?,
+                        event_type,
+                    )?,
+                );
+            }
+            data.insert("source".into(), Value::String("pos_order_refund".into()));
+            data.insert("source_id".into(), Value::String(return_id.to_owned()));
+            let payment = kernel.ent(tenant, "accounting.payment")?;
+            kernel
+                .create_in(
+                    tx,
+                    &Actor::System,
+                    tenant,
+                    &payment,
+                    data,
+                    &Opts {
+                        depth: Some(depth + 1),
+                        causation: Some(event_id),
+                        silent: false,
+                    },
+                )
+                .await?;
+            Ok(Some(true))
+        }
         _ => Ok(None),
     }
 }

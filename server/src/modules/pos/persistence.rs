@@ -11,6 +11,80 @@ pub async fn validate_persistence(
     action: &str,
     document: &Value,
 ) -> R<Vec<String>> {
+    if entity == "pos_order" && action == "refunded" {
+        let order_id = document
+            .get("id")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok());
+        if let Some(order_id) = order_id {
+            if tx.query_opt("SELECT id FROM pos__pos_return WHERE tenant_id = $1 AND pos_order = $2 AND status = 'received' LIMIT 1 FOR UPDATE", &[&tenant.id, &order_id]).await?.is_some() {
+                return Ok(vec!["Giao dịch đã có phiếu trả một phần; không thể hoàn toàn bộ thêm lần nữa".into()]);
+            }
+        }
+    }
+    if entity == "pos_return" && action == "received" {
+        let order_id = document
+            .get("pos_order")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok());
+        let Some(order_id) = order_id else {
+            return Ok(vec![
+                "Phiếu trả hàng cần tham chiếu giao dịch POS hợp lệ".into(),
+            ]);
+        };
+        let order = tx.query_opt("SELECT status, prescription, total::text, COALESCE(voucher_discount, 0)::text, voucher_code FROM pos__pos_order WHERE tenant_id = $1 AND id = $2 FOR UPDATE", &[&tenant.id, &order_id]).await?;
+        let Some(order) = order else {
+            return Ok(vec!["Không tìm thấy giao dịch POS gốc trong tenant".into()]);
+        };
+        let status: String = order.get(0);
+        let prescription: Option<String> = order.get(1);
+        let original_total = money::decimal_str(&order.get::<_, String>(2)).unwrap_or_default();
+        let voucher_discount = money::decimal_str(&order.get::<_, String>(3)).unwrap_or_default();
+        let voucher_code: Option<String> = order.get(4);
+        if status != "completed" {
+            return Ok(vec![
+                "Chỉ được trả hàng từ giao dịch POS đã hoàn tất và chưa hoàn hết".into(),
+            ]);
+        }
+        if prescription
+            .as_deref()
+            .is_some_and(|value| !value.trim().is_empty())
+        {
+            return Ok(vec![
+                "Giao dịch gắn với đơn thuốc cần được xử lý qua quy trình hoàn trả của nhà thuốc"
+                    .into(),
+            ]);
+        }
+        if voucher_discount > Decimal::ZERO
+            || voucher_code
+                .as_deref()
+                .is_some_and(|code| !code.trim().is_empty())
+        {
+            return Ok(vec!["Phiếu trả một phần chưa hỗ trợ giao dịch dùng voucher; hãy xử lý theo chính sách hoàn voucher".into()]);
+        }
+        let return_id = document
+            .get("id")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok());
+        let prior = tx.query_opt("SELECT COALESCE(SUM(total::numeric), 0)::text FROM pos__pos_return WHERE tenant_id = $1 AND pos_order = $2 AND status = 'received' AND id <> COALESCE($3, '00000000-0000-0000-0000-000000000000'::uuid)", &[&tenant.id, &order_id, &return_id]).await?;
+        let prior_total = prior
+            .as_ref()
+            .and_then(|row| row.get::<_, String>(0).parse::<Decimal>().ok())
+            .unwrap_or_default();
+        let this_total = document
+            .get("total")
+            .and_then(money::decimal)
+            .unwrap_or_default();
+        if this_total <= Decimal::ZERO
+            || prior_total
+                .checked_add(this_total)
+                .is_none_or(|amount| amount > original_total)
+        {
+            return Ok(vec![
+                "Tổng tiền các phiếu trả vượt quá số tiền giao dịch POS gốc còn được hoàn".into(),
+            ]);
+        }
+    }
     if entity == "pos_session" && action == "created" {
         let warehouse = document
             .get("warehouse")

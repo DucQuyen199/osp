@@ -105,6 +105,34 @@ pub async fn handle_source_event(
             })?;
             (party, "sales_return", change)
         }
+        domain::PointsEvent::ReversePosReturn => {
+            if persistence::transaction_exists(tx, tenant, "pos_order_partial_return", source_id)
+                .await?
+            {
+                return Ok(true);
+            }
+            let Some((party, points)) = persistence::pos_return_reversal(
+                tx,
+                tenant,
+                Uuid::parse_str(source_id).map_err(|_| {
+                    ApiError::validation(
+                        event_type,
+                        vec!["POS return id must be a valid UUID".into()],
+                    )
+                })?,
+            )
+            .await?
+            else {
+                return Ok(true);
+            };
+            let change = Decimal::ZERO.checked_sub(points).ok_or_else(|| {
+                ApiError::validation(
+                    event_type,
+                    vec!["Loyalty point reversal exceeds the supported decimal range".into()],
+                )
+            })?;
+            (party, "pos_order_partial_return", change)
+        }
     };
     let opts = Opts {
         depth: Some(depth + 1),

@@ -3,7 +3,7 @@
  "name": "POS - Bán lẻ tại quầy",
  "description": "Ca bán hàng và đơn bán tại quầy. Hoàn tất đơn sẽ trừ kho, ghi nhận thanh toán và tích điểm khách hàng thân thiết.",
  "category": "sales",
- "version": "0.2.0",
+ "version": "0.3.0",
  "depends": [
   "master-data",
   "inventory",
@@ -202,6 +202,27 @@
       "to": "refunded"
      }
     }
+   },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "pos_return",
+   "label": "Phiếu trả hàng POS",
+   "fields": [
+    { "name": "pos_order", "type": "ref", "required": true, "ref": "pos.pos_order" },
+    { "name": "warehouse", "type": "ref", "required": false, "ref": "inventory.warehouse", "system": true },
+    { "name": "refund_session", "type": "ref", "required": false, "ref": "pos.pos_session", "system": true },
+    { "name": "reason", "type": "string", "required": true },
+    { "name": "lines", "type": "json", "required": true },
+    { "name": "total", "type": "money", "required": false, "system": true },
+    { "name": "tax_total", "type": "money", "required": false, "system": true },
+    { "name": "status", "type": "enum", "required": false, "options": ["draft", "received"] }
+   ],
+   "states": {
+    "field": "status",
+    "initial": "draft",
+    "actions": { "received": { "from": ["draft"], "to": "received" } }
    },
    "computed": {},
    "constraints": []

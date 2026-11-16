@@ -172,6 +172,72 @@ pub async fn sales_return_reversal(
     Ok(Some((party, additional)))
 }
 
+/// Return only the additional points earned on POS value already refunded.
+pub async fn pos_return_reversal(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    return_id: Uuid,
+) -> R<Option<(Uuid, Decimal)>> {
+    let Some(source) = tx.query_opt(
+        "SELECT pr.pos_order, po.party FROM pos__pos_return pr JOIN pos__pos_order po ON po.tenant_id = pr.tenant_id AND po.id = pr.pos_order WHERE pr.tenant_id = $1 AND pr.id = $2 AND pr.status = 'received' FOR UPDATE OF po",
+        &[&tenant.id, &return_id],
+    ).await? else { return Ok(None); };
+    let order_id: Uuid = source.get(0);
+    let Some(party) = source.get::<_, Option<Uuid>>(1) else {
+        return Ok(None);
+    };
+    let Some(earned_text) = tx.query_opt(
+        "SELECT points::text FROM loyalty__point_txn WHERE tenant_id = $1 AND party = $2 AND source = 'pos_order' AND source_id = $3 LIMIT 1",
+        &[&tenant.id, &party, &order_id.to_string()],
+    ).await?.map(|row| row.get::<_, String>(0)) else { return Ok(None); };
+    let earned = money::decimal_str(&earned_text).ok_or_else(|| {
+        ApiError::validation(
+            "loyalty.point_txn.points",
+            vec!["Earned points are not a valid decimal value".into()],
+        )
+    })?;
+    let returned_text: String = tx.query_one_row(
+        "SELECT COALESCE(SUM(total), 0)::text FROM pos__pos_return WHERE tenant_id = $1 AND pos_order = $2 AND status = 'received'",
+        &[&tenant.id, &order_id],
+    ).await?.get(0);
+    let returned = money::decimal_str(&returned_text).ok_or_else(|| {
+        ApiError::validation(
+            "loyalty.pos_return.total",
+            vec!["Returned POS value is invalid".into()],
+        )
+    })?;
+    let reversed_text: String = tx.query_one_row(
+        "SELECT COALESCE(SUM(GREATEST(-pt.points, 0)), 0)::text FROM loyalty__point_txn pt JOIN pos__pos_return pr ON pr.tenant_id = pt.tenant_id AND pr.id::text = pt.source_id WHERE pt.tenant_id = $1 AND pt.party = $2 AND pt.source = 'pos_order_partial_return' AND pr.pos_order = $3 AND pr.status = 'received'",
+        &[&tenant.id, &party, &order_id],
+    ).await?.get(0);
+    let reversed = money::decimal_str(&reversed_text).ok_or_else(|| {
+        ApiError::validation(
+            "loyalty.point_txn.reversed",
+            vec!["Previously reversed POS points are invalid".into()],
+        )
+    })?;
+    let desired = returned
+        .checked_div(Decimal::new(10_000, 0))
+        .map(|points| points.floor())
+        .map(|points| earned.min(points))
+        .ok_or_else(|| {
+            ApiError::validation(
+                "loyalty.pos_return.total",
+                vec!["Return-derived points exceed the supported range".into()],
+            )
+        })?;
+    let additional = desired.checked_sub(reversed).ok_or_else(|| {
+        ApiError::validation(
+            "loyalty.point_txn.reversed",
+            vec!["Additional point reversal exceeds the supported range".into()],
+        )
+    })?;
+    if additional <= Decimal::ZERO {
+        return Ok(None);
+    }
+    Ok(Some((party, additional)))
+}
+
 pub async fn lock_member(tx: &Tx<'_>, tenant: &Tenant, party: Uuid) -> R<Option<(Uuid, Decimal)>> {
     let Some(row) = tx
         .query_opt(

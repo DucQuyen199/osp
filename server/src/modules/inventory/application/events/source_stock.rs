@@ -49,6 +49,7 @@ pub async fn handle_source_stock_event(
         "purchasing.purchase_receipt.received" => (Some("lines"), "in", "purchase_receipt", true),
         "pos.pos_order.completed" => (Some("lines"), "out", "pos_order", true),
         "pos.pos_order.refunded" => (Some("lines"), "in", "pos_order_refund", true),
+        "pos.pos_return.received" => (Some("lines"), "in", "pos_return", true),
         "field-service.work_order.done" => (Some("lines"), "out", "work_order", true),
         "restaurant.table_order.completed" => (Some("consumptions"), "out", "table_order", true),
         "auto-service.repair_order.completed" => (Some("lines"), "out", "repair_order", true),

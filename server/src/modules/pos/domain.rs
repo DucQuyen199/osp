@@ -182,6 +182,25 @@ pub fn validate_remove(document: &Value) -> Vec<String> {
     }
 }
 
+pub fn validate_return_update(current: &Value, patch: &Value) -> Vec<String> {
+    if current.get("status").and_then(Value::as_str) == Some("draft") {
+        return Vec::new();
+    }
+    if patch.as_object().is_some_and(|fields| !fields.is_empty()) {
+        vec!["Phiếu trả hàng đã nhận phải được giữ làm dấu vết giao dịch".into()]
+    } else {
+        Vec::new()
+    }
+}
+
+pub fn validate_return_remove(document: &Value) -> Vec<String> {
+    if document.get("status").and_then(Value::as_str) == Some("draft") {
+        Vec::new()
+    } else {
+        vec!["Phiếu trả hàng đã nhận phải được giữ làm dấu vết giao dịch".into()]
+    }
+}
+
 pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<String> {
     if entity == "cash_movement" {
         return validate_cash_movement_action(action, document);
@@ -213,6 +232,19 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
         let reason = document.get("refund_reason").and_then(Value::as_str);
         if !reason.is_some_and(|value| (5..=500).contains(&value.trim().chars().count())) {
             return vec!["Hoàn đơn POS cần lý do từ 5 đến 500 ký tự".into()];
+        }
+    }
+    if entity == "pos_return" && action == "received" {
+        let reason = document.get("reason").and_then(Value::as_str);
+        if !reason.is_some_and(|value| (5..=500).contains(&value.trim().chars().count())) {
+            return vec!["Phiếu trả hàng cần lý do từ 5 đến 500 ký tự".into()];
+        }
+        if !document
+            .get("total")
+            .and_then(decimal)
+            .is_some_and(|amount| amount > Decimal::ZERO)
+        {
+            return vec!["Tổng tiền trả phải lớn hơn 0".into()];
         }
     }
     Vec::new()

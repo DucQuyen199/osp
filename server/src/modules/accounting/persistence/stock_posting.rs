@@ -75,7 +75,7 @@ pub async fn post_stock_movement(
                 "sales_order" | "pos_order" | "work_order" | "table_order" | "repair_order"
                 | "prescription" | "maintenance",
             ) => ("632", "156"),
-            ("in", "sales_return" | "pos_order_refund") => ("156", "632"),
+            ("in", "sales_return" | "pos_order_refund" | "pos_return") => ("156", "632"),
             ("in", "purchase_receipt") => ("156", "GRNI"),
             ("out", "production_order_bom") => ("154", "156"),
             ("in", "production_order" | "production_rework" | "production_concession") => {

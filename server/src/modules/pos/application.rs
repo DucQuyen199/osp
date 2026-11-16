@@ -14,6 +14,32 @@ pub async fn prepare_action(
     action: &str,
     document: &mut Map<String, Value>,
 ) -> R<Vec<String>> {
+    if entity == "pos_return" && action == "received" {
+        let Some(order_id) = document
+            .get("pos_order")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+        else {
+            return Ok(vec!["Phiếu trả hàng cần giao dịch POS gốc hợp lệ".into()]);
+        };
+        let Some(method) = document.get("method").and_then(Value::as_str) else {
+            let method_row = tx
+                .query_opt(
+                    "SELECT method FROM pos__pos_order WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                    &[&tenant.id, &order_id],
+                )
+                .await?;
+            let method = method_row.and_then(|row| row.get::<_, Option<String>>(0));
+            if method.as_deref() != Some("cash") {
+                return Ok(Vec::new());
+            }
+            return prepare_refund_session(tx, tenant, document, order_id).await;
+        };
+        if method == "cash" {
+            return prepare_refund_session(tx, tenant, document, order_id).await;
+        }
+        return Ok(Vec::new());
+    }
     if entity == "pos_order" && action == "refunded" {
         if document.get("method").and_then(Value::as_str) != Some("cash") {
             return Ok(Vec::new());
@@ -56,7 +82,7 @@ pub async fn prepare_action(
         .unwrap_or_default();
     let row = tx
         .query_one_row(
-            "SELECT (COALESCE((SELECT SUM(CASE WHEN status = 'completed' AND session = $2 THEN total::numeric WHEN status = 'refunded' AND refund_session = $2 THEN -total::numeric ELSE 0::numeric END) FROM pos__pos_order WHERE tenant_id = $1 AND method = 'cash' AND (session = $2 OR refund_session = $2)), 0::numeric) + COALESCE((SELECT COALESCE(SUM(amount::numeric) FILTER (WHERE direction = 'cash_in'), 0::numeric) - COALESCE(SUM(amount::numeric) FILTER (WHERE direction = 'cash_out'), 0::numeric) FROM pos__cash_movement WHERE tenant_id = $1 AND session = $2 AND status = 'posted'), 0::numeric))::text",
+            "SELECT (COALESCE((SELECT SUM(CASE WHEN status = 'completed' AND session = $2 THEN total::numeric WHEN status = 'refunded' AND refund_session = $2 THEN -total::numeric ELSE 0::numeric END) FROM pos__pos_order WHERE tenant_id = $1 AND method = 'cash' AND (session = $2 OR refund_session = $2)), 0::numeric) - COALESCE((SELECT SUM(total::numeric) FROM pos__pos_return WHERE tenant_id = $1 AND refund_session = $2 AND status = 'received'), 0::numeric) + COALESCE((SELECT COALESCE(SUM(amount::numeric) FILTER (WHERE direction = 'cash_in'), 0::numeric) - COALESCE(SUM(amount::numeric) FILTER (WHERE direction = 'cash_out'), 0::numeric) FROM pos__cash_movement WHERE tenant_id = $1 AND session = $2 AND status = 'posted'), 0::numeric))::text",
             &[
                 &tenant.id as &(dyn tokio_postgres::types::ToSql + Sync),
                 &session_id,
@@ -89,6 +115,209 @@ pub async fn prepare_action(
     };
     document.insert("expected_cash".into(), expected_cash);
     document.insert("cash_difference".into(), cash_difference);
+    Ok(Vec::new())
+}
+
+async fn prepare_refund_session(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    document: &mut Map<String, Value>,
+    order_id: Uuid,
+) -> R<Vec<String>> {
+    let row = tx
+        .query_opt(
+            "SELECT session FROM pos__pos_order WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+            &[&tenant.id, &order_id],
+        )
+        .await?;
+    let original_session = row.and_then(|row| row.get::<_, Option<Uuid>>(0));
+    let Some(original_session) = original_session else {
+        return Ok(vec!["Hoàn tiền mặt cần ca bán gốc hợp lệ".into()]);
+    };
+    let session = tx.query_opt(
+        "SELECT current.id FROM pos__pos_session original JOIN pos__pos_session current ON current.tenant_id = original.tenant_id AND current.status = 'open' AND current.branch IS NOT DISTINCT FROM original.branch AND current.cashier IS NOT DISTINCT FROM original.cashier WHERE original.tenant_id = $1 AND original.id = $2 ORDER BY current.created_at DESC, current.id LIMIT 1 FOR UPDATE OF current",
+        &[&tenant.id, &original_session],
+    ).await?;
+    let Some(session) = session else {
+        return Ok(vec![
+            "Hoàn tiền mặt cần ca đang mở cùng chi nhánh và thu ngân với giao dịch bán gốc".into(),
+        ]);
+    };
+    document.insert("refund_session".into(), json!(session.get::<_, Uuid>(0)));
+    Ok(Vec::new())
+}
+
+/// Replace return selections with immutable snapshots taken from the completed POS order.
+pub async fn prepare_return_document(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    document: &mut Map<String, Value>,
+) -> R<Vec<String>> {
+    let Some(order_id) = document
+        .get("pos_order")
+        .and_then(Value::as_str)
+        .and_then(|value| Uuid::parse_str(value).ok())
+    else {
+        return Ok(vec!["Phiếu trả hàng cần giao dịch POS gốc hợp lệ".into()]);
+    };
+    let Some(order) = tx.query_opt(
+        "SELECT lines, warehouse FROM pos__pos_order WHERE tenant_id = $1 AND id = $2 AND status = 'completed' FOR UPDATE",
+        &[&tenant.id, &order_id],
+    ).await? else {
+        return Ok(vec!["Chỉ được trả hàng từ giao dịch POS đã hoàn tất".into()]);
+    };
+    let source_lines: Value = order.get(0);
+    let warehouse: Option<Uuid> = order.get(1);
+    if let Some(warehouse) = warehouse {
+        document.insert("warehouse".into(), json!(warehouse));
+    }
+    let Some(source_lines) = source_lines.as_array() else {
+        return Ok(vec!["Giao dịch POS gốc không có dòng hàng hợp lệ".into()]);
+    };
+    if let Some(first) = source_lines.first() {
+        let tax_id = first.get("tax").and_then(Value::as_str);
+        let tax_rate = first
+            .get("tax_rate")
+            .and_then(money::decimal)
+            .unwrap_or_default();
+        if source_lines.iter().skip(1).any(|line| {
+            line.get("tax").and_then(Value::as_str) != tax_id
+                || line
+                    .get("tax_rate")
+                    .and_then(money::decimal)
+                    .unwrap_or_default()
+                    != tax_rate
+        }) {
+            return Ok(vec![
+                "Giao dịch có nhiều mức thuế cần được trả qua chứng từ điều chỉnh thuế riêng"
+                    .into(),
+            ]);
+        }
+    }
+    let Some(selected) = document.get("lines").and_then(Value::as_array) else {
+        return Ok(vec!["Phiếu trả hàng cần chọn ít nhất một dòng hàng".into()]);
+    };
+    if selected.is_empty() {
+        return Ok(vec!["Phiếu trả hàng cần chọn ít nhất một dòng hàng".into()]);
+    }
+    let return_id = document
+        .get("id")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let mut errors = Vec::new();
+    let mut returned = Vec::new();
+    let mut total = Decimal::ZERO;
+    let mut tax_total = Decimal::ZERO;
+    let mut selected_quantities = std::collections::HashMap::<usize, Decimal>::new();
+    for (index, selection) in selected.iter().enumerate() {
+        let line_index = selection
+            .get("line_index")
+            .and_then(Value::as_u64)
+            .map(|value| value as usize);
+        let qty = selection
+            .get("qty")
+            .and_then(money::decimal)
+            .filter(|value| *value > Decimal::ZERO);
+        let (Some(line_index), Some(qty), Some(source)) = (
+            line_index,
+            qty,
+            line_index.and_then(|value| source_lines.get(value)),
+        ) else {
+            errors.push(format!("Dòng trả hàng {} không hợp lệ", index + 1));
+            continue;
+        };
+        let sold_qty = source
+            .get("qty")
+            .and_then(money::decimal)
+            .unwrap_or_default();
+        if sold_qty <= Decimal::ZERO || qty > sold_qty {
+            errors.push(format!("Số lượng trả ở dòng {} vượt số đã bán", index + 1));
+            continue;
+        }
+        let prior = tx.query_opt(
+            "SELECT COALESCE(SUM((item.line->>'qty')::numeric), 0)::text FROM pos__pos_return r CROSS JOIN LATERAL jsonb_array_elements(COALESCE(r.lines, '[]'::jsonb)) AS item(line) WHERE r.tenant_id = $1 AND r.pos_order = $2 AND r.id <> NULLIF($3, '')::uuid AND r.status = 'received' AND (item.line->>'source_line_index')::int = $4",
+            &[&tenant.id, &order_id, &return_id, &(line_index as i32)],
+        ).await?;
+        let already = prior
+            .as_ref()
+            .and_then(|row| row.get::<_, String>(0).parse::<Decimal>().ok())
+            .unwrap_or_default();
+        let selected_before = selected_quantities
+            .get(&line_index)
+            .copied()
+            .unwrap_or_default();
+        let selected_after = selected_before.checked_add(qty);
+        if selected_after
+            .and_then(|selected| already.checked_add(selected))
+            .is_none_or(|amount| amount > sold_qty)
+        {
+            errors.push(format!(
+                "Số lượng trả ở dòng {} vượt số lượng còn được trả",
+                index + 1
+            ));
+            continue;
+        }
+        selected_quantities.insert(line_index, selected_after.unwrap_or_default());
+        let ratio = qty.checked_div(sold_qty).unwrap_or_default();
+        let mut line = source.as_object().cloned().unwrap_or_default();
+        let Some(base_qty) = source
+            .get("base_qty")
+            .and_then(money::decimal)
+            .unwrap_or(sold_qty)
+            .checked_mul(ratio)
+        else {
+            errors.push(format!(
+                "Số lượng quy đổi ở dòng {} vượt giới hạn",
+                index + 1
+            ));
+            continue;
+        };
+        line.insert("qty".into(), json!(qty));
+        line.insert("base_qty".into(), json!(base_qty));
+        line.insert("source_line_index".into(), json!(line_index));
+        for field in ["discount_amount", "net_amount", "tax_amount", "line_total"] {
+            let amount = source
+                .get(field)
+                .and_then(money::decimal)
+                .unwrap_or_default()
+                .checked_mul(ratio);
+            let Some(amount) = amount else {
+                errors.push(format!("Giá trị dòng {} vượt giới hạn", index + 1));
+                continue;
+            };
+            line.insert(field.into(), json!(money::round_money(amount)));
+        }
+        let line_total = line
+            .get("line_total")
+            .and_then(money::decimal)
+            .unwrap_or_default();
+        let line_tax = line
+            .get("tax_amount")
+            .and_then(money::decimal)
+            .unwrap_or_default();
+        let (Some(next_total), Some(next_tax)) = (
+            total.checked_add(line_total),
+            tax_total.checked_add(line_tax),
+        ) else {
+            errors.push("Tổng tiền phiếu trả vượt giới hạn".into());
+            continue;
+        };
+        total = next_total;
+        tax_total = next_tax;
+        returned.push(Value::Object(line));
+    }
+    if !errors.is_empty() {
+        return Ok(errors);
+    }
+    let (Some(total), Some(tax_total)) = (
+        money::json_number(money::round_money(total)),
+        money::json_number(money::round_money(tax_total)),
+    ) else {
+        return Ok(vec!["Tổng phiếu trả hàng vượt giới hạn".into()]);
+    };
+    document.insert("lines".into(), Value::Array(returned));
+    document.insert("total".into(), total);
+    document.insert("tax_total".into(), tax_total);
     Ok(Vec::new())
 }
 

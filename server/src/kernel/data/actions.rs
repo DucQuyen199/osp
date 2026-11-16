@@ -249,6 +249,7 @@ impl Kernel {
         }
         if (qname == "pos.pos_session" && action == "closed")
             || (qname == "pos.pos_order" && action == "refunded")
+            || (qname == "pos.pos_return" && action == "received")
         {
             if qname == "pos.pos_session" {
                 let errors =
@@ -266,6 +267,7 @@ impl Kernel {
         }
         if (qname == "sales.sales_order" && action == "confirmed")
             || (qname == "pos.pos_order" && matches!(action, "completed" | "refunded"))
+            || (qname == "pos.pos_return" && action == "received")
             || (qname == "purchasing.purchase_order" && action == "received")
             || (qname == "purchasing.purchase_return" && action == "dispatched")
         {
@@ -275,6 +277,8 @@ impl Kernel {
             } else if qname.starts_with("purchasing.") {
                 crate::modules::purchasing::prepare_document(tx, t, ent.def.name.as_str(), &mut cur)
                     .await?
+            } else if qname == "pos.pos_return" {
+                crate::modules::pos::prepare_return_document(tx, t, &mut cur).await?
             } else {
                 crate::modules::pos::prepare_document(tx, t, &mut cur).await?
             };

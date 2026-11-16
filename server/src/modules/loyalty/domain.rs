@@ -9,6 +9,7 @@ pub enum PointsEvent {
     Earn { source: &'static str },
     Reverse { source: &'static str },
     ReverseSalesReturn,
+    ReversePosReturn,
 }
 
 pub fn event_kind(event_type: &str) -> Option<PointsEvent> {
@@ -23,6 +24,7 @@ pub fn event_kind(event_type: &str) -> Option<PointsEvent> {
             source: "pos_order_refund",
         }),
         "sales.sales_return.received" => Some(PointsEvent::ReverseSalesReturn),
+        "pos.pos_return.received" => Some(PointsEvent::ReversePosReturn),
         _ => None,
     }
 }

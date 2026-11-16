@@ -5,9 +5,16 @@ import { fmtMoney, fmtDateTime, statusLabel, uiText } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import PosReceipt from './components/PosReceipt.jsx';
 import PosCheckoutPanel from './components/PosCheckoutPanel.jsx';
+import PosReturnDialog from './components/PosReturnDialog.jsx';
 
 const readItems = (response) => Array.isArray(response?.items) ? response.items : [];
 const displayPrice = (product) => Number(product?.price) || 0;
+const supportsPartialReturn = (order) => {
+  const lines = order?.lines || [];
+  const first = lines[0];
+  return !order?.prescription && !order?.voucher_code && !(Number(order?.voucher_discount) > 0)
+    && lines.every((line) => line.tax === first?.tax && (Number(line.tax_rate) || 0) === (Number(first?.tax_rate) || 0));
+};
 const t = uiText;
 
 export default function PosTerminalPage() {
@@ -20,6 +27,11 @@ export default function PosTerminalPage() {
   const [accounts, setAccounts] = useState(new Map());
   const [sessions, setSessions] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [returns, setReturns] = useState([]);
+  const [returningOrder, setReturningOrder] = useState(null);
+  const [returnQuantities, setReturnQuantities] = useState({});
+  const [returnReason, setReturnReason] = useState('');
+  const [returnDraftId, setReturnDraftId] = useState('');
   const [prescriptions, setPrescriptions] = useState([]);
   const [prescriptionId, setPrescriptionId] = useState('');
   const [cashMovements, setCashMovements] = useState([]);
@@ -63,12 +75,13 @@ export default function PosTerminalPage() {
     if (!keepNotice) setNotice('');
     try {
       const pharmacyEnabled = app.meta?.modules?.some((module) => module.id === 'pharmacy');
-      const [warehouseMap, branchMap, productMap, unitMap, partyMap, taxMap, accountMap, sessionResponse, orderResponse, movementResponse, prescriptionResponse] = await Promise.all([
+      const [warehouseMap, branchMap, productMap, unitMap, partyMap, taxMap, accountMap, sessionResponse, orderResponse, movementResponse, prescriptionResponse, returnResponse] = await Promise.all([
         loadRefs('inventory.warehouse'), loadRefs('master-data.branch'),
         loadRefs('master-data.product'), can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()), loadRefs('master-data.party'), loadRefs('master-data.tax'),
         loadRefs('accounting.account'), loadAllResponse('pos.pos_session'),
         loadAllResponse('pos.pos_order'), loadAllResponse('pos.cash_movement'),
         pharmacyEnabled ? loadAllResponse('pharmacy.prescription') : Promise.resolve({ items: [] }),
+        can('pos.pos_return.read') ? loadAllResponse('pos.pos_return') : Promise.resolve({ items: [] }),
       ]);
       setWarehouses(warehouseMap);
       setBranches(branchMap);
@@ -81,6 +94,7 @@ export default function PosTerminalPage() {
       const nextOrders = readItems(orderResponse).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
       setSessions(nextSessions);
       setOrders(nextOrders);
+      setReturns(readItems(returnResponse));
       setCashMovements(readItems(movementResponse).filter((item) => item.status === 'draft').sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))));
       setPrescriptions(readItems(prescriptionResponse).filter((item) => ['verified', 'partially_dispensed'].includes(item.status)).sort((a, b) => String(a.valid_until || '').localeCompare(String(b.valid_until || ''))));
       setSessionId((current) => nextSessions.some((item) => item.id === current) ? current : nextSessions[0]?.id || '');
@@ -102,6 +116,8 @@ export default function PosTerminalPage() {
   const activeWarehouse = activeSession ? warehouses.get(activeSession.warehouse) : null;
   const sessionOrders = useMemo(() => orders.filter((item) => item.session === sessionId && item.status === 'open'), [orders, sessionId]);
   const recentTransactions = useMemo(() => orders.filter((item) => ['completed', 'refunded'].includes(item.status)).slice(0, 20), [orders]);
+  const partialReturnsFor = (orderId) => returns.filter((item) => item.pos_order === orderId && item.status === 'received');
+  const partialReturnTotal = (orderId) => partialReturnsFor(orderId).reduce((sum, item) => sum + (Number(item.total) || 0), 0);
   const cart = useMemo(() => Object.entries(quantities).map(([id, qty]) => ({ product: products.get(id), uom: selectedUnits[id] || products.get(id)?.uom || '', qty: Number(qty) })).filter((row) => row.product && row.qty > 0), [quantities, products, selectedUnits]);
   const unitsFor = (product) => product?.uom ? [...units.values()].filter((unit) => unit.id === product.uom || unit.base_uom === product.uom) : [];
   const priceFor = (product, uomId) => {
@@ -234,7 +250,56 @@ export default function PosTerminalPage() {
     finally { setBusy(false); }
   };
 
-  const printingOrder = orders.find((order) => order.id === printingOrderId);
+  const beginPartialReturn = (order) => {
+    setReturningOrder(order);
+    setReturnQuantities({});
+    setReturnReason('');
+    setReturnDraftId('');
+    setError('');
+  };
+
+  const submitPartialReturn = async (event) => {
+    event.preventDefault();
+    if (!returningOrder) return;
+    const reason = returnReason.trim();
+    const lines = Object.entries(returnQuantities)
+      .map(([lineIndex, qty]) => ({ line_index: Number(lineIndex), qty: Number(qty) }))
+      .filter((line) => Number.isFinite(line.qty) && line.qty > 0);
+    if (reason.length < 5 || reason.length > 500) {
+      setError(t('Lý do trả hàng cần từ 5 đến 500 ký tự.'));
+      return;
+    }
+    if (!lines.length) {
+      setError(t('Nhập số lượng lớn hơn 0 cho ít nhất một mặt hàng.'));
+      return;
+    }
+    setBusy(true); setError(''); setNotice('');
+    try {
+      let returnId = returnDraftId;
+      if (!returnId) {
+        const created = await api(dataPath('pos.pos_return'), { method: 'POST', body: { pos_order: returningOrder.id, reason, lines } });
+        returnId = created.id;
+        setReturnDraftId(returnId);
+      }
+      await api(dataPath('pos.pos_return', returnId, 'received'), { method: 'POST' });
+      setNotice(`${t('Đã ghi nhận phiếu trả hàng')} ${String(returnId).slice(0, 8)} · ${fmtMoney(lines.reduce((sum, line) => {
+        const sold = Number(returningOrder.lines?.[line.line_index]?.qty) || 0;
+        const value = Number(returningOrder.lines?.[line.line_index]?.line_total) || 0;
+        return sum + (sold > 0 ? value * line.qty / sold : 0);
+      }, 0))}.`);
+      setReturningOrder(null); setReturnDraftId('');
+      await load(true);
+      setPrintingOrderId(returnId);
+    } catch (reason) {
+      setError(t(reason.message || 'Không ghi nhận được phiếu trả hàng. Phiếu nháp vẫn được giữ để thử lại.'));
+    } finally { setBusy(false); }
+  };
+
+  const printingReturn = returns.find((record) => record.id === printingOrderId && record.status === 'received');
+  const returnSourceOrder = printingReturn ? orders.find((order) => order.id === printingReturn.pos_order) : null;
+  const printingOrder = printingReturn
+    ? { ...returnSourceOrder, id: printingReturn.id, created_at: printingReturn.created_at, status: 'partial_return', total: printingReturn.total, tax_total: printingReturn.tax_total, lines: printingReturn.lines, refund_reason: printingReturn.reason, return_source_id: printingReturn.pos_order, method: 'refund', cash_received: undefined, change_due: undefined }
+    : orders.find((order) => order.id === printingOrderId);
 
   const createCashMovement = async (event) => {
     event.preventDefault();
@@ -308,7 +373,7 @@ export default function PosTerminalPage() {
           {pharmacyEnabled && rxRequired && <label className="field"><span className="label">{t('Đơn thuốc *')}</span><select className="select" required={rxRequired} value={prescriptionId} onChange={(event) => { const id = event.target.value; setPrescriptionId(id); const rx = prescriptions.find((item) => item.id === id); if (rx?.party) setPartyId(rx.party); }}><option value="">{t('Chọn đơn còn thuốc được kê')}</option>{prescriptions.filter((item) => ['verified', 'partially_dispensed'].includes(item.status) && item.valid_until && item.valid_until >= localDate()).map((item) => <option key={item.id} value={item.id}>{item.prescription_no} · {t(item.status === 'partially_dispensed' ? 'cấp một phần' : 'đã xác minh')} · {t('hết hạn')} {item.valid_until}</option>)}</select>{rxRequired && <small className="muted">{t('Thuốc kê đơn chỉ được bán theo đơn còn hạn, đúng khách hàng; số lượng bán cộng dồn không vượt số lượng kê.')}</small>}</label>}
           <PosCheckoutPanel method={method} onMethodChange={setMethod} cashReceived={cashReceived} onCashReceived={setCashReceived} subtotal={subtotal} estimatedTax={estimatedTax} total={total} hasItems={cart.length > 0} busy={busy} canCreate={can('pos.pos_order.create')} onCheckout={checkout} formatMoney={fmtMoney} t={t} />
           {sessionOrders.length > 0 && <section className="pos-pending"><h3>{t('Đơn chờ xử lý')} ({sessionOrders.length})</h3>{sessionOrders.map((order) => <div className="pos-pending-item" key={order.id}><div><strong>{fmtMoney(order.total || 0)}</strong><div className="small muted">{fmtDateTime(order.created_at)} · {statusLabel(order.status)}</div>{order.method === 'cash' && <label className="field"><span className="label">{t('Khách đưa')}</span><input className="input num" type="number" min={Number(order.total || 0)} step="0.01" value={pendingCashReceived[order.id] ?? (order.cash_received ?? '')} onChange={(event) => setPendingCashReceived((current) => ({ ...current, [order.id]: event.target.value }))} aria-label={`${t('Tiền khách đưa cho đơn')} ${String(order.id).slice(0, 8)}`} /></label>}</div><button className="btn btn-primary btn-sm" type="button" disabled={busy || !can('pos.pos_order.completed')} onClick={() => completeOrder(order)}>{t('Hoàn tất')}</button><button className="btn btn-ghost btn-sm" type="button" disabled={busy || !can('pos.pos_order.delete')} onClick={() => removeOrder(order)}>{t('Hủy')}</button></div>)}</section>}
-          <section className="pos-pending"><h3>{t('Giao dịch gần đây')}</h3>{recentTransactions.length ? recentTransactions.map((order) => <div className="pos-pending-item" key={order.id}><div className="grow"><strong>{fmtMoney(order.total || 0)} · {parties.get(order.party)?.name || t('Khách lẻ')}</strong><div className="small muted">{fmtDateTime(order.created_at)} · {t(order.method === 'cash' ? 'Tiền mặt' : order.method === 'card' ? 'Thẻ' : order.method === 'transfer' ? 'Chuyển khoản' : order.method === 'ewallet' ? 'Ví điện tử' : '—')} · {statusLabel(order.status)}</div><div className="small muted">{(order.lines || []).map((line, index) => `${line.product_name || products.get(line.product)?.name || t('Mặt hàng')} × ${line.qty}${line.uom_name ? ` ${line.uom_name}` : ''}`).join(' · ')}</div>{order.refund_reason && <div className="small muted">{t('Lý do hoàn:')} {order.refund_reason}</div>}</div><button className="btn btn-ghost btn-sm" type="button" onClick={() => setPrintingOrderId(order.id)}>{t('In biên nhận')}</button>{order.status === 'completed' && can('pos.pos_order.refunded') && can('pos.pos_order.update') && <button className="btn btn-ghost btn-sm" type="button" disabled={busy} onClick={() => refundOrder(order)}>{t('Hoàn toàn bộ')}</button>}</div>) : <div className="empty">{t('Chưa có giao dịch hoàn tất trong danh sách gần đây.')}</div>}</section>
+          <section className="pos-pending"><h3>{t('Giao dịch gần đây')}</h3>{recentTransactions.length ? recentTransactions.map((order) => { const partialEligible = supportsPartialReturn(order); return <div className="pos-pending-item" key={order.id}><div className="grow"><strong>{fmtMoney(order.total || 0)} · {parties.get(order.party)?.name || t('Khách lẻ')}</strong><div className="small muted">{fmtDateTime(order.created_at)} · {t(order.method === 'cash' ? 'Tiền mặt' : order.method === 'card' ? 'Thẻ' : order.method === 'transfer' ? 'Chuyển khoản' : order.method === 'ewallet' ? 'Ví điện tử' : '—')} · {statusLabel(order.status)}</div><div className="small muted">{(order.lines || []).map((line, index) => `${line.product_name || products.get(line.product)?.name || t('Mặt hàng')} × ${line.qty}${line.uom_name ? ` ${line.uom_name}` : ''}`).join(' · ')}</div>{partialReturnsFor(order.id).length > 0 && <div className="small muted">{t('Đã trả một phần')}: {fmtMoney(partialReturnTotal(order.id))}</div>}{order.refund_reason && <div className="small muted">{t('Lý do hoàn:')} {order.refund_reason}</div>}{order.status === 'completed' && !partialEligible && <div className="small muted">{t('Đơn thuốc, voucher hoặc nhiều mức thuế cần quy trình hoàn riêng.')}</div>}</div><button className="btn btn-ghost btn-sm" type="button" onClick={() => setPrintingOrderId(order.id)}>{t('In biên nhận')}</button>{order.status === 'completed' && partialEligible && can('pos.pos_return.read') && can('pos.pos_return.create') && can('pos.pos_return.received') && <button className="btn btn-secondary btn-sm" type="button" disabled={busy} onClick={() => beginPartialReturn(order)}>{t('Trả một phần')}</button>}{order.status === 'completed' && partialReturnsFor(order.id).length === 0 && can('pos.pos_order.refunded') && can('pos.pos_order.update') && <button className="btn btn-ghost btn-sm" type="button" disabled={busy} onClick={() => refundOrder(order)}>{t('Hoàn toàn bộ')}</button>}</div>; }) : <div className="empty">{t('Chưa có giao dịch hoàn tất trong danh sách gần đây.')}</div>}</section>
           <details className="pos-cash-panel"><summary>{t('Thu / chi quỹ tiền mặt')}</summary><form className="pos-cash-form" onSubmit={createCashMovement}>
             <label className="field"><span className="label">{t('Loại giao dịch')}</span><select className="select" value={cashDirection} onChange={(event) => setCashDirection(event.target.value)}><option value="cash_out">{t('Chi tiền')}</option><option value="cash_in">{t('Nộp tiền vào quỹ')}</option></select></label>
             <label className="field"><span className="label">{t('Số tiền')}</span><input className="input num" required type="number" min="0.01" step="any" value={cashAmount} onChange={(event) => setCashAmount(event.target.value)} /></label>
@@ -322,6 +387,7 @@ export default function PosTerminalPage() {
         </aside>
       </div>}
     </>}
+    <PosReturnDialog order={returningOrder} returns={returns} products={products} quantities={returnQuantities} reason={returnReason} busy={busy} locked={Boolean(returnDraftId)} canSubmit={can('pos.pos_return.create') && can('pos.pos_return.received')} onReasonChange={setReturnReason} onQuantityChange={(index, value) => setReturnQuantities((current) => ({ ...current, [index]: value }))} onClose={() => setReturningOrder(null)} onSubmit={submitPartialReturn} t={t} />
     <PosReceipt order={printingOrder} storeName={app.meta?.name} partyName={parties.get(printingOrder?.party)?.name} products={products} t={t} />
   </div>;
 }

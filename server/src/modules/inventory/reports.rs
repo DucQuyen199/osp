@@ -468,6 +468,7 @@ impl Kernel {
                      WHEN 'quality_return' THEN 'quality.inspection' \
                      WHEN 'pos_order' THEN 'pos.pos_order' \
                      WHEN 'pos_order_refund' THEN 'pos.pos_order' \
+                     WHEN 'pos_return' THEN 'pos.pos_return' \
                      WHEN 'stock_transfer_in' THEN 'inventory.stock_transfer' \
                      WHEN 'stock_transfer_out' THEN 'inventory.stock_transfer' \
                      WHEN 'stock_count' THEN 'inventory.stock_count' \

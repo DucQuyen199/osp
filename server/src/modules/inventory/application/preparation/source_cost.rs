@@ -151,12 +151,23 @@ pub(super) async fn resolve_unit_cost(
                 if let Some(source_id) = source_id {
                     if let Some(row) = tx
                         .query_opt(
-                            "SELECT (SUM(total_cost::numeric) / NULLIF(SUM(qty::numeric), 0))::text FROM inventory__stock_move WHERE tenant_id = $1 AND source = 'pos_order' AND source_id = $2 AND product = $3 AND direction = 'out'",
+                            "SELECT (SUM(sm.total_cost::numeric) / NULLIF(SUM(sm.qty::numeric), 0))::text FROM inventory__stock_move sm LEFT JOIN pos__pos_return pr ON pr.tenant_id = sm.tenant_id AND pr.id::text = $2 WHERE sm.tenant_id = $1 AND sm.source = 'pos_order' AND sm.source_id = COALESCE(pr.pos_order::text, $2) AND sm.product = $3 AND sm.direction = 'out'",
                             &[&tenant.id, &source_id.to_string(), &product_id],
                         )
                         .await?
                     {
                         let prior = optional_decimal_column(&row, 0, "POS refund unit cost")?;
+                        unit_cost = prior.unwrap_or(standard_cost);
+                    }
+                }
+            }
+            "pos_return" => {
+                if let Some(source_id) = source_id {
+                    if let Some(row) = tx.query_opt(
+                        "SELECT (SUM(sm.total_cost::numeric) / NULLIF(SUM(sm.qty::numeric), 0))::text FROM inventory__stock_move sm JOIN pos__pos_return pr ON pr.tenant_id = sm.tenant_id AND pr.pos_order::text = sm.source_id WHERE sm.tenant_id = $1 AND pr.id = $2 AND sm.source = 'pos_order' AND sm.product = $3 AND sm.direction = 'out'",
+                        &[&tenant.id, &source_id, &product_id],
+                    ).await? {
+                        let prior = optional_decimal_column(&row, 0, "POS partial-return unit cost")?;
                         unit_cost = prior.unwrap_or(standard_cost);
                     }
                 }

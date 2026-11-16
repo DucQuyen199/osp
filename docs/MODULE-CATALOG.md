@@ -157,6 +157,7 @@ Tổng: **50 module**, **199 loại dữ liệu**, **903 sự kiện**.
 |---|---|
 | `pos_session` Ca bán hàng | `open` → **closed** (open→closed) |
 | `pos_order` Đơn POS | `open` → **completed** (open→completed), **refunded** (completed→refunded) |
+| `pos_return` Phiếu trả hàng POS | `draft` → **received** (draft→received; hỗ trợ hoàn một phần nhiều lần theo số lượng còn lại) |
 | `cash_movement` Phiếu thu chi quỹ tiền mặt | `draft` → **posted** (draft→posted) |
 
 ### subscription
