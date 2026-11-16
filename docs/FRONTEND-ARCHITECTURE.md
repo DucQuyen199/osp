@@ -38,6 +38,7 @@ For translations used only by a lazy-loaded feature, keep its English text map i
 - The HR workbench owns attendance-date rules and punch actions; `AttendanceEntriesTable` renders the controlled daily records and emits punch-out requests.
 - The inventory stock-count workbench owns the count draft, validation and persistence; `StockCountLinesEditor` renders controlled product, lot, location and quantity fields and emits line edits through callbacks.
 - The purchasing workbench owns requisition permissions and API actions; `PurchaseRequisitionsTable` renders request status and emits edit, submit, approve or reject actions through callbacks.
+- The purchasing workbench owns receipt validation and inventory API actions; `PurchaseReceiptForm` edits controlled actual quantities and notes, then submits through a callback.
 
 ## Styling layers
 
