@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
-import { fmtNumber, uiText } from '../../lib/i18n.js';
+import { fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
+import biEnglish from './bi.en.js';
+
+const t = (text) => uiTextWith(text, biEnglish);
 
 const asItems = (value) => Array.isArray(value?.items) ? value.items : [];
 const label = (value) => String(value ?? '—');
@@ -17,7 +20,7 @@ function downloadBlob(blob, filename) {
 
 function DataTable({ items }) {
   const columns = items.length ? Object.keys(items[0]).filter((key) => !['id', 'tenantId', 'createdAt', 'updatedAt'].includes(key)) : [];
-  if (!items.length) return <div className="empty"><h3>{uiText("Chưa có dữ liệu")}</h3><p>{uiText("Truy vấn đã lưu không trả về bản ghi nào.")}</p></div>;
+  if (!items.length) return <div className="empty"><h3>{t("Chưa có dữ liệu")}</h3><p>{t("Truy vấn đã lưu không trả về bản ghi nào.")}</p></div>;
   return <div className="table-wrap"><table className="table"><thead><tr>{columns.map((key) => <th scope="col" key={key}>{key}</th>)}</tr></thead>
     <tbody>{items.map((item, index) => <tr key={item.id || index}>{columns.map((key) => <td key={key} className={typeof item[key] === 'number' ? 'right num' : ''}>{typeof item[key] === 'number' ? fmtNumber(item[key]) : label(item[key])}</td>)}</tr>)}</tbody>
   </table></div>;
@@ -34,17 +37,17 @@ function Widget({ widget }) {
       ? `/reports/bi/kpis/${encodeURIComponent(resourceId)}`
       : `/reports/bi/${encodeURIComponent(resourceId)}`))
       .then((data) => { if (active) setResult(data); })
-      .catch((reason) => { if (active) setError(reason.message || 'Không tải được báo cáo.'); });
+      .catch((reason) => { if (active) setError(t(reason.message || 'Không tải được báo cáo.')); });
     return () => { active = false; };
   }, [isKpi, resourceId]);
   if (error) return <div className="alert danger" role="alert">{error}</div>;
   if (!result) return <div className="skeleton" data-h="row" />;
-  if (isKpi) return <div className="stat"><span className="stat-label">{result.name}</span><strong className="stat-value num">{fmtNumber(result.value)}</strong><span className="small">Target: {result.target == null ? '—' : fmtNumber(result.target)}{result.attainmentPercent == null ? '' : ` · ${fmtNumber(result.attainmentPercent)}%`}</span></div>;
+  if (isKpi) return <div className="stat"><span className="stat-label">{result.name}</span><strong className="stat-value num">{fmtNumber(result.value)}</strong><span className="small">{t('Target:')} {result.target == null ? '—' : fmtNumber(result.target)}{result.attainmentPercent == null ? '' : ` · ${fmtNumber(result.attainmentPercent)}%`}</span></div>;
   const items = asItems(result);
   if (widget.type === 'table') return <DataTable items={items} />;
   if (widget.type === 'number') return <div className="stat"><span className="stat-label">{result.name}</span><strong className="stat-value num">{fmtNumber(Number(items[0]?.value) || 0)}</strong></div>;
   const max = Math.max(1, ...items.map((item) => Math.abs(Number(item.value) || 0)));
-  if (!items.length) return <div className="empty"><p>{uiText("Chưa có dữ liệu cho biểu đồ.")}</p></div>;
+  if (!items.length) return <div className="empty"><p>{t("Chưa có dữ liệu cho biểu đồ.")}</p></div>;
   if (widget.type === 'pie') {
     const total = items.reduce((sum, item) => sum + Math.max(0, Number(item.value) || 0), 0) || 1;
     let cursor = 0;
@@ -73,7 +76,7 @@ function KpiCard({ kpi }) {
     let active = true;
     api(tenantPath(`/reports/bi/kpis/${encodeURIComponent(kpi.id)}`))
       .then((data) => { if (active) setResult(data); })
-      .catch((reason) => { if (active) setError(reason.message || 'KPI could not be evaluated.'); });
+      .catch((reason) => { if (active) setError(t(reason.message || 'Không thể tính KPI.')); });
     return () => { active = false; };
   }, [kpi.id]);
   return <article className="card bi-link-card">
@@ -134,28 +137,28 @@ export default function BiReportsPage({ route }) {
       setReports(asItems(reportList));
       setKpis(asItems(kpiList));
     } catch (reason) {
-      setError(reason.message || 'Không tải được danh mục báo cáo BI.');
+      setError(t(reason.message || 'Không tải được danh mục báo cáo BI.'));
     } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { document.title = 'Báo cáo & phân tích · OSP Suite'; load(); }, [load]);
+  useEffect(() => { document.title = `${t('Báo cáo & phân tích')} · OSP Suite`; load(); }, [load]);
   useEffect(() => {
     let active = true;
     setError('');
     setDashboard(null); setReport(null); setResult(null); setReportRuns([]); setSelectedRun(null);
     if (route.view === 'dashboard' && route.id) {
-      api(dataPath('bi.dashboard', route.id)).then((value) => { if (active) setDashboard(value); }).catch((reason) => { if (active) setError(reason.message || 'Không tải được dashboard.'); });
+      api(dataPath('bi.dashboard', route.id)).then((value) => { if (active) setDashboard(value); }).catch((reason) => { if (active) setError(t(reason.message || 'Không tải được dashboard.')); });
     }
     if (route.view === 'report' && route.id) {
       api(dataPath('bi.report', route.id)).then(async (value) => {
         if (!active) return;
         setReport(value);
         if (value.query) setResult(await api(tenantPath(`/reports/bi/${encodeURIComponent(route.id)}`)));
-      }).catch((reason) => { if (active) setError(reason.message || 'Không tải được báo cáo.'); });
+      }).catch((reason) => { if (active) setError(t(reason.message || 'Không tải được báo cáo.')); });
       if (can('bi.report.read')) {
         api(tenantPath(`/reports/bi/${encodeURIComponent(route.id)}/runs`))
           .then((value) => { if (active) setReportRuns(asItems(value)); })
-          .catch((reason) => { if (active) setError(reason.message || 'Could not load report run history.'); });
+          .catch((reason) => { if (active) setError(t(reason.message || 'Could not load report run history.')); });
       }
     }
     return () => { active = false; };
@@ -170,7 +173,7 @@ export default function BiReportsPage({ route }) {
       const response = await api(tenantPath(path), { raw: true });
       downloadBlob(await response.blob(), 'bi-report-' + route.id + '.csv');
     } catch (reason) {
-      setError(reason.message || 'Không xuất được báo cáo.');
+      setError(t(reason.message || 'Không xuất được báo cáo.'));
     } finally {
       setExporting(false);
     }
@@ -203,7 +206,7 @@ export default function BiReportsPage({ route }) {
       await load();
       if (created?.id) window.location.hash = `#/reports/bi/report/${encodeURIComponent(created.id)}`;
     } catch (reason) {
-      setError(reason.message || 'Could not create report.');
+      setError(t(reason.message || 'Could not create report.'));
     } finally { setSavingReport(false); }
   };
 
@@ -217,7 +220,7 @@ export default function BiReportsPage({ route }) {
         api(tenantPath(`/reports/bi/${encodeURIComponent(route.id)}/runs`)),
       ]);
       setReport(updated); setReportRuns(asItems(runs));
-    } catch (reason) { setError(reason.message || 'Could not update report schedule.'); }
+    } catch (reason) { setError(t(reason.message || 'Could not update report schedule.')); }
   };
 
   const reportWidgetTypes = (item) => {
@@ -240,7 +243,7 @@ export default function BiReportsPage({ route }) {
       setCreatingDashboard(false); setDashboardName(''); setDashboardWidgets([]);
       await load();
       if (created?.id) window.location.hash = `#/reports/bi/dashboard/${encodeURIComponent(created.id)}`;
-    } catch (reason) { setError(reason.message || 'Could not create dashboard.'); }
+    } catch (reason) { setError(t(reason.message || 'Could not create dashboard.')); }
     finally { setSavingDashboard(false); }
   };
   const kpiReports = reports.filter((item) => item.query?.aggregate && !item.query?.group_by);
@@ -255,68 +258,68 @@ export default function BiReportsPage({ route }) {
       await api(dataPath('bi.kpi'), { method: 'POST', body });
       setCreatingKpi(false); setKpiName(''); setKpiTarget(''); setKpiFormula('');
       await load();
-    } catch (reason) { setError(reason.message || 'Could not create KPI.'); }
+    } catch (reason) { setError(t(reason.message || 'Could not create KPI.')); }
     finally { setSavingKpi(false); }
   };
 
   if (route.view === 'dashboard' && route.id) return <div className="page">
-    <div className="page-head"><div><a className="back-link" href="#/reports/bi">{uiText("← Báo cáo & phân tích")}</a><h1>{dashboard?.name || 'Dashboard'}</h1><p className="sub">{uiText("Các widget được lấy từ báo cáo đã lưu và phân quyền theo tenant.")}</p></div></div>
+    <div className="page-head"><div><a className="back-link" href="#/reports/bi">{t("← Báo cáo & phân tích")}</a><h1>{dashboard?.name || t('Dashboard')}</h1><p className="sub">{t("Các widget được lấy từ báo cáo đã lưu và phân quyền theo tenant.")}</p></div></div>
     {error && <div className="alert danger" role="alert">{error}</div>}
-    {!dashboard ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <div className="bi-widget-grid">{(dashboard.widgets || []).map((widget, index) => <section className="card report-section bi-widget" key={`${widget.type === 'kpi' ? widget.kpi : widget.report}:${index}`}><div className="card-head"><h2>{widget.type === 'kpi' ? (kpis.find((item) => item.id === widget.kpi)?.name || 'KPI') : (reports.find((item) => item.id === widget.report)?.name || 'Report widget')}</h2><a href={widget.type === 'kpi' ? '#/reports/bi' : `#/reports/bi/report/${encodeURIComponent(widget.report)}`}>{widget.type === 'kpi' ? 'Mở KPI' : 'Mở báo cáo'}</a></div><div className="card-pad"><Widget widget={widget} /></div></section>)}</div>}
+    {!dashboard ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <div className="bi-widget-grid">{(dashboard.widgets || []).map((widget, index) => <section className="card report-section bi-widget" key={`${widget.type === 'kpi' ? widget.kpi : widget.report}:${index}`}><div className="card-head"><h2>{widget.type === 'kpi' ? (kpis.find((item) => item.id === widget.kpi)?.name || 'KPI') : (reports.find((item) => item.id === widget.report)?.name || 'Report widget')}</h2><a href={widget.type === 'kpi' ? '#/reports/bi' : `#/reports/bi/report/${encodeURIComponent(widget.report)}`}>{widget.type === 'kpi' ? t('Mở KPI') : t('Mở báo cáo')}</a></div><div className="card-pad"><Widget widget={widget} /></div></section>)}</div>}
   </div>;
 
   if (route.view === 'report' && route.id) return <div className="page">
-    <div className="page-head"><div><a className="back-link" href="#/reports/bi">{uiText("← Báo cáo & phân tích")}</a><h1>{report?.name || 'Báo cáo'}</h1><p className="sub">{report?.query?.source ? `Nguồn dữ liệu: ${report.query.source}` : 'Báo cáo chưa có truy vấn đã lưu.'}</p></div></div>
+    <div className="page-head"><div><a className="back-link" href="#/reports/bi">{t("← Báo cáo & phân tích")}</a><h1>{report?.name || t('Báo cáo')}</h1><p className="sub">{report?.query?.source ? `Nguồn dữ liệu: ${report.query.source}` : 'Báo cáo chưa có truy vấn đã lưu.'}</p></div></div>
     {error && <div className="alert danger" role="alert">{error}</div>}
-    {report?.schedule && <section className="card report-section"><div className="card-head"><h2>{uiText("Lịch snapshot")}</h2><span className="badge plain">{report.schedule === 'daily' ? 'Hằng ngày' : 'Hằng tuần'} · {report.schedule_status === 'scheduled' ? 'Đang chạy' : 'Đã tạm dừng'}</span></div><div className="card-pad row"><span className="small muted">Lần tiếp theo: {report.next_run_at || 'Chưa đặt lịch'} (UTC)</span>{report.schedule_status === 'scheduled' && can('bi.report.paused') && <button className="btn" type="button" onClick={() => runReportAction('paused')}>{uiText("Tạm dừng")}</button>}{report.schedule_status === 'paused' && can('bi.report.scheduled') && <button className="btn btn-primary" type="button" onClick={() => runReportAction('scheduled')}>{uiText("Tiếp tục")}</button>}</div></section>}
-    {reportRuns.length > 0 && <section className="card report-section"><div className="card-head"><h2>{uiText("Lịch sử snapshot")}</h2><span className="faint">{reportRuns.length} lần gần nhất</span></div><div className="card-pad stack-sm">{reportRuns.map((run) => <button className="btn" type="button" key={run.id} aria-pressed={selectedRun?.id === run.id} onClick={() => setSelectedRun(run)}>{run.runAt} · {run.rowCount} dòng</button>)}</div>{selectedRun && <div className="card-pad"><DataTable items={asItems(selectedRun.result)} /></div>}</section>}
-    {!report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : result ? <section className="card report-section"><div className="card-head"><h2>{uiText("Kết quả")}</h2><span className="faint">{fmtNumber(result.total || 0)} bản ghi</span><button className="btn" type="button" disabled={exporting} onClick={exportReport}>{exporting ? 'Đang xuất…' : 'Tải CSV'}</button></div><div className="card-pad"><DataTable items={asItems(result)} /></div></section> : <div className="empty"><h3>{uiText("Chưa cấu hình truy vấn")}</h3><p>{uiText("Thêm định nghĩa truy vấn an toàn vào báo cáo để xem dữ liệu.")}</p></div>}
+    {report?.schedule && <section className="card report-section"><div className="card-head"><h2>{t("Lịch snapshot")}</h2><span className="badge plain">{report.schedule === 'daily' ? t('Hằng ngày') : t('Hằng tuần')} · {report.schedule_status === 'scheduled' ? t('Đang chạy') : t('Đã tạm dừng')}</span></div><div className="card-pad row"><span className="small muted">{t("Lần tiếp theo:")} {report.next_run_at || t("Chưa đặt lịch")} (UTC)</span>{report.schedule_status === 'scheduled' && can('bi.report.paused') && <button className="btn" type="button" onClick={() => runReportAction('paused')}>{t("Tạm dừng")}</button>}{report.schedule_status === 'paused' && can('bi.report.scheduled') && <button className="btn btn-primary" type="button" onClick={() => runReportAction('scheduled')}>{t("Tiếp tục")}</button>}</div></section>}
+    {reportRuns.length > 0 && <section className="card report-section"><div className="card-head"><h2>{t("Lịch sử snapshot")}</h2><span className="faint">{reportRuns.length} {t("lần gần nhất")}</span></div><div className="card-pad stack-sm">{reportRuns.map((run) => <button className="btn" type="button" key={run.id} aria-pressed={selectedRun?.id === run.id} onClick={() => setSelectedRun(run)}>{run.runAt} · {run.rowCount} dòng</button>)}</div>{selectedRun && <div className="card-pad"><DataTable items={asItems(selectedRun.result)} /></div>}</section>}
+    {!report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : result ? <section className="card report-section"><div className="card-head"><h2>{t("Kết quả")}</h2><span className="faint">{fmtNumber(result.total || 0)} {t("bản ghi")}</span><button className="btn" type="button" disabled={exporting} onClick={exportReport}>{exporting ? t('Đang xuất…') : t('Tải CSV')}</button></div><div className="card-pad"><DataTable items={asItems(result)} /></div></section> : <div className="empty"><h3>{t("Chưa cấu hình truy vấn")}</h3><p>{t("Thêm định nghĩa truy vấn an toàn vào báo cáo để xem dữ liệu.")}</p></div>}
   </div>;
 
   return <div className="page">
     <div className="row" style={{ justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-      {can('bi.report.create') && !creating && <button className="btn btn-primary" type="button" onClick={() => { setCreating(true); if (!draftSource && sources[0]) setDraftSource(sources[0].qname); }}>{uiText("Tạo báo cáo")}</button>}
-      {can('bi.dashboard.create') && can('bi.report.read') && !creatingDashboard && <button className="btn" type="button" onClick={() => setCreatingDashboard(true)}>{uiText("Tạo dashboard")}</button>}
-      {can('bi.kpi.create') && can('bi.report.read') && !creatingKpi && <button className="btn" type="button" onClick={() => setCreatingKpi(true)}>{uiText("Tạo KPI")}</button>}
+      {can('bi.report.create') && !creating && <button className="btn btn-primary" type="button" onClick={() => { setCreating(true); if (!draftSource && sources[0]) setDraftSource(sources[0].qname); }}>{t("Tạo báo cáo")}</button>}
+      {can('bi.dashboard.create') && can('bi.report.read') && !creatingDashboard && <button className="btn" type="button" onClick={() => setCreatingDashboard(true)}>{t("Tạo dashboard")}</button>}
+      {can('bi.kpi.create') && can('bi.report.read') && !creatingKpi && <button className="btn" type="button" onClick={() => setCreatingKpi(true)}>{t("Tạo KPI")}</button>}
     </div>
-    {creating && <section className="card report-section"><div className="card-head"><h2>{uiText("Thiết kế báo cáo")}</h2><button className="btn btn-ghost" type="button" onClick={() => setCreating(false)}>{uiText("Đóng")}</button></div><form className="card-pad stack" onSubmit={createReport}>
-      <div className="form-grid"><label className="field"><span>{uiText("Tên báo cáo")}</span><input className="input" required maxLength={160} value={draftName} onChange={(event) => setDraftName(event.target.value)} /></label>
-        <label className="field"><span>{uiText("Nguồn dữ liệu")}</span><select className="input" required value={selectedSource?.qname || ''} onChange={(event) => { setDraftSource(event.target.value); setDraftField(''); setDraftGroup(''); setDraftFilter(''); }}><option value="">{uiText("Chọn module và dữ liệu")}</option>{sources.map((source) => <option key={source.qname} value={source.qname}>{source.label}</option>)}</select></label>
-        <label className="field"><span>{uiText("Kiểu kết quả")}</span><select className="input" value={draftOperation} onChange={(event) => { setDraftOperation(event.target.value); setDraftField(''); setDraftGroup(''); }}><option value="rows">{uiText("Danh sách bản ghi")}</option><option value="count">{uiText("Đếm bản ghi")}</option><option value="sum">{uiText("Tổng")}</option><option value="avg">{uiText("Trung bình")}</option><option value="min">{uiText("Nhỏ nhất")}</option><option value="max">{uiText("Lớn nhất")}</option></select></label>
-        {draftOperation !== 'rows' && draftOperation !== 'count' && <label className="field"><span>{uiText("Trường số cần tính")}</span><select className="input" required value={draftField} onChange={(event) => setDraftField(event.target.value)}><option value="">{uiText("Chọn trường")}</option>{numericFields.map((field) => <option key={field.name} value={field.name}>{field.label || field.name}</option>)}</select></label>}
-        {draftOperation !== 'rows' && <label className="field"><span>{uiText("Nhóm theo (không bắt buộc)")}</span><select className="input" value={draftGroup} onChange={(event) => setDraftGroup(event.target.value)}><option value="">{uiText("Không nhóm")}</option>{groupFields.map((field) => <option key={field.name} value={field.name}>{field.label || field.name}</option>)}</select></label>}
-        <label className="field"><span>{uiText("Tìm kiếm văn bản (không bắt buộc)")}</span><input className="input" value={draftSearch} onChange={(event) => setDraftSearch(event.target.value)} /></label>
-        <label className="field"><span>{uiText("Lịch chạy snapshot")}</span><select className="input" value={draftSchedule} onChange={(event) => setDraftSchedule(event.target.value)}><option value="">{uiText("Chạy thủ công")}</option><option value="daily">{uiText("Hằng ngày")}</option><option value="weekly">{uiText("Hằng tuần")}</option></select><span className="small muted">{uiText("Lịch dùng UTC; snapshot tiếp theo chạy sau một chu kỳ.")}</span></label>
-        <label className="field"><span>{uiText("Email nhận báo cáo (không bắt buộc)")}</span><textarea className="input" rows="3" value={draftRecipients} onChange={(event) => setDraftRecipients(event.target.value)} placeholder="name@example.com, team@example.com" disabled={!draftSchedule} /><span className="small muted">{uiText("Đính kèm CSV sau mỗi lần chạy theo lịch; cần cấu hình SMTP hoặc email provider.")}</span></label>
-        <label className="field"><span>{uiText("Lọc theo trường (không bắt buộc)")}</span><select className="input" value={draftFilter} onChange={(event) => setDraftFilter(event.target.value)}><option value="">{uiText("Không lọc")}</option>{sourceFields.filter((field) => field.type !== 'json').map((field) => <option key={field.name} value={field.name}>{field.label || field.name}</option>)}</select></label>
-        {draftFilter && <label className="field"><span>{uiText("Giá trị lọc chính xác")}</span><input className="input" value={draftFilterValue} onChange={(event) => setDraftFilterValue(event.target.value)} /></label>}
+    {creating && <section className="card report-section"><div className="card-head"><h2>{t("Thiết kế báo cáo")}</h2><button className="btn btn-ghost" type="button" onClick={() => setCreating(false)}>{t("Đóng")}</button></div><form className="card-pad stack" onSubmit={createReport}>
+      <div className="form-grid"><label className="field"><span>{t("Tên báo cáo")}</span><input className="input" required maxLength={160} value={draftName} onChange={(event) => setDraftName(event.target.value)} /></label>
+        <label className="field"><span>{t("Nguồn dữ liệu")}</span><select className="input" required value={selectedSource?.qname || ''} onChange={(event) => { setDraftSource(event.target.value); setDraftField(''); setDraftGroup(''); setDraftFilter(''); }}><option value="">{t("Chọn module và dữ liệu")}</option>{sources.map((source) => <option key={source.qname} value={source.qname}>{source.label}</option>)}</select></label>
+        <label className="field"><span>{t("Kiểu kết quả")}</span><select className="input" value={draftOperation} onChange={(event) => { setDraftOperation(event.target.value); setDraftField(''); setDraftGroup(''); }}><option value="rows">{t("Danh sách bản ghi")}</option><option value="count">{t("Đếm bản ghi")}</option><option value="sum">{t("Tổng")}</option><option value="avg">{t("Trung bình")}</option><option value="min">{t("Nhỏ nhất")}</option><option value="max">{t("Lớn nhất")}</option></select></label>
+        {draftOperation !== 'rows' && draftOperation !== 'count' && <label className="field"><span>{t("Trường số cần tính")}</span><select className="input" required value={draftField} onChange={(event) => setDraftField(event.target.value)}><option value="">{t("Chọn trường")}</option>{numericFields.map((field) => <option key={field.name} value={field.name}>{field.label || field.name}</option>)}</select></label>}
+        {draftOperation !== 'rows' && <label className="field"><span>{t("Nhóm theo (không bắt buộc)")}</span><select className="input" value={draftGroup} onChange={(event) => setDraftGroup(event.target.value)}><option value="">{t("Không nhóm")}</option>{groupFields.map((field) => <option key={field.name} value={field.name}>{field.label || field.name}</option>)}</select></label>}
+        <label className="field"><span>{t("Tìm kiếm văn bản (không bắt buộc)")}</span><input className="input" value={draftSearch} onChange={(event) => setDraftSearch(event.target.value)} /></label>
+        <label className="field"><span>{t("Lịch chạy snapshot")}</span><select className="input" value={draftSchedule} onChange={(event) => setDraftSchedule(event.target.value)}><option value="">{t("Chạy thủ công")}</option><option value="daily">{t("Hằng ngày")}</option><option value="weekly">{t("Hằng tuần")}</option></select><span className="small muted">{t("Lịch dùng UTC; snapshot tiếp theo chạy sau một chu kỳ.")}</span></label>
+        <label className="field"><span>{t("Email nhận báo cáo (không bắt buộc)")}</span><textarea className="input" rows="3" value={draftRecipients} onChange={(event) => setDraftRecipients(event.target.value)} placeholder="name@example.com, team@example.com" disabled={!draftSchedule} /><span className="small muted">{t("Đính kèm CSV sau mỗi lần chạy theo lịch; cần cấu hình SMTP hoặc email provider.")}</span></label>
+        <label className="field"><span>{t("Lọc theo trường (không bắt buộc)")}</span><select className="input" value={draftFilter} onChange={(event) => setDraftFilter(event.target.value)}><option value="">{t("Không lọc")}</option>{sourceFields.filter((field) => field.type !== 'json').map((field) => <option key={field.name} value={field.name}>{field.label || field.name}</option>)}</select></label>
+        {draftFilter && <label className="field"><span>{t("Giá trị lọc chính xác")}</span><input className="input" value={draftFilterValue} onChange={(event) => setDraftFilterValue(event.target.value)} /></label>}
       </div>
-      {!sources.length && <p className="small muted">{uiText("Bạn chưa có quyền đọc nguồn dữ liệu nào để thiết kế báo cáo.")}</p>}
+      {!sources.length && <p className="small muted">{t("Bạn chưa có quyền đọc nguồn dữ liệu nào để thiết kế báo cáo.")}</p>}
       <div className="row"><button className="btn btn-primary" type="submit" disabled={savingReport || !selectedSource}>{savingReport ? 'Đang lưu…' : 'Lưu và chạy báo cáo'}</button></div>
     </form></section>}
-    {creatingDashboard && <section className="card report-section"><div className="card-head"><h2>{uiText("Tạo dashboard")}</h2><button className="btn btn-ghost" type="button" onClick={() => setCreatingDashboard(false)}>{uiText("Đóng")}</button></div><form className="card-pad stack" onSubmit={createDashboard}>
-      <label className="field"><span>{uiText("Tên dashboard")}</span><input className="input" required maxLength={160} value={dashboardName} onChange={(event) => setDashboardName(event.target.value)} /></label>
-      <div className="form-grid"><label className="field"><span>{uiText("Báo cáo")}</span><select className="input" value={widgetReportId} onChange={(event) => { const next = reports.find((item) => item.id === event.target.value); setWidgetReportId(event.target.value); setWidgetType(reportWidgetTypes(next)[0]); }}><option value="">{uiText("Chọn báo cáo đã lưu")}</option>{reports.filter((item) => item.query).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-        <label className="field"><span>{uiText("Kiểu widget")}</span><select className="input" value={widgetTypeOptions.includes(widgetType) ? widgetType : widgetTypeOptions[0]} onChange={(event) => setWidgetType(event.target.value)}>{widgetTypeOptions.map((type) => <option key={type} value={type}>{({ table: 'Bảng', number: 'Chỉ số', line: 'Đường', bar: 'Cột', pie: 'Tròn' })[type]}</option>)}</select></label>
-        <button className="btn" type="button" disabled={!selectedWidgetReport || dashboardWidgets.length >= 24} onClick={addDashboardWidget}>{uiText("Thêm widget")}</button>
+    {creatingDashboard && <section className="card report-section"><div className="card-head"><h2>{t("Tạo dashboard")}</h2><button className="btn btn-ghost" type="button" onClick={() => setCreatingDashboard(false)}>{t("Đóng")}</button></div><form className="card-pad stack" onSubmit={createDashboard}>
+      <label className="field"><span>{t("Tên dashboard")}</span><input className="input" required maxLength={160} value={dashboardName} onChange={(event) => setDashboardName(event.target.value)} /></label>
+      <div className="form-grid"><label className="field"><span>{t("Báo cáo")}</span><select className="input" value={widgetReportId} onChange={(event) => { const next = reports.find((item) => item.id === event.target.value); setWidgetReportId(event.target.value); setWidgetType(reportWidgetTypes(next)[0]); }}><option value="">{t("Chọn báo cáo đã lưu")}</option>{reports.filter((item) => item.query).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label className="field"><span>{t("Kiểu widget")}</span><select className="input" value={widgetTypeOptions.includes(widgetType) ? widgetType : widgetTypeOptions[0]} onChange={(event) => setWidgetType(event.target.value)}>{widgetTypeOptions.map((type) => <option key={type} value={type}>{t(({ table: 'Bảng', number: 'Chỉ số', line: 'Đường', bar: 'Cột', pie: 'Tròn' })[type])}</option>)}</select></label>
+        <button className="btn" type="button" disabled={!selectedWidgetReport || dashboardWidgets.length >= 24} onClick={addDashboardWidget}>{t("Thêm widget")}</button>
       </div>
-      {dashboardWidgets.length > 0 && <ol className="stack-sm">{dashboardWidgets.map((widget, index) => <li key={`${widget.report}:${index}`} className="row"><span>{reports.find((item) => item.id === widget.report)?.name || 'Báo cáo'} · {widget.type}</span><button className="btn btn-ghost btn-sm" type="button" aria-label={`Xóa widget ${index + 1}`} onClick={() => setDashboardWidgets((items) => items.filter((_, itemIndex) => itemIndex !== index))}>{uiText("Xóa")}</button></li>)}</ol>}
-      <div className="row"><button className="btn btn-primary" type="submit" disabled={savingDashboard || !dashboardWidgets.length}>{savingDashboard ? 'Đang lưu…' : 'Lưu dashboard'}</button></div>
+      {dashboardWidgets.length > 0 && <ol className="stack-sm">{dashboardWidgets.map((widget, index) => <li key={`${widget.report}:${index}`} className="row"><span>{reports.find((item) => item.id === widget.report)?.name || t('Báo cáo')} · {widget.type}</span><button className="btn btn-ghost btn-sm" type="button" aria-label={`Xóa widget ${index + 1}`} onClick={() => setDashboardWidgets((items) => items.filter((_, itemIndex) => itemIndex !== index))}>{t("Xóa")}</button></li>)}</ol>}
+      <div className="row"><button className="btn btn-primary" type="submit" disabled={savingDashboard || !dashboardWidgets.length}>{savingDashboard ? t('Đang lưu…') : t('Lưu dashboard')}</button></div>
     </form></section>}
-    {creatingKpi && <section className="card report-section"><div className="card-head"><h2>{uiText("Tạo KPI")}</h2><button className="btn btn-ghost" type="button" onClick={() => setCreatingKpi(false)}>{uiText("Đóng")}</button></div><form className="card-pad stack" onSubmit={createKpi}>
-      <div className="form-grid"><label className="field"><span>{uiText("Tên KPI")}</span><input className="input" required maxLength={160} value={kpiName} onChange={(event) => setKpiName(event.target.value)} /></label>
-        <label className="field"><span>{uiText("Báo cáo tổng hợp không nhóm")}</span><select className="input" required value={kpiReportId} onChange={(event) => setKpiReportId(event.target.value)}><option value="">{uiText("Chọn nguồn KPI")}</option>{kpiReports.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-        <label className="field"><span>{uiText("Mục tiêu (không bắt buộc)")}</span><input className="input num" type="number" min="0" step="any" value={kpiTarget} onChange={(event) => setKpiTarget(event.target.value)} /></label>
-        <label className="field"><span>{uiText("Công thức (không bắt buộc)")}</span><input className="input" maxLength={500} value={kpiFormula} onChange={(event) => setKpiFormula(event.target.value)} /><span className="small muted">{uiText("Biến khả dụng: value, target. Ví dụ: value / target * 100")}</span></label>
+    {creatingKpi && <section className="card report-section"><div className="card-head"><h2>{t("Tạo KPI")}</h2><button className="btn btn-ghost" type="button" onClick={() => setCreatingKpi(false)}>{t("Đóng")}</button></div><form className="card-pad stack" onSubmit={createKpi}>
+      <div className="form-grid"><label className="field"><span>{t("Tên KPI")}</span><input className="input" required maxLength={160} value={kpiName} onChange={(event) => setKpiName(event.target.value)} /></label>
+        <label className="field"><span>{t("Báo cáo tổng hợp không nhóm")}</span><select className="input" required value={kpiReportId} onChange={(event) => setKpiReportId(event.target.value)}><option value="">{t("Chọn nguồn KPI")}</option>{kpiReports.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label className="field"><span>{t("Mục tiêu (không bắt buộc)")}</span><input className="input num" type="number" min="0" step="any" value={kpiTarget} onChange={(event) => setKpiTarget(event.target.value)} /></label>
+        <label className="field"><span>{t("Công thức (không bắt buộc)")}</span><input className="input" maxLength={500} value={kpiFormula} onChange={(event) => setKpiFormula(event.target.value)} /><span className="small muted">{t("Biến khả dụng: value, target. Ví dụ: value / target * 100")}</span></label>
       </div>
-      <div className="row"><button className="btn btn-primary" type="submit" disabled={savingKpi || !kpiReports.length}>{savingKpi ? 'Đang lưu…' : 'Lưu KPI'}</button></div>
+      <div className="row"><button className="btn btn-primary" type="submit" disabled={savingKpi || !kpiReports.length}>{savingKpi ? t('Đang lưu…') : t('Lưu KPI')}</button></div>
     </form></section>}
-    <div className="page-head"><div><h1>{uiText("Báo cáo & phân tích")}</h1><p className="sub">{uiText("Chạy truy vấn đã lưu và xem dashboard từ dữ liệu tenant mà Rust API cho phép.")}</p></div></div>
+    <div className="page-head"><div><h1>{t("Báo cáo & phân tích")}</h1><p className="sub">{t("Chạy truy vấn đã lưu và xem dashboard từ dữ liệu tenant mà Rust API cho phép.")}</p></div></div>
     {error && <div className="alert danger" role="alert">{error}</div>}
     {loading ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <div className="stack">
-      <section className="card report-section"><div className="card-head"><h2>Dashboard</h2><span className="faint">{dashboards.length}</span></div><div className="card-pad">{dashboards.length ? <div className="bi-link-grid">{dashboards.map((item) => <a className="card bi-link-card" key={item.id} href={`#/reports/bi/dashboard/${encodeURIComponent(item.id)}`}><strong>{item.name}</strong><span>{(item.widgets || []).length} widget</span></a>)}</div> : <div className="empty"><p>{uiText("Chưa có dashboard. Tạo dữ liệu dashboard trong module BI để bắt đầu.")}</p></div>}</div></section>
-      <section className="card report-section"><div className="card-head"><h2>{uiText("Báo cáo đã lưu")}</h2><span className="faint">{reports.length}</span></div><div className="card-pad">{reports.length ? <div className="bi-link-grid">{reports.map((item) => <a className="card bi-link-card" key={item.id} href={`#/reports/bi/report/${encodeURIComponent(item.id)}`}><strong>{item.name}</strong><span>{item.query?.source || 'Chưa cấu hình truy vấn'}</span></a>)}</div> : <div className="empty"><p>{uiText("Chưa có báo cáo. Tạo bản ghi trong module BI và khai báo truy vấn JSON an toàn.")}</p></div>}</div></section>
-      {can('bi.kpi.read') && <section className="card report-section"><div className="card-head"><h2>KPI</h2><span className="faint">{kpis.length}</span></div><div className="card-pad">{kpis.length ? <div className="bi-link-grid">{kpis.map((item) => <KpiCard key={item.id} kpi={item} />)}</div> : <div className="empty"><p>No KPIs configured.</p></div>}</div></section>}
+      <section className="card report-section"><div className="card-head"><h2>{t('Dashboard')}</h2><span className="faint">{dashboards.length}</span></div><div className="card-pad">{dashboards.length ? <div className="bi-link-grid">{dashboards.map((item) => <a className="card bi-link-card" key={item.id} href={`#/reports/bi/dashboard/${encodeURIComponent(item.id)}`}><strong>{item.name}</strong><span>{(item.widgets || []).length} widget</span></a>)}</div> : <div className="empty"><p>{t("Chưa có dashboard. Tạo dữ liệu dashboard trong module BI để bắt đầu.")}</p></div>}</div></section>
+      <section className="card report-section"><div className="card-head"><h2>{t("Báo cáo đã lưu")}</h2><span className="faint">{reports.length}</span></div><div className="card-pad">{reports.length ? <div className="bi-link-grid">{reports.map((item) => <a className="card bi-link-card" key={item.id} href={`#/reports/bi/report/${encodeURIComponent(item.id)}`}><strong>{item.name}</strong><span>{item.query?.source || 'Chưa cấu hình truy vấn'}</span></a>)}</div> : <div className="empty"><p>{t("Chưa có báo cáo. Tạo bản ghi trong module BI và khai báo truy vấn JSON an toàn.")}</p></div>}</div></section>
+      {can('bi.kpi.read') && <section className="card report-section"><div className="card-head"><h2>{t('KPI')}</h2><span className="faint">{kpis.length}</span></div><div className="card-pad">{kpis.length ? <div className="bi-link-grid">{kpis.map((item) => <KpiCard key={item.id} kpi={item} />)}</div> : <div className="empty"><p>{t("No KPIs configured.")}</p></div>}</div></section>}
     </div>}
   </div>;
 }
