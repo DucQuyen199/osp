@@ -334,6 +334,10 @@ async fn prepare_document_with_lock(
             }
         }
         let unit_price = line.get("price").and_then(money::decimal);
+        let requested_tax = line.get("tax").cloned();
+        let requested_tax_rate = line.get("tax_rate").and_then(money::decimal);
+        let requested_po_tax = line.get("po_tax").cloned();
+        let requested_po_tax_rate = line.get("po_tax_rate").and_then(money::decimal);
         let source_line = source_lines.iter().find(|source| {
             let matches_price = match entity {
                 "purchase_return" => unit_price.is_none_or(|price| {
@@ -367,12 +371,40 @@ async fn prepare_document_with_lock(
                 }),
                 _ => true,
             };
+            let matches_tax = match entity {
+                "purchase_return" => {
+                    requested_tax
+                        .as_ref()
+                        .is_none_or(|tax| source.get("tax").unwrap_or(&Value::Null) == tax)
+                        && requested_tax_rate.is_none_or(|rate| {
+                            source
+                                .get("tax_rate")
+                                .and_then(money::decimal)
+                                .unwrap_or_default()
+                                == rate
+                        })
+                }
+                "supplier_invoice" => {
+                    requested_po_tax
+                        .as_ref()
+                        .is_none_or(|tax| source.get("tax").unwrap_or(&Value::Null) == tax)
+                        && requested_po_tax_rate.is_none_or(|rate| {
+                            source
+                                .get("tax_rate")
+                                .and_then(money::decimal)
+                                .unwrap_or_default()
+                                == rate
+                        })
+                }
+                _ => true,
+            };
             source.get("product").and_then(Value::as_str) == Some(product_id.to_string().as_str())
                 && line
                     .get("uom")
                     .and_then(Value::as_str)
                     .is_none_or(|unit| source.get("uom").and_then(Value::as_str) == Some(unit))
                 && matches_price
+                && matches_tax
         });
         if entity == "purchase_return" {
             if unit_price.is_some() && source_line.is_none() {
@@ -390,6 +422,18 @@ async fn prepare_document_with_lock(
                         line.remove(field);
                     }
                 }
+                let po_tax = source
+                    .get("po_tax")
+                    .or_else(|| source.get("tax"))
+                    .cloned()
+                    .unwrap_or(Value::Null);
+                let po_tax_rate = source
+                    .get("po_tax_rate")
+                    .or_else(|| source.get("tax_rate"))
+                    .cloned()
+                    .unwrap_or(json!(0));
+                line.insert("po_tax".into(), po_tax);
+                line.insert("po_tax_rate".into(), po_tax_rate);
                 if entity == "purchase_return"
                     && let Some(po_price) = source.get("po_price")
                 {
@@ -403,6 +447,14 @@ async fn prepare_document_with_lock(
                     if let Some(order_price) = source.get("price") {
                         line.insert("po_price".into(), order_price.clone());
                     }
+                    line.insert(
+                        "po_tax".into(),
+                        source.get("tax").cloned().unwrap_or(Value::Null),
+                    );
+                    line.insert(
+                        "po_tax_rate".into(),
+                        source.get("tax_rate").cloned().unwrap_or(json!(0)),
+                    );
                 } else {
                     for field in ["tax", "tax_rate", "tax_name"] {
                         if let Some(value) = source.get(field) {

@@ -4,6 +4,7 @@
 
 ## [Unreleased]
 ### Added
+- Purchase receipt and return lines now retain separate PO tax snapshots for otherwise identical product, price, and unit lines, so invoice matching and return credits select the correct tax terms.
 - Agriculture yield and harvest totals now group output by product and use converted base units, so mixed units and products are not added together as if they were comparable.
 - Utility meter readings now validate future billing periods against the tenant's business date, avoiding incorrect month-boundary decisions based on the server's UTC date.
 - Sales returns now keep separate quantities and pricing terms for same-product lines with different discounts or tax snapshots, so the credit value follows the original order line.
