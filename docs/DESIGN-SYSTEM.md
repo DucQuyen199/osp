@@ -1,6 +1,6 @@
 # OSP Design System · v1
 
-Tài liệu này là quy chuẩn thiết kế và giao diện của OSP Suite. Ứng dụng React nằm trong [client/](../client); token CSS dùng chung nằm ở [platform/server/public/app/styles/](../platform/server/public/app/styles/).
+Tài liệu này là quy chuẩn thiết kế và giao diện của OSP Suite. Ứng dụng React nằm trong [client/](../client); token CSS dùng chung nằm ở [client/public/app/styles/](../client/public/app/styles/).
 
 **Phạm vi.** Ứng dụng web ERP/CRM đa module, đa ngành, tiếng Việt. Giao diện được **sinh tự động từ khai báo entity** (form, bảng, drawer, huy hiệu trạng thái, timeline) nên design system phải đủ chặt để hàng trăm màn hình sinh ra vẫn nhất quán mà không ai thiết kế từng màn.
 
@@ -24,7 +24,7 @@ Tài liệu này là quy chuẩn thiết kế và giao diện của OSP Suite. �
 
 ## 2. Design tokens
 
-Nguồn duy nhất: [tokens.css](../platform/server/public/app/styles/tokens.css). **Quy tắc cứng: thành phần chỉ dùng token ngữ nghĩa** (`--text`, `--accent`, `--border`…), không dùng hex. Hiện không còn màu hex nào ngoài `tokens.css` (đã kiểm bằng tìm kiếm mã nguồn).
+Nguồn duy nhất: [tokens.css](../client/public/app/styles/tokens.css). **Quy tắc cứng: thành phần chỉ dùng token ngữ nghĩa** (`--text`, `--accent`, `--border`…), không dùng hex. Hiện không còn màu hex nào ngoài `tokens.css` (đã kiểm bằng tìm kiếm mã nguồn).
 
 ### 2.1 Màu
 
@@ -126,7 +126,7 @@ Họ chữ hệ thống, không tải font ngoài (nhanh, không rò rỉ riêng
 | ≤ 640px | `form-grid` một cột |
 | ≤ 560px | Danh sách mô tả (`dl`) xếp dọc |
 
-Chiều rộng nội dung tối đa `--content-max` = 80rem; sidebar `--sidebar-w` = 15.5rem; thanh trên `--topbar-h` = 3.5rem.
+Chiều rộng nội dung tối đa `--content-max` = 92rem; sidebar `--sidebar-w` = 16.5rem; thanh trên `--topbar-h` = 4rem.
 
 **Lớp chồng (z-index):** skip-link 100 · toast 200 · menu 50 · sidebar mobile 40 · scrim 35 · thanh trên 30. Dialog/drawer dùng `<dialog>` gốc nên nằm ở *top layer* của trình duyệt, không cần z-index.
 
@@ -134,7 +134,7 @@ Chiều rộng nội dung tối đa `--content-max` = 80rem; sidebar `--sidebar-
 
 ## 3. Thành phần
 
-Mỗi thành phần ghi: mục đích, biến thể, trạng thái, truy cập, nên/không nên. Lớp CSS ở [components.css](../platform/server/public/app/styles/components.css); toast và hộp xác nhận dùng [feedback.js](../client/src/lib/feedback.js).
+Mỗi thành phần ghi: mục đích, biến thể, trạng thái, truy cập, nên/không nên. Lớp CSS ở [components.css](../client/public/app/styles/components.css); toast và hộp xác nhận dùng [feedback.js](../client/src/lib/feedback.js).
 
 ### 3.1 Button — `.btn`
 **Dùng khi:** thực hiện một hành động. Nút điều hướng thuần dùng thẻ `<a>`.
@@ -397,7 +397,7 @@ Design system dùng **semver**: *major* đổi/xóa token hoặc lớp CSS đang
 
 ### 9.3 Tệp nguồn
 ```
-platform/server/public/
+client/public/
   app/styles/tokens.css       Token (nguồn duy nhất của giá trị thiết kế)
   app/styles/base.css         Reset, kiểu chữ nền, tiện ích (.row .stack .muted ...)
   app/styles/components.css   Thành phần

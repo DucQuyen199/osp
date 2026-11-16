@@ -49,4 +49,4 @@ Runtime TypeScript đã được gỡ. Node.js chỉ còn chạy công cụ phá
 
 ## Giao diện
 
-Client React nằm trong `client/`; API, trạng thái và tiện ích dùng chung nằm ở `client/src/lib/`; token và CSS vẫn dùng chung từ `platform/server/public/app/styles/`. Tuân [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md), hỗ trợ bàn phím và không chèn dữ liệu người dùng bằng HTML thô. Các bounded context Rust mới theo cấu trúc `mod.rs`, `domain.rs`, `application.rs`, `persistence.rs`; khi mở rộng context cũ, chuyển từng luồng theo cấu trúc đó.
+Client React nằm trong `client/`; API, trạng thái và tiện ích dùng chung nằm ở `client/src/lib/`; token và CSS vẫn dùng chung từ `client/public/app/styles/`. Tuân [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md), hỗ trợ bàn phím và không chèn dữ liệu người dùng bằng HTML thô. Các bounded context Rust mới theo cấu trúc `mod.rs`, `domain.rs`, `application.rs`, `persistence.rs`; khi mở rộng context cũ, chuyển từng luồng theo cấu trúc đó.

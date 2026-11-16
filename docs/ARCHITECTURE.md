@@ -260,7 +260,7 @@ Events include causation identifiers. A configured maximum depth stops event loo
 
 ## Release status
 
-The Rust server, PostgreSQL deployment, and React/Vite client build are active. TypeScript source and runtime have been removed. React owns the web routes and screens; Rust owns the production API and business workflows. Shared client helpers live in `client/src/lib`; design tokens and styles remain in `platform/server/public/app/styles`. Deeper module behavior, external provider integrations, release rehearsals, and full workflow verification remain in the roadmap.
+The Rust server, PostgreSQL deployment, and React/Vite client build are active. TypeScript source and runtime have been removed. React owns the web routes and screens; Rust owns the production API and business workflows. Shared client helpers live in `client/src/lib`; design tokens and styles remain in `client/public/app/styles`. Deeper module behavior, external provider integrations, release rehearsals, and full workflow verification remain in the roadmap.
 
 Inventory bin tracking now covers transfers, stock-on-hand reporting, and physical counts. A submitted count snapshots the product/lot/bin book balance while holding the product/warehouse lock, prevents competing stock movements until disposition, and posts only approved variances back to the counted bin.
 
