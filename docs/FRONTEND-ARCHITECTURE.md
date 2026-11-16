@@ -7,15 +7,15 @@ The client is a React 19 application built with Vite. It uses JavaScript and the
 - `client/src/main.jsx` mounts React and registers the production service worker.
 - `client/src/app/App.jsx` owns session startup, authentication redirects, route changes, account preferences, and the shared application shell.
 - `client/src/app/parseRoute.js` translates the current hash into a route object. Unknown paths resolve to the not-found screen.
-- `client/src/app/PageRouter.jsx` maps route names to screens. Screens load with `React.lazy` inside one suspense boundary, keeping business workflows out of the initial bundle.
+- `client/src/app/PageRouter.jsx` uses explicit screen and settings registries. Screens load with `React.lazy` inside one suspense boundary, keeping business workflows out of the initial bundle.
 - `client/src/components/` contains shared shell and UI pieces such as navigation, global search, and icons.
 - `client/src/lib/` contains cross-screen API, tenant state, date, event, formatting, feedback, and URL helpers.
-- Feature screens remain in `client/src/` and own their workflow state and API orchestration. They should use the shared helpers and design tokens; move them into domain folders as they receive deeper refactors.
+- `client/src/features/<domain>/` groups workflow screens and related dialogs by business domain. Each feature owns its workflow state and API orchestration while using shared helpers and tokens.
 
 ## Adding a screen
 
-1. Add the workflow screen with a focused page component and a descriptive file name.
-2. Add a lazy import and route branch in `app/PageRouter.jsx`; add its URL mapping in `app/parseRoute.js`.
+1. Add the workflow screen under the matching `client/src/features/<domain>/` folder with a focused page component.
+2. Add a lazy import to the screen registry in `app/PageRouter.jsx`; add its URL mapping in `app/parseRoute.js`.
 3. Add navigation only where the feature is enabled and the current user has permission.
 4. Use the shared API/state/date/format helpers rather than recreating tenant or money rules in a screen.
 5. Use semantic headings, labels, accessible names, visible focus, and the existing CSS tokens. Add reusable styles to shared components only when more than one screen needs them.

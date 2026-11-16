@@ -4,6 +4,7 @@
 
 ## [Unreleased]
 ### Added
+- Moved 88 React screens and entity dialogs into 32 domain feature folders and rewrote local imports to preserve the existing route and page behavior.
 - Replaced the nested route rendering chain with explicit screen and settings registries, including a lazy not-found fallback for unsupported paths.
 - Unknown frontend routes now show a clear 404 page with a direct return to the workspace instead of silently opening the home dashboard.
 - Manufacturing work-center capacity now compares orders only when their finished products share the same base unit, and labels the daily limit in base units to prevent invalid mixed-unit scheduling.

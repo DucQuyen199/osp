@@ -1,5 +1,5 @@
 ﻿import { useCallback, useEffect, useRef, useState } from 'react';
-import AuthPage from '../AuthPage.jsx';
+import AuthPage from '../features/auth/AuthPage.jsx';
 import PageRouter from './PageRouter.jsx';
 import { parseRoute } from './parseRoute.js';
 import GlobalSearch from '../components/GlobalSearch.jsx';
