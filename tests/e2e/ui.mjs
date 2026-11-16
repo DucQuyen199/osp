@@ -212,6 +212,7 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Settings', 'inventory settings title is not translated');
   must((await page.$eval('#main h2', (heading) => heading.textContent)) === 'Inventory costing method', 'inventory costing policy is not translated');
+  must((await page.$eval('[role="tab"][aria-selected="true"]', (tab) => tab.textContent)) === 'Inventory', 'inventory settings tab is not translated');
   await axe('inventory settings tiếng Anh');
   await page.goto(`${BASE}/#/quality`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#main h1');
