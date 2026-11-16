@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { api, tenantPath } from '../../lib/api.js';
 import { toast } from '../../lib/feedback.js';
+import { uiText } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
 import { setBusinessTimezone } from '../../lib/dates.js';
 import SettingsTabs from './SettingsTabs.jsx';
@@ -34,28 +35,28 @@ export default function BusinessTimeSettingsPage() {
       setTimezone(settings.businessTimezone || 'UTC');
       setBusinessTimezone(settings.businessTimezone || 'UTC');
       window.dispatchEvent(new Event('osp:meta'));
-      toast('Business time zone updated.', 'success');
+      toast(uiText('Đã cập nhật múi giờ nghiệp vụ.'), 'success');
     } catch (reason) {
-      setError(reason.message || 'Could not update business time zone.');
+      setError(reason.message || uiText('Không cập nhật được múi giờ nghiệp vụ.'));
     } finally { setBusy(false); }
   };
 
-  if (!can('tenant.admin')) return <div className="page"><div className="alert danger" role="alert">Only tenant administrators can change the business time zone.</div></div>;
+  if (!can('tenant.admin')) return <div className="page"><div className="alert danger" role="alert">{uiText('Chỉ quản trị viên mới được đổi múi giờ nghiệp vụ.')}</div></div>;
 
   return <div className="page">
-    <div className="page-head"><div><h1>Settings</h1><p className="sub">Calendar policy for “{app.meta.name}”.</p></div></div>
+    <div className="page-head"><div><h1>{uiText('Cài đặt')}</h1><p className="sub">{uiText('Chính sách lịch của doanh nghiệp')} “{app.meta.name}”.</p></div></div>
     <SettingsTabs active="business-time" />
-    <section className="stack" aria-label="Business time zone settings">
+    <section className="stack" aria-label={uiText('Cài đặt múi giờ nghiệp vụ')}>
       {error && <div className="alert danger" role="alert">{error}</div>}
       <section className="card">
-        <div className="card-head"><h2>Business time zone</h2></div>
+        <div className="card-head"><h2>{uiText('Múi giờ nghiệp vụ')}</h2></div>
         <form className="card-pad stack" onSubmit={save}>
-          <label className="field" htmlFor="business-timezone"><span>IANA time zone</span>
+          <label className="field" htmlFor="business-timezone"><span>{uiText('Múi giờ IANA')}</span>
             <input className="input" id="business-timezone" list="business-timezone-options" required maxLength="80" value={timezone} disabled={busy} onChange={(event) => setTimezone(event.target.value)} />
             <datalist id="business-timezone-options">{timeZones().map((zone) => <option key={zone} value={zone} />)}</datalist>
           </label>
-          <p className="muted">Used for date-only business rules and default calendar dates. Examples: Asia/Ho_Chi_Minh, Europe/London, America/New_York. Changing this setting does not rewrite stored dates or timestamps.</p>
-          <div><button className="btn btn-primary" type="submit" disabled={busy || !timezone.trim()}>{busy ? 'Saving…' : 'Save time zone'}</button></div>
+          <p className="muted">{uiText('Múi giờ này được dùng cho quy tắc nghiệp vụ theo ngày và ngày mặc định trên lịch. Ví dụ: Asia/Ho_Chi_Minh, Europe/London, America/New_York. Đổi cài đặt không ghi lại ngày hoặc dấu thời gian đã lưu.')}</p>
+          <div><button className="btn btn-primary" type="submit" disabled={busy || !timezone.trim()}>{busy ? uiText('Đang lưu…') : uiText('Lưu múi giờ')}</button></div>
         </form>
       </section>
     </section>

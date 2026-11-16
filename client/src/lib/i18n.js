@@ -584,6 +584,16 @@ const UI_TEXT_EN = {
   'Outbox tích hợp': 'Integration outbox', 'Trạng thái giao nhận': 'Delivery status', 'Không có webhook dead-letter.': 'No dead-letter webhooks.',
   'Không có delivery trong trạng thái này.': 'No deliveries with this status.', 'Đích': 'Destination', 'Lỗi cuối': 'Last error', 'Connector': 'Connector', 'Webhook': 'Webhook', 'Đẩy lại': 'Retry delivery',
   'Đã xử lý': 'Resolved', 'Đã bỏ qua': 'Dismissed', 'Module': 'Module', 'Connector': 'Connector', 'Webhook': 'Webhook',
+  'Không tải được danh sách tiền tệ.': 'Could not load currencies.', 'Tiền tệ': 'Currency', 'Đã đặt tiền tệ cơ sở thành': 'Base currency set to',
+  'Không cập nhật được tiền tệ cơ sở.': 'Could not update the base currency.', 'Chỉ quản trị viên mới được đổi tiền tệ cơ sở.': 'Only tenant administrators can change the base currency.',
+  'Chính sách tiền tệ của doanh nghiệp': 'Company currency policy', 'Cài đặt tiền tệ': 'Currency settings', 'Tiền tệ cơ sở': 'Base currency',
+  'Tiền tệ sổ cái': 'Ledger currency', 'Chọn đơn vị này trước khi ghi nhận hóa đơn hoặc bút toán. Máy chủ sẽ khóa lựa chọn sau chứng từ tài chính đầu tiên để bảo đảm sổ cái nhất quán.': 'Choose this before recording invoices or journal entries. The server locks the choice after the first financial document to preserve ledger consistency.',
+  'Đã cập nhật múi giờ nghiệp vụ.': 'Business time zone updated.', 'Không cập nhật được múi giờ nghiệp vụ.': 'Could not update the business time zone.',
+  'Chỉ quản trị viên mới được đổi múi giờ nghiệp vụ.': 'Only tenant administrators can change the business time zone.',
+  'Chính sách lịch của doanh nghiệp': 'Company calendar policy', 'Cài đặt múi giờ nghiệp vụ': 'Business time zone settings',
+  'Múi giờ nghiệp vụ': 'Business time zone', 'Múi giờ IANA': 'IANA time zone',
+  'Múi giờ này được dùng cho quy tắc nghiệp vụ theo ngày và ngày mặc định trên lịch. Ví dụ: Asia/Ho_Chi_Minh, Europe/London, America/New_York. Đổi cài đặt không ghi lại ngày hoặc dấu thời gian đã lưu.': 'This time zone is used for date-only business rules and default calendar dates. Examples: Asia/Ho_Chi_Minh, Europe/London, America/New_York. Changing this setting does not rewrite stored dates or timestamps.',
+  'Đang lưu…': 'Saving…', 'Lưu múi giờ': 'Save time zone',
 };
 
 const storedUiLocale = () => {
