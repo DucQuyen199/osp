@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { api, session, tenantPath } from '../../lib/api.js';
 import { toast } from '../../lib/feedback.js';
+import { uiText } from '../../lib/i18n.js';
 import { app, can, entityLabel } from '../../lib/state.js';
 import EntityImportDialog from '../entities/EntityImportDialog.jsx';
 import SettingsTabs from './SettingsTabs.jsx';
@@ -29,8 +30,8 @@ export default function DataSettingsPage() {
     try {
       const response = await api(tenantPath(path), { raw: true });
       downloadBlob(await response.blob(), filename);
-      toast('Đã xuất dữ liệu.', 'success');
-    } catch (reason) { setError(reason.message || 'Không xuất được dữ liệu.'); }
+      toast(uiText('Đã xuất dữ liệu.'), 'success');
+    } catch (reason) { setError(reason.message || uiText('Không xuất được dữ liệu.')); }
     finally { setBusy(''); }
   };
 
@@ -44,30 +45,30 @@ export default function DataSettingsPage() {
       session.clear();
       location.hash = '#/login';
       location.reload();
-    } catch (reason) { setError(reason.message || 'Không xóa được doanh nghiệp.'); }
+    } catch (reason) { setError(reason.message || uiText('Không xóa được doanh nghiệp.')); }
     finally { setBusy(''); }
   };
 
-  if (!can('tenant.admin')) return <div className="page"><div className="alert danger" role="alert">Chỉ quản trị viên mới được xuất, nhập hoặc xóa dữ liệu doanh nghiệp.</div></div>;
+  if (!can('tenant.admin')) return <div className="page"><div className="alert danger" role="alert">{uiText('Chỉ quản trị viên mới được xuất, nhập hoặc xóa dữ liệu doanh nghiệp.')}</div></div>;
 
   return <div className="page">
-    <div className="page-head"><div><h1>Cài đặt</h1><p className="sub">Dữ liệu của doanh nghiệp “{app.meta.name}”.</p></div></div>
+    <div className="page-head"><div><h1>{uiText('Cài đặt')}</h1><p className="sub">{uiText('Dữ liệu của doanh nghiệp')} “{app.meta.name}”.</p></div></div>
     <SettingsTabs active="data" />
     <section className="stack">
       {error && <div className="alert danger" role="alert">{error}</div>}
-      <section className="card"><div className="card-head"><h2>Xuất dữ liệu</h2></div><div className="card-pad stack">
-        <p className="muted">Tải dữ liệu doanh nghiệp về bất cứ lúc nào. Bản JSON gồm dữ liệu, vai trò và trường mở rộng; không chứa mật khẩu hoặc bí mật token.</p>
-        <div><button className="btn btn-primary" type="button" disabled={Boolean(busy)} onClick={() => exportData('/export', `osp-${app.meta.id}.json`)}>{busy === '/export' ? 'Đang xuất…' : 'Tải toàn bộ (JSON)'}</button></div>
-        <div className="row wrap"><div className="field grow"><label htmlFor="export-entity">Xuất một loại dữ liệu (CSV)</label><select className="select" id="export-entity" value={exportEntity} onChange={(event) => setExportEntity(event.target.value)}>{entities.map((entity) => <option key={entity} value={entity}>{entityLabel(entity)} ({entity})</option>)}</select></div><button className="btn" type="button" disabled={Boolean(busy) || !exportEntity} onClick={() => exportData(`/export/${exportEntity.replace('.', '/')}`, `${exportEntity}.csv`)}>Tải CSV</button></div>
+      <section className="card"><div className="card-head"><h2>{uiText('Xuất dữ liệu')}</h2></div><div className="card-pad stack">
+        <p className="muted">{uiText('Tải dữ liệu doanh nghiệp về bất cứ lúc nào. Bản JSON gồm dữ liệu, vai trò và trường mở rộng; không chứa mật khẩu hoặc bí mật token.')}</p>
+        <div><button className="btn btn-primary" type="button" disabled={Boolean(busy)} onClick={() => exportData('/export', `osp-${app.meta.id}.json`)}>{busy === '/export' ? uiText('Đang xuất…') : uiText('Tải toàn bộ (JSON)')}</button></div>
+        <div className="row wrap"><div className="field grow"><label htmlFor="export-entity">{uiText('Xuất một loại dữ liệu (CSV)')}</label><select className="select" id="export-entity" value={exportEntity} onChange={(event) => setExportEntity(event.target.value)}>{entities.map((entity) => <option key={entity} value={entity}>{entityLabel(entity)} ({entity})</option>)}</select></div><button className="btn" type="button" disabled={Boolean(busy) || !exportEntity} onClick={() => exportData(`/export/${exportEntity.replace('.', '/')}`, `${exportEntity}.csv`)}>{uiText('Tải CSV')}</button></div>
       </div></section>
-      <section className="card"><div className="card-head"><h2>Nhập dữ liệu</h2></div><div className="card-pad stack">
-        <p className="muted">Nhập CSV theo kiểu tất-cả-hoặc-không. Nếu có lỗi, không bản ghi nào được ghi. Dữ liệu nhập không kích hoạt các bước tự động.</p>
-        <div className="row wrap"><div className="field grow"><label htmlFor="import-entity">Loại dữ liệu</label><select className="select" id="import-entity" value={importEntity} onChange={(event) => setImportEntity(event.target.value)}>{entities.map((entity) => <option key={entity} value={entity}>{entityLabel(entity)} ({entity})</option>)}</select></div><button className="btn" type="button" disabled={!importEntity} onClick={() => setImportOpen(true)}>Chọn tệp CSV…</button></div>
+      <section className="card"><div className="card-head"><h2>{uiText('Nhập dữ liệu')}</h2></div><div className="card-pad stack">
+        <p className="muted">{uiText('Nhập CSV theo kiểu tất-cả-hoặc-không. Nếu có lỗi, không bản ghi nào được ghi. Dữ liệu nhập không kích hoạt các bước tự động.')}</p>
+        <div className="row wrap"><div className="field grow"><label htmlFor="import-entity">{uiText('Loại dữ liệu')}</label><select className="select" id="import-entity" value={importEntity} onChange={(event) => setImportEntity(event.target.value)}>{entities.map((entity) => <option key={entity} value={entity}>{entityLabel(entity)} ({entity})</option>)}</select></div><button className="btn" type="button" disabled={!importEntity} onClick={() => setImportOpen(true)}>{uiText('Chọn tệp CSV…')}</button></div>
       </div></section>
-      <section className="card danger-zone"><div className="card-head"><h2>Khu vực nguy hiểm</h2></div><div className="card-pad stack"><p className="muted">Xóa vĩnh viễn doanh nghiệp cùng toàn bộ dữ liệu, người dùng và token. Hành động này không thể khôi phục. Hãy xuất dữ liệu trước.</p>
-        <form className="stack-sm" onSubmit={deleteTenant}><div className="field"><label htmlFor="delete-tenant-name">Gõ chính xác tên doanh nghiệp để xác nhận: <strong>{app.meta.name}</strong></label><input className="input" id="delete-tenant-name" value={deleteName} onChange={(event) => setDeleteName(event.target.value)} autoComplete="off" /></div><div><button className="btn btn-danger" type="submit" disabled={Boolean(busy) || deleteName !== app.meta.name}>{busy === 'delete' ? 'Đang xóa…' : 'Xóa vĩnh viễn doanh nghiệp'}</button></div></form>
+      <section className="card danger-zone"><div className="card-head"><h2>{uiText('Khu vực nguy hiểm')}</h2></div><div className="card-pad stack"><p className="muted">{uiText('Xóa vĩnh viễn doanh nghiệp cùng toàn bộ dữ liệu, người dùng và token. Hành động này không thể khôi phục. Hãy xuất dữ liệu trước.')}</p>
+        <form className="stack-sm" onSubmit={deleteTenant}><div className="field"><label htmlFor="delete-tenant-name">{uiText('Gõ chính xác tên doanh nghiệp để xác nhận:')} <strong>{app.meta.name}</strong></label><input className="input" id="delete-tenant-name" value={deleteName} onChange={(event) => setDeleteName(event.target.value)} autoComplete="off" /></div><div><button className="btn btn-danger" type="submit" disabled={Boolean(busy) || deleteName !== app.meta.name}>{busy === 'delete' ? uiText('Đang xóa…') : uiText('Xóa vĩnh viễn doanh nghiệp')}</button></div></form>
       </div></section>
     </section>
-    {importOpen && <EntityImportDialog qname={importEntity} onClose={() => setImportOpen(false)} onDone={() => toast('Đã nhập dữ liệu.', 'success')} />}
+    {importOpen && <EntityImportDialog qname={importEntity} onClose={() => setImportOpen(false)} onDone={() => toast(uiText('Đã nhập dữ liệu.'), 'success')} />}
   </div>;
 }

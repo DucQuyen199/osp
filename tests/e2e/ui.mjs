@@ -234,6 +234,10 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   await page.waitForSelector('#main h2');
   must((await page.$eval('#main h2', (heading) => heading.textContent)) === 'Create role', 'role settings are not translated');
   await axe('role settings tiếng Anh');
+  await page.goto(`${BASE}/#/settings/data`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#main h2');
+  must((await page.$eval('#main h2', (heading) => heading.textContent)) === 'Export data', 'data settings are not translated');
+  await axe('data settings tiếng Anh');
   await page.goto(`${BASE}/#/period-close`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Accounting period close', 'accounting period close title is not translated');
