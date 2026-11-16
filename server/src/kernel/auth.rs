@@ -476,7 +476,7 @@ impl Kernel {
         let conn = self.pool.get().await?;
         let rows = conn
             .query(
-                "SELECT jsonb_build_object('id', substr(hash, 1, 12), 'label', COALESCE(label, 'Browser session'), 'current', hash = $3, 'createdAt', created_at, 'expiresAt', expires_at) \\
+                "SELECT jsonb_build_object('id', substr(hash, 1, 12), 'label', COALESCE(label, 'Browser session'), 'current', hash = $3, 'createdAt', created_at, 'expiresAt', expires_at) \
                  FROM osp_sessions WHERE tenant_id = $1 AND user_id = $2 AND kind = 'session' AND (expires_at IS NULL OR expires_at > now()) ORDER BY created_at DESC",
                 &[&t.id, user_id, &current_hash],
             )

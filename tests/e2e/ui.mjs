@@ -238,6 +238,10 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   await page.waitForSelector('#main h2');
   must((await page.$eval('#main h2', (heading) => heading.textContent)) === 'Export data', 'data settings are not translated');
   await axe('data settings tiếng Anh');
+  await page.goto(`${BASE}/#/account/security`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#main h1');
+  must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Account security', 'account security screen is not translated');
+  await axe('account security tiếng Anh');
   await page.goto(`${BASE}/#/period-close`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Accounting period close', 'accounting period close title is not translated');
