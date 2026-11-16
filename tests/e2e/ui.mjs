@@ -217,6 +217,14 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Nonconformance register', 'quality workbench title is not translated');
   await axe('quality workbench tiếng Anh');
+  await page.goto(`${BASE}/#/settings/audit`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#main h2');
+  must((await page.$eval('#main h2', (heading) => heading.textContent)) === 'Audit log', 'audit log is not translated');
+  await axe('audit settings tiếng Anh');
+  await page.goto(`${BASE}/#/unknown`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#main h1');
+  must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Page not found', 'not-found page is not translated');
+  await axe('not-found page tiếng Anh');
   await page.goto(`${BASE}/#/reports/inventory/lot-expiry`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Expiring lots', 'màn hình lô cận hạn chưa được dịch');
