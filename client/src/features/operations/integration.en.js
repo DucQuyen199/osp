@@ -21,7 +21,7 @@ const integrationEnglish = {
   'Chưa có connector.': 'No connectors yet.', 'Tên': 'Name', 'Loại': 'Type', 'Trạng thái': 'Status', 'Cập nhật': 'Updated',
   'Đang gửi': 'Sending', 'Thiếu adapter': 'Adapter missing', 'Đã tắt': 'Disabled', 'Gửi thử': 'Send test', 'Tạm ngưng': 'Pause', 'Bật lại': 'Enable',
   'Webhook gửi sự kiện': 'Event webhooks', 'Chưa đăng ký webhook.': 'No webhooks registered.', 'Endpoint': 'Endpoint', 'Sự kiện': 'Events',
-  'Chưa chọn sự kiện': 'No events selected', 'Ví dụ sự kiện:': 'Example events:', 'Theo dõi và thử lại lần gửi tới webhook hoặc connector trong': 'Monitor and retry webhook or connector deliveries in',
+  'Chưa chọn sự kiện': 'No events selected', 'Ví dụ sự kiện:': 'Example events:', 'Theo dõi và thử lại lần gửi tới webhook hoặc connector trong': 'Monitor and retry webhook or connector deliveries in', 'Cài đặt API token': 'API token settings',
   'Outbox tích hợp': 'Integration Outbox', 'Tạo token tích hợp giới hạn quyền tại': 'Create a scoped integration token in', 'Thao tác': 'Actions',
 };
 
