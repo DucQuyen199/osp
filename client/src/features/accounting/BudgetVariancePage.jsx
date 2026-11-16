@@ -55,7 +55,7 @@ export default function BudgetVariancePage() {
           <VarianceStats summary={summary} />
         </section>)}
       </section>}
-      {!report.lines?.length ? <div className="empty"><h3>Chưa có ngân sách đã duyệt</h3><p>Hãy thêm các dòng tài khoản chi phí hoặc doanh thu rồi duyệt ngân sách.</p></div> : <div className="card table-wrap"><table className="table">
+      {!report.lines?.length ? <div className="empty"><h2>Chưa có ngân sách đã duyệt</h2><p>Hãy thêm các dòng tài khoản chi phí hoặc doanh thu rồi duyệt ngân sách.</p></div> : <div className="card table-wrap"><table className="table">
         <thead><tr><th scope="col">Kỳ</th><th scope="col">Ngân sách</th><th scope="col">Tài khoản</th><th scope="col">Loại</th><th scope="col">Trạng thái</th><th scope="col" className="right">Dự toán</th><th scope="col" className="right">Thực tế</th><th scope="col" className="right">Chênh lệch thuận lợi</th><th scope="col" className="right">Sử dụng</th></tr></thead>
         <tbody>{report.lines.map((line) => <tr key={line.lineId}>
           <td>{line.period}</td><td>{line.budget}</td><td>{line.accountCode} · {line.account}</td><td>{line.accountKind === 'revenue' ? 'Doanh thu' : 'Chi phí'}</td><td>{line.budgetStatus}</td>

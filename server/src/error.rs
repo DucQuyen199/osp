@@ -98,10 +98,11 @@ impl From<tokio_postgres::Error> for ApiError {
                 _ => {}
             }
             return Self::internal(format!(
-                "{} [{}] {}",
+                "{} [{}] {} at {:?}",
                 db.message(),
                 db.code().code(),
-                db.detail().unwrap_or("")
+                db.detail().unwrap_or(""),
+                db.position()
             ));
         }
         Self::internal(e)

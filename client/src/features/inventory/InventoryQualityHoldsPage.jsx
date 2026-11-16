@@ -84,7 +84,7 @@ export default function InventoryQualityHoldsPage() {
         <div className="card stat"><span className="stat-label">Số lượng đang giữ theo đơn vị gốc</span><strong className="stat-value num">{report.heldQtyByUnit?.length ? report.heldQtyByUnit.map((row) => `${quantity(row.qty)} ${row.unit}`).join(' · ') : '0'}</strong></div>
         <div className="card stat"><span className="stat-label">Giá trị đang giữ</span><strong className="stat-value num">{fmtMoney(report.heldValue)}</strong></div>
       </div>
-      {!report.items?.length ? <div className="empty"><h3>Không có hàng tồn đang giữ QC</h3><p>Các phiếu chờ kiểm tra hoặc không đạt đã được xử lý.</p></div> : <div className="card table-wrap"><table className="table">
+      {!report.items?.length ? <div className="empty"><h2>Không có hàng tồn đang giữ QC</h2><p>Các phiếu chờ kiểm tra hoặc không đạt đã được xử lý.</p></div> : <div className="card table-wrap"><table className="table">
         <thead><tr><th scope="col">Trạng thái</th><th scope="col">Sản phẩm</th><th scope="col">Kho</th><th scope="col">Lô</th><th scope="col">Nguồn / lớp nhập</th><th scope="col" className="right">Đang giữ (đơn vị gốc)</th><th scope="col" className="right">Đơn giá / đơn vị gốc</th><th scope="col" className="right">Giá trị</th><th scope="col" className="right">Số ngày</th><th scope="col">Thao tác QC</th></tr></thead>
         <tbody>{report.items.map((item) => <tr key={item.inspectionId}>
           <td><span className={`badge ${item.inspectionStatus === 'failed' ? 'danger' : 'warning'}`}>{statusLabel(item.inspectionStatus)}</span></td>

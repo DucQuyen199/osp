@@ -69,7 +69,7 @@ async fn replenishment_rows(
            GROUP BY inspection.tenant_id, inspection.product, inspection.warehouse, inspection.lot \
          ), "
     } else {
-        "quality_holds AS (SELECT NULL::uuid AS tenant_id, NULL::uuid AS product, NULL::uuid AS warehouse, NULL::uuid AS lot, 0::numeric AS qty WHERE FALSE), "
+        "quality_holds AS (SELECT NULL::text AS tenant_id, NULL::uuid AS product, NULL::uuid AS warehouse, NULL::uuid AS lot, 0::numeric AS qty WHERE FALSE), "
     };
     tx.query_json(
         &format!("WITH {sales_demand} ordered_lines AS ( \
@@ -586,7 +586,7 @@ impl Kernel {
                    WHERE qi.tenant_id = $1 AND qi.status IN ('pending', 'failed') \
                      AND ($2::uuid IS NULL OR qi.warehouse = $2) AND ($3::text IS NULL OR qi.status = $3) \
                  ), source_layers AS ( \
-                   SELECT sm.*, round((COALESCE(sm.total_cost, 0)::numeric / NULLIF(sm.qty::numeric, 0)), 4) AS unit_cost, \
+                   SELECT sm.*, round((COALESCE(sm.total_cost, 0)::numeric / NULLIF(sm.qty::numeric, 0)), 4) AS derived_unit_cost, \
                      row_number() OVER (PARTITION BY sm.tenant_id, sm.source, sm.source_id, sm.product, sm.warehouse, sm.lot, \
                        round((COALESCE(sm.total_cost, 0)::numeric / NULLIF(sm.qty::numeric, 0)), 4), round(sm.qty::numeric, 6) \
                        ORDER BY sm.created_at, sm.id) AS layer_ordinal \
@@ -598,8 +598,8 @@ impl Kernel {
                    'warehouseId', w.id, 'warehouse', w.name, \
                    'lotId', lot.id, 'lotCode', lot.code, 'layerId', layer.id, 'layerOriginId', layer.fifo_origin_id, \
                    'layerReceivedAt', layer.created_at, 'layerQty', layer.qty, 'heldQty', qi.held_qty, \
-                   'unitCost', COALESCE(qi.unit_cost, layer.unit_cost, 0), \
-                   'heldValue', qi.held_qty * COALESCE(qi.unit_cost, layer.unit_cost, 0), \
+                   'unitCost', COALESCE(qi.unit_cost, layer.derived_unit_cost, 0), \
+                   'heldValue', qi.held_qty * COALESCE(qi.unit_cost, layer.derived_unit_cost, 0), \
                    'daysHeld', GREATEST($4::date - (qi.created_at AT TIME ZONE $5)::date, 0) \
                  ) FROM held_inspections qi \
                  JOIN master_data__product p ON p.tenant_id = qi.tenant_id AND p.id = qi.product \
@@ -609,7 +609,7 @@ impl Kernel {
                  LEFT JOIN source_layers layer ON layer.tenant_id = qi.tenant_id AND layer.source = qi.source \
                    AND layer.source_id = qi.source_id AND layer.product = qi.product AND layer.warehouse = qi.warehouse \
                    AND layer.lot IS NOT DISTINCT FROM qi.lot::text \
-                   AND layer.unit_cost IS NOT DISTINCT FROM round(COALESCE(qi.unit_cost, 0)::numeric, 4) \
+                   AND layer.derived_unit_cost IS NOT DISTINCT FROM round(COALESCE(qi.unit_cost, 0)::numeric, 4) \
                    AND round(layer.qty::numeric, 6) = round(qi.qty::numeric, 6) AND layer.layer_ordinal = qi.layer_ordinal \
                  WHERE qi.held_qty > 0.000001 \
                  ORDER BY qi.created_at, qi.id",

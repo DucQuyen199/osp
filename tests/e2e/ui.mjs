@@ -231,7 +231,8 @@ const verticalScreens = [
   ['retail', '#/pos', 'Retail'], ['saas-technology', '#/subscriptions', 'SaaS'],
   ['utilities-isp', '#/utilities', 'Utilities'], ['wholesale', '#/wholesale', 'Wholesale'],
 ];
-for (const [vertical, hash, label] of verticalScreens) {
+const requestedVerticals = new Set((process.env.E2E_VERTICALS || '').split(',').map((name) => name.trim()).filter(Boolean));
+for (const [vertical, hash, label] of verticalScreens.filter(([name]) => !requestedVerticals.size || requestedVerticals.has(name))) {
   await step(`${label} vertical: route and accessibility`, async () => {
     await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
     await page.goto(`${BASE}/?demo=${encodeURIComponent(vertical)}&go=${encodeURIComponent(hash.slice(1))}`, { waitUntil: 'networkidle0' });
@@ -240,6 +241,20 @@ for (const [vertical, hash, label] of verticalScreens) {
     must(!(await page.$('.not-found-page')), `${label} vertical route resolved to not found`);
     await axe(`${label} vertical`);
   });
+  if (process.env.E2E_ALL_NAV === '1') {
+    const navigationRoutes = await page.$$eval('.sidebar a.nav-link', (links) => [...new Set(links
+      .map((link) => link.getAttribute('href'))
+      .filter((href) => href?.startsWith('#/') && href !== '#/' && !href.startsWith('#/m/') && !href.startsWith('#/e/')))]);
+    for (const navHash of navigationRoutes) {
+      await step(`${label} navigation ${navHash}: route and accessibility`, async () => {
+        await page.goto(`${BASE}/${navHash}`, { waitUntil: 'networkidle0' });
+        await page.waitForSelector('h1');
+        must(!(await page.$('.route-error')), `${navHash} route failed to render`);
+        must(!(await page.$('.not-found-page')), `${navHash} route resolved to not found`);
+        await axe(`${label} ${navHash}`);
+      });
+    }
+  }
 }
 
 await step('lazy route load failure: recovery boundary', async () => {
