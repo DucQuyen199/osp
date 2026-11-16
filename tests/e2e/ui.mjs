@@ -459,6 +459,19 @@ for (const [vertical, hash, label, summaryEntity, setupEntity] of verticalScreen
       await page.reload({ waitUntil: 'networkidle0' });
       await page.goto(`${BASE}/${hash}`, { waitUntil: 'networkidle0' });
     }
+    if (vertical === 'finance') {
+      await page.evaluate(() => localStorage.setItem('osp.uiLocale', 'en-US'));
+      await page.reload({ waitUntil: 'networkidle0' });
+      await page.goto(`${BASE}/#/finance`, { waitUntil: 'networkidle0' });
+      await page.waitForSelector('#main h1');
+      must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Lending and insurance operations', 'lending and insurance workbench is not translated');
+      const financeText = await page.$eval('#main', (main) => main.innerText);
+      must(financeText.includes('Loans and repayments') && financeText.includes('Policies and premiums') && financeText.includes('Insurance claims'), 'finance workflow sections are not translated');
+      await axe('finance workbench tiếng Anh');
+      await page.evaluate(() => localStorage.setItem('osp.uiLocale', 'vi-VN'));
+      await page.reload({ waitUntil: 'networkidle0' });
+      await page.goto(`${BASE}/${hash}`, { waitUntil: 'networkidle0' });
+    }
     if (vertical === 'ngo-government') {
       await page.evaluate(() => localStorage.setItem('osp.uiLocale', 'en-US'));
       await page.reload({ waitUntil: 'networkidle0' });
