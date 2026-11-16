@@ -1,4 +1,6 @@
 const pharmacyEnglish = {
+  'Thuốc kê đơn phải là hàng hóa tồn kho': 'Prescribed medicines must be inventory goods.',
+  'Thuốc kê đơn cần được theo dõi tồn kho': 'Prescribed medicines must be inventory-tracked.',
   'Không tải được danh sách đơn thuốc.': 'Could not load prescriptions.',
   'Quản lý đơn thuốc': 'Prescription management',
   'Đã lưu đơn thuốc ở trạng thái nháp. Hãy đối chiếu bản gốc rồi xác minh.': 'Prescription saved as a draft. Compare it with the original before verification.',

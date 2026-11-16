@@ -66,7 +66,16 @@ pub async fn prepare_tracked_lines(
             ));
         }
         let kind = kind.unwrap_or_else(|| "goods".into());
-        line.insert("tracked".into(), json!(tracked.unwrap_or(kind == "goods")));
+        let is_tracked = tracked.unwrap_or(kind == "goods");
+        if key == "items" && kind != "goods" {
+            errors.push("Thuốc kê đơn phải là hàng hóa tồn kho".into());
+            continue;
+        }
+        if key == "items" && !is_tracked {
+            errors.push("Thuốc kê đơn cần được theo dõi tồn kho".into());
+            continue;
+        }
+        line.insert("tracked".into(), json!(is_tracked));
         line.insert("kind".into(), json!(kind));
         if key == "parts" && editable {
             let selected_unit = match line.get("uom") {
