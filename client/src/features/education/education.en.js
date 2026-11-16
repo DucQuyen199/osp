@@ -1,6 +1,6 @@
 const educationEnglish = {
   'Bắt đầu *': 'Start *', 'Buổi học đã hủy.': 'Class session cancelled.', 'Chỉ xem': 'View only', 'Chọn buổi học': 'Select a class session', 'Chọn học viên': 'Select a learner',
-  'Chọn lớp': 'Select a class', 'Chọn lớp có học phí': 'Select a class with tuition', 'Chọn lớp để mở sổ điểm.': 'Select a class to open its gradebook.', 'Chọn lớp để xem danh sách ghi danh.': 'Select a class to view its enrollments.',
+  'Chọn lớp': 'Select a class', 'Lớp cần quản lý ghi danh': 'Class to manage enrollments', 'Chọn lớp có học phí': 'Select a class with tuition', 'Chọn lớp để mở sổ điểm.': 'Select a class to open its gradebook.', 'Chọn lớp để xem danh sách ghi danh.': 'Select a class to view its enrollments.',
   'Chốt buổi học': 'Close session', 'Chủ đề buổi học *': 'Session topic *', 'Chưa có buổi học.': 'No class sessions yet.', 'Chưa có đợt tạo học phí.': 'No tuition batches yet.',
   'Chưa có khoản học phí. Tạo khoản nháp ở trên rồi phát hành để sinh hóa đơn.': 'No tuition charges yet. Create a draft above and issue it to generate an invoice.', 'Có mặt': 'Present', 'Có phép': 'Excused',
   'Đã lên lịch buổi học.': 'Class session scheduled.', 'Đã lưu điểm danh.': 'Attendance saved.', 'Đã lưu điểm học viên.': 'Learner grade saved.', 'Đã phát hành học phí và tạo hóa đơn phải thu trong cùng giao dịch.': 'Tuition issued and accounts receivable invoice created in one transaction.',
