@@ -1,15 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from '../../lib/api.js';
-import { fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
+import { fmtMoney, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
-import { recordHref } from '../../lib/routes.js';
 import ecommerceEnglish from './ecommerce.en.js';
+import WebOrderCard from './components/WebOrderCard.jsx';
 
 const t = (text) => uiTextWith(text, ecommerceEnglish);
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
-const channelLabel = (value) => value === 'web' ? 'Website' : value === 'app' ? 'Ứng dụng' : value === 'marketplace' ? 'Sàn thương mại' : value || '—';
-
 export default function EcommerceOrderDeskPage() {
   const [storefronts, setStorefronts] = useState(new Map());
   const [parties, setParties] = useState(new Map());
@@ -108,23 +106,28 @@ export default function EcommerceOrderDeskPage() {
     const sale = relatedSalesOrder(order.id);
     const orderShipments = sale ? relatedShipments(sale.id) : [];
     const invoice = sale && relatedInvoice(sale.id);
-    return <article className="card ecommerce-order" key={order.id}>
-      <header className="card-head"><div><strong>{recordLabel('master-data.party', parties.get(order.party))}</strong><div className="small muted">{storefronts.get(order.storefront)?.name || t('Gian hàng')} · {t(channelLabel(order.channel || 'web'))} · {fmtDateTime(order.created_at)}</div></div><span className={`badge ${order.status === 'placed' ? 'success' : order.status === 'cancelled' ? 'plain' : 'warning'}`}>{statusLabel(order.status)}</span></header>
-      <ul className="ecommerce-order-lines">{(order.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{products.get(line.product)?.name || t('Sản phẩm')} × {line.qty}</span><strong className="num">{fmtMoney(line.line_total ?? (Number(line.price || 0) * Number(line.qty || 0)), currencyCode)}</strong></li>)}</ul>
-      <div className="ecommerce-order-total"><span>{t('Tổng đơn')}{currencyCode ? ` (${currencyCode})` : ''}</span><strong className="num">{fmtMoney(order.total || 0, currencyCode)}</strong></div>
-      {order.shipping_address && <div className="small muted ecommerce-address">{t('Giao đến:')} {order.shipping_address}</div>}
-      <footer className="row wrap ecommerce-order-footer">
-        {sale && can('sales.sales_order.read') && <a className="small" href={recordHref('sales.sales_order', sale.id)}>{t('Đơn bán')} {sale.number || String(sale.id).slice(0, 8)} · {statusLabel(sale.status)}</a>}
-        {orderShipments.map((shipment) => can('logistics.shipment.read') && <a className="small" key={shipment.id} href={recordHref('logistics.shipment', shipment.id)}>{t('Vận đơn')} {shipment.tracking_number || String(shipment.id).slice(0, 8)} · {statusLabel(shipment.status)}</a>)}
-        {invoice && can('accounting.invoice.read') && <a className="small" href={recordHref('accounting.invoice', invoice.id)}>{t('Hóa đơn')} · {statusLabel(invoice.status)}</a>}
-        <span className="grow" />
-        {order.status === 'cart' && can('ecommerce.web_order.update') && <button className="btn btn-secondary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => refreshCartPrice(order)}>{busy === `${order.id}:reprice` ? t('Đang cập nhật…') : t('Cập nhật giá')}</button>}
-        {order.status === 'cart' && can('ecommerce.web_order.placed') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => transition(order, 'placed')}>{busy === `${order.id}:placed` ? t('Đang đặt…') : t('Xác nhận đặt đơn')}</button>}
-        {order.status === 'cart' && can('ecommerce.web_order.cancelled') && <button className="btn btn-secondary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => transition(order, 'cancelled')}>{busy === `${order.id}:cancelled` ? t('Đang hủy…') : t('Hủy giỏ')}</button>}
-        {order.status === 'placed' && sale?.status === 'confirmed' && can('ecommerce.web_order.cancelled') && <button className="btn btn-secondary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => transition(order, 'cancelled')}>{busy === `${order.id}:cancelled` ? t('Đang hủy…') : t('Hủy đơn chưa giao')}</button>}
-        {sale && !can('sales.sales_order.read') && <span className="small muted">{t('Đã chuyển thành đơn bán')}</span>}
-      </footer>
-    </article>;
+    return <WebOrderCard key={order.id}
+      order={order}
+      storefrontName={storefronts.get(order.storefront)?.name}
+      partyName={recordLabel('master-data.party', parties.get(order.party))}
+      products={products}
+      currencyCode={currencyCode}
+      sale={sale}
+      shipments={orderShipments}
+      invoice={invoice}
+      busy={busy}
+      permissions={{
+        salesRead: can('sales.sales_order.read'),
+        logisticsRead: can('logistics.shipment.read'),
+        invoiceRead: can('accounting.invoice.read'),
+        update: can('ecommerce.web_order.update'),
+        place: can('ecommerce.web_order.placed'),
+        cancel: can('ecommerce.web_order.cancelled'),
+      }}
+      onRefreshPrice={refreshCartPrice}
+      onTransition={transition}
+      t={t}
+    />;
   };
 
   const draftCarts = orders.filter((order) => order.status === 'cart');
