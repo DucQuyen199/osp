@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
-import { fmtDate, fmtMoney, statusLabel } from '../../lib/i18n.js';
+import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 
@@ -66,7 +66,7 @@ export default function BankReconciliationWorkbenchPage() {
       setStatementId((id) => statementRows.some((row) => row.id === id) ? id : statementRows.find((row) => row.status === 'draft')?.id || statementRows[0]?.id || '');
       const baseCurrency = [...currencyMap.values()].find((currency) => String(currency.code).toUpperCase() === String(app.meta?.settings?.baseCurrency || 'VND').toUpperCase());
       setStatementForm((form) => ({ ...form, account: form.account || [...accountMap.values()].find((account) => account.code === '112')?.id || [...accountMap.values()].find(isBankAccount)?.id || '', currency: form.currency || baseCurrency?.id || '' }));
-    } catch (reason) { setError(reason.message || 'Không tải được dữ liệu đối soát ngân hàng.'); }
+    } catch (reason) { setError(reason.message || uiText('Không tải được dữ liệu đối soát ngân hàng.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
 
@@ -75,11 +75,11 @@ export default function BankReconciliationWorkbenchPage() {
     if (!id || !can('accounting.bank_statement_line.read')) { setAllLines([]); setLinesLoading(false); return; }
     setLinesLoading(true);
     try { const rows = await listAll('accounting.bank_statement_line', { statement: id }); if (version === lineLoadVersion.current) setAllLines(rows); }
-    catch (reason) { if (version === lineLoadVersion.current) setError(reason.message || 'Không tải được các dòng trong sao kê.'); }
+    catch (reason) { if (version === lineLoadVersion.current) setError(reason.message || uiText('Không tải được các dòng trong sao kê.')); }
     finally { if (version === lineLoadVersion.current) setLinesLoading(false); }
   }, []);
 
-  useEffect(() => { document.title = 'Đối soát ngân hàng · OSP Suite'; load(); }, [load]);
+  useEffect(() => { document.title = `${uiText('Đối soát ngân hàng')} · OSP Suite`; load(); }, [load]);
   useEffect(() => { loadLines(statementId); }, [statementId, loadLines]);
 
   const selected = statements.find((row) => row.id === statementId);
@@ -102,7 +102,7 @@ export default function BankReconciliationWorkbenchPage() {
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
     try { const result = await operation(); setNotice(typeof success === 'function' ? success(result) : success); await load(true); await loadLines(statementId); }
-    catch (reason) { setError(reason.message || 'Thao tác đối soát không thành công.'); await load(true); await loadLines(statementId); }
+    catch (reason) { setError(reason.message || uiText('Thao tác đối soát không thành công.')); await load(true); await loadLines(statementId); }
     finally { setBusy(''); }
   }
 
@@ -114,7 +114,7 @@ export default function BankReconciliationWorkbenchPage() {
       } });
       setStatementId(created.id);
       setStatementForm((form) => ({ ...form, statement_number: '', opening_balance: '', closing_balance: '' }));
-    }, 'Đã mở kỳ sao kê nháp. Nhập tệp ngân hàng hoặc thêm giao dịch để bắt đầu đối chiếu.');
+    }, uiText('Đã mở kỳ sao kê nháp. Nhập tệp ngân hàng hoặc thêm giao dịch để bắt đầu đối chiếu.'));
   }
 
   async function importFile() {
@@ -126,7 +126,7 @@ export default function BankReconciliationWorkbenchPage() {
       });
       setStatementFile(null);
       return result;
-    }, (result) => `Đã nhập ${result.imported} dòng; bỏ qua ${result.skipped} dòng trùng.`);
+    }, (result) => uiText('Đã nhập {imported} dòng; bỏ qua {skipped} dòng trùng.').replace('{imported}', result.imported).replace('{skipped}', result.skipped));
   }
 
   async function createLine(event) {
@@ -136,7 +136,7 @@ export default function BankReconciliationWorkbenchPage() {
         statement: selected.id, ...lineForm, amount: Number(lineForm.amount), reference: lineForm.reference.trim() || undefined, description: lineForm.description.trim() || undefined,
       } });
       setLineForm((form) => ({ ...form, reference: '', description: '', amount: '' }));
-    }, 'Đã thêm giao dịch vào sao kê.');
+    }, uiText('Đã thêm giao dịch vào sao kê.'));
   }
 
   function candidatesFor(line, override) {
@@ -181,88 +181,88 @@ export default function BankReconciliationWorkbenchPage() {
         };
       }
       setMatchCandidates((current) => ({ ...current, [line.id]: result }));
-    } catch (reason) { setError(reason.message || 'Không tải được chứng từ để khớp giao dịch.'); }
+    } catch (reason) { setError(reason.message || uiText('Không tải được chứng từ để khớp giao dịch.')); }
     finally { setCandidateLoading((current) => ({ ...current, [line.id]: false })); }
   }
 
   async function autoMatch(line) {
-    await run(`${line.id}:matched`, () => action('accounting.bank_statement_line', line, 'matched'), 'Đã tự khớp dòng với bút toán ngân hàng duy nhất phù hợp.');
+    await run(`${line.id}:matched`, () => action('accounting.bank_statement_line', line, 'matched'), uiText('Đã tự khớp dòng với bút toán ngân hàng duy nhất phù hợp.'));
   }
 
   async function manualMatch(line) {
     const selection = matchChoices[line.id] || (line.payment ? `payment:${line.payment}` : line.journal_entry ? `journal:${line.journal_entry}` : '');
     const [kind, id] = selection.split(':');
-    if (!id) { setError('Chọn payment hoặc bút toán đã ghi sổ trước khi khớp.'); return; }
+    if (!id) { setError(uiText('Chọn payment hoặc bút toán đã ghi sổ trước khi khớp.')); return; }
     await run(`${line.id}:manual-match`, async () => {
       const fields = kind === 'payment' ? { payment: id, journal_entry: null } : { payment: null, journal_entry: id };
       await api(dataPath('accounting.bank_statement_line', line.id, 'matched'), { method: 'POST', body: fields });
-    }, 'Đã đối chiếu dòng sao kê với chứng từ kế toán đã ghi sổ.');
+    }, uiText('Đã đối chiếu dòng sao kê với chứng từ kế toán đã ghi sổ.'));
   }
 
   async function ignoreLine(line) {
     const reason = String(ignoreReasons[line.id] || line.ignore_reason || '').trim();
-    if (!reason) { setError('Nhập lý do bỏ qua để lưu dấu vết kiểm toán.'); return; }
+    if (!reason) { setError(uiText('Nhập lý do bỏ qua để lưu dấu vết kiểm toán.')); return; }
     await run(`${line.id}:ignored`, async () => {
       await api(dataPath('accounting.bank_statement_line', line.id, 'ignored'), { method: 'POST', body: { ignore_reason: reason } });
-    }, 'Đã bỏ qua dòng sao kê và lưu lý do.');
+    }, uiText('Đã bỏ qua dòng sao kê và lưu lý do.'));
   }
 
   async function deleteLine(line) {
-    if (!window.confirm('Xóa dòng chưa đối chiếu này khỏi sao kê?')) return;
-    await run(`${line.id}:delete`, () => api(dataPath('accounting.bank_statement_line', line.id), { method: 'DELETE' }), 'Đã xóa dòng sao kê chưa đối chiếu.');
+    if (!window.confirm(uiText('Xóa dòng chưa đối chiếu này khỏi sao kê?'))) return;
+    await run(`${line.id}:delete`, () => api(dataPath('accounting.bank_statement_line', line.id), { method: 'DELETE' }), uiText('Đã xóa dòng sao kê chưa đối chiếu.'));
   }
 
   async function reconcile() {
     if (!selected) return;
-    await run(`${selected.id}:reconciled`, () => action('accounting.bank_statement', selected, 'reconciled'), 'Đã khóa đối soát sao kê.');
+    await run(`${selected.id}:reconciled`, () => action('accounting.bank_statement', selected, 'reconciled'), uiText('Đã khóa đối soát sao kê.'));
   }
 
   async function cancelStatement() {
-    if (!selected || !window.confirm(`Hủy sao kê ${selected.statement_number}?`)) return;
-    await run(`${selected.id}:cancelled`, () => action('accounting.bank_statement', selected, 'cancelled'), 'Đã hủy sao kê nháp.');
+    if (!selected || !window.confirm(uiText('Hủy sao kê {number}?').replace('{number}', selected.statement_number))) return;
+    await run(`${selected.id}:cancelled`, () => action('accounting.bank_statement', selected, 'cancelled'), uiText('Đã hủy sao kê nháp.'));
   }
 
   const currencyCode = currencies.get(selected?.currency)?.code;
   const readyToReconcile = Boolean(selected && selected.status === 'draft' && selectedLines.length && totals.unmatched === 0 && Math.abs(totals.difference) <= .005);
 
   return <div className="page">
-    <div className="page-head"><div><h1>Đối soát ngân hàng</h1><p className="sub">Nhập sao kê, khớp từng giao dịch với payment hoặc bút toán đã ghi sổ, giải trình dòng bỏ qua và khóa kỳ khi số dư khớp.</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={async () => { await load(); await loadLines(statementId); }}>Làm mới</button></div>
+    <div className="page-head"><div><h1>{uiText("Đối soát ngân hàng")}</h1><p className="sub">{uiText("Nhập sao kê, khớp từng giao dịch với payment hoặc bút toán đã ghi sổ, giải trình dòng bỏ qua và khóa kỳ khi số dư khớp.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={async () => { await load(); await loadLines(statementId); }}>{uiText("Làm mới")}</button></div>
     {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
 
-    {can('accounting.bank_statement.create') && <section className="card card-pad"><h2>Mở sao kê ngân hàng</h2><form className="form-grid" onSubmit={createStatement}>
-      <label className="field"><span className="label">Tài khoản ngân hàng *</span><select className="select" required value={statementForm.account} onChange={(event) => setStatementForm((form) => ({ ...form, account: event.target.value }))}><option value="">Chọn tài khoản nhóm 112</option>{[...accounts.values()].filter(isBankAccount).map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}</select></label>
-      <label className="field"><span className="label">Đồng tiền sao kê *</span><select className="select" required value={statementForm.currency} onChange={(event) => setStatementForm((form) => ({ ...form, currency: event.target.value }))}><option value="">Chọn đồng tiền</option>{[...currencies.values()].map((currency) => <option key={currency.id} value={currency.id}>{currency.code} · {currency.name}</option>)}</select></label>
-      <label className="field"><span className="label">Số sao kê *</span><input className="input" required value={statementForm.statement_number} onChange={(event) => setStatementForm((form) => ({ ...form, statement_number: event.target.value }))}/></label>
-      <label className="field"><span className="label">Từ ngày *</span><input className="input" required type="date" value={statementForm.start_date} onChange={(event) => setStatementForm((form) => ({ ...form, start_date: event.target.value }))}/></label>
-      <label className="field"><span className="label">Đến ngày *</span><input className="input" required type="date" min={statementForm.start_date} value={statementForm.end_date} onChange={(event) => setStatementForm((form) => ({ ...form, end_date: event.target.value }))}/></label>
-      <label className="field"><span className="label">Số dư đầu kỳ *</span><input className="input num" required type="number" step="any" value={statementForm.opening_balance} onChange={(event) => setStatementForm((form) => ({ ...form, opening_balance: event.target.value }))}/></label>
-      <label className="field"><span className="label">Số dư cuối kỳ theo ngân hàng *</span><input className="input num" required type="number" step="any" value={statementForm.closing_balance} onChange={(event) => setStatementForm((form) => ({ ...form, closing_balance: event.target.value }))}/></label>
-      <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || loading || !statementForm.account || !statementForm.currency}>Mở sao kê nháp</button></div>
+    {can('accounting.bank_statement.create') && <section className="card card-pad"><h2>{uiText("Mở sao kê ngân hàng")}</h2><form className="form-grid" onSubmit={createStatement}>
+      <label className="field"><span className="label">{uiText("Tài khoản ngân hàng *")}</span><select className="select" required value={statementForm.account} onChange={(event) => setStatementForm((form) => ({ ...form, account: event.target.value }))}><option value="">{uiText("Chọn tài khoản nhóm 112")}</option>{[...accounts.values()].filter(isBankAccount).map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}</select></label>
+      <label className="field"><span className="label">{uiText("Đồng tiền sao kê *")}</span><select className="select" required value={statementForm.currency} onChange={(event) => setStatementForm((form) => ({ ...form, currency: event.target.value }))}><option value="">{uiText("Chọn đồng tiền")}</option>{[...currencies.values()].map((currency) => <option key={currency.id} value={currency.id}>{currency.code} · {currency.name}</option>)}</select></label>
+      <label className="field"><span className="label">{uiText("Số sao kê *")}</span><input className="input" required value={statementForm.statement_number} onChange={(event) => setStatementForm((form) => ({ ...form, statement_number: event.target.value }))}/></label>
+      <label className="field"><span className="label">{uiText("Từ ngày *")}</span><input className="input" required type="date" value={statementForm.start_date} onChange={(event) => setStatementForm((form) => ({ ...form, start_date: event.target.value }))}/></label>
+      <label className="field"><span className="label">{uiText("Đến ngày *")}</span><input className="input" required type="date" min={statementForm.start_date} value={statementForm.end_date} onChange={(event) => setStatementForm((form) => ({ ...form, end_date: event.target.value }))}/></label>
+      <label className="field"><span className="label">{uiText("Số dư đầu kỳ *")}</span><input className="input num" required type="number" step="any" value={statementForm.opening_balance} onChange={(event) => setStatementForm((form) => ({ ...form, opening_balance: event.target.value }))}/></label>
+      <label className="field"><span className="label">{uiText("Số dư cuối kỳ theo ngân hàng *")}</span><input className="input num" required type="number" step="any" value={statementForm.closing_balance} onChange={(event) => setStatementForm((form) => ({ ...form, closing_balance: event.target.value }))}/></label>
+      <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || loading || !statementForm.account || !statementForm.currency}>{uiText("Mở sao kê nháp")}</button></div>
     </form></section>}
 
     <div className="layout-split" style={{ marginTop: 16 }}>
-      <section className="card card-pad"><h2>Kỳ sao kê</h2>{loading ? <div className="skeleton" data-h="row"/> : !statements.length ? <div className="empty">Chưa có sao kê ngân hàng.</div> : <div className="table-wrap"><table className="table"><thead><tr><th>Số sao kê</th><th>Khoảng ngày</th><th>Tài khoản</th><th>Trạng thái</th></tr></thead><tbody>{statements.map((row) => <tr key={row.id} className={row.id === statementId ? 'selected' : ''} onClick={() => setStatementId(row.id)} style={{ cursor: 'pointer' }}><td><strong>{row.statement_number}</strong><div className="small muted">{currencies.get(row.currency)?.code || ''}</div></td><td>{fmtDate(row.start_date)} – {fmtDate(row.end_date)}</td><td>{accounts.get(row.account)?.code || '112'}</td><td><span className="badge warning">{statusLabel(row.status)}</span></td></tr>)}</tbody></table></div>}</section>
+      <section className="card card-pad"><h2>{uiText("Kỳ sao kê")}</h2>{loading ? <div className="skeleton" data-h="row"/> : !statements.length ? <div className="empty">{uiText("Chưa có sao kê ngân hàng.")}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{uiText("Số sao kê *")}</th><th>{uiText("Khoảng ngày")}</th><th>{uiText("Tài khoản")}</th><th>{uiText("Trạng thái")}</th></tr></thead><tbody>{statements.map((row) => <tr key={row.id} className={row.id === statementId ? 'selected' : ''} onClick={() => setStatementId(row.id)} style={{ cursor: 'pointer' }}><td><strong>{row.statement_number}</strong><div className="small muted">{currencies.get(row.currency)?.code || ''}</div></td><td>{fmtDate(row.start_date)} – {fmtDate(row.end_date)}</td><td>{accounts.get(row.account)?.code || '112'}</td><td><span className="badge warning">{statusLabel(row.status)}</span></td></tr>)}</tbody></table></div>}</section>
 
-      {selected && <section className="card card-pad"><div className="row wrap"><div><h2>Sao kê {selected.statement_number}</h2><div className="small muted">{accounts.get(selected.account) ? recordLabel('accounting.account', accounts.get(selected.account)) : 'Tài khoản 112'} · {fmtDate(selected.start_date)} – {fmtDate(selected.end_date)} · {currencyCode}</div></div><span className="grow"/><span className={`badge ${selected.status === 'reconciled' ? 'success' : 'warning'}`}>{statusLabel(selected.status)}</span>{selected.status === 'draft' && can('accounting.bank_statement.cancelled') && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={cancelStatement}>Hủy sao kê</button>}</div>
-        <div className="stats" style={{ marginTop: 12 }}><div className="card stat"><span className="stat-label">Giao dịch Có</span><strong className="stat-value num">{fmtMoney(totals.credits, currencyCode)}</strong></div><div className="card stat"><span className="stat-label">Giao dịch Nợ</span><strong className="stat-value num">{fmtMoney(totals.debits, currencyCode)}</strong></div><div className="card stat"><span className="stat-label">Khớp / bỏ qua</span><strong className="stat-value">{totals.matched} / {totals.ignored}</strong><span className="small muted">Còn {totals.unmatched} chưa xử lý</span></div><div className="card stat"><span className="stat-label">Số dư tính toán / sao kê</span><strong className="stat-value num">{fmtMoney(totals.calculated, currencyCode)}</strong><span className={`small ${Math.abs(totals.difference) <= .005 ? 'muted' : 'danger'}`}>Chênh lệch {fmtMoney(totals.difference, currencyCode)}</span></div></div>
+      {selected && <section className="card card-pad"><div className="row wrap"><div><h2>{uiText('Sao kê {number}').replace('{number}', selected.statement_number)}</h2><div className="small muted">{accounts.get(selected.account) ? recordLabel('accounting.account', accounts.get(selected.account)) : uiText('Tài khoản 112')} · {fmtDate(selected.start_date)} – {fmtDate(selected.end_date)} · {currencyCode}</div></div><span className="grow"/><span className={`badge ${selected.status === 'reconciled' ? 'success' : 'warning'}`}>{statusLabel(selected.status)}</span>{selected.status === 'draft' && can('accounting.bank_statement.cancelled') && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={cancelStatement}>{uiText("Hủy sao kê")}</button>}</div>
+        <div className="stats" style={{ marginTop: 12 }}><div className="card stat"><span className="stat-label">{uiText("Giao dịch Có")}</span><strong className="stat-value num">{fmtMoney(totals.credits, currencyCode)}</strong></div><div className="card stat"><span className="stat-label">{uiText("Giao dịch Nợ")}</span><strong className="stat-value num">{fmtMoney(totals.debits, currencyCode)}</strong></div><div className="card stat"><span className="stat-label">{uiText("Khớp / bỏ qua")}</span><strong className="stat-value">{totals.matched} / {totals.ignored}</strong><span className="small muted">{uiText("Còn {count} chưa xử lý").replace("{count}", totals.unmatched)}</span></div><div className="card stat"><span className="stat-label">{uiText("Số dư tính toán / sao kê")}</span><strong className="stat-value num">{fmtMoney(totals.calculated, currencyCode)}</strong><span className={`small ${Math.abs(totals.difference) <= .005 ? 'muted' : 'danger'}`}>{uiText("Chênh lệch {amount}").replace("{amount}", fmtMoney(totals.difference, currencyCode))}</span></div></div>
 
-        {selected.status === 'draft' && <><div className="row wrap" style={{ marginTop: 12 }}><label className="field grow"><span className="label">Tệp CSV hoặc CAMT.053</span><input className="input" type="file" accept=".csv,.xml,.camt,text/csv,application/xml,text/xml" disabled={Boolean(busy)} onChange={(event) => setStatementFile(event.target.files?.[0] || null)}/></label><button className="btn btn-secondary" type="button" disabled={!statementFile || Boolean(busy)} onClick={importFile}>Nhập {statementFile && /\.(xml|camt)$/i.test(statementFile.name) ? 'CAMT.053' : 'CSV'}</button><a className="small" href={recordHref('accounting.bank_statement', selected.id)}>Mở chi tiết / sửa số dư</a></div>
-          {can('accounting.bank_statement_line.create') && <form className="form-grid" style={{ marginTop: 12 }} onSubmit={createLine}><div className="full"><h3>Thêm giao dịch thủ công</h3></div><label className="field"><span className="label">Ngày giao dịch *</span><input className="input" required type="date" min={selected.start_date} max={selected.end_date} value={lineForm.transaction_date} onChange={(event) => setLineForm((form) => ({ ...form, transaction_date: event.target.value }))}/></label><label className="field"><span className="label">Chiều tiền *</span><select className="select" value={lineForm.direction} onChange={(event) => setLineForm((form) => ({ ...form, direction: event.target.value }))}><option value="credit">Có · tiền vào</option><option value="debit">Nợ · tiền ra</option></select></label><label className="field"><span className="label">Số tiền *</span><input className="input num" required type="number" min="0.01" step="any" value={lineForm.amount} onChange={(event) => setLineForm((form) => ({ ...form, amount: event.target.value }))}/></label><label className="field"><span className="label">Mã tham chiếu</span><input className="input" value={lineForm.reference} onChange={(event) => setLineForm((form) => ({ ...form, reference: event.target.value }))}/></label><label className="field"><span className="label">Diễn giải</span><input className="input" value={lineForm.description} onChange={(event) => setLineForm((form) => ({ ...form, description: event.target.value }))}/></label><div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy) || !lineForm.amount}>Thêm dòng</button></div></form>}
+        {selected.status === 'draft' && <><div className="row wrap" style={{ marginTop: 12 }}><label className="field grow"><span className="label">{uiText("Tệp CSV hoặc CAMT.053")}</span><input className="input" type="file" accept=".csv,.xml,.camt,text/csv,application/xml,text/xml" disabled={Boolean(busy)} onChange={(event) => setStatementFile(event.target.files?.[0] || null)}/></label><button className="btn btn-secondary" type="button" disabled={!statementFile || Boolean(busy)} onClick={importFile}>{uiText("Nhập {format}").replace("{format}", statementFile && /\.(xml|camt)$/i.test(statementFile.name) ? 'CAMT.053' : 'CSV')}</button><a className="small" href={recordHref('accounting.bank_statement', selected.id)}>{uiText("Mở chi tiết / sửa số dư")}</a></div>
+          {can('accounting.bank_statement_line.create') && <form className="form-grid" style={{ marginTop: 12 }} onSubmit={createLine}><div className="full"><h3>{uiText("Thêm giao dịch thủ công")}</h3></div><label className="field"><span className="label">{uiText("Ngày giao dịch *")}</span><input className="input" required type="date" min={selected.start_date} max={selected.end_date} value={lineForm.transaction_date} onChange={(event) => setLineForm((form) => ({ ...form, transaction_date: event.target.value }))}/></label><label className="field"><span className="label">{uiText("Chiều tiền *")}</span><select className="select" value={lineForm.direction} onChange={(event) => setLineForm((form) => ({ ...form, direction: event.target.value }))}><option value="credit">{uiText("Có · tiền vào")}</option><option value="debit">{uiText("Nợ · tiền ra")}</option></select></label><label className="field"><span className="label">{uiText("Số tiền *")}</span><input className="input num" required type="number" min="0.01" step="any" value={lineForm.amount} onChange={(event) => setLineForm((form) => ({ ...form, amount: event.target.value }))}/></label><label className="field"><span className="label">{uiText("Mã tham chiếu")}</span><input className="input" value={lineForm.reference} onChange={(event) => setLineForm((form) => ({ ...form, reference: event.target.value }))}/></label><label className="field"><span className="label">{uiText("Diễn giải")}</span><input className="input" value={lineForm.description} onChange={(event) => setLineForm((form) => ({ ...form, description: event.target.value }))}/></label><div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy) || !lineForm.amount}>{uiText("Thêm dòng")}</button></div></form>}
         </>}
 
-        <div className="table-wrap" style={{ marginTop: 14 }}>{linesLoading ? <div className="skeleton" data-h="row"/> : !selectedLines.length ? <div className="empty">Chưa có giao dịch. Nhập tệp sao kê hoặc thêm dòng thủ công.</div> : <table className="table"><thead><tr><th>Ngày / tham chiếu</th><th>Diễn giải</th><th>Chiều</th><th>Số tiền</th><th>Đối chiếu / thao tác</th></tr></thead><tbody>{selectedLines.map((line) => {
+        <div className="table-wrap" style={{ marginTop: 14 }}>{linesLoading ? <div className="skeleton" data-h="row"/> : !selectedLines.length ? <div className="empty">{uiText("Chưa có giao dịch. Nhập tệp sao kê hoặc thêm dòng thủ công.")}</div> : <table className="table"><thead><tr><th>{uiText("Ngày / tham chiếu")}</th><th>{uiText("Diễn giải")}</th><th>{uiText("Chiều")}</th><th>{uiText("Số tiền")}</th><th>{uiText("Đối chiếu / thao tác")}</th></tr></thead><tbody>{selectedLines.map((line) => {
           const options = candidatesFor(line);
           const currentChoice = matchChoices[line.id] || (line.payment ? `payment:${line.payment}` : line.journal_entry ? `journal:${line.journal_entry}` : '');
-          const paymentLabel = (payment) => `${fmtDate(payment.payment_date)} · ${parties.get(payment.party) ? recordLabel('master-data.party', parties.get(payment.party)) : payment.source || 'Payment'} · ${fmtMoney(payment.amount, currencies.get(payment.currency)?.code || currencyCode)}`;
-          const journalLabel = (entry) => `${fmtDate(entry.posting_date)} · ${entry.source || 'Bút toán'} · ${fmtMoney(Math.abs(bankNet(entry, bankAccount?.id)), app.meta?.settings?.baseCurrency || 'VND')}`;
-          return <tr key={line.id}><td>{fmtDate(line.transaction_date)}<div className="small muted">{line.reference || 'Không có mã tham chiếu'}</div></td><td>{line.description || '—'}{line.status === 'ignored' && <div className="small muted">Lý do: {line.ignore_reason}</div>}</td><td>{line.direction === 'credit' ? 'Có · vào' : 'Nợ · ra'}</td><td className="num">{fmtMoney(line.amount, currencyCode)}</td><td><div className="stack-sm"><span className={`badge ${line.status === 'matched' ? 'success' : line.status === 'ignored' ? 'plain' : 'warning'}`}>{statusLabel(line.status)}</span>
-            {line.status === 'unmatched' && selected.status === 'draft' && <><div className="row wrap"><button className="btn btn-primary btn-sm" disabled={Boolean(busy) || !can('accounting.bank_statement_line.matched')} onClick={() => autoMatch(line)}>Tự khớp duy nhất</button><button className="btn btn-ghost btn-sm" disabled={Boolean(busy) || !can('accounting.bank_statement_line.delete')} onClick={() => deleteLine(line)}>Xóa dòng</button></div>{!matcherOpen[line.id] ? <button className="btn btn-ghost btn-sm" disabled={Boolean(busy) || !can('accounting.payment.read') || !can('accounting.journal_entry.read')} onClick={() => findCandidates(line)}>Tìm chứng từ quanh ngày để khớp</button> : candidateLoading[line.id] ? <span className="small muted">Đang tìm payment và bút toán…</span> : <><select className="select" aria-label="Chọn payment hoặc bút toán đã ghi sổ" value={currentChoice} disabled={Boolean(busy)} onChange={(event) => setMatchChoices((current) => ({ ...current, [line.id]: event.target.value }))}><option value="">Chọn chứng từ khớp thủ công…</option>{options.payments.length > 0 && <optgroup label="Payment ngân hàng">{options.payments.map((payment) => <option key={payment.id} value={`payment:${payment.id}`}>{paymentLabel(payment)}</option>)}</optgroup>}{options.journals.length > 0 && <optgroup label="Bút toán ngân hàng đã ghi sổ">{options.journals.map((entry) => <option key={entry.id} value={`journal:${entry.id}`}>{journalLabel(entry)}</option>)}</optgroup>}</select>{!options.payments.length && !options.journals.length && <span className="small muted">Không thấy chứng từ ghi sổ cùng ngày, chiều và số tiền. Tự khớp vẫn có thể tìm đúng bút toán duy nhất.</span>}</>}<div className="row wrap"><button className="btn btn-secondary btn-sm" disabled={Boolean(busy) || !currentChoice || !can('accounting.bank_statement_line.matched') || !can('accounting.bank_statement_line.update')} onClick={() => manualMatch(line)}>Khớp chứng từ đã chọn</button><button className="btn btn-ghost btn-sm" disabled={Boolean(busy) || !can('accounting.bank_statement_line.ignored') || !can('accounting.bank_statement_line.update')} onClick={() => setIgnoreOpen((current) => ({ ...current, [line.id]: !current[line.id] }))}>Bỏ qua có giải trình</button></div>{ignoreOpen[line.id] && <><input className="input" maxLength="500" aria-label="Lý do bỏ qua giao dịch" placeholder="Nhập lý do bắt buộc" value={ignoreReasons[line.id] || ''} onChange={(event) => setIgnoreReasons((current) => ({ ...current, [line.id]: event.target.value }))}/><button className="btn btn-sm" disabled={Boolean(busy) || !ignoreReasons[line.id]?.trim() || !can('accounting.bank_statement_line.update')} onClick={() => ignoreLine(line)}>Lưu lý do và bỏ qua</button></>}</>}
-            {line.status === 'matched' && <span className="small muted">{line.payment ? <a href={recordHref('accounting.payment', line.payment)}>Mở payment</a> : line.journal_entry ? <a href={recordHref('accounting.journal_entry', line.journal_entry)}>Mở bút toán</a> : 'Đã khớp'}</span>}
+          const paymentLabel = (payment) => `${fmtDate(payment.payment_date)} · ${parties.get(payment.party) ? recordLabel('master-data.party', parties.get(payment.party)) : payment.source || uiText('Payment')} · ${fmtMoney(payment.amount, currencies.get(payment.currency)?.code || currencyCode)}`;
+          const journalLabel = (entry) => `${fmtDate(entry.posting_date)} · ${entry.source || uiText('Bút toán')} · ${fmtMoney(Math.abs(bankNet(entry, bankAccount?.id)), app.meta?.settings?.baseCurrency || 'VND')}`;
+          return <tr key={line.id}><td>{fmtDate(line.transaction_date)}<div className="small muted">{line.reference || uiText('Không có mã tham chiếu')}</div></td><td>{line.description || '—'}{line.status === 'ignored' && <div className="small muted">{uiText("Lý do: {reason}").replace("{reason}", line.ignore_reason)}</div>}</td><td>{line.direction === 'credit' ? uiText('Có · vào') : uiText('Nợ · ra')}</td><td className="num">{fmtMoney(line.amount, currencyCode)}</td><td><div className="stack-sm"><span className={`badge ${line.status === 'matched' ? 'success' : line.status === 'ignored' ? 'plain' : 'warning'}`}>{statusLabel(line.status)}</span>
+            {line.status === 'unmatched' && selected.status === 'draft' && <><div className="row wrap"><button className="btn btn-primary btn-sm" disabled={Boolean(busy) || !can('accounting.bank_statement_line.matched')} onClick={() => autoMatch(line)}>{uiText("Tự khớp duy nhất")}</button><button className="btn btn-ghost btn-sm" disabled={Boolean(busy) || !can('accounting.bank_statement_line.delete')} onClick={() => deleteLine(line)}>{uiText("Xóa dòng")}</button></div>{!matcherOpen[line.id] ? <button className="btn btn-ghost btn-sm" disabled={Boolean(busy) || !can('accounting.payment.read') || !can('accounting.journal_entry.read')} onClick={() => findCandidates(line)}>{uiText("Tìm chứng từ quanh ngày để khớp")}</button> : candidateLoading[line.id] ? <span className="small muted">{uiText("Đang tìm payment và bút toán…")}</span> : <><select className="select" aria-label={uiText("Chọn payment hoặc bút toán đã ghi sổ")} value={currentChoice} disabled={Boolean(busy)} onChange={(event) => setMatchChoices((current) => ({ ...current, [line.id]: event.target.value }))}><option value="">{uiText("Chọn chứng từ khớp thủ công…")}</option>{options.payments.length > 0 && <optgroup label={uiText("Payment ngân hàng")}>{options.payments.map((payment) => <option key={payment.id} value={`payment:${payment.id}`}>{paymentLabel(payment)}</option>)}</optgroup>}{options.journals.length > 0 && <optgroup label={uiText("Bút toán ngân hàng đã ghi sổ")}>{options.journals.map((entry) => <option key={entry.id} value={`journal:${entry.id}`}>{journalLabel(entry)}</option>)}</optgroup>}</select>{!options.payments.length && !options.journals.length && <span className="small muted">{uiText("Không thấy chứng từ ghi sổ cùng ngày, chiều và số tiền. Tự khớp vẫn có thể tìm đúng bút toán duy nhất.")}</span>}</>}<div className="row wrap"><button className="btn btn-secondary btn-sm" disabled={Boolean(busy) || !currentChoice || !can('accounting.bank_statement_line.matched') || !can('accounting.bank_statement_line.update')} onClick={() => manualMatch(line)}>{uiText("Khớp chứng từ đã chọn")}</button><button className="btn btn-ghost btn-sm" disabled={Boolean(busy) || !can('accounting.bank_statement_line.ignored') || !can('accounting.bank_statement_line.update')} onClick={() => setIgnoreOpen((current) => ({ ...current, [line.id]: !current[line.id] }))}>{uiText("Bỏ qua có giải trình")}</button></div>{ignoreOpen[line.id] && <><input className="input" maxLength="500" aria-label={uiText("Lý do bỏ qua giao dịch")} placeholder={uiText("Nhập lý do bắt buộc")} value={ignoreReasons[line.id] || ''} onChange={(event) => setIgnoreReasons((current) => ({ ...current, [line.id]: event.target.value }))}/><button className="btn btn-sm" disabled={Boolean(busy) || !ignoreReasons[line.id]?.trim() || !can('accounting.bank_statement_line.update')} onClick={() => ignoreLine(line)}>{uiText("Lưu lý do và bỏ qua")}</button></>}</>}
+            {line.status === 'matched' && <span className="small muted">{line.payment ? <a href={recordHref('accounting.payment', line.payment)}>{uiText("Mở payment")}</a> : line.journal_entry ? <a href={recordHref('accounting.journal_entry', line.journal_entry)}>{uiText("Mở bút toán")}</a> : 'Đã khớp'}</span>}
           </div></td></tr>;
         })}</tbody></table>}</div>
-        {selected.status === 'draft' && <div className="row wrap" style={{ marginTop: 14 }}><span className="small muted">Số cuối kỳ tính từ đầu kỳ + tiền vào − tiền ra. Mọi dòng cần được khớp hoặc có lý do bỏ qua.</span><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !readyToReconcile || !can('accounting.bank_statement.reconciled')} onClick={reconcile}>Đối soát và khóa sao kê</button></div>}
+        {selected.status === 'draft' && <div className="row wrap" style={{ marginTop: 14 }}><span className="small muted">{uiText("Số cuối kỳ tính từ đầu kỳ + tiền vào − tiền ra. Mọi dòng cần được khớp hoặc có lý do bỏ qua.")}</span><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !readyToReconcile || !can('accounting.bank_statement.reconciled')} onClick={reconcile}>{uiText("Đối soát và khóa sao kê")}</button></div>}
       </section>}
     </div>
-    <p className="small muted" style={{ marginTop: 12 }}>Tự khớp chỉ chạy khi backend tìm được duy nhất một bút toán TK 112 đã ghi sổ đúng ngày, chiều và số tiền. Khi có nhiều ứng viên, chọn payment hoặc bút toán thủ công; server vẫn kiểm tra đồng tiền, số tiền quy đổi và việc một bút toán không bị dùng hai lần.</p>
+    <p className="small muted" style={{ marginTop: 12 }}>{uiText("Tự khớp chỉ chạy khi backend tìm được duy nhất một bút toán TK 112 đã ghi sổ đúng ngày, chiều và số tiền. Khi có nhiều ứng viên, chọn payment hoặc bút toán thủ công; server vẫn kiểm tra đồng tiền, số tiền quy đổi và việc một bút toán không bị dùng hai lần.")}</p>
   </div>;
 }
