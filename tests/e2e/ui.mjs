@@ -209,6 +209,21 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   const contractText = await page.$eval('#main', (main) => main.innerText);
   must(contractText.includes('Create contract draft') && contractText.includes('Contract list'), 'contract workflows are not translated');
   await axe('contract workbench tiếng Anh');
+  const approvalModule = await page.evaluate(async () => {
+    const session = JSON.parse(sessionStorage.getItem('osp.session') || localStorage.getItem('osp.session') || 'null');
+    const response = await fetch(`/api/t/${session.tenantId}/modules/enable`, {
+      method: 'POST', headers: { authorization: `Bearer ${session.token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ ids: ['workflow-approval'] }),
+    });
+    return { ok: response.ok, status: response.status };
+  });
+  must(approvalModule.ok, `could not enable approval module for UI test (${approvalModule.status})`);
+  await page.goto(`${BASE}/#/approvals`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#main h1');
+  must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Approval center', 'approval workbench is not translated');
+  must(await clickText('Approval rules', '[role="tab"]'), 'approval rules tab is not translated');
+  must((await page.$eval('#main h2', (heading) => heading.textContent)) === 'Rules by amount and role', 'approval rule setup is not translated');
+  await axe('approval workbench tiếng Anh');
   await page.goto(`${BASE}/#/reports/inventory/replenishment`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Inventory replenishment suggestions', 'màn hình bổ sung tồn kho chưa được dịch');
