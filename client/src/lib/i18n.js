@@ -545,6 +545,15 @@ const UI_TEXT_EN = {
   'Chặn ghi sổ vượt ngân sách': 'Block postings over budget', 'Bắt buộc có ngân sách đã duyệt và còn hạn mức cho chi phí': 'Require an approved budget with remaining expense capacity',
   'Khi bật, hệ thống kiểm tra phát sinh Nợ ròng trên từng tài khoản chi phí tại bước ghi sổ. Ngân sách tháng và năm cùng áp dụng nếu cả hai có dòng tương ứng; khoản chi chưa được phân bổ hoặc vượt kế hoạch sẽ bị từ chối. Nếu chưa có ngân sách được duyệt cho kỳ, chi phí không thể ghi sổ. Mặc định chính sách này tắt.': 'When enabled, the system checks net debits on each expense account before posting. Monthly and annual budgets both apply when matching lines exist; unallocated expenses or expenses over plan are rejected. Expenses cannot be posted without an approved budget for the period. This policy is off by default.',
   'Kiểm soát ngân sách đang bật cho toàn doanh nghiệp.': 'Budget enforcement is enabled for the entire company.', 'Kiểm soát ngân sách đang tắt.': 'Budget enforcement is off.',
+  'Chi phí dự toán': 'Planned expenses', 'Chi phí thực tế': 'Actual expenses', 'Còn lại chi phí': 'Expense remaining', 'Chi phí': 'Expenses', 'Doanh thu': 'Revenue',
+  'Doanh thu kế hoạch': 'Planned revenue', 'Doanh thu thực tế': 'Actual revenue', 'Chênh lệch doanh thu': 'Revenue variance', 'Dòng bất lợi': 'Unfavorable lines',
+  'Không tải được báo cáo thực hiện ngân sách.': 'Could not load the budget performance report.', 'Thực hiện ngân sách': 'Budget performance',
+  'Đối chiếu kế hoạch doanh thu và chi phí với số phát sinh theo số dư tự nhiên trên sổ kế toán.': 'Compare planned revenue and expenses with actuals using the natural account balances in the ledger.',
+  'Kỳ ngân sách': 'Budget period', 'YYYY hoặc YYYY-MM': 'YYYY or YYYY-MM', 'Xem báo cáo': 'View report',
+  'Tổng hợp theo kỳ ngân sách': 'Summary by budget period', 'Chưa có ngân sách đã duyệt': 'No approved budgets',
+  'Hãy thêm các dòng tài khoản chi phí hoặc doanh thu rồi duyệt ngân sách.': 'Add expense or revenue account lines, then approve the budget.',
+  'Kỳ': 'Period', 'Ngân sách': 'Budget', 'Tài khoản': 'Account', 'Loại': 'Type', 'Dự toán': 'Planned', 'Thực tế': 'Actual',
+  'Chênh lệch thuận lợi': 'Favorable variance', 'Sử dụng': 'Utilization', 'Thực tế doanh thu/chi phí dùng số dư tự nhiên của tài khoản và cập nhật cùng transaction kế toán.': 'Revenue and expense actuals use each account’s natural balance and update with accounting transactions.',
 };
 
 const storedUiLocale = () => {

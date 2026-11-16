@@ -340,6 +340,16 @@ for (const [vertical, hash, label, summaryEntity, setupEntity] of verticalScreen
     must(!(await page.$('.route-error')), `${label} vertical route failed to render`);
     must(!(await page.$('.not-found-page')), `${label} vertical route resolved to not found`);
     await axe(`${label} vertical`);
+    if (vertical === 'ngo-government') {
+      await page.evaluate(() => localStorage.setItem('osp.uiLocale', 'en-US'));
+      await page.reload({ waitUntil: 'networkidle0' });
+      await page.goto(`${BASE}/#/reports/budget/variance`, { waitUntil: 'networkidle0' });
+      await page.waitForSelector('#main h1');
+      must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Budget performance', 'budget performance report is not translated');
+      await axe('budget performance tiếng Anh');
+      await page.evaluate(() => localStorage.setItem('osp.uiLocale', 'vi-VN'));
+      await page.reload({ waitUntil: 'networkidle0' });
+    }
   });
   await step(`${label} dashboard uses vertical summary entities`, async () => {
     await page.goto(`${BASE}/#/`, { waitUntil: 'networkidle0' });
