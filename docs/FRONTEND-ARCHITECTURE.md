@@ -43,6 +43,7 @@ Wrap every user-visible literal with `uiText()` or the feature-local translator,
 - The purchasing workbench owns supplier-invoice validation, permissions and state transitions; `SupplierInvoicesPanel` renders controlled dispute fields and emits dispute, resolution, submit and approval requests.
 - The POS terminal owns cart, tender, permissions and checkout; `PosCheckoutPanel` displays controlled payment fields and emits the checkout request.
 - The HR workbench owns attendance-date rules and punch actions; `AttendanceEntriesTable` renders the controlled daily records and emits punch-out requests.
+- The HR workbench owns schedule-pattern permissions, template selection, date limits and persistence; `WorkSchedulePatternForm` renders the controlled rotation schedule and emits form edits through callbacks.
 - The performance workbench owns key-result permissions and updates; `KeyResultProgressCard` renders a controlled progress meter and value field and emits edits and submit requests.
 - The inventory stock-count workbench owns the count draft, validation and persistence; `StockCountLinesEditor` renders controlled product, lot, location and quantity fields and emits line edits through callbacks.
 - The purchasing workbench owns requisition permissions and API actions; `PurchaseRequisitionsTable` renders request status and emits edit, submit, approve or reject actions through callbacks.

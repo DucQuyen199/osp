@@ -5,6 +5,7 @@ import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import { listHref, recordHref } from '../../lib/routes.js';
 import AttendanceEntriesTable from './components/AttendanceEntriesTable.jsx';
+import WorkSchedulePatternForm from './components/WorkSchedulePatternForm.jsx';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const fmtTime = (value) => value ? localTime(new Date(value)) : '--';
@@ -196,6 +197,32 @@ export default function HrmOperationsPage() {
     });
   }
 
+  function updatePatternField(field, value) {
+    setPatternForm((form) => ({ ...form, [field]: value }));
+  }
+
+  function togglePatternCycleDay(index, isWorking) {
+    setPatternForm((form) => ({ ...form, cycle: form.cycle.map((day, itemIndex) => itemIndex === index ? {
+      ...day,
+      is_working: isWorking,
+      start_time: isWorking ? (day.start_time || '09:00') : '',
+      end_time: isWorking ? (day.end_time || '17:00') : '',
+      break_minutes: isWorking ? (day.break_minutes || 0) : 0,
+    } : day) }));
+  }
+
+  function updatePatternCycleField(index, field, value) {
+    setPatternForm((form) => ({ ...form, cycle: form.cycle.map((day, itemIndex) => itemIndex === index ? { ...day, [field]: value } : day) }));
+  }
+
+  function removePatternCycleDay(index) {
+    setPatternForm((form) => ({ ...form, cycle: form.cycle.filter((_, itemIndex) => itemIndex !== index) }));
+  }
+
+  function addPatternCycleDay() {
+    setPatternForm((form) => ({ ...form, cycle: [...form.cycle, { is_working: true, start_time: '09:00', end_time: '17:00', break_minutes: 60 }] }));
+  }
+
   function useScheduleTemplate(id) {
     setScheduleTemplateId(id);
     const template = scheduleTemplates.find((row) => row.id === id);
@@ -289,22 +316,24 @@ export default function HrmOperationsPage() {
         {can('hrm.work_schedule_template.create') && <><label className="field grow"><span className="label">{uiText("Tên mẫu để lưu hoặc cập nhật")}</span><input className="input" maxLength="120" value={scheduleTemplateName} onChange={(event) => setScheduleTemplateName(event.target.value)} placeholder={uiText("Ví dụ: Ca xoay 2 ngày")}/></label><button type="button" className="btn btn-secondary" disabled={Boolean(busy) || !scheduleTemplateName.trim()} onClick={saveScheduleTemplate}>{scheduleTemplateId ? uiText('Cập nhật mẫu') : uiText('Lưu thành mẫu')}</button></>}
       </div>}
       {can('hrm.work_schedule_template.read') && scheduleTemplates.length > 0 && <div className="row wrap small muted u-legacy-b56987dbcb" ><span>{uiText("Thư viện có")} {scheduleTemplates.length} {uiText("mẫu.")}</span>{can('hrm.work_schedule_template.delete') && scheduleTemplateId && <button type="button" className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => { const row = scheduleTemplates.find((item) => item.id === scheduleTemplateId); if (row) removeScheduleTemplate(row); }}>{uiText("Xóa mẫu đang chọn")}</button>}</div>}
-      {can('hrm.work_schedule_pattern.create') && <form className="form-grid" onSubmit={createSchedulePattern}>
-        <fieldset className="field u-legacy-d865c2ed50" ><legend className="label">{uiText("Nhân viên trong đội * (")}{patternForm.employees.length}/50)</legend><input className="input" value={patternEmployeeFilter} onChange={(event) => setPatternEmployeeFilter(event.target.value)} placeholder={uiText("Tìm theo tên hoặc mã nhân viên")}/><div className="row wrap u-legacy-b1279b10ef" >{matchingPatternEmployees.map((row) => <label className="row small" key={row.id}><input type="checkbox" checked={patternForm.employees.includes(row.id)} disabled={!patternForm.employees.includes(row.id) && patternForm.employees.length >= 50} onChange={(event) => updatePatternEmployees(row.id, event.target.checked)}/>{recordLabel('hrm.employee', row)}</label>)}</div>{!matchingPatternEmployees.length && <span className="small muted">{uiText("Không tìm thấy nhân viên đang làm việc phù hợp.")}</span>}<span className="small muted">{uiText("Chọn tối đa 50 nhân viên; phạm vi tối đa hiện tại là")} {rotationDayLimit(patternForm.employees.length)} {uiText("ngày để không vượt giới hạn 40.000 dòng và trần 10 năm.")}</span></fieldset>
-        <label className="field"><span className="label">{uiText("Ngày bắt đầu chu kỳ *")}</span><input className="input" required type="date" value={patternForm.start_date} onChange={(event) => updatePatternStartDate(event.target.value)}/></label>
-        <label className="field"><span className="label">{uiText("Sinh lịch đến ngày *")}</span><input className="input" required min={patternForm.start_date} max={maxPatternEndDate} type="date" value={patternForm.end_date} onChange={(event) => setPatternForm({ ...patternForm, end_date: event.target.value })}/></label>
-        <label className="field"><span className="label">{uiText("Múi giờ IANA *")}</span><input className="input" required value={patternForm.timezone} onChange={(event) => setPatternForm({ ...patternForm, timezone: event.target.value })} placeholder="Asia/Ho_Chi_Minh"/></label>
-        <div className="field u-legacy-75be3216d0" ><span className="label">{uiText("Các ngày trong chu kỳ (lặp từ ngày bắt đầu)")}</span><div className="stack u-legacy-43a97fe494" >
-          {patternForm.cycle.map((day, index) => <div className="row wrap card card-pad u-legacy-d5a33b90d3" key={index} >
-            <strong>{uiText("Ngày")}{index + 1}</strong>
-            <label className="row small"><input type="checkbox" checked={day.is_working} onChange={(event) => setPatternForm((form) => ({ ...form, cycle: form.cycle.map((item, itemIndex) => itemIndex === index ? { ...item, is_working: event.target.checked, start_time: event.target.checked ? (item.start_time || '09:00') : '', end_time: event.target.checked ? (item.end_time || '17:00') : '', break_minutes: event.target.checked ? (item.break_minutes || 0) : 0 } : item) }))}/>{uiText("Có ca làm")}</label>
-            {day.is_working && <><label className="field"><span className="label">{uiText("Bắt đầu")}</span><input className="input" type="time" required value={day.start_time} onChange={(event) => setPatternForm((form) => ({ ...form, cycle: form.cycle.map((item, itemIndex) => itemIndex === index ? { ...item, start_time: event.target.value } : item) }))}/></label><label className="field"><span className="label">{uiText("Kết thúc")}</span><input className="input" type="time" required value={day.end_time} onChange={(event) => setPatternForm((form) => ({ ...form, cycle: form.cycle.map((item, itemIndex) => itemIndex === index ? { ...item, end_time: event.target.value } : item) }))}/></label><label className="field"><span className="label">{uiText("Nghỉ (phút)")}</span><input className="input num" type="number" min="0" max="1439" step="1" value={day.break_minutes} onChange={(event) => setPatternForm((form) => ({ ...form, cycle: form.cycle.map((item, itemIndex) => itemIndex === index ? { ...item, break_minutes: Number(event.target.value) } : item) }))}/></label></>}
-            <button type="button" className="btn btn-ghost btn-sm" disabled={patternForm.cycle.length <= 1} onClick={() => setPatternForm((form) => ({ ...form, cycle: form.cycle.filter((_, itemIndex) => itemIndex !== index) }))}>{uiText("Xóa ngày")}</button>
-          </div>)}
-          <button type="button" className="btn btn-secondary btn-sm" disabled={patternForm.cycle.length >= 31} onClick={() => setPatternForm((form) => ({ ...form, cycle: [...form.cycle, { is_working: true, start_time: '09:00', end_time: '17:00', break_minutes: 60 }] }))}>{uiText("Thêm ngày vào chu kỳ")}</button>
-        </div></div>
-        <div className="row"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !patternForm.employees.length || patternForm.employees.length > 50 || !patternForm.start_date || !patternForm.end_date || patternForm.end_date < patternForm.start_date || !patternForm.cycle.length}>{can('hrm.work_schedule_pattern.applied') ? uiText('Tạo và áp dụng lịch') : uiText('Lưu mẫu nháp')}</button></div>
-      </form>}
+      {can('hrm.work_schedule_pattern.create') && <WorkSchedulePatternForm
+        patternForm={patternForm}
+        matchingEmployees={matchingPatternEmployees}
+        employeeFilter={patternEmployeeFilter}
+        maxEndDate={maxPatternEndDate}
+        dayLimit={rotationDayLimit(patternForm.employees.length)}
+        busy={busy}
+        canApply={can('hrm.work_schedule_pattern.applied')}
+        onSubmit={createSchedulePattern}
+        onEmployeeFilterChange={setPatternEmployeeFilter}
+        onEmployeeToggle={updatePatternEmployees}
+        onFieldChange={updatePatternField}
+        onStartDateChange={updatePatternStartDate}
+        onCycleDayToggle={togglePatternCycleDay}
+        onCycleFieldChange={updatePatternCycleField}
+        onCycleDayRemove={removePatternCycleDay}
+        onCycleDayAdd={addPatternCycleDay}
+      />}
       {can('hrm.work_schedule_pattern.read') && <div className="table-wrap u-legacy-2bdf8e45fd" ><table className="table"><thead><tr><th>{uiText("Nhân viên")}</th><th>{uiText("Khoảng ngày")}</th><th>{uiText("Chu kỳ / múi giờ")}</th><th>{uiText("Trạng thái")}</th><th scope="col">{uiText("Thao tác")}</th></tr></thead><tbody>{schedulePatterns.map((row) => <tr key={row.id}><td>{rotationEmployees(row).map((id) => employeeMap.get(id) ? recordLabel('hrm.employee', employeeMap.get(id)) : uiText('Nhân viên')).join(', ')}</td><td>{fmtDate(row.start_date)} – {fmtDate(row.end_date)}</td><td>{Array.isArray(row.cycle) ? `${row.cycle.length} ${uiText('ngày')}` : '—'} · {row.timezone}</td><td>{statusLabel(row.status)}</td><td><div className="row wrap">{row.status === 'draft' && can('hrm.work_schedule_pattern.applied') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => applySchedulePattern(row)}>{uiText("Áp dụng")}</button>}{row.status === 'draft' && can('hrm.work_schedule_pattern.delete') && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => removeSchedulePattern(row)}>{uiText("Xóa nháp")}</button>}</div></td></tr>)}</tbody></table>{!schedulePatterns.length && <p className="small muted">{uiText("Chưa có mẫu ca luân phiên.")}</p>}</div>}
     </section>}
     {(can('hrm.work_schedule_entry.create') || can('hrm.work_schedule_entry.read')) && <section className="card card-pad u-legacy-92c18f6bda" ><h2>{uiText("Lịch ca theo ngày")}</h2><p className="small muted">{uiText("Mỗi dòng ghi đè lịch tuần của nhân viên trong đúng một ngày. Bỏ lịch để trở về lịch tuần; ca qua đêm được hỗ trợ.")}</p>{can('hrm.work_schedule_entry.create') && <form className="form-grid" onSubmit={saveScheduleEntry}><label className="field"><span className="label">{uiText("Nhân viên *")}</span><select className="select" required value={scheduleForm.employee} onChange={(event) => setScheduleForm({ ...scheduleForm, employee: event.target.value })}><option value="">{uiText("Chọn nhân viên")}</option>{activeEmployees.map((row) => <option key={row.id} value={row.id}>{recordLabel('hrm.employee', row)}</option>)}</select></label><label className="field"><span className="label">{uiText("Ngày làm việc *")}</span><input className="input" required type="date" value={scheduleForm.work_date} onChange={(event) => setScheduleForm({ ...scheduleForm, work_date: event.target.value })}/></label><label className="row small u-legacy-eee80941ee" ><input type="checkbox" checked={scheduleForm.is_working} onChange={(event) => setScheduleForm({ ...scheduleForm, is_working: event.target.checked })}/>{uiText("Có ca làm việc trong ngày này")}</label>{scheduleForm.is_working && <><label className="field"><span className="label">{uiText("Bắt đầu *")}</span><input className="input" required type="time" value={scheduleForm.start_time} onChange={(event) => setScheduleForm({ ...scheduleForm, start_time: event.target.value })}/></label><label className="field"><span className="label">{uiText("Kết thúc *")}</span><input className="input" required type="time" value={scheduleForm.end_time} onChange={(event) => setScheduleForm({ ...scheduleForm, end_time: event.target.value })}/></label><label className="field"><span className="label">{uiText("Nghỉ không tính giờ (phút)")}</span><input className="input num" type="number" min="0" max="1439" step="1" value={scheduleForm.break_minutes} onChange={(event) => setScheduleForm({ ...scheduleForm, break_minutes: event.target.value })}/></label></>}<div className="row"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !scheduleForm.employee || !scheduleForm.work_date}>{scheduleEntries.some((row) => row.employee === scheduleForm.employee && row.work_date === scheduleForm.work_date) ? uiText('Cập nhật lịch ngày') : uiText('Lưu lịch ngày')}</button></div></form>}{can('hrm.work_schedule_entry.read') && <><h3 className="u-legacy-2bdf8e45fd">{uiText("Ngoại lệ trong tháng")} {scheduleForm.work_date.slice(0, 7)}</h3>{scheduleEntriesThisMonth.length ? <div className="table-wrap"><table className="table"><thead><tr><th>{uiText("Ngày")}</th><th>{uiText("Nhân viên")}</th><th>{uiText("Lịch áp dụng")}</th><th scope="col">{uiText("Thao tác")}</th></tr></thead><tbody>{scheduleEntriesThisMonth.map((row) => <tr key={row.id}><td>{fmtDate(row.work_date)}</td><td>{employeeMap.get(row.employee) ? recordLabel('hrm.employee', employeeMap.get(row.employee)) : uiText('Nhân viên')}</td><td>{row.is_working ? `${fmtTime(row.start_at)}–${fmtTime(row.end_at)} · ${uiText('nghỉ')} ${row.break_minutes || 0} ${uiText('phút')}` : uiText('Ngày nghỉ')}</td><td>{can('hrm.work_schedule_entry.delete') && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => removeScheduleEntry(row)}>{uiText("Xóa ngoại lệ")}</button>}</td></tr>)}</tbody></table></div> : <p className="small muted">{uiText("Chưa có ngoại lệ lịch trong tháng này.")}</p>}</>}</section>}
