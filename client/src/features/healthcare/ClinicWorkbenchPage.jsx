@@ -190,7 +190,7 @@ export default function ClinicWorkbenchPage() {
         <label className="field"><span className="label">{t("Nhóm máu")}</span><input className="input" value={patientRegistration.blood_type} onChange={(event) => setPatientRegistration({ ...patientRegistration, blood_type: event.target.value })} /></label>
         <label className="field"><span className="label">{t("Số bảo hiểm")}</span><input className="input" value={patientRegistration.insurance_no} onChange={(event) => setPatientRegistration({ ...patientRegistration, insurance_no: event.target.value })} /></label>
         <label className="field"><span className="label">{t("Dị ứng cần lưu ý")}</span><input className="input" value={patientRegistration.allergies} onChange={(event) => setPatientRegistration({ ...patientRegistration, allergies: event.target.value })} /></label>
-        {pendingPatientParty && <p className="small muted">Đã tạo liên hệ “{pendingPatientParty.name}”; gửi lại để hoàn tất hồ sơ bệnh nhân.</p>}
+        {pendingPatientParty && <p className="small muted">{t('Đã tạo liên hệ “{name}”; gửi lại để hoàn tất hồ sơ bệnh nhân.').replace('{name}', pendingPatientParty.name)}</p>}
         <button className="btn btn-primary" type="submit" disabled={busy || (patientRegistration.mode === 'existing' && !pendingPatientParty && !patientRegistration.party) || (patientRegistration.mode === 'new' && !patientRegistration.name.trim())}>{t("Đăng ký hồ sơ")}</button>
       </form></section>}
       <section className="card clinic-intake"><div><h2>{t("Tiếp nhận lượt khám")}</h2><p className="small muted">{t("Chỉ chọn hồ sơ bệnh nhân đã đăng ký; lượt khám tự liên kết đúng khách hàng của hồ sơ.")}</p></div><form className="clinic-intake-form" onSubmit={createEncounter}>
