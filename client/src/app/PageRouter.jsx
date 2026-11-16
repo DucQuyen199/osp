@@ -34,151 +34,165 @@ const OutboxSettingsPage = lazy(() => import('../OutboxSettingsPage.jsx'));
 const FieldsSettingsPage = lazy(() => import('../FieldsSettingsPage.jsx'));
 const DataSettingsPage = lazy(() => import('../DataSettingsPage.jsx'));
 const MfaSettingsPage = lazy(() => import('../MfaSettingsPage.jsx'));
- const PosTerminalPage = lazy(() => import('../PosTerminalPage.jsx'));
- const ManufacturingWipPage = lazy(() => import('../ManufacturingWipPage.jsx'));
- const ClinicWorkbenchPage = lazy(() => import('../ClinicWorkbenchPage.jsx'));
- const EcommerceOrderDeskPage = lazy(() => import('../EcommerceOrderDeskPage.jsx'));
- const AgricultureOperationsPage = lazy(() => import('../AgricultureOperationsPage.jsx'));
- const HotelFrontDeskPage = lazy(() => import('../HotelFrontDeskPage.jsx'));
- const AutoServiceWorkshopPage = lazy(() => import('../AutoServiceWorkshopPage.jsx'));
- const RestaurantServicePage = lazy(() => import('../RestaurantServicePage.jsx'));
- const WholesaleSalesDeskPage = lazy(() => import('../WholesaleSalesDeskPage.jsx'));
- const PharmacyWorkbenchPage = lazy(() => import('../PharmacyWorkbenchPage.jsx'));
- const EducationWorkbenchPage = lazy(() => import('../EducationWorkbenchPage.jsx'));
- const UtilitiesWorkbenchPage = lazy(() => import('../UtilitiesWorkbenchPage.jsx'));
- const FinanceOperationsPage = lazy(() => import('../FinanceOperationsPage.jsx'));
- const EventsOperationsPage = lazy(() => import('../EventsOperationsPage.jsx'));
- const FieldServiceWorkbenchPage = lazy(() => import('../FieldServiceWorkbenchPage.jsx'));
- const RealEstateWorkbenchPage = lazy(() => import('../RealEstateWorkbenchPage.jsx'));
- const ConstructionWorkbenchPage = lazy(() => import('../ConstructionWorkbenchPage.jsx'));
- const ProjectWorkbenchPage = lazy(() => import('../ProjectWorkbenchPage.jsx'));
- const SubscriptionWorkbenchPage = lazy(() => import('../SubscriptionWorkbenchPage.jsx'));
- const CharityWorkbenchPage = lazy(() => import('../CharityWorkbenchPage.jsx'));
- const ProfessionalServicesWorkbenchPage = lazy(() => import('../ProfessionalServicesWorkbenchPage.jsx'));
- const WellnessBookingPage = lazy(() => import('../WellnessBookingPage.jsx'));
- const PurchasingWorkbenchPage = lazy(() => import('../PurchasingWorkbenchPage.jsx'));
- const PurchasingSourcingWorkbenchPage = lazy(() => import('../PurchasingSourcingWorkbenchPage.jsx'));
- const MaintenanceWorkbenchPage = lazy(() => import('../MaintenanceWorkbenchPage.jsx'));
- const RecruitmentWorkbenchPage = lazy(() => import('../RecruitmentWorkbenchPage.jsx'));
- const PayrollWorkbenchPage = lazy(() => import('../PayrollWorkbenchPage.jsx'));
- const HrmOperationsPage = lazy(() => import('../HrmOperationsPage.jsx'));
- const ExpenseWorkbenchPage = lazy(() => import('../ExpenseWorkbenchPage.jsx'));
- const SalesReturnsWorkbenchPage = lazy(() => import('../SalesReturnsWorkbenchPage.jsx'));
- const BankReconciliationWorkbenchPage = lazy(() => import('../BankReconciliationWorkbenchPage.jsx'));
- const AccountingPeriodClosePage = lazy(() => import('../AccountingPeriodClosePage.jsx'));
- const AccountingAdjustmentRefundsPage = lazy(() => import('../AccountingAdjustmentRefundsPage.jsx'));
- const AccountingSettlementWorkbenchPage = lazy(() => import('../AccountingSettlementWorkbenchPage.jsx'));
- const InventoryStockCountWorkbenchPage = lazy(() => import('../InventoryStockCountWorkbenchPage.jsx'));
- const EInvoiceWorkbenchPage = lazy(() => import('../EInvoiceWorkbenchPage.jsx'));
- const HelpdeskWorkbenchPage = lazy(() => import('../HelpdeskWorkbenchPage.jsx'));
- const PerformanceWorkbenchPage = lazy(() => import('../PerformanceWorkbenchPage.jsx'));
- const ApprovalWorkbenchPage = lazy(() => import('../ApprovalWorkbenchPage.jsx'));
- const ContractWorkbenchPage = lazy(() => import('../ContractWorkbenchPage.jsx'));
- const DocumentWorkbenchPage = lazy(() => import('../DocumentWorkbenchPage.jsx'));
- const IntegrationHubPage = lazy(() => import('../IntegrationHubPage.jsx'));
- const LoyaltyWorkbenchPage = lazy(() => import('../LoyaltyWorkbenchPage.jsx'));
- const LmsWorkbenchPage = lazy(() => import('../LmsWorkbenchPage.jsx'));
- const QualityWorkbenchPage = lazy(() => import('../QualityWorkbenchPage.jsx'));
- const CommunicationWorkbenchPage = lazy(() => import('../CommunicationWorkbenchPage.jsx'));
- const PaymentsWorkbenchPage = lazy(() => import('../PaymentsWorkbenchPage.jsx'));
- const AssetWorkbenchPage = lazy(() => import('../AssetWorkbenchPage.jsx'));
+const PosTerminalPage = lazy(() => import('../PosTerminalPage.jsx'));
+const ManufacturingWipPage = lazy(() => import('../ManufacturingWipPage.jsx'));
+const ClinicWorkbenchPage = lazy(() => import('../ClinicWorkbenchPage.jsx'));
+const EcommerceOrderDeskPage = lazy(() => import('../EcommerceOrderDeskPage.jsx'));
+const AgricultureOperationsPage = lazy(() => import('../AgricultureOperationsPage.jsx'));
+const HotelFrontDeskPage = lazy(() => import('../HotelFrontDeskPage.jsx'));
+const AutoServiceWorkshopPage = lazy(() => import('../AutoServiceWorkshopPage.jsx'));
+const RestaurantServicePage = lazy(() => import('../RestaurantServicePage.jsx'));
+const WholesaleSalesDeskPage = lazy(() => import('../WholesaleSalesDeskPage.jsx'));
+const PharmacyWorkbenchPage = lazy(() => import('../PharmacyWorkbenchPage.jsx'));
+const EducationWorkbenchPage = lazy(() => import('../EducationWorkbenchPage.jsx'));
+const UtilitiesWorkbenchPage = lazy(() => import('../UtilitiesWorkbenchPage.jsx'));
+const FinanceOperationsPage = lazy(() => import('../FinanceOperationsPage.jsx'));
+const EventsOperationsPage = lazy(() => import('../EventsOperationsPage.jsx'));
+const FieldServiceWorkbenchPage = lazy(() => import('../FieldServiceWorkbenchPage.jsx'));
+const RealEstateWorkbenchPage = lazy(() => import('../RealEstateWorkbenchPage.jsx'));
+const ConstructionWorkbenchPage = lazy(() => import('../ConstructionWorkbenchPage.jsx'));
+const ProjectWorkbenchPage = lazy(() => import('../ProjectWorkbenchPage.jsx'));
+const SubscriptionWorkbenchPage = lazy(() => import('../SubscriptionWorkbenchPage.jsx'));
+const CharityWorkbenchPage = lazy(() => import('../CharityWorkbenchPage.jsx'));
+const ProfessionalServicesWorkbenchPage = lazy(() => import('../ProfessionalServicesWorkbenchPage.jsx'));
+const WellnessBookingPage = lazy(() => import('../WellnessBookingPage.jsx'));
+const PurchasingWorkbenchPage = lazy(() => import('../PurchasingWorkbenchPage.jsx'));
+const PurchasingSourcingWorkbenchPage = lazy(() => import('../PurchasingSourcingWorkbenchPage.jsx'));
+const MaintenanceWorkbenchPage = lazy(() => import('../MaintenanceWorkbenchPage.jsx'));
+const RecruitmentWorkbenchPage = lazy(() => import('../RecruitmentWorkbenchPage.jsx'));
+const PayrollWorkbenchPage = lazy(() => import('../PayrollWorkbenchPage.jsx'));
+const HrmOperationsPage = lazy(() => import('../HrmOperationsPage.jsx'));
+const ExpenseWorkbenchPage = lazy(() => import('../ExpenseWorkbenchPage.jsx'));
+const SalesReturnsWorkbenchPage = lazy(() => import('../SalesReturnsWorkbenchPage.jsx'));
+const BankReconciliationWorkbenchPage = lazy(() => import('../BankReconciliationWorkbenchPage.jsx'));
+const AccountingPeriodClosePage = lazy(() => import('../AccountingPeriodClosePage.jsx'));
+const AccountingAdjustmentRefundsPage = lazy(() => import('../AccountingAdjustmentRefundsPage.jsx'));
+const AccountingSettlementWorkbenchPage = lazy(() => import('../AccountingSettlementWorkbenchPage.jsx'));
+const InventoryStockCountWorkbenchPage = lazy(() => import('../InventoryStockCountWorkbenchPage.jsx'));
+const EInvoiceWorkbenchPage = lazy(() => import('../EInvoiceWorkbenchPage.jsx'));
+const HelpdeskWorkbenchPage = lazy(() => import('../HelpdeskWorkbenchPage.jsx'));
+const PerformanceWorkbenchPage = lazy(() => import('../PerformanceWorkbenchPage.jsx'));
+const ApprovalWorkbenchPage = lazy(() => import('../ApprovalWorkbenchPage.jsx'));
+const ContractWorkbenchPage = lazy(() => import('../ContractWorkbenchPage.jsx'));
+const DocumentWorkbenchPage = lazy(() => import('../DocumentWorkbenchPage.jsx'));
+const IntegrationHubPage = lazy(() => import('../IntegrationHubPage.jsx'));
+const LoyaltyWorkbenchPage = lazy(() => import('../LoyaltyWorkbenchPage.jsx'));
+const LmsWorkbenchPage = lazy(() => import('../LmsWorkbenchPage.jsx'));
+const QualityWorkbenchPage = lazy(() => import('../QualityWorkbenchPage.jsx'));
+const CommunicationWorkbenchPage = lazy(() => import('../CommunicationWorkbenchPage.jsx'));
+const PaymentsWorkbenchPage = lazy(() => import('../PaymentsWorkbenchPage.jsx'));
+const AssetWorkbenchPage = lazy(() => import('../AssetWorkbenchPage.jsx'));
+const ROUTES = Object.freeze({
+  home: HomePage,
+  'not-found': NotFoundPage,
+  events: EventsPage,
+  module: ModuleOverviewPage,
+  'account-security': MfaSettingsPage,
+  'accounting-reports': AccountingReportsPage,
+  'manufacturing-wip': ManufacturingWipPage,
+  'asset-depreciation-schedule': AssetDepreciationSchedulePage,
+  'inventory-replenishment': InventoryReplenishmentPage,
+  'inventory-location-stock': InventoryLocationStockPage,
+  'inventory-quality-holds': InventoryQualityHoldsPage,
+  'inventory-stock-count-workbench': InventoryStockCountWorkbenchPage,
+  'inventory-lot-traceability': InventoryLotTraceabilityPage,
+  'inventory-lot-expiry': InventoryLotExpiryPage,
+  'restaurant-kitchen-board': RestaurantKitchenBoardPage,
+  'logistics-delivery-board': LogisticsDeliveryBoardPage,
+  'hotel-housekeeping-board': HotelHousekeepingBoardPage,
+  'pos-terminal': PosTerminalPage,
+  'clinic-workbench': ClinicWorkbenchPage,
+  'pharmacy-workbench': PharmacyWorkbenchPage,
+  'education-workbench': EducationWorkbenchPage,
+  'lms-workbench': LmsWorkbenchPage,
+  'quality-workbench': QualityWorkbenchPage,
+  'communication-workbench': CommunicationWorkbenchPage,
+  'payments-workbench': PaymentsWorkbenchPage,
+  'asset-workbench': AssetWorkbenchPage,
+  'utilities-workbench': UtilitiesWorkbenchPage,
+  'finance-operations': FinanceOperationsPage,
+  'events-operations': EventsOperationsPage,
+  'field-service-workbench': FieldServiceWorkbenchPage,
+  'real-estate-workbench': RealEstateWorkbenchPage,
+  'construction-workbench': ConstructionWorkbenchPage,
+  'project-workbench': ProjectWorkbenchPage,
+  'subscription-workbench': SubscriptionWorkbenchPage,
+  'charity-workbench': CharityWorkbenchPage,
+  'professional-services-workbench': ProfessionalServicesWorkbenchPage,
+  'wellness-booking-workbench': WellnessBookingPage,
+  'purchasing-workbench': PurchasingWorkbenchPage,
+  'purchasing-sourcing-workbench': PurchasingSourcingWorkbenchPage,
+  'maintenance-workbench': MaintenanceWorkbenchPage,
+  'recruitment-workbench': RecruitmentWorkbenchPage,
+  'payroll-workbench': PayrollWorkbenchPage,
+  'hrm-operations': HrmOperationsPage,
+  'expense-workbench': ExpenseWorkbenchPage,
+  'sales-returns-workbench': SalesReturnsWorkbenchPage,
+  'bank-reconciliation-workbench': BankReconciliationWorkbenchPage,
+  'accounting-period-close': AccountingPeriodClosePage,
+  'accounting-adjustment-refunds': AccountingAdjustmentRefundsPage,
+  'accounting-settlement-workbench': AccountingSettlementWorkbenchPage,
+  'einvoice-workbench': EInvoiceWorkbenchPage,
+  'ecommerce-order-desk': EcommerceOrderDeskPage,
+  'agriculture-operations': AgricultureOperationsPage,
+  'hotel-frontdesk': HotelFrontDeskPage,
+  'auto-service-workshop': AutoServiceWorkshopPage,
+  'restaurant-service': RestaurantServicePage,
+  'wholesale-sales-desk': WholesaleSalesDeskPage,
+  'budget-variance': BudgetVariancePage,
+  'crm-pipeline': CrmPipelinePage,
+  'helpdesk-workbench': HelpdeskWorkbenchPage,
+  'performance-workbench': PerformanceWorkbenchPage,
+  'approval-workbench': ApprovalWorkbenchPage,
+  'contract-workbench': ContractWorkbenchPage,
+  'document-workbench': DocumentWorkbenchPage,
+  'integration-hub-workbench': IntegrationHubPage,
+  'loyalty-workbench': LoyaltyWorkbenchPage,
+  'marketing-campaign-performance': MarketingCampaignPerformancePage,
+  'helpdesk-sla': HelpdeskSlaPage,
+  'bi-reports': BiReportsPage,
+});
+
+const SETTINGS_ROUTES = Object.freeze({
+  users: UsersSettingsPage,
+  modules: ModuleSettingsPage,
+  roles: RolesSettingsPage,
+  inventory: InventorySettingsPage,
+  budget: BudgetSettingsPage,
+  currency: CurrencySettingsPage,
+  'business-time': BusinessTimeSettingsPage,
+  tokens: TokensSettingsPage,
+  audit: AuditSettingsPage,
+  failures: FailuresSettingsPage,
+  outbox: OutboxSettingsPage,
+  fields: FieldsSettingsPage,
+  data: DataSettingsPage,
+});
 
 export default function PageRouter({ route, meta, summary }) {
-  return (
-<Suspense fallback={<div className="card-pad"><div className="skeleton" data-h="row" /></div>}>
-  {route.name === 'entity'
-    ? <>
+  if (route.name === 'entity') {
+    return <Suspense fallback={<div className="card-pad"><div className="skeleton" data-h="row" /></div>}>
       <EntityListPage key={route.qname} qname={route.qname} />
       {route.id && <EntityDetailPage key={`${route.qname}:${route.id}`} qname={route.qname} id={route.id} />}
-    </>
-    : route.name === 'account-security' ? <MfaSettingsPage />
-    : route.name === 'events' ? <EventsPage />
-    : route.name === 'home' ? <HomePage summary={summary} />
-    : route.name === 'not-found' ? <NotFoundPage />
-    : route.name === 'module' ? <ModuleOverviewPage moduleId={route.module} summary={summary} />
-    : route.name === 'accounting-reports' ? <AccountingReportsPage />
-    : route.name === 'manufacturing-wip' ? <ManufacturingWipPage />
-    : route.name === 'asset-depreciation-schedule' ? <AssetDepreciationSchedulePage />
-    : route.name === 'inventory-replenishment' ? <InventoryReplenishmentPage />
-    : route.name === 'inventory-location-stock' ? <InventoryLocationStockPage />
-    : route.name === 'inventory-quality-holds' ? <InventoryQualityHoldsPage />
-    : route.name === 'inventory-stock-count-workbench' ? <InventoryStockCountWorkbenchPage />
-    : route.name === 'inventory-lot-traceability' ? <InventoryLotTraceabilityPage lotId={route.lotId} />
-    : route.name === 'inventory-lot-expiry' ? <InventoryLotExpiryPage />
-    : route.name === 'restaurant-kitchen-board' ? <RestaurantKitchenBoardPage />
-    : route.name === 'logistics-delivery-board' ? <LogisticsDeliveryBoardPage />
-    : route.name === 'hotel-housekeeping-board' ? <HotelHousekeepingBoardPage />
-    : route.name === 'pos-terminal' ? <PosTerminalPage />
-    : route.name === 'clinic-workbench' ? <ClinicWorkbenchPage />
-    : route.name === 'pharmacy-workbench' ? <PharmacyWorkbenchPage />
-    : route.name === 'education-workbench' ? <EducationWorkbenchPage />
-    : route.name === 'lms-workbench' ? <LmsWorkbenchPage />
-    : route.name === 'quality-workbench' ? <QualityWorkbenchPage />
-    : route.name === 'communication-workbench' ? <CommunicationWorkbenchPage />
-    : route.name === 'payments-workbench' ? <PaymentsWorkbenchPage />
-    : route.name === 'asset-workbench' ? <AssetWorkbenchPage />
-    : route.name === 'utilities-workbench' ? <UtilitiesWorkbenchPage />
-    : route.name === 'finance-operations' ? <FinanceOperationsPage />
-    : route.name === 'events-operations' ? <EventsOperationsPage />
-    : route.name === 'field-service-workbench' ? <FieldServiceWorkbenchPage />
-    : route.name === 'real-estate-workbench' ? <RealEstateWorkbenchPage />
-    : route.name === 'construction-workbench' ? <ConstructionWorkbenchPage />
-    : route.name === 'project-workbench' ? <ProjectWorkbenchPage />
-    : route.name === 'subscription-workbench' ? <SubscriptionWorkbenchPage />
-    : route.name === 'charity-workbench' ? <CharityWorkbenchPage />
-    : route.name === 'professional-services-workbench' ? <ProfessionalServicesWorkbenchPage />
-    : route.name === 'wellness-booking-workbench' ? <WellnessBookingPage healthcare={meta.modules.some((module) => module.id === 'clinic')} />
-    : route.name === 'purchasing-workbench' ? <PurchasingWorkbenchPage />
-    : route.name === 'purchasing-sourcing-workbench' ? <PurchasingSourcingWorkbenchPage />
-    : route.name === 'maintenance-workbench' ? <MaintenanceWorkbenchPage />
-    : route.name === 'recruitment-workbench' ? <RecruitmentWorkbenchPage />
-    : route.name === 'payroll-workbench' ? <PayrollWorkbenchPage />
-    : route.name === 'hrm-operations' ? <HrmOperationsPage />
-    : route.name === 'expense-workbench' ? <ExpenseWorkbenchPage />
-    : route.name === 'sales-returns-workbench' ? <SalesReturnsWorkbenchPage />
-    : route.name === 'bank-reconciliation-workbench' ? <BankReconciliationWorkbenchPage />
-    : route.name === 'accounting-period-close' ? <AccountingPeriodClosePage />
-    : route.name === 'accounting-adjustment-refunds' ? <AccountingAdjustmentRefundsPage />
-    : route.name === 'accounting-settlement-workbench' ? <AccountingSettlementWorkbenchPage />
-    : route.name === 'einvoice-workbench' ? <EInvoiceWorkbenchPage />
-    : route.name === 'ecommerce-order-desk' ? <EcommerceOrderDeskPage />
-    : route.name === 'agriculture-operations' ? <AgricultureOperationsPage />
-    : route.name === 'hotel-frontdesk' ? <HotelFrontDeskPage />
-    : route.name === 'auto-service-workshop' ? <AutoServiceWorkshopPage />
-    : route.name === 'restaurant-service' ? <RestaurantServicePage />
-    : route.name === 'wholesale-sales-desk' ? <WholesaleSalesDeskPage />
-    : route.name === 'budget-variance' ? <BudgetVariancePage />
-    : route.name === 'crm-pipeline' ? <CrmPipelinePage />
-    : route.name === 'helpdesk-workbench' ? <HelpdeskWorkbenchPage />
-    : route.name === 'performance-workbench' ? <PerformanceWorkbenchPage />
-    : route.name === 'approval-workbench' ? <ApprovalWorkbenchPage />
-    : route.name === 'contract-workbench' ? <ContractWorkbenchPage />
-    : route.name === 'document-workbench' ? <DocumentWorkbenchPage />
-    : route.name === 'integration-hub-workbench' ? <IntegrationHubPage />
-    : route.name === 'loyalty-workbench' ? <LoyaltyWorkbenchPage />
-    : route.name === 'marketing-campaign-performance' ? <MarketingCampaignPerformancePage />
-    : route.name === 'helpdesk-sla' ? <HelpdeskSlaPage />
-    : route.name === 'bi-reports' ? <BiReportsPage route={route} />
-    : route.name === 'settings' && route.tab === 'modules' ? <ModuleSettingsPage />
-    : route.name === 'settings' && route.tab === 'users' ? <UsersSettingsPage />
-    : route.name === 'settings' && route.tab === 'roles' ? <RolesSettingsPage />
-    : route.name === 'settings' && route.tab === 'inventory' ? <InventorySettingsPage />
-    : route.name === 'settings' && route.tab === 'budget' ? <BudgetSettingsPage />
-    : route.name === 'settings' && route.tab === 'currency' ? <CurrencySettingsPage />
-    : route.name === 'settings' && route.tab === 'business-time' ? <BusinessTimeSettingsPage />
-    : route.name === 'settings' && route.tab === 'tokens' ? <TokensSettingsPage />
-    : route.name === 'settings' && route.tab === 'audit' ? <AuditSettingsPage />
-    : route.name === 'settings' && route.tab === 'failures' ? <FailuresSettingsPage />
-    : route.name === 'settings' && route.tab === 'outbox' ? <OutboxSettingsPage />
-    : route.name === 'settings' && route.tab === 'fields' ? <FieldsSettingsPage />
-    : route.name === 'settings' && route.tab === 'data' ? <DataSettingsPage />
-    : route.name === 'settings' ? <UsersSettingsPage />
-    : <HomePage summary={summary} />}
-  </Suspense>
-  );
+    </Suspense>;
+  }
+
+  const Page = route.name === 'settings' ? SETTINGS_ROUTES[route.tab] : ROUTES[route.name];
+  if (!Page) return <Suspense fallback={<div className="card-pad"><div className="skeleton" data-h="row" /></div>}><NotFoundPage /></Suspense>;
+
+  const props = route.name === 'home'
+    ? { summary }
+    : route.name === 'module'
+      ? { moduleId: route.module, summary }
+      : route.name === 'inventory-lot-traceability'
+        ? { lotId: route.lotId }
+        : route.name === 'bi-reports'
+          ? { route }
+          : route.name === 'wellness-booking-workbench'
+            ? { healthcare: meta.modules.some((module) => module.id === 'clinic') }
+            : {};
+
+  return <Suspense fallback={<div className="card-pad"><div className="skeleton" data-h="row" /></div>}>
+    <Page {...props} />
+  </Suspense>;
 }
-
-
-
-
-
