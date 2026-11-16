@@ -437,6 +437,17 @@ for (const [vertical, hash, label, summaryEntity, setupEntity] of verticalScreen
       await page.reload({ waitUntil: 'networkidle0' });
       await page.goto(`${BASE}/${hash}`, { waitUntil: 'networkidle0' });
     }
+    if (vertical === 'construction') {
+      await page.evaluate(() => localStorage.setItem('osp.uiLocale', 'en-US'));
+      await page.reload({ waitUntil: 'networkidle0' });
+      await page.goto(`${BASE}/#/reports/asset/depreciation-schedule`, { waitUntil: 'networkidle0' });
+      await page.waitForSelector('#main h1');
+      must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Depreciation schedule', 'asset depreciation schedule is not translated');
+      await axe('asset depreciation schedule tiếng Anh');
+      await page.evaluate(() => localStorage.setItem('osp.uiLocale', 'vi-VN'));
+      await page.reload({ waitUntil: 'networkidle0' });
+      await page.goto(`${BASE}/${hash}`, { waitUntil: 'networkidle0' });
+    }
     if (vertical === 'ngo-government') {
       await page.evaluate(() => localStorage.setItem('osp.uiLocale', 'en-US'));
       await page.reload({ waitUntil: 'networkidle0' });
