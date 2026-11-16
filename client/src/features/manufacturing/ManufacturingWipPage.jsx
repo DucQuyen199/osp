@@ -9,6 +9,7 @@ import ProductionOrderCard from './components/ProductionOrderCard.jsx';
 import ProductionOrderForm from './components/ProductionOrderForm.jsx';
 import ProductionInspectionQueue from './components/ProductionInspectionQueue.jsx';
 import ManufacturingWipReport from './components/ManufacturingWipReport.jsx';
+import ConditionalAcceptancePanel from './components/ConditionalAcceptancePanel.jsx';
 const t = (text) => uiTextWith(text, manufacturingEnglish);
 const today = localDate;
 const qty = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
@@ -110,6 +111,11 @@ export default function ManufacturingWipPage() {
     + conditionalAcceptances.filter((row) => row.inspection === inspectionId && ['draft', 'submitted', 'approved'].includes(row.status)).reduce((total, row) => total + Number(row.qty || 0), 0)
   );
   const remainingFailedQty = (inspection) => Math.max(0, Number(inspection?.qty || 0) - alreadyAccountedReworkQty(inspection?.id));
+  const conditionalAcceptanceCandidates = inspections.filter((inspection) =>
+    ['production_order', 'production_rework'].includes(inspection.source)
+    && inspection.status === 'failed'
+    && remainingFailedQty(inspection) > 0.000001
+  );
   const resetBom = () => { setEditingBom(''); setBomProduct(''); setBomOutputQty('1'); setComponents([{ product: '', qty: '1', uom: '' }]); };
   const editBom = (bom) => {
     setEditingBom(bom.id); setBomProduct(bom.product); setBomOutputQty(String(bom.output_qty || 1));
@@ -300,18 +306,35 @@ export default function ManufacturingWipPage() {
       {can('quality.inspection.read') && <ProductionInspectionQueue inspections={inspections} products={products} qcNotes={qcNotes} busy={busy} canPass={can('quality.inspection.passed')} canRecordFailure={can('quality.inspection.failed') && can('quality.inspection.update')} formatQty={qty} baseUnitName={baseUnitName} t={t} onNoteChange={(id, value) => setQcNotes((rows) => ({ ...rows, [id]: value }))} onDecide={decideInspection} />}
     </section>
       {can('manufacturing.rework_order.read') && <div className="manufacturing-orders"><h3>{t("Sửa hàng không đạt")}</h3>{can('manufacturing.rework_order.create') && <form className="manufacturing-form" onSubmit={createReworkOrder}><label className="field"><span>{t("Phiếu QC trượt *")}</span><select className="select" required value={reworkInspection} onChange={(event) => { const nextId = event.target.value; const selected = inspections.find((row) => row.id === nextId); const alreadyAssigned = alreadyAccountedReworkQty(nextId); setReworkInspection(nextId); setReworkQty(selected ? String(Math.max(0, Number(selected.qty || 0) - alreadyAssigned)) : ''); }}><option value="">{t("Chọn phiếu QC")}</option>{inspections.filter((inspection) => ['production_order', 'production_rework'].includes(inspection.source) && inspection.status === 'failed' && Number(inspection.qty || 0) - alreadyAccountedReworkQty(inspection.id) > 0.000001).map((inspection) => { const remaining = Math.max(0, Number(inspection.qty || 0) - alreadyAccountedReworkQty(inspection.id)); return <option key={inspection.id} value={inspection.id}>{products.get(inspection.product)?.name || inspection.product} · còn {qty(remaining)} {baseUnitName(inspection.product)} · lệnh {String(inspection.source_id).slice(0, 8)}</option>; })}</select></label>{reworkInspection && <><label className="field"><span>{t("Số lượng sửa *")}</span><input className="input num" type="number" min="0.000001" max={remainingFailedQty(inspections.find((row) => row.id === reworkInspection))} step="any" required value={reworkQty} onChange={(event) => setReworkQty(event.target.value)} /></label><p className="small muted">{t("Sau khi sửa, đúng số lượng này sẽ được kiểm tra lại riêng; phần còn lỗi vẫn được giữ trong phiếu QC ban đầu.")}</p></>}<label className="field"><span>{t("Lý do sửa *")}</span><input className="input" minLength={5} maxLength={500} required value={reworkReason} onChange={(event) => setReworkReason(event.target.value)} /></label><button className="btn btn-primary btn-sm" type="submit" disabled={busy === 'rework' || !reworkInspection || !Number(reworkQty) || reworkReason.trim().length < 5}>{busy === 'rework' ? t("Đang tạo…") : t("Tạo lệnh sửa")}</button></form>}{reworkOrders.map((order) => { const inspection = inspections.find((row) => row.id === order.inspection); return <article className="manufacturing-order-card" key={order.id}><div className="manufacturing-order-summary"><strong>{products.get(inspection?.product)?.name || t("Lô sửa hàng")}</strong><span className="badge">{statusLabel(order.status)}</span><span className="small muted">{t("Lệnh")} {String(order.production_order).slice(0, 8)} · Số lượng {qty(order.qty)} · {order.reason}</span></div>{order.status === 'planned' && can('manufacturing.rework_order.started') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateRework(order, 'started')}>{t("Bắt đầu, xuất vật tư")}</button>}{order.status === 'in_progress' && can('manufacturing.rework_order.done') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateRework(order, 'done')}>{t("Hoàn tất, gửi QC kiểm tra lại")}</button>}{order.status === 'planned' && can('manufacturing.rework_order.cancelled') && <button className="btn btn-ghost btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateRework(order, 'cancelled')}>{t("Hủy lệnh sửa")}</button>}</article>; })}{!reworkOrders.length && <p className="small muted">{t("Chưa có lệnh sửa hàng.")}</p>}</div>}
-    {can('manufacturing.conditional_acceptance.read') && <section className="card card-pad">
-      <h3>{t("Chấp nhận có điều kiện")}</h3>
-      <p className="small muted">{t("Dùng khi có căn cứ cho phép dùng một phần sản phẩm chưa đạt chuẩn thông thường. Phải ghi điều kiện kiểm soát và lý do; chỉ người được giao quyền trong quy tắc phê duyệt mới có thể duyệt. Hàng vẫn bị giữ cho đến khi duyệt.")}</p>
-      {can('manufacturing.conditional_acceptance.create') && can('manufacturing.conditional_acceptance.submitted') && <form className="manufacturing-form" onSubmit={submitConditionalAcceptance}>
-        <label className="field"><span>{t("Phiếu QC trượt *")}</span><select className="select" required value={acceptanceInspection} onChange={(event) => { const nextId = event.target.value; const selected = inspections.find((row) => row.id === nextId); setAcceptanceInspection(nextId); setAcceptanceQty(selected ? String(remainingFailedQty(selected)) : ''); }}><option value="">{t("Chọn phiếu QC")}</option>{inspections.filter((inspection) => ['production_order', 'production_rework'].includes(inspection.source) && inspection.status === 'failed' && remainingFailedQty(inspection) > 0.000001).map((inspection) => <option key={inspection.id} value={inspection.id}>{products.get(inspection.product)?.name || inspection.product} · còn {qty(remainingFailedQty(inspection))} {baseUnitName(inspection.product)} · lệnh {String(inspection.source_id).slice(0, 8)}</option>)}</select></label>
-        {acceptanceInspection && <label className="field"><span>{t("Số lượng đề nghị *")}</span><input className="input num" type="number" min="0.000001" max={remainingFailedQty(inspections.find((row) => row.id === acceptanceInspection))} step="any" required value={acceptanceQty} onChange={(event) => setAcceptanceQty(event.target.value)} /></label>}
-        <label className="field"><span>{t("Điều kiện sử dụng / kiểm soát sau chấp nhận *")}</span><textarea className="input" rows="2" minLength="5" maxLength="2000" required value={acceptanceCondition} onChange={(event) => setAcceptanceCondition(event.target.value)} placeholder={t("Ví dụ: giới hạn sử dụng, kiểm tra bổ sung hoặc thông báo cho khách hàng")} /></label>
-        <label className="field"><span>{t("Căn cứ đề nghị *")}</span><textarea className="input" rows="2" minLength="5" maxLength="2000" required value={acceptanceJustification} onChange={(event) => setAcceptanceJustification(event.target.value)} placeholder={t("Ghi kết quả đánh giá rủi ro và căn cứ kỹ thuật")} /></label>
-        <button className="btn btn-primary btn-sm" type="submit" disabled={Boolean(busy) || !acceptanceInspection || !(Number(acceptanceQty) > 0) || acceptanceCondition.trim().length < 5 || acceptanceJustification.trim().length < 5}>{busy === 'conditional-acceptance' ? t("Đang gửi…") : t("Gửi phê duyệt")}</button>
-      </form>}
-      <div className="stack-sm u-legacy-92c18f6bda" >{conditionalAcceptances.map((row) => { const inspection = inspections.find((item) => item.id === row.inspection); return <article className="manufacturing-order-card" key={row.id}><div className="manufacturing-order-summary"><strong>{products.get(inspection?.product)?.name || t("Thành phẩm QC lỗi")}</strong><span className={`badge ${row.status === 'approved' ? 'success' : row.status === 'rejected' ? 'danger' : 'warning'}`}>{statusLabel(row.status)}</span><span className="small muted">Lệnh {String(inspection?.source_id || '').slice(0, 8)} · {qty(row.qty)} {baseUnitName(inspection?.product)} · {row.condition}</span><span className="small muted">{t("Căn cứ")}: {row.justification}</span></div>{row.status === 'submitted' && <a className="btn btn-ghost btn-sm" href="#/approvals">{t("Mở hàng chờ phê duyệt")}</a>}{row.status === 'rejected' && can('manufacturing.conditional_acceptance.submitted') && <button className="btn btn-secondary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateConditionalAcceptance(row, 'submitted')}>{t("Gửi duyệt lại")}</button>}{['draft', 'rejected'].includes(row.status) && can('manufacturing.conditional_acceptance.cancelled') && <button className="btn btn-ghost btn-sm" type="button" disabled={Boolean(busy)} onClick={() => operateConditionalAcceptance(row, 'cancelled')}>{t("Hủy đề nghị")}</button>}</article>; })}{!conditionalAcceptances.length && <p className="small muted">{t("Chưa có đề nghị chấp nhận có điều kiện.")}</p>}</div>
-    </section>}
+    {can('manufacturing.conditional_acceptance.read') && <ConditionalAcceptancePanel
+      inspections={inspections}
+      candidates={conditionalAcceptanceCandidates}
+      acceptances={conditionalAcceptances}
+      products={products}
+      busy={busy}
+      inspectionId={acceptanceInspection}
+      quantity={acceptanceQty}
+      condition={acceptanceCondition}
+      justification={acceptanceJustification}
+      canCreate={can('manufacturing.conditional_acceptance.create') && can('manufacturing.conditional_acceptance.submitted')}
+      canResubmit={can('manufacturing.conditional_acceptance.submitted')}
+      canCancel={can('manufacturing.conditional_acceptance.cancelled')}
+      remainingQuantity={remainingFailedQty}
+      baseUnitName={baseUnitName}
+      formatQuantity={qty}
+      statusLabel={statusLabel}
+      onSubmit={submitConditionalAcceptance}
+      onInspectionChange={(id) => {
+        const inspection = inspections.find((row) => row.id === id);
+        setAcceptanceInspection(id);
+        setAcceptanceQty(inspection ? String(remainingFailedQty(inspection)) : '');
+      }}
+      onQuantityChange={setAcceptanceQty}
+      onConditionChange={setAcceptanceCondition}
+      onJustificationChange={setAcceptanceJustification}
+      onAction={operateConditionalAcceptance}
+      t={t}
+    />}
     {can('manufacturing.production_disposition.read') && <section className="card card-pad">
       <h3>{t("Loại bỏ thành phẩm QC lỗi")}</h3>
       {can('manufacturing.production_disposition.create') && <form className="manufacturing-form" onSubmit={createProductionDisposition}>
