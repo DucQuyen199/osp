@@ -90,6 +90,10 @@ pub(super) fn calculate_charge(
 }
 
 pub fn validate(entity: &str, document: &Value) -> Vec<String> {
+    validate_at(entity, document, chrono::Utc::now().date_naive())
+}
+
+pub fn validate_at(entity: &str, document: &Value, today: NaiveDate) -> Vec<String> {
     match entity {
         "meter" => {
             let mut errors = Vec::new();
@@ -134,8 +138,7 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
                     NaiveDate::parse_from_str(&format!("{period}-01"), "%Y-%m-%d").ok()
                 });
             if let Some(period) = period {
-                let current_period = chrono::Utc::now()
-                    .date_naive()
+                let current_period = today
                     .with_day(1)
                     .expect("the first day of a valid date exists");
                 if period > current_period {

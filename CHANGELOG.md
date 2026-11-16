@@ -4,6 +4,7 @@
 
 ## [Unreleased]
 ### Added
+- Utility meter readings now validate future billing periods against the tenant's business date, avoiding incorrect month-boundary decisions based on the server's UTC date.
 - Sales returns now keep separate quantities and pricing terms for same-product lines with different discounts or tax snapshots, so the credit value follows the original order line.
 - POS prescription selection appears only when the cart contains prescription medicine, clears if those items are removed, and lists only verified, partially dispensed, unexpired prescriptions.
 - E-commerce storefront currency now has to exist in the tenant currency catalog and match its price list; carts snapshot that currency into the sales order, delivered-order invoices retain it for accounting FX posting, and the order desk formats totals in the order currency.

@@ -82,7 +82,7 @@ fn validate_document_at(
         "pharmacy" => pharmacy::validate_at(entity, document, today),
         "performance" => performance::validate(entity, document),
         "subscription" => subscription::validate(entity, document),
-        "utilities" => utilities::validate(entity, document),
+        "utilities" => utilities::validate_at(entity, document, today),
         "pos" => pos::validate(entity, document),
         "project" => project::validate(entity, document),
         "quality" => quality::validate(entity, document),
