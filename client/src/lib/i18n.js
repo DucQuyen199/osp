@@ -657,6 +657,20 @@ const UI_TEXT_EN = {
   'Chỉ quản trị viên mới được thay đổi module.': 'Only administrators can change modules.', 'Quản trị doanh nghiệp': 'Company administration', 'Quản lý module': 'Manage modules',
   'Bật module để nối các luồng liên mô-đun. Tắt module không xóa dữ liệu; bật lại sẽ tiếp tục dùng dữ liệu cũ.': 'Enable modules to connect cross-module workflows. Disabling a module keeps its data; enabling it again restores access to that data.',
   'Phụ thuộc': 'Dependencies', 'Luôn bật': 'Always on',
+  'Gom một lần thu hoặc chi để phân bổ vào nhiều hóa đơn cùng đối tác và tiền tệ. Mỗi hóa đơn vẫn có payment riêng; sổ cái nhận một bút toán tổng hợp để đối soát giao dịch ngân hàng.': 'Group one receipt or payment and allocate it to multiple invoices for the same party and currency. Each invoice keeps its own payment record; the ledger receives one summarized journal entry for bank reconciliation.',
+  'Lập phiếu thu/chi': 'Create receipt/payment batch', 'Nghiệp vụ *': 'Transaction type *', 'Thu khách hàng': 'Customer receipt', 'Chi nhà cung cấp': 'Supplier payment',
+  'Đối tác *': 'Party *', 'Chọn đối tác': 'Select a party', 'Tiền tệ *': 'Currency *', 'Chọn tiền tệ': 'Select a currency', 'Phương thức *': 'Payment method *',
+  'Ngân hàng': 'Bank', 'Ngày thanh toán *': 'Payment date *', 'Mã tham chiếu ngân hàng': 'Bank reference', 'Hóa đơn còn dư': 'Open invoices',
+  'Chọn đối tác để xem chứng từ còn công nợ.': 'Select a party to see documents with outstanding balances.', 'Đối tác này chưa có hóa đơn còn dư.': 'This party has no invoices with outstanding balances.',
+  'Không có chứng từ cùng loại và tiền tệ còn số dư.': 'No open documents match this transaction type and currency.', 'Chứng từ': 'Document', 'Còn nợ': 'Balance due',
+  'Phân bổ': 'Allocation', 'Tất cả dư nợ': 'Allocate full balance', 'Lưu phiếu nháp': 'Save draft batch', 'Phiếu thu/chi': 'Receipt/payment batches',
+  'Chưa có phiếu thu/chi phân bổ.': 'No receipt/payment batches yet.', 'Phiếu': 'Batch', 'Ngày / tiền tệ': 'Date / currency', 'Trạng thái / thao tác': 'Status / actions',
+  'Tổng phân bổ:': 'Total allocated:', 'Không tải được phiếu thu/chi công nợ.': 'Could not load receipt/payment batches.',
+  'Không cập nhật được phiếu thu/chi.': 'Could not update the receipt/payment batch.', 'Không có mã tham chiếu': 'No reference', 'payment': 'payment', 'payments': 'payments',
+  'Thu/chi phân bổ công nợ': 'Accounts receivable/payable settlement', 'Số tiền phân bổ': 'Allocation amount', 'Mở yêu cầu duyệt ·': 'Open approval request ·',
+  'Đã lưu phiếu nháp. Gửi duyệt khi thông tin và phân bổ đã chính xác.': 'Draft batch saved. Submit it for approval after checking the details and allocations.',
+  'Đã duyệt và ghi nhận các payment cùng bút toán tổng hợp.': 'Approved; payments and the summary journal entry were recorded.',
+  'Đã gửi phiếu đi duyệt.': 'Batch submitted for approval.', 'Đã từ chối phiếu.': 'Batch rejected.', 'Đã hủy phiếu.': 'Batch cancelled.',
 };
 
 const MODULE_NAME_EN = {

@@ -259,6 +259,10 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Accounting period close', 'accounting period close title is not translated');
   await axe('accounting period close tiếng Anh');
+  await page.goto(`${BASE}/#/settlements`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#main h1');
+  must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Accounts receivable/payable settlement', 'accounting settlement workbench is not translated');
+  await axe('accounting settlement workbench tiếng Anh');
   await page.goto(`${BASE}/#/quality`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Nonconformance register', 'quality workbench title is not translated');
