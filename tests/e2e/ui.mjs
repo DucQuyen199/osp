@@ -188,6 +188,10 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'RFQ and quote comparison', 'màn hình tìm nguồn mua chưa được dịch');
   await axe('purchasing sourcing workbench tiếng Anh');
+  await page.goto(`${BASE}/#/purchasing`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#main h1');
+  must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Purchasing and receiving', 'màn hình mua hàng chưa được dịch');
+  await axe('purchasing workbench tiếng Anh');
   await page.goto(`${BASE}/#/`, { waitUntil: 'networkidle0' });
   await page.click('.menu > button');
   must(await clickText('Vietnamese', 'button'), 'không có lựa chọn tiếng Việt sau khi chuyển ngôn ngữ');
