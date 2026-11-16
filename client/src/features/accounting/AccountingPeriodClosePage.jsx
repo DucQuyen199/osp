@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
-import { fmtDate, fmtMoney, statusLabel } from '../../lib/i18n.js';
+import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 
@@ -49,11 +49,11 @@ export default function AccountingPeriodClosePage() {
       periodRows.sort((a, b) => String(b.start_date || '').localeCompare(String(a.start_date || '')));
       setPeriods(periodRows); setDraftStatements(statementRows); setDraftJournals(journalRows);
       setPeriodId((id) => periodRows.some((row) => row.id === id) ? id : periodRows.find((row) => row.status === 'open')?.id || periodRows[0]?.id || '');
-    } catch (reason) { setError(reason.message || 'Không tải được dữ liệu khóa sổ.'); }
+    } catch (reason) { setError(reason.message || uiText('Không tải được dữ liệu khóa sổ.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
 
-  useEffect(() => { document.title = 'Khóa sổ kế toán · OSP Suite'; load(); }, [load]);
+  useEffect(() => { document.title = `${uiText('Khóa sổ kế toán')} · OSP Suite`; load(); }, [load]);
 
   const selected = periods.find((row) => row.id === periodId);
   const blockingStatements = useMemo(() => selected ? draftStatements.filter((row) => row.start_date <= selected.end_date && row.end_date >= selected.start_date) : [], [draftStatements, selected]);
@@ -64,7 +64,7 @@ export default function AccountingPeriodClosePage() {
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); setNotice(success); await load(true); }
-    catch (reason) { setError(reason.message || 'Không cập nhật được kỳ kế toán.'); await load(true); }
+    catch (reason) { setError(reason.message || uiText('Không cập nhật được kỳ kế toán.')); await load(true); }
     finally { setBusy(''); }
   }
 
@@ -73,28 +73,28 @@ export default function AccountingPeriodClosePage() {
     await run('period:create', async () => {
       await api(dataPath('accounting.period'), { method: 'POST', body: form });
       setForm((current) => ({ ...current, name: `${today().slice(0, 7)}`, start_date: monthStart(), end_date: monthEnd() }));
-    }, 'Đã tạo kỳ kế toán. Hệ thống sẽ chặn kỳ bị chồng và bảo vệ ngày sau khi có bút toán.');
+    }, uiText('Đã tạo kỳ kế toán. Hệ thống sẽ chặn kỳ bị chồng và bảo vệ ngày sau khi có bút toán.'));
   }
 
   async function closePeriod() {
     if (!selected) return;
-    await run(`${selected.id}:closed`, () => api(dataPath('accounting.period', selected.id, 'closed'), { method: 'POST' }), 'Đã khóa kỳ. Hệ thống không cho ghi sổ hoặc sửa bút toán trong khoảng ngày này.');
+    await run(`${selected.id}:closed`, () => api(dataPath('accounting.period', selected.id, 'closed'), { method: 'POST' }), uiText('Đã khóa kỳ. Hệ thống không cho ghi sổ hoặc sửa bút toán trong khoảng ngày này.'));
   }
 
   async function reopenPeriod() {
-    if (!selected || !window.confirm(`Mở lại kỳ ${selected.name}? Việc này cho phép ghi nhận lại bút toán trong kỳ.`)) return;
-    await run(`${selected.id}:reopened`, () => api(dataPath('accounting.period', selected.id, 'reopened'), { method: 'POST' }), 'Đã mở lại kỳ kế toán.');
+    if (!selected || !window.confirm(`${uiText('Mở lại kỳ')} ${selected.name}? ${uiText('Việc này cho phép ghi nhận lại bút toán trong kỳ.')}`)) return;
+    await run(`${selected.id}:reopened`, () => api(dataPath('accounting.period', selected.id, 'reopened'), { method: 'POST' }), uiText('Đã mở lại kỳ kế toán.'));
   }
 
   return <div className="page">
-    <div className="page-head"><div><h1>Khóa sổ kế toán</h1><p className="sub">Rà soát chứng từ nháp, xác nhận ngày kết thúc và khóa kỳ bằng quy tắc kiểm tra của hệ thống.</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>Làm mới</button></div>
+    <div className="page-head"><div><h1>{uiText('Khóa sổ kế toán')}</h1><p className="sub">{uiText('Rà soát chứng từ nháp, xác nhận ngày kết thúc và khóa kỳ bằng quy tắc kiểm tra của hệ thống.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{uiText('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{error}</div>}{notice && <div className="alert success" role="status">{notice}</div>}
 
-    {can('accounting.period.create') && <section className="card card-pad"><h2>Tạo kỳ kế toán</h2><form className="form-grid" onSubmit={createPeriod}>
-      <label className="field"><span className="label">Tên kỳ *</span><input className="input" required value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}/></label>
-      <label className="field"><span className="label">Từ ngày *</span><input className="input" required type="date" value={form.start_date} onChange={(event) => setForm((current) => ({ ...current, start_date: event.target.value }))}/></label>
-      <label className="field"><span className="label">Đến ngày *</span><input className="input" required type="date" min={form.start_date} value={form.end_date} onChange={(event) => setForm((current) => ({ ...current, end_date: event.target.value }))}/></label>
-      <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || loading}>Tạo kỳ mở</button></div>
+    {can('accounting.period.create') && <section className="card card-pad"><h2>{uiText('Tạo kỳ kế toán')}</h2><form className="form-grid" onSubmit={createPeriod}>
+      <label className="field"><span className="label">{uiText('Tên kỳ')} *</span><input className="input" required value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}/></label>
+      <label className="field"><span className="label">{uiText('Từ ngày')} *</span><input className="input" required type="date" value={form.start_date} onChange={(event) => setForm((current) => ({ ...current, start_date: event.target.value }))}/></label>
+      <label className="field"><span className="label">{uiText('Đến ngày')} *</span><input className="input" required type="date" min={form.start_date} value={form.end_date} onChange={(event) => setForm((current) => ({ ...current, end_date: event.target.value }))}/></label>
+      <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || loading}>{uiText('Tạo kỳ mở')}</button></div>
     </form></section>}
 
     <div className="layout-split" style={{ marginTop: 16 }}>

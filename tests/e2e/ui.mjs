@@ -218,6 +218,10 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   await page.waitForSelector('#main h2');
   must((await page.$eval('#main h2', (heading) => heading.textContent)) === 'Block postings over budget', 'budget controls are not translated');
   await axe('budget settings tiếng Anh');
+  await page.goto(`${BASE}/#/period-close`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#main h1');
+  must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Accounting period close', 'accounting period close title is not translated');
+  await axe('accounting period close tiếng Anh');
   await page.goto(`${BASE}/#/quality`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Nonconformance register', 'quality workbench title is not translated');

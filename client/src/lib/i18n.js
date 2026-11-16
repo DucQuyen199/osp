@@ -554,6 +554,13 @@ const UI_TEXT_EN = {
   'Hãy thêm các dòng tài khoản chi phí hoặc doanh thu rồi duyệt ngân sách.': 'Add expense or revenue account lines, then approve the budget.',
   'Kỳ': 'Period', 'Ngân sách': 'Budget', 'Tài khoản': 'Account', 'Loại': 'Type', 'Dự toán': 'Planned', 'Thực tế': 'Actual',
   'Chênh lệch thuận lợi': 'Favorable variance', 'Sử dụng': 'Utilization', 'Thực tế doanh thu/chi phí dùng số dư tự nhiên của tài khoản và cập nhật cùng transaction kế toán.': 'Revenue and expense actuals use each account’s natural balance and update with accounting transactions.',
+  'Không tải được dữ liệu khóa sổ.': 'Could not load accounting close data.', 'Khóa sổ kế toán': 'Accounting period close',
+  'Không cập nhật được kỳ kế toán.': 'Could not update the accounting period.',
+  'Đã tạo kỳ kế toán. Hệ thống sẽ chặn kỳ bị chồng và bảo vệ ngày sau khi có bút toán.': 'Accounting period created. Overlapping periods are blocked, and dates are protected after a journal is posted.',
+  'Đã khóa kỳ. Hệ thống không cho ghi sổ hoặc sửa bút toán trong khoảng ngày này.': 'Period closed. Posting or editing journal entries in this date range is now blocked.',
+  'Mở lại kỳ': 'Reopen period', 'Việc này cho phép ghi nhận lại bút toán trong kỳ.': 'This allows journal entries in the period to be changed again.',
+  'Đã mở lại kỳ kế toán.': 'Accounting period reopened.', 'Rà soát chứng từ nháp, xác nhận ngày kết thúc và khóa kỳ bằng quy tắc kiểm tra của hệ thống.': 'Review draft documents, confirm the end date, and close the period using the system checks.',
+  'Tạo kỳ kế toán': 'Create accounting period', 'Tên kỳ': 'Period name', 'Tạo kỳ mở': 'Create open period',
 };
 
 const storedUiLocale = () => {
