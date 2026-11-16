@@ -1,4 +1,4 @@
-# OSP Suite
+﻿# OSP Suite
 
 Bộ phần mềm quản trị doanh nghiệp dạng **module**: ERP, CRM, kế toán, nhân sự, kho, POS, thương mại điện tử… cho **22 ngành**. Các bounded context có mã nguồn và ranh giới riêng trong một Rust modular monolith, triển khai cùng một ứng dụng và dùng PostgreSQL chung. Các luồng liên module được điều phối bằng sự kiện trong cùng giao dịch.
 
@@ -80,6 +80,7 @@ Mục lục đầy đủ: **[docs/README.md](docs/README.md)**
 | [Kiến trúc Rust theo bounded context](docs/RUST-MODULAR-ARCHITECTURE.md) · [ADR-0007](docs/adr/0007-rust-bounded-contexts.md) | Ranh giới module, quy tắc phụ thuộc và thứ tự port |
 | [Hướng dẫn cấu trúc module](docs/MODULE-ARCHITECTURE.md) | Trách nhiệm từng lớp, quy tắc giao dịch/tenant và module BI mẫu |
 | [Design system](docs/DESIGN-SYSTEM.md) | Tokens, thành phần, mẫu màn hình, truy cập, giọng văn |
+| [React frontend architecture](docs/FRONTEND-ARCHITECTURE.md) | Route, app shell, shared components, styling, conventions |
 | [API](docs/API.md) · [OpenAPI](docs/openapi.json) | Tích hợp |
 | [Viết module / ngành](docs/MODULE-AUTHORING.md) | Thêm module, thêm ngành |
 | [Triển khai](docs/DEPLOYMENT.md) | Chạy thật, sao lưu, định cỡ |
