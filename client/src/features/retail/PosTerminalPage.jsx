@@ -168,7 +168,7 @@ export default function PosTerminalPage() {
         ...(method === 'cash' ? { cash_received: Number(cashReceived) } : {}),
         lines: cart.map(({ product, uom, qty }) => ({ product: product.id, uom: uom || undefined, qty, price: priceFor(product, uom) })),
       } });
-      setQuantities({}); setSelectedUnits({}); setPartyId(''); setPrescriptionId(''); setVoucherCode('');
+      setQuantities({}); setSelectedUnits({}); setPartyId(''); setPrescriptionId(''); setVoucherCode(''); setCashReceived('');
       let completionError = '';
       try {
         await api(dataPath('pos.pos_order', created.id, 'completed'), { method: 'POST' });
@@ -180,7 +180,6 @@ export default function PosTerminalPage() {
         setNotice(`${t('Đã lưu đơn chờ thanh toán')} ${String(created.id).slice(0, 8)}. ${t('Mở mục đơn chờ bên dưới để hoàn tất hoặc xóa đơn.')}`);
         setError(completionError);
       } else {
-        setCashReceived('');
         setNotice(`${t('Đã thanh toán')} ${fmtMoney(Number(created.total) || total)}.`);
       }
     } catch (reason) {
