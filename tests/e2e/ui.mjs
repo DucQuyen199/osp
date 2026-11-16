@@ -216,6 +216,30 @@ for (const [hash, label] of retailScreens) {
   });
 }
 
+const verticalScreens = [
+  ['agriculture', '#/agriculture', 'Agriculture'], ['automotive', '#/workshop', 'Automotive'],
+  ['beauty-wellness', '#/wellness', 'Beauty and wellness'], ['construction', '#/construction', 'Construction'],
+  ['ecommerce', '#/ecommerce', 'Ecommerce'], ['education', '#/education', 'Education'],
+  ['events-media', '#/event-ops', 'Events and media'], ['finance', '#/finance', 'Finance'],
+  ['fnb', '#/restaurant', 'Food and beverage'], ['healthcare', '#/clinic', 'Healthcare'],
+  ['home-services', '#/field-service', 'Home services'], ['hospitality', '#/hotel', 'Hospitality'],
+  ['logistics', '#/reports/logistics/delivery-board', 'Logistics'],
+  ['manufacturing', '#/reports/manufacturing/wip', 'Manufacturing'],
+  ['ngo-government', '#/charity', 'Nonprofit'], ['pharmacy', '#/pharmacy', 'Pharmacy'],
+  ['professional-services', '#/cases', 'Professional services'], ['real-estate', '#/real-estate', 'Real estate'],
+  ['retail', '#/pos', 'Retail'], ['saas-technology', '#/subscriptions', 'SaaS'],
+  ['utilities-isp', '#/utilities', 'Utilities'], ['wholesale', '#/wholesale', 'Wholesale'],
+];
+for (const [vertical, hash, label] of verticalScreens) {
+  await step(`${label} vertical: route and accessibility`, async () => {
+    await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
+    await page.goto(`${BASE}/?demo=${encodeURIComponent(vertical)}&go=${encodeURIComponent(hash)}`, { waitUntil: 'networkidle0' });
+    await page.waitForSelector('h1');
+    must(!(await page.$('.route-error')), `${label} vertical route failed to render`);
+    await axe(`${label} vertical`);
+  });
+}
+
 await step('lazy route load failure: recovery boundary', async () => {
   let blocked = false;
   const intercept = (request) => {
