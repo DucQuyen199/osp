@@ -1,4 +1,5 @@
 const hotelEnglish = {
+  'Đang tải…': 'Loading…',
   'Không tải được dữ liệu lễ tân.': 'Could not load front desk data.', 'Lễ tân khách sạn': 'Hotel front desk',
   'Đã tạo đặt phòng. Giá phòng và số đêm được hệ thống tính theo loại phòng.': 'Reservation created. The rate and number of nights are calculated from the room type.',
   'Không tạo được đặt phòng. Kiểm tra sức chứa và lịch phòng.': 'Could not create the reservation. Check room capacity and availability.',

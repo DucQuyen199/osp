@@ -27,6 +27,7 @@ const agricultureEnglish = {
   'Cần diện tích': 'Area required', 'Lần bón / dùng vật tư': 'Input applications',
   'Chi phí vật tư đã xuất kho': 'Input costs issued from inventory', 'Chi phí vật tư / ha': 'Input cost / ha',
   'Phân bón': 'Fertilizer', 'Thuốc': 'Pesticide', 'Giống': 'Seed', 'Nước có xuất kho': 'Water issued from inventory',
+  'thuốc bảo vệ thực vật': 'pesticide',
   'Theo giá trị phiếu xuất tại thời điểm ghi nhận; chưa gồm nhân công, nước ghi ngoài kho hoặc khoản landed cost hạch toán sau.': 'Based on issue value when recorded; excludes labor, water logged outside inventory, and later landed-cost adjustments.',
   'Ghi nhận ít nhất một lần thu hoạch trước': 'Record at least one harvest first', 'Kết thúc vụ': 'Close cycle',
   'Đánh dấu thất bại': 'Mark as failed', 'Ghi vật tư canh tác': 'Log crop inputs',
