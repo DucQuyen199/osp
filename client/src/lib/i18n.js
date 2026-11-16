@@ -506,6 +506,17 @@ const UI_TEXT_EN = {
   'Lý do giải phóng một phần': 'Partial release reason', 'Lý do giải phóng': 'Release reason', 'Giải phóng một phần': 'Release part',
   'Thực tế (đơn vị gốc)': 'Counted (base unit)', 'Theo sổ (đơn vị gốc)': 'Book (base unit)', 'Chênh lệch (đơn vị gốc)': 'Variance (base unit)',
   'Chênh lệch đã chuyển thành biến động kho theo FIFO/lô và vị trí tương ứng.': 'The variance was posted to inventory using FIFO, lot, and location tracking.',
+  'Chính sách kho': 'Inventory policy', 'Cài đặt': 'Settings', 'Đã cho phép tồn kho âm.': 'Negative inventory enabled.',
+  'Đã chặn xuất vượt tồn khả dụng.': 'Issues above available stock are blocked.', 'Không cập nhật được chính sách kho.': 'Could not update inventory policy.',
+  'Đã bật giá vốn FIFO.': 'FIFO costing enabled.', 'Đã bật giá vốn bình quân di động.': 'Moving average costing enabled.',
+  'Không cập nhật được phương pháp giá vốn.': 'Could not update the costing method.', 'Chỉ quản trị viên mới được đổi chính sách kho.': 'Only administrators can change inventory policy.',
+  'Chính sách kho của doanh nghiệp': 'Company inventory policy', 'Phương pháp tính giá vốn': 'Inventory costing method',
+  'Phương pháp': 'Method', 'Bình quân di động': 'Moving average', 'Nhập trước, xuất trước (FIFO)': 'First in, first out (FIFO)',
+  'Chọn phương pháp trước khi ghi nhận tồn đầu kỳ hoặc phiếu kho. Sau giao dịch kho đầu tiên, phương pháp bị khóa để bảo toàn sổ giá vốn. FIFO yêu cầu chặn tồn kho âm.': 'Choose a method before recording opening stock or inventory transactions. The method locks after the first inventory transaction to preserve the cost ledger. FIFO requires negative stock to be blocked.',
+  'Cho phép tồn kho âm': 'Allow negative inventory', 'Cho phép số tồn khả dụng giảm xuống dưới 0': 'Allow available stock to fall below zero',
+  'Khi tắt (mặc định), hệ thống từ chối phiếu xuất nếu số lượng vượt tồn sau khi trừ hàng đang giữ chờ kiểm tra chất lượng. Khi bật, nghiệp vụ xuất kho có thể ghi nhận tồn âm; chỉ dùng khi doanh nghiệp cho phép xuất trước, nhập sau.': 'When off (the default), the system rejects issues that exceed stock after quantities held for quality inspection are deducted. When on, issues can create negative stock; use this only when the business allows shipping before receiving.',
+  'Tồn kho âm đang được cho phép cho toàn doanh nghiệp.': 'Negative inventory is allowed for the entire company.',
+  'Tồn kho âm đang bị chặn cho toàn doanh nghiệp.': 'Negative inventory is blocked for the entire company.',
 };
 
 const storedUiLocale = () => {

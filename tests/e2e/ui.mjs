@@ -208,6 +208,11 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Inventory on quality hold', 'màn hình tồn giữ QC chưa được dịch');
   await axe('inventory quality hold workbench tiếng Anh');
+  await page.goto(`${BASE}/#/settings/inventory`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#main h1');
+  must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Settings', 'inventory settings title is not translated');
+  must((await page.$eval('#main h2', (heading) => heading.textContent)) === 'Inventory costing method', 'inventory costing policy is not translated');
+  await axe('inventory settings tiếng Anh');
   await page.goto(`${BASE}/#/reports/inventory/lot-expiry`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Expiring lots', 'màn hình lô cận hạn chưa được dịch');
