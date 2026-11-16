@@ -31,6 +31,8 @@ For translations used only by a lazy-loaded feature, keep its English text map i
 - Split a long workflow view into focused components under `features/<domain>/components/`. Pass controlled values and callbacks so child components render and edit the state owned by the workflow.
 - Keep business rules, API calls, and cross-module coordination out of presentational line editors and panels. Promote a component to `components/` only when more than one domain uses it.
 - The ecommerce order desk follows this boundary: `EcommerceOrderDeskPage` owns loading, permissions, API actions and cart state; `WebOrderCreateForm` edits controlled values through callbacks, and `WebOrderCard` renders an order and emits requested actions.
+- The school workbench keeps attendance persistence and permission checks in `EducationWorkbenchPage`; `AttendanceRosterTable` renders the roster and requests marks through a callback.
+- The manufacturing workbench keeps production commands and output drafts in `ManufacturingWipPage`; `ProductionOrderCard` renders the controlled output fields and emits requested transitions.
 
 ## Styling layers
 
