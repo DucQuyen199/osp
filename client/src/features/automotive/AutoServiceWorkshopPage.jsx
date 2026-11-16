@@ -4,6 +4,7 @@ import { fmtDateTime, fmtMoney, fmtNumber, statusLabel, uiTextWith } from '../..
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import autoServiceEnglish from './auto-service.en.js';
+import RepairQuoteEditor from './components/RepairQuoteEditor.jsx';
 
 const t = (text) => uiTextWith(text, autoServiceEnglish);
 
@@ -31,6 +32,7 @@ export default function AutoServiceWorkshopPage() {
   const [warehouseId, setWarehouseId] = useState('');
   const [complaint, setComplaint] = useState('');
   const [draftLines, setDraftLines] = useState([]);
+  const [quoteDraft, setQuoteDraft] = useState(null);
   const [busy, setBusy] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -102,7 +104,7 @@ export default function AutoServiceWorkshopPage() {
       } });
       setPlate(''); setMake(''); setModel(''); setVin(''); setOdometer('');
       await load(true); setVehicleId(created.id); setNotice(`${t('Đã tiếp nhận xe')} ${created.plate}.`);
-    } catch (reason) { setError(reason.message || t('Không tiếp nhận được xe.')); }
+    } catch (reason) { setError(t(reason.message || 'Không tiếp nhận được xe.')); }
     finally { setBusy(''); }
   };
 
@@ -119,7 +121,7 @@ export default function AutoServiceWorkshopPage() {
       } });
       setDraftLines([]); setComplaint(''); await load(true); setSelectedId(created.id);
       setNotice(`${t('Đã lập lệnh')} ${String(created.id).slice(0, 8)}${t('. Đơn giá và tổng tiền do server lấy theo danh mục sản phẩm.')}`);
-    } catch (reason) { setError(reason.message || t('Không lập được lệnh sửa chữa. Kiểm tra phụ tùng, giá và kho.')); }
+    } catch (reason) { setError(t(reason.message || 'Không lập được lệnh sửa chữa. Kiểm tra phụ tùng, giá và kho.')); }
     finally { setBusy(''); }
   };
 
@@ -140,8 +142,48 @@ export default function AutoServiceWorkshopPage() {
       await load(true);
       const messages = { approved: 'Đã ghi nhận khách duyệt báo giá.', quote_declined: 'Đã lưu lý do khách từ chối; có thể tiếp nhận lệnh mới cho xe này.', started: 'Đã đưa xe vào sửa chữa.', completed: 'Đã hoàn tất sửa chữa; hệ thống ghi nhận xuất kho và lập hóa đơn.', delivered: 'Đã ghi nhận bàn giao xe.' };
       setNotice(t(messages[action]));
-    } catch (reason) { setError(reason.message || t('Không chuyển được trạng thái. Kiểm tra tồn kho phụ tùng và dữ liệu liên quan.')); await load(true); }
+    } catch (reason) { setError(t(reason.message || 'Không chuyển được trạng thái. Kiểm tra tồn kho phụ tùng và dữ liệu liên quan.')); await load(true); }
     finally { setBusy(''); }
+  };
+
+  const startQuoteEdit = (order) => setQuoteDraft({
+    repairOrderId: order.id,
+    complaint: order.complaint || '',
+    warehouseId: order.warehouse || '',
+    lines: (order.lines || []).map((line) => ({ product: line.product || '', qty: String(line.qty ?? ''), uom: line.uom || '' })),
+  });
+  const updateQuoteDraft = (field, value) => setQuoteDraft((current) => ({ ...current, [field]: value }));
+  const updateQuoteLine = (index, field, value) => setQuoteDraft((current) => ({
+    ...current,
+    lines: current.lines.map((line, row) => row === index ? { ...line, [field]: value, ...(field === 'product' ? { uom: '' } : {}) } : line),
+  }));
+  const addQuoteLine = () => setQuoteDraft((current) => current && ({
+    ...current,
+    lines: [...current.lines, { product: productChoices[0]?.id || '', qty: '1', uom: '' }],
+  }));
+  const removeQuoteLine = (index) => setQuoteDraft((current) => ({
+    ...current,
+    lines: current.lines.filter((_, row) => row !== index),
+  }));
+  const saveQuoteEdit = async (event) => {
+    event.preventDefault();
+    if (!selected || selected.status !== 'intake' || quoteDraft?.repairOrderId !== selected.id || !quoteDraft.lines.length) return;
+    setBusy(`${selected.id}:quote`); setError(''); setNotice('');
+    try {
+      await api(dataPath('auto-service.repair_order', selected.id), {
+        method: 'PATCH',
+        body: {
+          complaint: quoteDraft.complaint.trim(),
+          warehouse: quoteDraft.warehouseId || null,
+          lines: quoteDraft.lines.map((line) => ({ product: line.product, qty: Number(line.qty), ...(line.uom ? { uom: line.uom } : {}) })),
+        },
+      });
+      setQuoteDraft(null);
+      await load(true);
+      setNotice(t('Đã cập nhật báo giá. Đơn giá được lấy lại từ danh mục; khách cần duyệt trước khi sửa chữa.'));
+    } catch (reason) {
+      setError(reason.message || t('Không cập nhật được báo giá. Kiểm tra phụ tùng, giá và kho.'));
+    } finally { setBusy(''); }
   };
 
   const updateOdometer = async (event) => {
@@ -151,7 +193,7 @@ export default function AutoServiceWorkshopPage() {
     try {
       await api(dataPath('auto-service.vehicle', currentVehicle.id), { method: 'PATCH', body: { odometer: Number(odometerReading) } });
       await load(true); setNotice(`${t('Đã cập nhật công-tơ-mét xe')} ${currentVehicle.plate}.`);
-    } catch (reason) { setError(reason.message || t('Không thể cập nhật số công-tơ-mét.')); }
+    } catch (reason) { setError(t(reason.message || 'Không thể cập nhật số công-tơ-mét.')); }
     finally { setBusy(''); }
   };
 
@@ -202,12 +244,14 @@ export default function AutoServiceWorkshopPage() {
         {currentVehicle && can('auto-service.vehicle.update') && <form className="workshop-form u-legacy-0e001e227c"  onSubmit={updateOdometer}><label className="field"><span>{t('Số công-tơ-mét hiện tại (km)')}</span><input className="input" type="number" min={currentOdometer ?? 0} step="1" required value={odometerReading} onChange={(event) => setOdometerReading(event.target.value)} /></label><button className="button" disabled={busy === 'odometer' || odometerReading === '' || Number(odometerReading) === Number(currentOdometer || 0)}>{t('Cập nhật số km')}</button><span className="small muted">{t('Số km không được thấp hơn lần ghi nhận trước hoặc lịch sử xưởng.')}</span></form>}
         {selected.complaint && <p className="workshop-complaint"><strong>{t('Yêu cầu:')}</strong> {selected.complaint}</p>}
         {selected.status === 'quote_declined' && selected.declined_reason && <div className="alert">{t('Khách từ chối báo giá:')} {selected.declined_reason}</div>}
+        {selected.status === 'intake' && can('auto-service.repair_order.update') && quoteDraft?.repairOrderId !== selected.id && <button type="button" className="button" disabled={Boolean(busy)} onClick={() => startQuoteEdit(selected)}>{t('Điều chỉnh báo giá')}</button>}
+        {selected.status === 'intake' && can('auto-service.repair_order.update') && quoteDraft?.repairOrderId === selected.id && <RepairQuoteEditor draft={quoteDraft} products={products} productChoices={productChoices} warehouses={warehouses} unitsFor={unitsFor} unitRatio={unitRatio} fmtMoney={fmtMoney} t={t} busy={busy === `${selected.id}:quote`} onDraftChange={updateQuoteDraft} onLineChange={updateQuoteLine} onAddLine={addQuoteLine} onRemoveLine={removeQuoteLine} onSubmit={saveQuoteEdit} onCancel={() => setQuoteDraft(null)} />}
         <h3>{t('Báo giá')}</h3><ul className="workshop-estimate">{(selected.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{line.product_name || products.get(line.product)?.name || t('Sản phẩm')} × {line.qty} {line.uom_name || units.get(line.uom)?.name || ''}</span><strong className="num">{fmtMoney((Number(line.qty) || 0) * (Number(line.price) || 0))}</strong></li>)}</ul>
         <div className="workshop-total"><span>{t('Tổng cộng')}</span><strong className="num">{fmtMoney(selected.total || 0)}</strong></div>
         {selectedInvoice && <a className="button" href={recordHref('accounting.invoice', selectedInvoice.id)}>{t('Mở hóa đơn')} {String(selectedInvoice.id).slice(0, 8)}</a>}
         <div className="workshop-actions">
-          {selected.status === 'intake' && can('auto-service.repair_order.approved') && <button className="button primary" onClick={() => transition(selected, 'approved')} disabled={!!busy}>{t('Khách duyệt báo giá')}</button>}
-        {selected.status === 'intake' && can('auto-service.repair_order.quote_declined') && can('auto-service.repair_order.update') && <div className="workshop-decline"><label className="field"><span>{t('Lý do khách từ chối báo giá *')}</span><textarea className="input textarea" rows="2" minLength="5" maxLength="500" value={declineReasons[selected.id] || ''} onChange={(event) => setDeclineReasons((current) => ({ ...current, [selected.id]: event.target.value }))} placeholder={t('Ví dụ: khách chưa đồng ý chi phí sửa chữa')} /></label><button className="button" type="button" disabled={!!busy || (declineReasons[selected.id] || '').trim().length < 5} onClick={() => transition(selected, 'quote_declined')}>{t('Ghi nhận khách từ chối')}</button></div>}
+          {selected.status === 'intake' && can('auto-service.repair_order.approved') && quoteDraft?.repairOrderId !== selected.id && <button className="button primary" onClick={() => transition(selected, 'approved')} disabled={!!busy}>{t('Khách duyệt báo giá')}</button>}
+        {selected.status === 'intake' && can('auto-service.repair_order.quote_declined') && can('auto-service.repair_order.update') && quoteDraft?.repairOrderId !== selected.id && <div className="workshop-decline"><label className="field"><span>{t('Lý do khách từ chối báo giá *')}</span><textarea className="input textarea" rows="2" minLength="5" maxLength="500" value={declineReasons[selected.id] || ''} onChange={(event) => setDeclineReasons((current) => ({ ...current, [selected.id]: event.target.value }))} placeholder={t('Ví dụ: khách chưa đồng ý chi phí sửa chữa')} /></label><button className="button" type="button" disabled={!!busy || (declineReasons[selected.id] || '').trim().length < 5} onClick={() => transition(selected, 'quote_declined')}>{t('Ghi nhận khách từ chối')}</button></div>}
           {selected.status === 'approved' && can('auto-service.repair_order.started') && <button className="button primary" onClick={() => transition(selected, 'started')} disabled={!!busy}>{t('Bắt đầu sửa chữa')}</button>}
           {selected.status === 'in_progress' && can('auto-service.repair_order.completed') && <button className="button primary" onClick={() => transition(selected, 'completed')} disabled={!!busy}>{t('Hoàn tất, xuất phụ tùng và lập hóa đơn')}</button>}
           {selected.status === 'completed' && can('auto-service.repair_order.delivered') && <button className="button primary" onClick={() => transition(selected, 'delivered')} disabled={!!busy}>{t('Bàn giao xe')}</button>}

@@ -39,6 +39,13 @@ const autoServiceEnglish = {
   'Đang lập…': 'Creating…', 'Lịch sử xe': 'Vehicle history', 'lệnh': 'orders',
   'Chưa khai báo': 'Not provided', 'Chưa ghi số km': 'Mileage not recorded',
   'Ví dụ: khách chưa đồng ý chi phí sửa chữa': 'For example: the customer did not approve the repair cost',
+  'Điều chỉnh báo giá': 'Revise quote',
+  'Phụ tùng / dịch vụ': 'Parts / service', 'Đơn vị tính': 'Unit of measure', 'Hủy': 'Cancel',
+  'Bảng giá sản phẩm hiện tại sẽ được áp dụng khi lưu. Khách cần duyệt báo giá đã cập nhật trước khi sửa chữa.': 'Current catalog prices will be applied when saved. The customer must approve the updated quote before repair begins.',
+  'Đã cập nhật báo giá. Đơn giá được lấy lại từ danh mục; khách cần duyệt trước khi sửa chữa.': 'Quote updated using current catalog prices; customer approval is required before repair begins.',
+  'Không cập nhật được báo giá. Kiểm tra phụ tùng, giá và kho.': 'Could not update the quote. Check parts, prices, and warehouse.',
+  'Lệnh có phụ tùng theo dõi tồn kho cần chọn kho trước khi lưu.': 'Select a warehouse before saving a quote that includes inventory tracked parts.',
+  'Lưu báo giá': 'Save quote',
 };
 
 export default autoServiceEnglish;
