@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { confirmDialog } from '../../lib/feedback.js';
 import { fmtDateTime, uiText } from '../../lib/i18n.js';
 import { app, publishAppState } from '../../lib/state.js';
-
 export default function MfaSettingsPage() {
+  useDocumentTitle(`${uiText('Bảo mật tài khoản')} · OSP Suite`);
   const [status, setStatus] = useState(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -14,7 +15,6 @@ export default function MfaSettingsPage() {
   const [setup, setSetup] = useState(null);
   const [recoveryCodes, setRecoveryCodes] = useState([]);
   const [sessions, setSessions] = useState([]);
-
   const reload = useCallback(async () => {
     setError('');
     try {
@@ -26,9 +26,7 @@ export default function MfaSettingsPage() {
     }
     catch (reason) { setError(reason.message || uiText('Không tải được trạng thái bảo mật.')); }
   }, []);
-
-  useEffect(() => { document.title = `${uiText('Bảo mật tài khoản')} · OSP Suite`; reload(); }, [reload]);
-
+  useEffect(() => {  reload(); }, [reload]);
   const startSetup = async (event) => {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
@@ -37,7 +35,6 @@ export default function MfaSettingsPage() {
     } catch (reason) { setError(reason.message || uiText('Không bắt đầu được thiết lập xác thực hai lớp.')); }
     finally { setBusy(false); }
   };
-
   const confirmSetup = async (event) => {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
@@ -51,7 +48,6 @@ export default function MfaSettingsPage() {
     } catch (reason) { setError(reason.message || uiText('Mã xác thực không đúng.')); }
     finally { setBusy(false); }
   };
-
   const disableMfa = async (event) => {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
@@ -64,7 +60,6 @@ export default function MfaSettingsPage() {
     } catch (reason) { setError(reason.message || uiText('Không tắt được xác thực hai lớp.')); }
     finally { setBusy(false); }
   };
-
   const revokeOtherSessions = async () => {
     if (!await confirmDialog({ title: uiText('Đăng xuất phiên khác'), message: uiText('Đăng xuất các phiên trình duyệt khác của tài khoản này?'), danger: true, confirmLabel: uiText('Đăng xuất') })) return;
     setBusy(true); setError(''); setNotice('');
@@ -75,12 +70,10 @@ export default function MfaSettingsPage() {
     } catch (reason) { setError(reason.message || uiText('Không thu hồi được các phiên khác.')); }
     finally { setBusy(false); }
   };
-
   const copyRecoveryCodes = async () => {
     try { await navigator.clipboard.writeText(recoveryCodes.join('\n')); setNotice(uiText('Đã sao chép mã khôi phục.')); }
     catch { setError(uiText('Trình duyệt không cho phép sao chép. Hãy lưu các mã hiển thị bên dưới.')); }
   };
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Bảo mật tài khoản')}</h1><p className="sub">{uiText('Thêm mã xác thực cho lần đăng nhập bằng mật khẩu. Mã khôi phục chỉ dùng một lần.')}</p></div></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}

@@ -1,18 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { toast } from '../../lib/feedback.js';
 import { uiText } from '../../lib/i18n.js';
 import { app, can, entityLabel, fieldLabelOf, loadMeta, resetCaches } from '../../lib/state.js';
 import SettingsTabs from './SettingsTabs.jsx';
-
 export default function FieldsSettingsPage() {
+  useDocumentTitle(`${uiText('Trường mở rộng')} · ${uiText('Cài đặt')} · OSP Suite`);
   const entities = [...app.entities.keys()];
   const [qname, setQname] = useState(entities[0] || '');
   const [spec, setSpec] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  useEffect(() => { document.title = `${uiText('Trường mở rộng')} · ${uiText('Cài đặt')} · OSP Suite`; }, []);
-
   const add = async (event) => {
     event.preventDefault();
     setBusy(true);
@@ -27,9 +26,7 @@ export default function FieldsSettingsPage() {
     } catch (reason) { setError(reason.message || uiText('Không tạo được trường mở rộng.')); }
     finally { setBusy(false); }
   };
-
   if (!can('tenant.admin')) return <div className="page"><div className="alert danger" role="alert">{uiText('Chỉ quản trị viên mới được thêm trường mở rộng.')}</div></div>;
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Cài đặt')}</h1><p className="sub">{uiText('Trường mở rộng của doanh nghiệp')} “{app.meta.name}”.</p></div></div>
     <SettingsTabs active="fields" />

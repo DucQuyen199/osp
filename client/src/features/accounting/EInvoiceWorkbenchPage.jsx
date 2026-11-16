@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath } from '../../lib/api.js';
 import { statusLabel, fmtDateTime, uiText, uiLocale } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
-
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 async function listAll(qname) {
   const rows = [];
@@ -16,12 +16,11 @@ async function listAll(qname) {
   }
   return rows;
 }
-
 const timestamp = (row) => row.updatedAt || row.updated_at || row.createdAt || row.created_at || '';
 const formatDateTime = (value) => value ? fmtDateTime(value) : '—';
 const statusTone = (status) => status === 'issued' || status === 'cancelled' ? 'success' : status === 'failed' ? 'danger' : status === 'withdrawn' ? 'muted' : 'warning';
-
 export default function EInvoiceWorkbenchPage() {
+  useDocumentTitle(`${uiText('Hóa đơn điện tử')} · OSP Suite`);
   const [rows, setRows] = useState([]);
   const [invoices, setInvoices] = useState(new Map());
   const [filter, setFilter] = useState('all');
@@ -32,7 +31,6 @@ export default function EInvoiceWorkbenchPage() {
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -51,12 +49,8 @@ export default function EInvoiceWorkbenchPage() {
       setLoading(false);
     }
   }, []);
-
-  useEffect(() => {
-    document.title = `${uiText('Hóa đơn điện tử')} · OSP Suite`;
-    load();
+  useEffect(() => { load();
   }, [load]);
-
   const counts = useMemo(() => rows.reduce((result, row) => {
     result.all += 1;
     result[row.status] = (result[row.status] || 0) + 1;
@@ -74,7 +68,6 @@ export default function EInvoiceWorkbenchPage() {
   }, [rows, invoices, filter, search, uiLocale]);
   const selected = rows.find((row) => row.id === selectedId);
   const selectedInvoice = selected ? invoices.get(selected.invoice) : null;
-
   async function run(row, action, success, operation = () => api(dataPath('einvoice.einvoice', row.id, action), { method: 'POST' })) {
     setBusy(`${row.id}:${action}`);
     setError('');
@@ -89,7 +82,6 @@ export default function EInvoiceWorkbenchPage() {
       setBusy('');
     }
   }
-
   function requestCancellation(row) {
     const value = reason.trim();
     if (!value) {
@@ -105,13 +97,11 @@ export default function EInvoiceWorkbenchPage() {
       setReason('');
     });
   }
-
   const enabled = app.meta?.modules?.some((module) => module.id === 'einvoice');
   const filterOptions = [
     ['all', 'Tất cả'], ['pending', 'Chờ phát hành'], ['failed', 'Lỗi'],
     ['issued', 'Đã phát hành'], ['cancellation_pending', 'Chờ hủy'], ['cancelled', 'Đã hủy'], ['withdrawn', 'Đã rút'],
   ];
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText("Hóa đơn điện tử")}</h1><p className="sub">{uiText("Theo dõi yêu cầu phát hành từ hóa đơn kế toán đã ghi sổ, xử lý lỗi provider và lưu dấu vết hủy theo từng ngành hàng.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={load}>{uiText("Làm mới")}</button></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}

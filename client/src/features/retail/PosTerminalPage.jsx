@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { confirmDialog, textDialog } from '../../lib/feedback.js';
@@ -19,6 +20,7 @@ const t = (text) => uiTextWith(text, {
 });
 
 export default function PosTerminalPage() {
+  useDocumentTitle(`${t('Quầy bán hàng POS')} · OSP Suite`);
   const [warehouses, setWarehouses] = useState(new Map());
   const [branches, setBranches] = useState(new Map());
   const [products, setProducts] = useState(new Map());
@@ -106,9 +108,7 @@ export default function PosTerminalPage() {
     }
   }, []);
 
-  useEffect(() => {
-    document.title = `${t('Quầy bán hàng POS')} · OSP Suite`;
-    load();
+  useEffect(() => { load();
   }, [load]);
 
   const activeSession = sessions.find((item) => item.id === sessionId) || null;

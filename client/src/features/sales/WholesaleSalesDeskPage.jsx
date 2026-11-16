@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
-
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const today = localDate;
-
 export default function WholesaleSalesDeskPage() {
+  useDocumentTitle(`${uiText('Bán hàng và báo giá')} · OSP Suite`);
   const emailQueueEnabled = app.meta?.modules?.some((module) => module.id === 'communication') || false;
   const [parties, setParties] = useState(new Map());
   const [products, setProducts] = useState(new Map());
@@ -38,7 +38,6 @@ export default function WholesaleSalesDeskPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -64,9 +63,7 @@ export default function WholesaleSalesDeskPage() {
     } catch (reason) { setError(reason.message || uiText('Không tải được báo giá và đơn bán hàng.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = `${uiText('Bán hàng và báo giá')} · OSP Suite`; load(); const timer = window.setInterval(() => load(true), 20000); return () => window.clearInterval(timer); }, [load]);
-
+  useEffect(() => { load(); const timer = window.setInterval(() => load(true), 20000); return () => window.clearInterval(timer); }, [load]);
   const activeProducts = [...products.values()].filter((product) => product.active !== false).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
   const selectedList = priceLists.find((item) => item.id === priceList);
   const unitsFor = (product) => product?.uom ? [...units.values()].filter((unit) => unit.id === product.uom || unit.base_uom === product.uom) : [];
@@ -78,7 +75,6 @@ export default function WholesaleSalesDeskPage() {
   };
   const estimate = cart.reduce((total, line) => total + getPrice(line.product, line.uom) * line.qty, 0);
   const setQuantity = (id, value) => setQuantities((current) => { const next = { ...current }; const qty = Math.max(0, Number(value) || 0); if (qty) next[id] = qty; else delete next[id]; return next; });
-
   const createQuote = async (event) => {
     event.preventDefault(); if (!party || !warehouse || !cart.length) return;
     setBusy('create'); setError(''); setNotice('');
@@ -93,7 +89,6 @@ export default function WholesaleSalesDeskPage() {
     } catch (reason) { setError(reason.message || uiText('Không tạo được báo giá. Kiểm tra khách hàng, giá và ngày hiệu lực.')); }
     finally { setBusy(''); }
   };
-
   const transition = async (entity, record, action) => {
     setBusy(`${record.id}:${action}`); setError(''); setNotice('');
     try {
@@ -110,7 +105,6 @@ export default function WholesaleSalesDeskPage() {
     } catch (reason) { setError(reason.message || uiText('Không cập nhật được chứng từ. Kiểm tra giá, tín dụng và tồn kho.')); await load(true); }
     finally { setBusy(''); }
   };
-
   const applyVoucher = async (order) => {
     const code = (orderVoucherCodes[order.id] ?? order.voucher_code ?? '').trim().toUpperCase();
     setBusy(`${order.id}:voucher`); setError(''); setNotice('');
@@ -121,12 +115,10 @@ export default function WholesaleSalesDeskPage() {
     } catch (reason) { setError(reason.message || uiText('Không áp dụng được voucher. Kiểm tra ngày hiệu lực, thành viên và mã.')); }
     finally { setBusy(''); }
   };
-
   const orderForQuote = (quote) => orders.find((order) => order.source === 'quotation' && order.source_id === quote.id);
   const shipmentForOrder = (order) => shipments.filter((shipment) => shipment.source === 'sales_order' && shipment.source_id === order.id);
   const invoiceForOrder = (order) => invoices.find((invoice) => invoice.source === 'sales_order' && invoice.source_id === order.id);
   const expired = (quote) => quote.valid_until && quote.valid_until < today();
-
   const eligibleReturnLines = (order) => {
     const groups = new Map();
     for (const line of order.lines || []) {
@@ -147,7 +139,6 @@ export default function WholesaleSalesDeskPage() {
       return { ...line, eligible, remaining: Math.max(0, eligible - alreadyReturned) };
     }).filter((line) => line.remaining > 0);
   };
-
   const remainingShipmentLines = (order) => {
     const groups = new Map();
     for (const line of order.lines || []) {
@@ -173,7 +164,6 @@ export default function WholesaleSalesDeskPage() {
       remaining: Math.max(0, line.ordered - (reserved.get(line.key) || 0)),
     })).filter((line) => line.remaining > 0.000001);
   };
-
   const createShipment = async (order) => {
     const openLines = remainingShipmentLines(order);
     const lines = openLines.map((line) => ({
@@ -199,7 +189,6 @@ export default function WholesaleSalesDeskPage() {
       await load(true);
     } finally { setBusy(''); }
   };
-
   const createReturn = async (order) => {
     const lines = eligibleReturnLines(order).map((line) => ({ ...line, qty: Number(returnQuantities[`${order.id}:${line.key}`]) || 0 })).filter((line) => line.qty > 0).map(({ product, price, qty, uom }) => ({ product, price, qty, uom }));
     if (!lines.length || !returnReasons[order.id]?.trim()) return;
@@ -214,7 +203,6 @@ export default function WholesaleSalesDeskPage() {
     } catch (reason) { setError(reason.message || uiText('Không lập được phiếu trả. Kiểm tra số lượng đã giao và các phiếu trả trước.')); }
     finally { setBusy(''); }
   };
-
   const decideApproval = async (request, action) => {
     setBusy(`${request.id}:${action}`); setError(''); setNotice('');
     try {
@@ -223,7 +211,6 @@ export default function WholesaleSalesDeskPage() {
     } catch (reason) { setError(reason.message || uiText('Không cập nhật được quyết định phê duyệt.')); await load(true); }
     finally { setBusy(''); }
   };
-
   return <div className="page-content wholesale-sales-page">
     <header className="page-header"><div><h1>{uiText('Bán hàng, báo giá và giao hàng')}</h1><p className="muted">{uiText('Lập báo giá theo khách hàng, chuyển báo giá được chấp nhận thành đơn, kiểm soát tín dụng và theo dõi giao hàng.')}</p></div><button className="button" onClick={() => load()} disabled={loading}>{uiText('Làm mới')}</button></header>
     {error && <div className="alert error" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
@@ -244,7 +231,6 @@ export default function WholesaleSalesDeskPage() {
       <div className="wholesale-estimate"><span>{uiText('Tạm tính theo bảng giá, chưa gồm thuế')}</span><strong className="num">{fmtMoney(estimate)}</strong></div>
       <button className="button primary" disabled={busy === 'create' || !party || !warehouse || !cart.length}>{busy === 'create' ? uiText('Đang tạo…') : uiText('Lưu báo giá nháp')}</button>
     </form></section>}
-
     <section className="wholesale-section"><header><h2>{uiText('Báo giá')}</h2><span className="badge plain">{quotations.length}</span></header>
       <div className="wholesale-documents">{quotations.map((quote) => {
         const customer = parties.get(quote.party); const order = orderForQuote(quote);
@@ -262,7 +248,6 @@ export default function WholesaleSalesDeskPage() {
         </article>;
       })}{!quotations.length && <div className="card-pad muted">{uiText('Chưa có báo giá.')}</div>}</div>
     </section>
-
     <section className="wholesale-section"><header><h2>{uiText('Đơn bán và giao hàng')}</h2><a href="#/reports/logistics/delivery-board">{uiText('Mở bảng điều phối')}</a></header>
       <div className="wholesale-documents">{orders.map((order) => {
         const shipmentsForOrder = shipmentForOrder(order); const invoice = invoiceForOrder(order);
@@ -296,7 +281,6 @@ export default function WholesaleSalesDeskPage() {
         </article>;
       })}{!orders.some((order) => ['confirmed', 'partially_delivered', 'delivered'].includes(order.status)) && <div className="card-pad muted">{uiText('Chưa có đơn đủ điều kiện trả hàng.')}</div>}</div>
     </section>}
-
     {can('sales.sales_return.read') && <section className="wholesale-section"><header><h2>{uiText('Phiếu trả và phê duyệt')}</h2><span className="badge plain">{returns.length}</span></header>
       <div className="wholesale-documents">{returns.map((record) => {
         const request = approvalRequests.find((item) => item.entity === 'sales.sales_return' && item.record_id === record.id && item.status === 'pending');

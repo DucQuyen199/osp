@@ -1,13 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate as businessDate, localDateTime as businessDateTime, localDateTimeToIso } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import wellnessEnglish from './wellness.en.js';
-
 const t = (text) => uiTextWith(text, wellnessEnglish);
-
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const localDate = (value) => {
   if (!value) return '';
@@ -15,8 +14,8 @@ const localDate = (value) => {
   return Number.isNaN(date.getTime()) ? '' : businessDate(date);
 };
 const action = (row, verb) => api(dataPath('booking.booking', row.id, verb), { method: 'POST' });
-
 export default function WellnessBookingPage({ healthcare = false }) {
+  useDocumentTitle(`${t(healthcare ? 'Lịch hẹn khám' : 'Lịch dịch vụ và hội viên')} · OSP Suite`);
   const [bookings, setBookings] = useState([]);
   const [resources, setResources] = useState([]);
   const [services, setServices] = useState([]);
@@ -33,7 +32,6 @@ export default function WellnessBookingPage({ healthcare = false }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -56,8 +54,7 @@ export default function WellnessBookingPage({ healthcare = false }) {
     } catch (reason) { setError(t(reason.message || 'Không tải được lịch hẹn.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = `${t(healthcare ? 'Lịch hẹn khám' : 'Lịch dịch vụ và hội viên')} · OSP Suite`; load(); }, [load, healthcare]);
+  useEffect(() => { load(); }, [load, healthcare]);
   const resourceById = useMemo(() => new Map(resources.map((row) => [row.id, row])), [resources]);
   const serviceById = useMemo(() => new Map(services.map((row) => [row.id, row])), [services]);
   const invoiceByBooking = useMemo(() => new Map(invoices.filter((row) => row.source === 'booking').map((row) => [row.source_id, row])), [invoices]);
@@ -71,14 +68,12 @@ export default function WellnessBookingPage({ healthcare = false }) {
   const inProgress = todays.filter((row) => row.status === 'checked_in').length;
   const completed = todays.filter((row) => row.status === 'completed').length;
   const selectedService = serviceById.get(form.service);
-
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); setNotice(t(success)); await load(true); }
     catch (reason) { setError(t(reason.message || 'Thao tác không thành công.')); await load(true); }
     finally { setBusy(''); }
   }
-
   async function createBooking(event) {
     event.preventDefault();
     await run('booking', async () => {
@@ -93,24 +88,20 @@ export default function WellnessBookingPage({ healthcare = false }) {
     }, 'Đã tiếp nhận lịch hẹn. Tài nguyên và khung giờ sẽ được kiểm tra trùng lịch ở máy chủ.');
     setForm((current) => ({ ...current, note: '', price: '', ends_at: '' }));
   }
-
   async function createResource(event) {
     event.preventDefault();
     await run('resource', () => api(dataPath('booking.resource'), { method: 'POST', body: resourceForm }), 'Đã thêm kỹ thuật viên hoặc phòng vào danh mục tài nguyên.');
     setResourceForm({ name: '', kind: 'staff' });
   }
-
   async function createService(event) {
     event.preventDefault();
     await run('service', () => api(dataPath('booking.service'), { method: 'POST', body: { ...serviceForm, duration_min: Number(serviceForm.duration_min), price: Number(serviceForm.price) } }), 'Đã thêm dịch vụ và giá niêm yết.');
     setServiceForm({ name: '', duration_min: '', price: '' });
   }
-
   async function change(row, verb) {
     const messages = { confirmed: 'Đã xác nhận lịch và khóa khung giờ tài nguyên.', checked_in: healthcare ? 'Đã check-in và tạo lượt khám trong hồ sơ phòng khám.' : 'Đã check-in khách.', completed: 'Đã hoàn tất dịch vụ; hóa đơn được tạo theo cấu hình kế toán.', cancelled: 'Đã hủy lịch.', no_show: 'Đã ghi nhận khách vắng mặt.', expired: 'Đã đóng yêu cầu lịch chưa xác nhận sau khi hết khung giờ.' };
     await run(`${row.id}:${verb}`, () => action(row, verb), messages[verb]);
   }
-
   function startEditBooking(row) {
     setEditForm({
       resource: row.resource || '',
@@ -122,7 +113,6 @@ export default function WellnessBookingPage({ healthcare = false }) {
     });
     setEditingBooking(true);
   }
-
   async function saveBooking(event) {
     event.preventDefault();
     if (!selected) return;
@@ -147,13 +137,11 @@ export default function WellnessBookingPage({ healthcare = false }) {
     }, 'Đã cập nhật lịch chờ; máy chủ đã tính lại thời lượng dịch vụ và kiểm tra xung đột tài nguyên.');
     setEditingBooking(false);
   }
-
   const canNoShow = (row) => row.status === 'confirmed' && row.ends_at && new Date(row.ends_at).getTime() <= Date.now();
   const canExpire = (row) => row.status === 'requested' && row.ends_at && new Date(row.ends_at).getTime() <= Date.now();
   const kindLabel = (kind) => (healthcare
     ? ({ staff: 'Bác sĩ', room: 'Phòng khám', equipment: 'Thiết bị y tế' }[kind] || t('Tài nguyên'))
     : ({ staff: 'Kỹ thuật viên', room: 'Phòng', equipment: 'Thiết bị', table: 'Bàn', court: 'Sân' }[kind] || t('Tài nguyên')));
-
   return <div className="page">
     <div className="page-head"><div><h1>{t(healthcare ? 'Lịch hẹn khám' : 'Lịch dịch vụ và hội viên')}</h1><p className="sub">{t(healthcare ? 'Điều phối bác sĩ và phòng khám, quản lý lịch bệnh nhân, check-in và ghi nhận khách vắng.' : 'Điều phối kỹ thuật viên/phòng, quản lý lịch khách, check-in, hoàn tất và ghi nhận khách vắng.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
@@ -168,10 +156,8 @@ export default function WellnessBookingPage({ healthcare = false }) {
       <label className="field"><span className="label">{t('Ghi chú')}</span><input className="input" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })}/></label>
       <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy)}>{t('Tiếp nhận lịch')}</button></div>
     </form></section>}
-
     {can('booking.resource.create') && <section className="card card-pad u-legacy-92c18f6bda" ><h2>{t('Danh mục vận hành')}</h2><div className="layout-split"><form className="form-grid" onSubmit={createResource}><h3 className="full">{t('Tài nguyên')}</h3><label className="field"><span className="label">{t('Tên kỹ thuật viên / phòng *')}</span><input className="input" required value={resourceForm.name} onChange={(e) => setResourceForm({ ...resourceForm, name: e.target.value })}/></label><label className="field"><span className="label">{t('Loại')}</span><select className="select" value={resourceForm.kind} onChange={(e) => setResourceForm({ ...resourceForm, kind: e.target.value })}>{[['staff','Kỹ thuật viên'],['room','Phòng'],['equipment','Thiết bị']].map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></label><div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy)}>{t('Thêm tài nguyên')}</button></div></form>
       {can('booking.service.create') && <form className="form-grid" onSubmit={createService}><h3 className="full">{t('Dịch vụ')}</h3><label className="field"><span className="label">{t('Tên dịch vụ *')}</span><input className="input" required value={serviceForm.name} onChange={(e) => setServiceForm({ ...serviceForm, name: e.target.value })}/></label><label className="field"><span className="label">{t('Thời lượng (phút) *')}</span><input className="input" type="number" min="1" step="1" required value={serviceForm.duration_min} onChange={(e) => setServiceForm({ ...serviceForm, duration_min: e.target.value })}/></label><label className="field"><span className="label">{t('Giá niêm yết *')}</span><input className="input" type="number" min="0" step="any" required value={serviceForm.price} onChange={(e) => setServiceForm({ ...serviceForm, price: e.target.value })}/></label><div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy)}>{t('Thêm dịch vụ')}</button></div></form>}</div></section>}
-
     {loading ? <div className="skeleton" data-h="row"/> : <div className="layout-split u-legacy-92c18f6bda" >
       <section className="card card-pad"><h2>{t('Lịch hẹn')}</h2>{!bookings.length ? <p className="empty">{t('Chưa có lịch hẹn.')}</p> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Giờ / khách')}</th><th>{t('Dịch vụ / tài nguyên')}</th><th>{t('Trạng thái')}</th></tr></thead><tbody>{bookings.map((row) => <tr {...selectableTableRowProps} key={row.id} aria-selected={selectedId === row.id} className={[selectedId === row.id ? 'selected' : '', 'u-legacy-9463ff4798'].filter(Boolean).join(' ')} onClick={() => { setSelectedId(row.id); setEditingBooking(false); }} ><td><strong>{fmtDateTime(row.starts_at)}</strong><div className="small muted">{parties.has(row.party) ? recordLabel('master-data.party', parties.get(row.party)) : row.party ? `${t('Khách')} ${row.party.slice(0, 8)}` : t('Khách vãng lai')}</div></td><td>{serviceById.get(row.service)?.name || t('Dịch vụ')}<div className="small muted">{resourceById.get(row.resource)?.name || t('Tài nguyên')}</div></td><td>{statusLabel(row.status)}</td></tr>)}</tbody></table></div>}</section>
       {selected && <section className="card card-pad"><div className="row wrap"><div><h2>{serviceById.get(selected.service)?.name || t('Lịch dịch vụ')}</h2><div className="small muted">{parties.has(selected.party) ? recordLabel('master-data.party', parties.get(selected.party)) : selected.party ? `${t('Khách')} ${selected.party.slice(0,8)}` : t('Khách vãng lai')} · {resourceById.get(selected.resource)?.name || t('Tài nguyên')}</div></div><span className="grow"/><span className="badge warning">{statusLabel(selected.status)}</span></div>

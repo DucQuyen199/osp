@@ -1,25 +1,23 @@
 import React, { useEffect, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { toast } from '../../lib/feedback.js';
 import { app, can } from '../../lib/state.js';
 import { setBaseCurrency, uiText } from '../../lib/i18n.js';
 import SettingsTabs from './SettingsTabs.jsx';
-
 export default function CurrencySettingsPage() {
+  useDocumentTitle(`${uiText('Tiền tệ')} · ${uiText('Cài đặt')} · OSP Suite`);
   const [currencies, setCurrencies] = useState([]);
   const [baseCurrency, setBaseCurrency] = useState(app.meta.settings?.baseCurrency || 'VND');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-
   useEffect(() => {
-    document.title = `${uiText('Tiền tệ')} · ${uiText('Cài đặt')} · OSP Suite`;
     let active = true;
     api(`${dataPath('master-data.currency')}?limit=200&sort=code&dir=asc`)
       .then((result) => { if (active) setCurrencies(result.items || []); })
       .catch((reason) => { if (active) setError(reason.message || uiText('Không tải được danh sách tiền tệ.')); });
     return () => { active = false; };
   }, []);
-
   const save = async (event) => {
     const next = event.target.value;
     setBusy(true);
@@ -36,9 +34,7 @@ export default function CurrencySettingsPage() {
       setError(reason.message || uiText('Không cập nhật được tiền tệ cơ sở.'));
     } finally { setBusy(false); }
   };
-
   if (!can('tenant.admin')) return <div className="page"><div className="alert danger" role="alert">{uiText('Chỉ quản trị viên mới được đổi tiền tệ cơ sở.')}</div></div>;
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Cài đặt')}</h1><p className="sub">{uiText('Chính sách tiền tệ của doanh nghiệp')} “{app.meta.name}”.</p></div></div>
     <SettingsTabs active="currency" />

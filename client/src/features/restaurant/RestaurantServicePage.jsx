@@ -1,18 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDateTime as businessDateTime, localDateTimeToIso } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import restaurantEnglish from './restaurant.en.js';
-
 const t = (text) => uiTextWith(text, restaurantEnglish);
-
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const METHODS = [['cash', 'Tiền mặt'], ['card', 'Thẻ'], ['transfer', 'Chuyển khoản'], ['ewallet', 'Ví điện tử']];
 const reservationStart = () => businessDateTime(new Date(Date.now() + 60 * 60 * 1000));
-
 export default function RestaurantServicePage() {
+  useDocumentTitle(`${t('Phục vụ nhà hàng')} · OSP Suite`);
   const [tables, setTables] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const [recipes, setRecipes] = useState([]);
@@ -40,7 +39,6 @@ export default function RestaurantServicePage() {
   const [recipeOutputQty, setRecipeOutputQty] = useState('1');
   const [recipeIngredients, setRecipeIngredients] = useState([{ product: '', qty: '1', uom: '' }]);
   const [reservationForm, setReservationForm] = useState({ guest_name: '', phone: '', table: '', guest_count: '2', starts_at: reservationStart(), ends_at: businessDateTime(new Date(Date.now() + 2 * 60 * 60 * 1000)), note: '' });
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -62,9 +60,7 @@ export default function RestaurantServicePage() {
     } catch (reason) { setError(reason.message || t('Không tải được dữ liệu nhà hàng.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = `${t('Phục vụ nhà hàng')} · OSP Suite`; load(); const timer = window.setInterval(() => load(true), 15000); return () => window.clearInterval(timer); }, [load]);
-
+  useEffect(() => { load(); const timer = window.setInterval(() => load(true), 15000); return () => window.clearInterval(timer); }, [load]);
   const occupiedTableIds = useMemo(() => new Set(orders.filter((order) => ['open', 'sent', 'served'].includes(order.status)).map((order) => order.table).filter(Boolean)), [orders]);
   const availableTables = tables.filter((table) => !occupiedTableIds.has(table.id));
   const selectedTable = tables.find((table) => table.id === tableId);
@@ -103,7 +99,6 @@ export default function RestaurantServicePage() {
     } catch (reason) { setError(reason.message || t('Không lưu được công thức.')); }
     finally { setBusy(''); }
   };
-
   const createOrder = async (event) => {
     event.preventDefault(); if (!cart.length) return;
     setBusy('create'); setError(''); setNotice('');
@@ -118,7 +113,6 @@ export default function RestaurantServicePage() {
     } catch (reason) { setError(reason.message || t('Không tạo được order. Kiểm tra món, thực đơn và giá bán.')); }
     finally { setBusy(''); }
   };
-
   const createReservation = async (event) => {
     event.preventDefault(); setBusy('reservation:create'); setError(''); setNotice('');
     try {
@@ -133,7 +127,6 @@ export default function RestaurantServicePage() {
     } catch (reason) { setError(reason.message || t('Không tạo được yêu cầu đặt bàn. Kiểm tra sức chứa và thời gian.')); }
     finally { setBusy(''); }
   };
-
   const transitionReservation = async (reservation, action) => {
     setBusy(`${reservation.id}:${action}`); setError(''); setNotice('');
     try {
@@ -142,7 +135,6 @@ export default function RestaurantServicePage() {
     } catch (reason) { setError(reason.message || t('Không cập nhật được trạng thái đặt bàn.')); await load(true); }
     finally { setBusy(''); }
   };
-
   const assignReservationTable = async (reservation, table) => {
     if (!table) return;
     setBusy(`${reservation.id}:table`); setError(''); setNotice('');
@@ -152,7 +144,6 @@ export default function RestaurantServicePage() {
     } catch (reason) { setError(reason.message || t('Không gán được bàn. Kiểm tra sức chứa và lịch đặt trùng.')); await load(true); }
     finally { setBusy(''); }
   };
-
   const transition = async (order, action) => {
     if (action === 'cancelled' && order.status === 'sent') {
       const reason = cancellationReasons[order.id]?.trim() || '';
@@ -174,7 +165,6 @@ export default function RestaurantServicePage() {
     } catch (reason) { setError(reason.message || t('Không chuyển được trạng thái. Kiểm tra phiếu bếp, kho và phương thức thanh toán.')); await load(true); }
     finally { setBusy(''); }
   };
-
   return <div className="page-content restaurant-service-page">
     <header className="page-header"><div><h1>{t('Phục vụ nhà hàng')}</h1><p className="muted">{t('Mở bàn, ghi món, gửi bếp, theo dõi món sẵn sàng và thanh toán.')}</p></div><button className="button" onClick={() => load()} disabled={loading}>{t('Làm mới')}</button></header>
     {error && <div className="alert error" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
@@ -214,7 +204,6 @@ export default function RestaurantServicePage() {
         {exceedsTableCapacity && <div className="alert warning" role="status">{t('Bàn chỉ có')} {selectedTable.seats} {t('chỗ; chọn bàn lớn hơn hoặc giảm số khách.')}</div>}
         <button className="button primary" disabled={busy === 'create' || !cart.length || exceedsTableCapacity}>{busy === 'create' ? t('Đang tạo…') : t('Mở order')}</button>
       </form></section>
-
       <section className="restaurant-order-list"><header><h2>{t('Orders')}</h2><span className="badge warning">{orders.filter((order) => ['open', 'sent', 'served'].includes(order.status)).length} {t('đang mở')}</span></header>
         {loading ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <div className="restaurant-orders">{orders.map((order) => {
           const table = tables.find((item) => item.id === order.table);
@@ -224,7 +213,6 @@ export default function RestaurantServicePage() {
           </button>;
         })}{!orders.length && <div className="empty">{t('Chưa có order.')}</div>}</div>}
       </section>
-
       <section className="restaurant-order-detail card">{selected ? <>
       <header className="restaurant-order-card-head"><div><h2>{tables.find((table) => table.id === selected.table)?.name || t('Mang đi')}</h2><span className="small muted">{fmtDateTime(selected.created_at)}{selected.table ? ` · ${selected.guest_count || 1} ${t('khách')}` : ''}</span></div><span className={`badge ${selected.status === 'completed' ? 'success' : selected.status === 'cancelled' ? 'plain' : 'warning'}`}>{statusLabel(selected.status)}</span></header>
         {selected.cancellation_reason && <div className="small muted">{t('Lý do hủy:')} {selected.cancellation_reason}</div>}

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { addCalendarMonths, localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, statusLabel, fmtNumber, uiText } from '../../lib/i18n.js';
@@ -6,13 +7,12 @@ import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js'
 import LoanRepaymentPanel from './workbenches/LoanRepaymentPanel.jsx';
 import InsurancePolicyPanel from './workbenches/InsurancePolicyPanel.jsx';
 import InsuranceClaimsPanel from './workbenches/InsuranceClaimsPanel.jsx';
-
 const today = localDate;
 const defaultFirstDueDate = () => addCalendarMonths(today(), 1);
 const money = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 2 });
 const actions = async (qname, row, action) => api(dataPath(qname, row.id, action), { method: 'POST' });
-
 export default function FinanceOperationsPage() {
+  useDocumentTitle(`${uiText(uiText("Điều hành cho vay và bảo hiểm"))} · OSP Suite`);
   const [parties, setParties] = useState(new Map());
   const [accounts, setAccounts] = useState([]);
   const [loans, setLoans] = useState([]);
@@ -32,7 +32,6 @@ export default function FinanceOperationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
@@ -64,8 +63,7 @@ export default function FinanceOperationsPage() {
     } catch (reason) { setError(reason.message || uiText("Không tải được dữ liệu hồ sơ tài chính.")); }
     finally { setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = `${uiText(uiText("Điều hành cho vay và bảo hiểm"))} · OSP Suite`; load(); }, [load]);
+  useEffect(() => { load(); }, [load]);
   const invoiceByPolicy = useMemo(() => new Map(invoices.filter((item) => item.source === 'policy').map((item) => [item.source_id, item])), [invoices]);
   const repaymentsByLoan = useMemo(() => {
     const map = new Map();
@@ -74,7 +72,6 @@ export default function FinanceOperationsPage() {
     return map;
   }, [repayments]);
   const activePolicies = policies.filter((policy) => policy.status === 'active');
-
   async function createLoan(event) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
@@ -83,7 +80,6 @@ export default function FinanceOperationsPage() {
     } catch (reason) { setError(reason.message || uiText("Không thể tiếp nhận hồ sơ vay.")); }
     finally { setBusy(false); }
   }
-
   async function loanAction(loan, action) {
     setBusy(true); setError(''); setNotice('');
     try {
@@ -92,7 +88,6 @@ export default function FinanceOperationsPage() {
     } catch (reason) { setError(reason.message || uiText("Không thể cập nhật khoản vay.")); }
     finally { setBusy(false); }
   }
-
   async function repaymentAction(row, action) {
     setBusy(true); setError(''); setNotice('');
     try {
@@ -104,7 +99,6 @@ export default function FinanceOperationsPage() {
     } catch (reason) { setError(reason.message || uiText("Không thể cập nhật kỳ trả nợ.")); }
     finally { setBusy(false); }
   }
-
   async function createPolicy(event) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
@@ -113,7 +107,6 @@ export default function FinanceOperationsPage() {
     } catch (reason) { setError(reason.message || uiText("Không thể tạo hợp đồng bảo hiểm.")); }
     finally { setBusy(false); }
   }
-
   async function createClaim(event) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
@@ -122,7 +115,6 @@ export default function FinanceOperationsPage() {
     } catch (reason) { setError(reason.message || uiText("Không thể tiếp nhận hồ sơ bồi thường.")); }
     finally { setBusy(false); }
   }
-
   async function payClaim(claim) {
     const values = claimPay[claim.id] || {};
     setBusy(true); setError(''); setNotice('');
@@ -132,7 +124,6 @@ export default function FinanceOperationsPage() {
     } catch (reason) { setError(reason.message || uiText("Không thể chi trả hồ sơ bồi thường.")); }
     finally { setBusy(false); }
   }
-
   async function claimAction(claim, action) {
     setBusy(true); setError(''); setNotice('');
     try {
@@ -153,7 +144,6 @@ export default function FinanceOperationsPage() {
     } catch (reason) { setError(reason.message || uiText("Không thể cập nhật hồ sơ bồi thường.")); }
     finally { setBusy(false); }
   }
-
   async function policyAction(policy, action) {
     setBusy(true); setError(''); setNotice('');
     try {
@@ -169,15 +159,11 @@ export default function FinanceOperationsPage() {
     } catch (reason) { setError(reason.message || uiText("Không thể cập nhật hợp đồng.")); }
     finally { setBusy(false); }
   }
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText("Điều hành cho vay và bảo hiểm")}</h1><p className="sub">{uiText("Theo dõi hồ sơ qua các bước tiếp nhận, thẩm định, giải ngân hoặc chi trả và thu nợ.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={load}>{uiText("Làm mới")}</button></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
-
     <LoanRepaymentPanel {...{ can, loans, loading, uiText, loanForm, setLoanForm, parties, recordLabel, createLoan, busy, repaymentsByLoan, statusLabel, today, loanAction, repaymentMethods, setRepaymentMethods, repaymentAction, money }} />
-
     <InsurancePolicyPanel {...{ can, policies, loading, uiText, policyForm, setPolicyForm, parties, createPolicy, busy, recordLabel, invoiceByPolicy, fmtDate, statusLabel, policyCancellationReasons, setPolicyCancellationReasons, policyAction }} />
-
     <InsuranceClaimsPanel {...{ can, claims, loading, uiText, claimForm, setClaimForm, activePolicies, today, createClaim, policies, parties, money, claimPay, claimApprovalAmounts, setClaimApprovalAmounts, claimAction, claimRejectionReasons, setClaimRejectionReasons, busy, payClaim, accounts, fmtDate }} />
   </div>;
 }

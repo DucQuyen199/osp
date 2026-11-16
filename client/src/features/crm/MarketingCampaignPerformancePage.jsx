@@ -1,16 +1,15 @@
 import React, { useEffect, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { fmtMoney, statusLabel, fmtNumber, uiText } from '../../lib/i18n.js';
-
 export default function MarketingCampaignPerformancePage() {
+  useDocumentTitle(`${uiText('Hiệu quả chiến dịch')} · OSP Suite`);
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [model, setModel] = useState('first_touch');
-
   useEffect(() => {
     let active = true;
-    document.title = `${uiText('Hiệu quả chiến dịch')} · OSP Suite`;
     setLoading(true);
     setError('');
     const params = new URLSearchParams({ model });
@@ -20,7 +19,6 @@ export default function MarketingCampaignPerformancePage() {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [model]);
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Hiệu quả chiến dịch')}</h1><p className="sub">{uiText('Đo lead, chuyển đổi và doanh thu theo mô hình quy nguồn đã chọn.')}</p></div><label className="field"><span className="field-label">{uiText('Mô hình ghi nhận')}</span><select className="input" value={model} onChange={(event) => setModel(event.target.value)}><option value="first_touch">{uiText('Chạm đầu tiên')}</option><option value="last_touch">{uiText('Chạm cuối cùng')}</option><option value="linear">{uiText('Chia đều các lần chạm')}</option></select></label><a className="btn btn-secondary" href="#/e/marketing/campaign">{uiText('Chiến dịch')}</a></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}

@@ -1,14 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
 import biEnglish from './bi.en.js';
-
 const t = (text) => uiTextWith(text, biEnglish);
-
 const asItems = (value) => Array.isArray(value?.items) ? value.items : [];
 const label = (value) => String(value ?? '—');
-
 function downloadBlob(blob, filename) {
   const href = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
@@ -17,7 +15,6 @@ function downloadBlob(blob, filename) {
   anchor.click();
   window.setTimeout(() => URL.revokeObjectURL(href), 1000);
 }
-
 function pieSlicePath(start, end) {
   const point = (turn) => {
     const angle = turn * Math.PI * 2 - Math.PI / 2;
@@ -26,7 +23,6 @@ function pieSlicePath(start, end) {
   const largeArc = end - start > 0.5 ? 1 : 0;
   return `M 50 50 L ${point(start)} A 48 48 0 ${largeArc} 1 ${point(end)} Z`;
 }
-
 function DataTable({ items }) {
   const columns = items.length ? Object.keys(items[0]).filter((key) => !['id', 'tenantId', 'createdAt', 'updatedAt'].includes(key)) : [];
   if (!items.length) return <div className="empty"><h3>{t("Chưa có dữ liệu")}</h3><p>{t("Truy vấn đã lưu không trả về bản ghi nào.")}</p></div>;
@@ -34,7 +30,6 @@ function DataTable({ items }) {
     <tbody>{items.map((item, index) => <tr key={item.id || index}>{columns.map((key) => <td key={key} className={typeof item[key] === 'number' ? 'right num' : ''}>{typeof item[key] === 'number' ? fmtNumber(item[key]) : label(item[key])}</td>)}</tr>)}</tbody>
   </table></div>;
 }
-
 function Widget({ widget }) {
   const isKpi = widget.type === 'kpi';
   const resourceId = isKpi ? widget.kpi : widget.report;
@@ -80,7 +75,6 @@ function Widget({ widget }) {
     <span title={label(item.group)}>{label(item.group)}</span><div className="bi-bar-track"><svg className="bi-bar-fill" viewBox="0 0 100 1" preserveAspectRatio="none" aria-hidden="true"><rect width={Math.max(2, Math.abs(Number(item.value) || 0) / max * 100)} height="1" /></svg></div><strong className="num">{fmtNumber(Number(item.value) || 0)}</strong>
   </div>)}</div>;
 }
-
 function KpiCard({ kpi }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
@@ -98,8 +92,8 @@ function KpiCard({ kpi }) {
       : <span className="skeleton" data-h="row" />}
   </article>;
 }
-
 export default function BiReportsPage({ route }) {
+  useDocumentTitle(`${t('Báo cáo & phân tích')} · OSP Suite`);
   const [dashboards, setDashboards] = useState([]);
   const [reports, setReports] = useState([]);
   const [kpis, setKpis] = useState([]);
@@ -135,7 +129,6 @@ export default function BiReportsPage({ route }) {
   const [kpiReportId, setKpiReportId] = useState('');
   const [kpiTarget, setKpiTarget] = useState('');
   const [kpiFormula, setKpiFormula] = useState('');
-
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -152,8 +145,7 @@ export default function BiReportsPage({ route }) {
       setError(t(reason.message || 'Không tải được danh mục báo cáo BI.'));
     } finally { setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = `${t('Báo cáo & phân tích')} · OSP Suite`; load(); }, [load]);
+  useEffect(() => { load(); }, [load]);
   useEffect(() => {
     let active = true;
     setError('');
@@ -175,7 +167,6 @@ export default function BiReportsPage({ route }) {
     }
     return () => { active = false; };
   }, [route.view, route.id]);
-
   const exportReport = async () => {
     if (!route.id || exporting) return;
     setExporting(true);
@@ -190,7 +181,6 @@ export default function BiReportsPage({ route }) {
       setExporting(false);
     }
   };
-
   const sources = (app.meta?.modules || []).flatMap((module) => (module.entities || [])
     .filter((item) => can(`${module.id}.${item.name}.read`))
     .map((item) => ({ qname: `${module.id}.${item.name}`, label: `${module.name} · ${item.label}`, fields: item.fields || [] })));
@@ -198,7 +188,6 @@ export default function BiReportsPage({ route }) {
   const sourceFields = selectedSource?.fields || [];
   const numericFields = sourceFields.filter((field) => ['number', 'money'].includes(field.type));
   const groupFields = sourceFields.filter((field) => !['json', 'text'].includes(field.type));
-
   const createReport = async (event) => {
     event.preventDefault();
     if (savingReport || !draftName.trim() || !selectedSource) return;
@@ -221,7 +210,6 @@ export default function BiReportsPage({ route }) {
       setError(t(reason.message || 'Could not create report.'));
     } finally { setSavingReport(false); }
   };
-
   const runReportAction = async (action) => {
     if (!route.id) return;
     setError('');
@@ -234,7 +222,6 @@ export default function BiReportsPage({ route }) {
       setReport(updated); setReportRuns(asItems(runs));
     } catch (reason) { setError(t(reason.message || 'Could not update report schedule.')); }
   };
-
   const reportWidgetTypes = (item) => {
     if (!item?.query?.aggregate) return ['table'];
     return item.query.group_by ? ['line', 'bar', 'pie'] : ['number'];
@@ -273,13 +260,11 @@ export default function BiReportsPage({ route }) {
     } catch (reason) { setError(t(reason.message || 'Could not create KPI.')); }
     finally { setSavingKpi(false); }
   };
-
   if (route.view === 'dashboard' && route.id) return <div className="page">
     <div className="page-head"><div><a className="back-link" href="#/reports/bi">{t("← Báo cáo & phân tích")}</a><h1>{dashboard?.name || t('Dashboard')}</h1><p className="sub">{t("Các widget được lấy từ báo cáo đã lưu và phân quyền theo tenant.")}</p></div></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}
     {!dashboard ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <div className="bi-widget-grid">{(dashboard.widgets || []).map((widget, index) => <section className="card report-section bi-widget" key={`${widget.type === 'kpi' ? widget.kpi : widget.report}:${index}`}><div className="card-head"><h2>{widget.type === 'kpi' ? (kpis.find((item) => item.id === widget.kpi)?.name || 'KPI') : (reports.find((item) => item.id === widget.report)?.name || 'Report widget')}</h2><a href={widget.type === 'kpi' ? '#/reports/bi' : `#/reports/bi/report/${encodeURIComponent(widget.report)}`}>{widget.type === 'kpi' ? t('Mở KPI') : t('Mở báo cáo')}</a></div><div className="card-pad"><Widget widget={widget} /></div></section>)}</div>}
   </div>;
-
   if (route.view === 'report' && route.id) return <div className="page">
     <div className="page-head"><div><a className="back-link" href="#/reports/bi">{t("← Báo cáo & phân tích")}</a><h1>{report?.name || t('Báo cáo')}</h1><p className="sub">{report?.query?.source ? `Nguồn dữ liệu: ${report.query.source}` : 'Báo cáo chưa có truy vấn đã lưu.'}</p></div></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}
@@ -287,7 +272,6 @@ export default function BiReportsPage({ route }) {
     {reportRuns.length > 0 && <section className="card report-section"><div className="card-head"><h2>{t("Lịch sử snapshot")}</h2><span className="faint">{reportRuns.length} {t("lần gần nhất")}</span></div><div className="card-pad stack-sm">{reportRuns.map((run) => <button className="btn" type="button" key={run.id} aria-pressed={selectedRun?.id === run.id} onClick={() => setSelectedRun(run)}>{run.runAt} · {run.rowCount} dòng</button>)}</div>{selectedRun && <div className="card-pad"><DataTable items={asItems(selectedRun.result)} /></div>}</section>}
     {!report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : result ? <section className="card report-section"><div className="card-head"><h2>{t("Kết quả")}</h2><span className="faint">{fmtNumber(result.total || 0)} {t("bản ghi")}</span><button className="btn" type="button" disabled={exporting} onClick={exportReport}>{exporting ? t('Đang xuất…') : t('Tải CSV')}</button></div><div className="card-pad"><DataTable items={asItems(result)} /></div></section> : <div className="empty"><h3>{t("Chưa cấu hình truy vấn")}</h3><p>{t("Thêm định nghĩa truy vấn an toàn vào báo cáo để xem dữ liệu.")}</p></div>}
   </div>;
-
   return <div className="page">
     <div className="row bi-toolbar">
       {can('bi.report.create') && !creating && <button className="btn btn-primary" type="button" onClick={() => { setCreating(true); if (!draftSource && sources[0]) setDraftSource(sources[0].qname); }}>{t("Tạo báo cáo")}</button>}

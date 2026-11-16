@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadAll, loadRefs, recordLabel } from '../../lib/state.js';
 import clinicEnglish from './clinic.en.js';
-
 const t = (text) => uiTextWith(text, clinicEnglish);
-
 export default function ClinicWorkbenchPage() {
+  useDocumentTitle(t("Điều phối phòng khám · OSP Suite"));
   const [patients, setPatients] = useState([]);
   const [parties, setParties] = useState(new Map());
   const [encounters, setEncounters] = useState([]);
@@ -34,7 +34,6 @@ export default function ClinicWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async (preserveNotice = false) => {
     setLoading(true); setError(''); if (!preserveNotice) setNotice('');
     try {
@@ -52,9 +51,7 @@ export default function ClinicWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không tải được dữ liệu phòng khám.")); }
     finally { setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = t("Điều phối phòng khám · OSP Suite"); load(); }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   const selected = encounters.find((item) => item.id === selectedId) || null;
   const availablePatientParties = useMemo(() => {
     const registered = new Set(patients.map((item) => item.party));
@@ -70,18 +67,15 @@ export default function ClinicWorkbenchPage() {
     const baseUnit = products.get(productId)?.uom;
     return baseUnit ? [...units.values()].filter((unit) => unit.id === baseUnit || unit.base_uom === baseUnit) : [];
   };
-
   useEffect(() => {
     if (!selected) return;
     setDoctor(selected.doctor || app.user?.name || '');
     setDiagnosis(selected.diagnosis || '');
     setFee(selected.fee ?? '');
   }, [selectedId]);
-
   useEffect(() => {
     setPatientRecordForm({ dob: patient?.dob || '', gender: patient?.gender || '', blood_type: patient?.blood_type || '', allergies: patient?.allergies || '', insurance_no: patient?.insurance_no || '' });
   }, [patient?.id, patient?.dob, patient?.gender, patient?.blood_type, patient?.allergies, patient?.insurance_no]);
-
   const createEncounter = async (event) => {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
@@ -91,7 +85,6 @@ export default function ClinicWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không tạo được lượt khám.")); }
     finally { setBusy(false); }
   };
-
   const registerPatient = async (event) => {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
@@ -116,7 +109,6 @@ export default function ClinicWorkbenchPage() {
       setError(reason.message || t("Không đăng ký được hồ sơ bệnh nhân. Nếu thông tin liên hệ đã tạo, hãy thử lại để hoàn tất hồ sơ."));
     } finally { setBusy(false); }
   };
-
   const updatePatientRecord = async (event) => {
     event.preventDefault(); if (!patient) return;
     setBusy(true); setError(''); setNotice('');
@@ -130,7 +122,6 @@ export default function ClinicWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không thể cập nhật hồ sơ bệnh nhân.")); }
     finally { setBusy(false); }
   };
-
   const completeEncounter = async (event) => {
     event.preventDefault(); if (!selected) return;
     setBusy(true); setError(''); setNotice('');
@@ -140,7 +131,6 @@ export default function ClinicWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Chưa thể hoàn tất lượt khám. Hãy nhập bác sĩ, chẩn đoán và phí khám.")); }
     finally { setBusy(false); }
   };
-
   const createPrescription = async (event) => {
     event.preventDefault(); if (!selected) return;
     setBusy(true); setError(''); setNotice('');
@@ -150,21 +140,18 @@ export default function ClinicWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không lưu được đơn thuốc.")); }
     finally { setBusy(false); }
   };
-
   const dispensePrescription = async (prescription) => {
     setBusy(true); setError(''); setNotice('');
     try { await api(dataPath('clinic.prescription', prescription.id, 'dispensed'), { method: 'POST' }); await load(true); setNotice(t("Đã phát thuốc và ghi nhận xuất kho.")); }
     catch (reason) { setError(reason.message || t("Không phát được thuốc. Kiểm tra tồn kho, lô và kho cấp phát.")); }
     finally { setBusy(false); }
   };
-
   const createLabOrder = async (event) => {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try { await api(dataPath('clinic.lab_order'), { method: 'POST', body: { encounter: testEncounterId || selected?.id, test: testName.trim() } }); await load(true); setTestName(''); setNotice(t("Đã tạo chỉ định xét nghiệm.")); }
     catch (reason) { setError(reason.message || t("Không tạo được chỉ định xét nghiệm.")); }
     finally { setBusy(false); }
   };
-
   const completeLab = async (lab) => {
     setBusy(true); setError(''); setNotice('');
     try {
@@ -173,7 +160,6 @@ export default function ClinicWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Cần nhập kết quả xét nghiệm trước khi xác nhận.")); }
     finally { setBusy(false); }
   };
-
   return <div className="page clinic-page">
     <div className="page-head"><div><h1>{t("Điều phối phòng khám")}</h1><p className="sub">{t("Tiếp nhận bệnh nhân, hoàn tất lượt khám, theo dõi xét nghiệm và phát thuốc theo kho. Hồ sơ được hiển thị theo quyền clinic của tài khoản.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={() => load()}>{t("Làm mới")}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}

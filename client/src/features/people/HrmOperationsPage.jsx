@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { addCalendarDays, addCalendarMonths, localDate, localDateTimeToIso, localTime } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
@@ -6,7 +7,6 @@ import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/stat
 import { listHref, recordHref } from '../../lib/routes.js';
 import AttendanceEntriesTable from './components/AttendanceEntriesTable.jsx';
 import WorkSchedulePatternForm from './components/WorkSchedulePatternForm.jsx';
-
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const fmtTime = (value) => value ? localTime(new Date(value)) : '--';
 const rotationEmployees = (row) => Array.isArray(row?.employees) ? row.employees : row?.employee ? [row.employee] : [];
@@ -18,7 +18,6 @@ const nowIso = () => new Date().toISOString();
 const nextLocalDate = (date) => addCalendarDays(date, 1);
 const addLocalDays = addCalendarDays;
 const nextMonthStart = (date) => addCalendarMonths(`${date.slice(0, 7)}-01`, 1);
-
 async function listAllRows(entity, filters = {}) {
   const rows = [];
   let total = Number.POSITIVE_INFINITY;
@@ -32,8 +31,8 @@ async function listAllRows(entity, filters = {}) {
   }
   return { items: rows, total };
 }
-
 export default function HrmOperationsPage() {
+  useDocumentTitle(`${uiText('Vận hành nhân sự')} · OSP Suite`);
   const weekdayOptions = [[1, uiText('T2')], [2, uiText('T3')], [3, uiText('T4')], [4, uiText('T5')], [5, uiText('T6')], [6, uiText('T7')], [7, uiText('CN')]];
   const [employees, setEmployees] = useState([]);
   const [employeeMap, setEmployeeMap] = useState(new Map());
@@ -68,7 +67,6 @@ export default function HrmOperationsPage() {
   const maxPatternEndDate = patternForm.start_date
     ? addLocalDays(patternForm.start_date, rotationDayLimit(patternForm.employees.length) - 1)
     : undefined;
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -103,8 +101,7 @@ export default function HrmOperationsPage() {
     } catch (reason) { setError(reason.message || uiText('Không tải được dữ liệu nhân sự.')); }
     finally { if (!quiet) setLoading(false); }
   }, [attendanceDate, scheduleMonthStart, scheduleMonthEnd, workflowApproval]);
-
-  useEffect(() => { document.title = `${uiText('Vận hành nhân sự')} · OSP Suite`; load(); }, [load]);
+  useEffect(() => { load(); }, [load]);
   const activeEmployees = employees.filter((row) => row.status === 'active');
   const pendingLeaves = leaveRequests.filter((row) => row.status === 'submitted');
   const pendingRevisions = salaryRevisions.filter((row) => row.status === 'submitted');
@@ -112,20 +109,17 @@ export default function HrmOperationsPage() {
   const scheduleEntriesThisMonth = scheduleEntries.filter((row) => String(row.work_date || '').startsWith(scheduleForm.work_date.slice(0, 7)));
   const attendanceByEmployee = useMemo(() => new Map(attendance.map((row) => [row.employee, row])), [attendance]);
   const incompleteAttendance = attendance.filter((row) => row.check_in && !row.check_out).length;
-
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); setNotice(success); await load(true); }
     catch (reason) { setError(reason.message || uiText('Thao tác không thành công.')); await load(true); }
     finally { setBusy(''); }
   }
-
   async function createEmployee(event) {
     event.preventDefault();
     const body = { name: employeeForm.name.trim(), code: employeeForm.code.trim() || undefined, department: employeeForm.department || undefined, position: employeeForm.position || undefined, email: employeeForm.email.trim() || undefined, phone: employeeForm.phone.trim() || undefined, hire_date: employeeForm.hire_date || undefined, base_salary: employeeForm.base_salary ? Number(employeeForm.base_salary) : undefined, work_weekdays: employeeForm.customSchedule ? employeeForm.work_weekdays : undefined, standard_hours_per_day: employeeForm.customSchedule ? Number(employeeForm.standard_hours_per_day || 8) : undefined };
     await run('employee:create', async () => { await api(dataPath('hrm.employee'), { method: 'POST', body }); setEmployeeForm({ name: '', code: '', department: '', position: '', email: '', phone: '', hire_date: localDate(), base_salary: '', customSchedule: false, work_weekdays: [1, 2, 3, 4, 5], standard_hours_per_day: '8' }); }, uiText('Đã tạo hồ sơ nhân viên mới. Thay đổi lương sau tuyển dụng cần tạo điều chỉnh có ngày hiệu lực.'));
   }
-
   async function punchIn() {
     if (!punchEmployee) return;
     const existing = attendanceByEmployee.get(punchEmployee);
@@ -134,11 +128,9 @@ export default function HrmOperationsPage() {
       else await api(dataPath('hrm.attendance'), { method: 'POST', body: { employee: punchEmployee, date: attendanceDate, check_in: nowIso() } });
     }, uiText('Đã ghi nhận giờ vào.'));
   }
-
   async function punchOut(row) {
     await run(`${row.id}:punch-out`, () => api(dataPath('hrm.attendance', row.id), { method: 'PATCH', body: { check_out: nowIso() } }), uiText('Đã ghi nhận giờ ra.'));
   }
-
   async function saveScheduleEntry(event) {
     event.preventDefault();
     const existing = scheduleEntries.find((row) => row.employee === scheduleForm.employee && row.work_date === scheduleForm.work_date);
@@ -159,11 +151,9 @@ export default function HrmOperationsPage() {
       else await api(dataPath('hrm.work_schedule_entry'), { method: 'POST', body: { employee: scheduleForm.employee, work_date: scheduleForm.work_date, is_working: scheduleForm.is_working, ...details } });
     }, existing ? uiText('Đã cập nhật lịch làm việc trong ngày.') : uiText('Đã thêm lịch làm việc trong ngày.'));
   }
-
   async function removeScheduleEntry(row) {
     await run(`${row.id}:remove`, () => api(dataPath('hrm.work_schedule_entry', row.id), { method: 'DELETE' }), uiText('Đã xóa ngoại lệ lịch; ngày này trở về lịch tuần của nhân viên.'));
   }
-
   async function createSchedulePattern(event) {
     event.preventDefault();
     await run('schedule-pattern:create', async () => {
@@ -171,7 +161,6 @@ export default function HrmOperationsPage() {
       if (can('hrm.work_schedule_pattern.applied')) await action('hrm.work_schedule_pattern', row, 'applied');
     }, can('hrm.work_schedule_pattern.applied') ? uiText('Đã tạo lịch luân phiên và sinh các ca theo ngày; payroll và hạn mức phép sẽ dùng lịch mới.') : uiText('Đã lưu mẫu ca nháp để người có quyền áp dụng.'));
   }
-
   function updatePatternEmployees(employeeId, selected) {
     setPatternForm((form) => {
       const employees = selected
@@ -185,7 +174,6 @@ export default function HrmOperationsPage() {
       };
     });
   }
-
   function updatePatternStartDate(startDate) {
     setPatternForm((form) => {
       const maxEnd = addLocalDays(startDate, rotationDayLimit(form.employees.length) - 1);
@@ -196,11 +184,9 @@ export default function HrmOperationsPage() {
       };
     });
   }
-
   function updatePatternField(field, value) {
     setPatternForm((form) => ({ ...form, [field]: value }));
   }
-
   function togglePatternCycleDay(index, isWorking) {
     setPatternForm((form) => ({ ...form, cycle: form.cycle.map((day, itemIndex) => itemIndex === index ? {
       ...day,
@@ -210,26 +196,21 @@ export default function HrmOperationsPage() {
       break_minutes: isWorking ? (day.break_minutes || 0) : 0,
     } : day) }));
   }
-
   function updatePatternCycleField(index, field, value) {
     setPatternForm((form) => ({ ...form, cycle: form.cycle.map((day, itemIndex) => itemIndex === index ? { ...day, [field]: value } : day) }));
   }
-
   function removePatternCycleDay(index) {
     setPatternForm((form) => ({ ...form, cycle: form.cycle.filter((_, itemIndex) => itemIndex !== index) }));
   }
-
   function addPatternCycleDay() {
     setPatternForm((form) => ({ ...form, cycle: [...form.cycle, { is_working: true, start_time: '09:00', end_time: '17:00', break_minutes: 60 }] }));
   }
-
   function useScheduleTemplate(id) {
     setScheduleTemplateId(id);
     const template = scheduleTemplates.find((row) => row.id === id);
     setScheduleTemplateName(template?.name || '');
     if (template) setPatternForm((form) => ({ ...form, timezone: template.timezone || form.timezone, cycle: Array.isArray(template.cycle) ? template.cycle.map((day) => ({ ...day })) : form.cycle }));
   }
-
   async function saveScheduleTemplate() {
     const name = scheduleTemplateName.trim();
     if (!name) return;
@@ -243,20 +224,16 @@ export default function HrmOperationsPage() {
       }
     }, uiText('Đã lưu mẫu ca vào thư viện để tái sử dụng.'));
   }
-
   async function removeScheduleTemplate(row) {
     await run(`${row.id}:template-remove`, () => api(dataPath('hrm.work_schedule_template', row.id), { method: 'DELETE' }), uiText('Đã xóa mẫu ca khỏi thư viện.'));
     if (scheduleTemplateId === row.id) { setScheduleTemplateId(''); setScheduleTemplateName(''); }
   }
-
   async function applySchedulePattern(row) {
     await run(`${row.id}:applied`, () => action('hrm.work_schedule_pattern', row, 'applied'), uiText('Đã sinh lịch luân phiên thành các ca theo ngày.'));
   }
-
   async function removeSchedulePattern(row) {
     await run(`${row.id}:remove`, () => api(dataPath('hrm.work_schedule_pattern', row.id), { method: 'DELETE' }), uiText('Đã xóa mẫu ca nháp.'));
   }
-
   async function createLeave(event) {
     event.preventDefault();
     await run('leave:create', async () => {
@@ -264,12 +241,10 @@ export default function HrmOperationsPage() {
       await action('hrm.leave_request', row, 'submitted'); setLeaveForm((form) => ({ ...form, start_date: '', end_date: '', reason: '' }));
     }, uiText('Đã gửi yêu cầu nghỉ phép. Hạn mức, ngày làm việc, ngày lễ và đơn trùng được kiểm tra trên máy chủ.'));
   }
-
   async function leaveDecision(row, verb) {
     const messages = { approved: uiText('Đã duyệt nghỉ phép và cập nhật dữ liệu nguồn cho chấm công/bảng lương.'), rejected: uiText('Đã từ chối yêu cầu nghỉ phép.') };
     await run(`${row.id}:${verb}`, () => action('hrm.leave_request', row, verb), messages[verb]);
   }
-
   async function createRevision(event) {
     event.preventDefault();
     await run('revision:create', async () => {
@@ -277,18 +252,15 @@ export default function HrmOperationsPage() {
       await action('hrm.salary_revision', row, 'submitted'); setRevisionForm((form) => ({ ...form, effective_from: '', base_salary: '', reason: '' }));
     }, uiText('Đã gửi đề nghị điều chỉnh lương. Mức mới chỉ có hiệu lực sau khi được duyệt theo ngày hiệu lực.'));
   }
-
   async function revisionDecision(row, verb) {
     await run(`${row.id}:${verb}`, () => action('hrm.salary_revision', row, verb), verb === 'approved' ? uiText('Đã duyệt mức lương mới có hiệu lực theo kỳ.') : uiText('Đã từ chối đề nghị điều chỉnh lương.'));
   }
-
   async function terminateEmployee(row) {
     const terminationDate = localDate();
     await run(`${row.id}:terminated`, async () => {
       await api(dataPath('hrm.employee', row.id, 'terminated'), { method: 'POST', body: { termination_date: terminationDate } });
     }, uiText('Đã kết thúc hồ sơ nhân viên. Máy chủ đã kiểm tra chấm công và nghỉ phép còn vướng.'));
   }
-
   const approvalFor = (entity, id) => approvalRequests.find((row) => row.entity === entity && row.record_id === id);
   const linkList = [
     ['hrm.leave_allocation.read', 'hrm.leave_allocation', 'Hạn mức nghỉ'],
@@ -297,17 +269,14 @@ export default function HrmOperationsPage() {
     ['hrm.department.read', 'hrm.department', 'Phòng ban'],
     ['hrm.position.read', 'hrm.position', 'Chức danh'],
   ].filter(([permission]) => can(permission));
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText("Vận hành nhân sự")}</h1><p className="sub">{uiText("Quản lý hồ sơ, ghi nhận chấm công, duyệt nghỉ phép và điều chỉnh lương theo ngày hiệu lực.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{uiText("Làm mới")}</button></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
     <div className="stats u-legacy-bf4a218e05" ><div className="card stat"><span className="stat-label">{uiText("Nhân viên đang làm")}</span><strong className="stat-value">{activeEmployees.length}</strong></div><div className="card stat"><span className="stat-label">{uiText("Đơn nghỉ chờ duyệt")}</span><strong className="stat-value">{pendingLeaves.length}</strong></div><div className="card stat"><span className="stat-label">{uiText("Điều chỉnh lương chờ duyệt")}</span><strong className="stat-value">{pendingRevisions.length}</strong></div><div className="card stat"><span className="stat-label">{uiText("Thiếu giờ ra hôm nay")}</span><strong className="stat-value">{attendanceDate === localDate() ? incompleteAttendance : '—'}</strong></div></div>
-
     <section className="card card-pad"><h2>{uiText("Chấm công trong ngày")}</h2><div className="row wrap"><label className="field"><span className="label">{uiText("Ngày")}</span><input className="input" type="date" value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)}/></label><label className="field grow"><span className="label">{uiText("Nhân viên ghi nhận giờ vào")}</span><select className="select" value={punchEmployee} onChange={(event) => setPunchEmployee(event.target.value)}><option value="">{uiText("Chọn nhân viên")}</option>{activeEmployees.map((row) => <option key={row.id} value={row.id}>{recordLabel('hrm.employee', row)}</option>)}</select></label>{can('hrm.attendance.create') && <button className="btn btn-primary" type="button" disabled={Boolean(busy) || !punchEmployee || attendanceDate !== localDate() || Boolean(attendanceByEmployee.get(punchEmployee)?.check_in)} onClick={punchIn}>{uiText("Ghi giờ vào")}</button>}</div>
       {attendance.length > 0 && <AttendanceEntriesTable attendance={attendance} employees={employeeMap} busy={busy} canPunchOut={can('hrm.attendance.update') && attendanceDate === localDate()} onPunchOut={punchOut} />}
       {!attendance.length && !loading && <p className="small muted">{uiText("Chưa có bản ghi chấm công trong ngày đã chọn.")}</p>}
     </section>
-
     {(can('hrm.work_schedule_pattern.create') || can('hrm.work_schedule_pattern.read') || can('hrm.work_schedule_template.create') || can('hrm.work_schedule_template.read')) && <section className="card card-pad u-legacy-92c18f6bda" >
       <h2>{uiText("Lịch ca luân phiên")}</h2>
       <p className="small muted">{uiText("Khai báo chu kỳ ngày làm/nghỉ, ngày bắt đầu và múi giờ. Khi áp dụng, hệ thống sinh lịch theo ngày để chấm công, nghỉ phép và payroll cùng sử dụng. Mỗi đợt tối đa 10 năm và 40.000 dòng; phạm vi ngày tối đa giảm theo số nhân viên trong đội.")}</p>
@@ -338,22 +307,16 @@ export default function HrmOperationsPage() {
     </section>}
     {(can('hrm.work_schedule_entry.create') || can('hrm.work_schedule_entry.read')) && <section className="card card-pad u-legacy-92c18f6bda" ><h2>{uiText("Lịch ca theo ngày")}</h2><p className="small muted">{uiText("Mỗi dòng ghi đè lịch tuần của nhân viên trong đúng một ngày. Bỏ lịch để trở về lịch tuần; ca qua đêm được hỗ trợ.")}</p>{can('hrm.work_schedule_entry.create') && <form className="form-grid" onSubmit={saveScheduleEntry}><label className="field"><span className="label">{uiText("Nhân viên *")}</span><select className="select" required value={scheduleForm.employee} onChange={(event) => setScheduleForm({ ...scheduleForm, employee: event.target.value })}><option value="">{uiText("Chọn nhân viên")}</option>{activeEmployees.map((row) => <option key={row.id} value={row.id}>{recordLabel('hrm.employee', row)}</option>)}</select></label><label className="field"><span className="label">{uiText("Ngày làm việc *")}</span><input className="input" required type="date" value={scheduleForm.work_date} onChange={(event) => setScheduleForm({ ...scheduleForm, work_date: event.target.value })}/></label><label className="row small u-legacy-eee80941ee" ><input type="checkbox" checked={scheduleForm.is_working} onChange={(event) => setScheduleForm({ ...scheduleForm, is_working: event.target.checked })}/>{uiText("Có ca làm việc trong ngày này")}</label>{scheduleForm.is_working && <><label className="field"><span className="label">{uiText("Bắt đầu *")}</span><input className="input" required type="time" value={scheduleForm.start_time} onChange={(event) => setScheduleForm({ ...scheduleForm, start_time: event.target.value })}/></label><label className="field"><span className="label">{uiText("Kết thúc *")}</span><input className="input" required type="time" value={scheduleForm.end_time} onChange={(event) => setScheduleForm({ ...scheduleForm, end_time: event.target.value })}/></label><label className="field"><span className="label">{uiText("Nghỉ không tính giờ (phút)")}</span><input className="input num" type="number" min="0" max="1439" step="1" value={scheduleForm.break_minutes} onChange={(event) => setScheduleForm({ ...scheduleForm, break_minutes: event.target.value })}/></label></>}<div className="row"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !scheduleForm.employee || !scheduleForm.work_date}>{scheduleEntries.some((row) => row.employee === scheduleForm.employee && row.work_date === scheduleForm.work_date) ? uiText('Cập nhật lịch ngày') : uiText('Lưu lịch ngày')}</button></div></form>}{can('hrm.work_schedule_entry.read') && <><h3 className="u-legacy-2bdf8e45fd">{uiText("Ngoại lệ trong tháng")} {scheduleForm.work_date.slice(0, 7)}</h3>{scheduleEntriesThisMonth.length ? <div className="table-wrap"><table className="table"><thead><tr><th>{uiText("Ngày")}</th><th>{uiText("Nhân viên")}</th><th>{uiText("Lịch áp dụng")}</th><th scope="col">{uiText("Thao tác")}</th></tr></thead><tbody>{scheduleEntriesThisMonth.map((row) => <tr key={row.id}><td>{fmtDate(row.work_date)}</td><td>{employeeMap.get(row.employee) ? recordLabel('hrm.employee', employeeMap.get(row.employee)) : uiText('Nhân viên')}</td><td>{row.is_working ? `${fmtTime(row.start_at)}–${fmtTime(row.end_at)} · ${uiText('nghỉ')} ${row.break_minutes || 0} ${uiText('phút')}` : uiText('Ngày nghỉ')}</td><td>{can('hrm.work_schedule_entry.delete') && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => removeScheduleEntry(row)}>{uiText("Xóa ngoại lệ")}</button>}</td></tr>)}</tbody></table></div> : <p className="small muted">{uiText("Chưa có ngoại lệ lịch trong tháng này.")}</p>}</>}</section>}
     {can('hrm.employee.create') && <section className="card card-pad u-legacy-92c18f6bda" ><h2>{uiText("Tiếp nhận nhân viên")}</h2><form onSubmit={createEmployee}><div className="form-grid"><label className="field"><span className="label">{uiText("Họ và tên *")}</span><input className="input" required value={employeeForm.name} onChange={(event) => setEmployeeForm({ ...employeeForm, name: event.target.value })}/></label><label className="field"><span className="label">{uiText("Mã nhân viên")}</span><input className="input" value={employeeForm.code} onChange={(event) => setEmployeeForm({ ...employeeForm, code: event.target.value })}/></label><label className="field"><span className="label">Email</span><input className="input" type="email" value={employeeForm.email} onChange={(event) => setEmployeeForm({ ...employeeForm, email: event.target.value })}/></label><label className="field"><span className="label">{uiText("Điện thoại")}</span><input className="input" type="tel" value={employeeForm.phone} onChange={(event) => setEmployeeForm({ ...employeeForm, phone: event.target.value })}/></label><label className="field"><span className="label">{uiText("Phòng ban")}</span><select className="select" value={employeeForm.department} onChange={(event) => setEmployeeForm({ ...employeeForm, department: event.target.value })}><option value="">{uiText("Chọn phòng ban")}</option>{[...departments.values()].map((row) => <option key={row.id} value={row.id}>{recordLabel('hrm.department', row)}</option>)}</select></label><label className="field"><span className="label">{uiText("Chức danh")}</span><select className="select" value={employeeForm.position} onChange={(event) => setEmployeeForm({ ...employeeForm, position: event.target.value })}><option value="">{uiText("Chọn chức danh")}</option>{[...positions.values()].map((row) => <option key={row.id} value={row.id}>{recordLabel('hrm.position', row)}</option>)}</select></label><label className="field"><span className="label">{uiText("Ngày vào làm")}</span><input className="input" type="date" value={employeeForm.hire_date} onChange={(event) => setEmployeeForm({ ...employeeForm, hire_date: event.target.value })}/></label><label className="field"><span className="label">{uiText("Lương cơ bản ban đầu")}</span><input className="input num" type="number" min="0" step="any" value={employeeForm.base_salary} onChange={(event) => setEmployeeForm({ ...employeeForm, base_salary: event.target.value })}/></label></div><div className="field u-legacy-75be3216d0" ><label className="row small"><input type="checkbox" checked={employeeForm.customSchedule} onChange={(event) => setEmployeeForm({ ...employeeForm, customSchedule: event.target.checked })}/>{uiText("Lịch tuần và giờ chuẩn riêng cho nhân viên")}</label>{employeeForm.customSchedule && <div className="form-grid u-legacy-43a97fe494" ><label className="field"><span className="label">{uiText("Giờ chuẩn mỗi ngày")}</span><input className="input num" type="number" min="1" max="24" step="0.25" value={employeeForm.standard_hours_per_day} onChange={(event) => setEmployeeForm({ ...employeeForm, standard_hours_per_day: event.target.value })}/></label><fieldset className="field u-legacy-d865c2ed50" ><legend className="label">{uiText("Ngày làm việc")}</legend><div className="row wrap u-legacy-297096a428" >{weekdayOptions.map(([day, label]) => <label className="row small u-legacy-0d6046eefe" key={day} ><input type="checkbox" checked={employeeForm.work_weekdays.includes(day)} onChange={() => setEmployeeForm((current) => ({ ...current, work_weekdays: current.work_weekdays.includes(day) ? current.work_weekdays.filter((value) => value !== day) : [...current.work_weekdays, day].sort((a, b) => a - b) }))}/>{label}</label>)}</div></fieldset><span className="small muted u-legacy-75be3216d0" >{uiText("Nếu không bật, nhân viên dùng lịch làm việc và giờ chuẩn của kỳ lương.")}</span></div>}</div><div className="row u-legacy-0ee7f66ad9" ><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || (employeeForm.customSchedule && !employeeForm.work_weekdays.length)}>{uiText("Tạo hồ sơ")}</button></div></form></section>}
-
     {can('hrm.employee.read') && employees.some((row) => Array.isArray(row.work_weekdays) || row.standard_hours_per_day) && <section className="card card-pad u-legacy-92c18f6bda" ><h2>{uiText("Lịch tuần riêng")}</h2><div className="table-wrap"><table className="table"><thead><tr><th>{uiText("Nhân viên")}</th><th>{uiText("Ngày làm việc")}</th><th>{uiText("Giờ chuẩn mỗi ngày")}</th></tr></thead><tbody>{employees.filter((row) => Array.isArray(row.work_weekdays) || row.standard_hours_per_day).map((row) => <tr key={row.id}><td>{recordLabel('hrm.employee', row)}</td><td>{Array.isArray(row.work_weekdays) ? row.work_weekdays.map((day) => weekdayOptions.find(([number]) => number === Number(day))?.[1]).filter(Boolean).join(', ') : uiText('Theo lịch kỳ lương')}</td><td>{row.standard_hours_per_day || uiText('Theo lịch kỳ lương')}</td></tr>)}</tbody></table></div><p className="small muted u-legacy-df928149c5" >{uiText("Lịch tuần là mặc định; các ca và ngày nghỉ cụ thể ghi ở phần Lịch ca theo ngày phía trên sẽ được ưu tiên.")}</p></section>}
-
     <div className="layout-split u-legacy-92c18f6bda" >
       {can('hrm.leave_request.create') && <section className="card card-pad"><h2>{uiText("Gửi yêu cầu nghỉ phép")}</h2><form onSubmit={createLeave}><label className="field"><span className="label">{uiText("Nhân viên *")}</span><select className="select" required value={leaveForm.employee} onChange={(event) => setLeaveForm({ ...leaveForm, employee: event.target.value })}><option value="">{uiText("Chọn nhân viên")}</option>{activeEmployees.map((row) => <option key={row.id} value={row.id}>{recordLabel('hrm.employee', row)}</option>)}</select></label><div className="form-grid u-legacy-df928149c5" ><label className="field"><span className="label">{uiText("Loại nghỉ")}</span><select className="select" value={leaveForm.kind} onChange={(event) => setLeaveForm({ ...leaveForm, kind: event.target.value, pay_treatment: event.target.value === 'unpaid' ? 'unpaid' : 'paid' })}><option value="annual">{uiText("Phép năm")}</option><option value="sick">{uiText("Nghỉ ốm")}</option><option value="unpaid">{uiText("Không lương")}</option><option value="maternity">{uiText("Thai sản")}</option><option value="other">{uiText("Khác")}</option></select></label><label className="field"><span className="label">{uiText("Hưởng lương")}</span><select className="select" value={leaveForm.pay_treatment} onChange={(event) => setLeaveForm({ ...leaveForm, pay_treatment: event.target.value })}><option value="paid">{uiText("Có lương")}</option><option value="unpaid">{uiText("Không lương")}</option></select></label><label className="field"><span className="label">{uiText("Từ ngày *")}</span><input className="input" required type="date" value={leaveForm.start_date} onChange={(event) => setLeaveForm({ ...leaveForm, start_date: event.target.value, end_date: leaveForm.partial_day !== 'full' || (leaveForm.end_date && leaveForm.end_date < event.target.value) ? event.target.value : leaveForm.end_date })}/></label><label className="field"><span className="label">{uiText("Đến ngày *")}</span><input className="input" required min={leaveForm.start_date || undefined} type="date" value={leaveForm.end_date} onChange={(event) => setLeaveForm({ ...leaveForm, end_date: event.target.value })}/></label><label className="field"><span className="label">{uiText("Buổi nghỉ")}</span><select className="select" value={leaveForm.partial_day} onChange={(event) => setLeaveForm({ ...leaveForm, partial_day: event.target.value, end_date: event.target.value === 'full' ? leaveForm.end_date : leaveForm.start_date || leaveForm.end_date })}><option value="full">{uiText("Cả ngày")}</option><option value="morning">{uiText("Buổi sáng")}</option><option value="afternoon">{uiText("Buổi chiều")}</option></select></label></div><label className="field u-legacy-df928149c5" ><span className="label">{uiText("Lý do")}</span><textarea className="input" rows="2" value={leaveForm.reason} onChange={(event) => setLeaveForm({ ...leaveForm, reason: event.target.value })}/></label><button className="btn btn-primary u-legacy-df928149c5"  disabled={Boolean(busy) || !activeEmployees.length}>{uiText("Gửi duyệt")}</button></form></section>}
-
       {can('hrm.salary_revision.create') && <section className="card card-pad"><h2>{uiText("Đề nghị điều chỉnh lương")}</h2><form onSubmit={createRevision}><label className="field"><span className="label">{uiText("Nhân viên *")}</span><select className="select" required value={revisionForm.employee} onChange={(event) => setRevisionForm({ ...revisionForm, employee: event.target.value })}><option value="">{uiText("Chọn nhân viên")}</option>{activeEmployees.map((row) => <option key={row.id} value={row.id}>{recordLabel('hrm.employee', row)}</option>)}</select></label><div className="form-grid u-legacy-df928149c5" ><label className="field"><span className="label">{uiText("Ngày hiệu lực *")}</span><input className="input" required type="date" value={revisionForm.effective_from} onChange={(event) => setRevisionForm({ ...revisionForm, effective_from: event.target.value })}/></label><label className="field"><span className="label">{uiText("Lương cơ bản mới *")}</span><input className="input num" required type="number" min="0.01" step="any" value={revisionForm.base_salary} onChange={(event) => setRevisionForm({ ...revisionForm, base_salary: event.target.value })}/></label></div><label className="field u-legacy-df928149c5" ><span className="label">{uiText("Lý do *")}</span><textarea className="input" required rows="2" value={revisionForm.reason} onChange={(event) => setRevisionForm({ ...revisionForm, reason: event.target.value })}/></label><button className="btn btn-primary u-legacy-df928149c5"  disabled={Boolean(busy)}>{uiText("Gửi duyệt điều chỉnh")}</button></form></section>}
     </div>
-
     <div className="layout-split u-legacy-92c18f6bda" >
       <section className="card card-pad"><h2>{uiText("Đơn nghỉ phép cần xử lý")}</h2>{loading ? <div className="skeleton" data-h="row"/> : !leaveRequests.length ? <div className="empty">{uiText("Chưa có đơn nghỉ phép.")}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{uiText("Nhân viên / loại nghỉ")}</th><th>{uiText("Thời gian")}</th><th>{uiText("Hưởng lương")}</th><th>{uiText("Trạng thái")}</th><th scope="col">{uiText("Thao tác")}</th></tr></thead><tbody>{leaveRequests.slice(0, 100).map((row) => { const req = approvalFor('hrm.leave_request', row.id); return <tr key={row.id}><td><strong>{employeeMap.get(row.employee)?.name || uiText('Nhân viên')}</strong><div className="small muted">{statusLabel(row.kind)}{row.partial_day !== 'full' ? ` · ${statusLabel(row.partial_day)}` : ''}</div></td><td>{fmtDate(row.start_date)} – {fmtDate(row.end_date)}</td><td>{statusLabel(row.pay_treatment)}</td><td>{statusLabel(row.status)}{row.status === 'submitted' && workflowApproval && req && <div className="small"><a href={`#/e/workflow-approval/approval_request/${req.id}`}>{uiText("Mở yêu cầu duyệt")}</a></div>}</td><td>{row.status === 'submitted' && !workflowApproval && can('hrm.leave_request.approved') && <div className="row wrap"><button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => leaveDecision(row, 'approved')}>{uiText("Duyệt")}</button><button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => leaveDecision(row, 'rejected')}>{uiText("Từ chối")}</button></div>}{['draft','rejected'].includes(row.status) && can('hrm.leave_request.submitted') && <div className="row wrap"><a className="small" href={recordHref('hrm.leave_request', row.id)}>{uiText('M\u1edf / s\u1eeda')}</a><button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => run(`${row.id}:submitted`, () => action('hrm.leave_request', row, 'submitted'), uiText('\u0110\u00e3 g\u1eedi l\u1ea1i \u0111\u01a1n ngh\u1ec9 ph\u00e9p.'))}>{uiText('G\u1eedi l\u1ea1i')}</button></div>}</td></tr>; })}</tbody></table></div>}</section>
       <section className="card card-pad"><h2>{uiText("Hồ sơ nhân viên")}</h2>{loading ? <div className="skeleton" data-h="row"/> : !employees.length ? <div className="empty">{uiText("Chưa có hồ sơ nhân viên.")}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{uiText("Nhân viên / chức danh")}</th><th>{uiText("Ngày vào")}</th><th>{uiText("Trạng thái")}</th><th scope="col">{uiText("Thao tác")}</th></tr></thead><tbody>{employees.slice(0, 150).map((row) => <tr key={row.id}><td><strong>{recordLabel('hrm.employee', row)}</strong><div className="small muted">{departments.get(row.department)?.name || uiText('Chưa phân phòng ban')}{positions.get(row.position)?.name ? ` · ${positions.get(row.position).name}` : ''}</div></td><td>{fmtDate(row.hire_date)}</td><td>{statusLabel(row.status)}</td><td>{row.status === 'active' && can('hrm.employee.update') && can('hrm.employee.terminated') && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => terminateEmployee(row)}>{uiText("Kết thúc")}</button>}</td></tr>)}</tbody></table></div>}</section>
     </div>
-
     <section className="card card-pad u-legacy-92c18f6bda" ><h2>{uiText("Điều chỉnh lương theo hiệu lực")}</h2>{!salaryRevisions.length ? <div className="empty">{uiText("Chưa có đề nghị điều chỉnh lương.")}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{uiText("Nhân viên / lý do")}</th><th>{uiText("Hiệu lực")}</th><th>{uiText("Mức mới")}</th><th>{uiText("Trạng thái")}</th><th scope="col">{uiText("Thao tác")}</th></tr></thead><tbody>{salaryRevisions.slice(0, 100).map((row) => <tr key={row.id}><td><strong>{employeeMap.get(row.employee)?.name || uiText('Nhân viên')}</strong><div className="small muted">{row.reason}</div></td><td>{fmtDate(row.effective_from)}</td><td>{fmtMoney(row.base_salary || 0)}</td><td>{statusLabel(row.status)}</td><td>{row.status === 'submitted' && can('hrm.salary_revision.approved') && <div className="row wrap"><button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => revisionDecision(row, 'approved')}>{uiText("Duyệt")}</button><button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => revisionDecision(row, 'rejected')}>{uiText("Từ chối")}</button></div>}{['draft','rejected'].includes(row.status) && can('hrm.salary_revision.submitted') && <div className="row wrap"><a className="small" href={recordHref('hrm.salary_revision', row.id)}>{uiText('M\u1edf / s\u1eeda')}</a><button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => run(`${row.id}:submitted`, () => action('hrm.salary_revision', row, 'submitted'), uiText('\u0110\u00e3 g\u1eedi l\u1ea1i \u0111\u1ec1 ngh\u1ecb \u0111i\u1ec1u ch\u1ec9nh.'))}>{uiText('G\u1eedi l\u1ea1i')}</button></div>}</td></tr>)}</tbody></table></div>}</section>
-
     {linkList.length > 0 && <section className="card card-pad u-legacy-92c18f6bda" ><h2>{uiText("Danh mục nhân sự và lương")}</h2><div className="row wrap">{linkList.map(([, entity, label]) => <a className="btn btn-secondary btn-sm" key={entity} href={listHref(entity)}>{uiText(label)}</a>)}</div><p className="small muted u-legacy-df928149c5" >{allocations.length} {uiText("bản ghi hạn mức nghỉ đang được cấu hình. Hạn mức, ngày lễ, nghỉ trùng và hiệu lực kỳ lương được kiểm tra trên máy chủ.")}</p></section>}
   </div>;
 }

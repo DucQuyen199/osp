@@ -1,18 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
 import performanceEnglish from './performance.en.js';
 import KeyResultProgressCard from './components/KeyResultProgressCard.jsx';
-
 const emptyObjective = { title: '', owner: '', period: '' };
 const emptyKeyResult = { title: '', target: '', unit: '' };
 const emptyReview = { employee: '', reviewer: '', period: '', score: '', comment: '' };
 const rows = (response) => Array.isArray(response?.items) ? response.items : [];
 const t = (text) => uiTextWith(text, performanceEnglish);
-
 export default function PerformanceWorkbenchPage() {
+  useDocumentTitle(t('Mục tiêu và đánh giá hiệu suất · OSP Suite'));
   const [objectives, setObjectives] = useState([]);
   const [keyResults, setKeyResults] = useState([]);
   const [reviews, setReviews] = useState([]);
@@ -30,7 +30,6 @@ export default function PerformanceWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -50,9 +49,7 @@ export default function PerformanceWorkbenchPage() {
     } catch (reason) { setError(reason.message || t('Không tải được dữ liệu đánh giá hiệu suất.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = t('Mục tiêu và đánh giá hiệu suất · OSP Suite'); load(); }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   const selectedObjective = objectives.find((row) => row.id === selectedObjectiveId);
   const objectiveResults = useMemo(() => keyResults.filter((row) => row.objective === selectedObjectiveId), [keyResults, selectedObjectiveId]);
   const selectedReview = reviews.find((row) => row.id === selectedReviewId);
@@ -61,23 +58,19 @@ export default function PerformanceWorkbenchPage() {
     const employee = employees.get(id);
     return employee ? recordLabel('hrm.employee', employee) : (id ? `#${String(id).slice(0, 8)}` : t('Chưa phân công'));
   };
-
   useEffect(() => {
     if (!visibleReviews.some((row) => row.id === selectedReviewId)) setSelectedReviewId(visibleReviews[0]?.id || '');
   }, [reviewFilter, reviews, selectedReviewId]);
-
   useEffect(() => {
     setReviewEdit({ period: selectedReview?.period || '', reviewer: selectedReview?.reviewer || '', score: selectedReview?.score ?? '', comment: selectedReview?.comment || '' });
     setRevisionNote('');
   }, [selectedReviewId]);
-
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); await load(true); if (success) setNotice(success); }
     catch (reason) { setError(reason.message || t('Thao tác không thành công.')); await load(true); }
     finally { setBusy(''); }
   }
-
   async function createObjective(event) {
     event.preventDefault();
     await run('objective:create', async () => {
@@ -88,7 +81,6 @@ export default function PerformanceWorkbenchPage() {
       setObjectiveForm((form) => ({ ...emptyObjective, owner: form.owner })); setSelectedObjectiveId(created.id);
     }, t('Đã tạo mục tiêu.'));
   }
-
   async function createKeyResult(event) {
     event.preventDefault(); if (!selectedObjective) return;
     await run('key-result:create', async () => {
@@ -99,13 +91,11 @@ export default function PerformanceWorkbenchPage() {
       setKeyResultForm(emptyKeyResult);
     }, t('Đã thêm kết quả then chốt, tiến độ bắt đầu từ 0.'));
   }
-
   async function updateProgress(event, keyResult) {
     event.preventDefault();
     const value = Number(progress[keyResult.id] ?? keyResult.current ?? 0);
     await run(`${keyResult.id}:progress`, () => api(dataPath('performance.key_result', keyResult.id), { method: 'PATCH', body: { current: value } }), t('Đã cập nhật tiến độ kết quả then chốt.'));
   }
-
   async function createReview(event) {
     event.preventDefault();
     const created = await run('review:create', async () => {
@@ -118,7 +108,6 @@ export default function PerformanceWorkbenchPage() {
     }, t('Đã tạo phiếu đánh giá nháp.'));
     return created;
   }
-
   async function saveReview(event) {
     event.preventDefault(); if (!selectedReview) return;
     await run(`${selectedReview.id}:save`, () => api(dataPath('performance.review', selectedReview.id), { method: 'PATCH', body: {
@@ -126,11 +115,9 @@ export default function PerformanceWorkbenchPage() {
       score: reviewEdit.score === '' ? null : Number(reviewEdit.score), comment: reviewEdit.comment.trim(),
     } }), t('Đã lưu nội dung đánh giá.'));
   }
-
   async function transition(review, action, message) {
     await run(`${review.id}:${action}`, () => api(dataPath('performance.review', review.id, action), { method: 'POST' }), message);
   }
-
   async function submitReview(review) {
     await run(`${review.id}:submitted`, () => api(dataPath('performance.review', review.id, 'submitted'), {
       method: 'POST', body: {
@@ -139,17 +126,14 @@ export default function PerformanceWorkbenchPage() {
       },
     }), t('Đã gửi đánh giá; nội dung được khóa chờ nhân viên xác nhận.'));
   }
-
   async function returnReview(event) {
     event.preventDefault(); if (!selectedReview) return;
     await run(`${selectedReview.id}:returned`, () => api(dataPath('performance.review', selectedReview.id, 'returned'), {
       method: 'POST', body: { revision_note: revisionNote.trim() },
     }), t('Đã trả phiếu đánh giá kèm lý do cần chỉnh sửa.'));
   }
-
   const completedReviews = reviews.filter((row) => row.status === 'acknowledged').length;
   const pendingReviews = reviews.filter((row) => ['draft', 'returned', 'submitted'].includes(row.status)).length;
-
   return <div className="page">
     <div className="page-head"><div><h1>{t("Mục tiêu và đánh giá hiệu suất")}</h1><p className="sub">{t("Lập mục tiêu theo kỳ, theo dõi kết quả then chốt và quản lý quy trình đánh giá, chỉnh sửa, xác nhận của nhân viên.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t("Làm mới")}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
@@ -159,7 +143,6 @@ export default function PerformanceWorkbenchPage() {
       <div className="card stat"><span className="stat-label">{t("Đánh giá cần xử lý")}</span><strong className="stat-value">{pendingReviews}</strong></div>
       <div className="card stat"><span className="stat-label">{t("Đã xác nhận")}</span><strong className="stat-value">{completedReviews}</strong></div>
     </div>
-
     {(can('performance.objective.read') || can('performance.key_result.read')) && <section className="card card-pad">
       <div className="row wrap"><div><h2>{t("Mục tiêu và kết quả then chốt")}</h2><p className="small muted">{t("Theo dõi tiến độ định lượng cho từng mục tiêu và người phụ trách.")}</p></div><span className="grow"/>
         {can('performance.objective.create') && <form className="row wrap" onSubmit={createObjective}><input className="input" aria-label={t('Tên mục tiêu')} required maxLength="240" placeholder={t('Tên mục tiêu')} value={objectiveForm.title} onChange={(event) => setObjectiveForm((form) => ({ ...form, title: event.target.value }))} /><select className="select" aria-label={t('Người phụ trách mục tiêu')} value={objectiveForm.owner} onChange={(event) => setObjectiveForm((form) => ({ ...form, owner: event.target.value }))}><option value="">{t("Chưa phân công")}</option>{[...employees.values()].map((employee) => <option key={employee.id} value={employee.id}>{recordLabel('hrm.employee', employee)}</option>)}</select><input className="input" aria-label={t('Kỳ mục tiêu')} maxLength="80" placeholder={t('Kỳ, ví dụ 2026-Q4')} value={objectiveForm.period} onChange={(event) => setObjectiveForm((form) => ({ ...form, period: event.target.value }))} /><button className="btn btn-primary" disabled={Boolean(busy)}>{t("Tạo mục tiêu")}</button></form>}
@@ -177,7 +160,6 @@ export default function PerformanceWorkbenchPage() {
         </section>}
       </div>}
     </section>}
-
     {(can('performance.review.read') || can('performance.review.create')) && <section className="card card-pad u-legacy-92c18f6bda" >
       <div className="row wrap"><div><h2>{t("Đánh giá nhân viên")}</h2><p className="small muted">{t("Nháp → gửi đánh giá → yêu cầu chỉnh sửa hoặc xác nhận đã đọc. Phiếu đã xác nhận được lưu trong lịch sử.")}</p></div><span className="grow"/>
         <div className="tabs" role="tablist" aria-label={t('Lọc phiếu đánh giá')}>{[['all','Tất cả'],['draft','Nháp'],['submitted','Chờ xác nhận'],['returned','Cần chỉnh sửa'],['acknowledged','Đã xác nhận']].map(([value,label]) => <button key={value} className="tab" type="button" role="tab" aria-selected={reviewFilter === value} onClick={() => setReviewFilter(value)}>{t(label)}</button>)}</div>

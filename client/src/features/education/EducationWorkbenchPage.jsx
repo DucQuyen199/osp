@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate as formatLocalDate, localDateTime as businessDateTime, localDateTimeToIso } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
@@ -8,14 +9,12 @@ import AttendanceRosterTable from './components/AttendanceRosterTable.jsx';
 import StudentIntakeForm from './components/StudentIntakeForm.jsx';
 import TuitionLedgerTable from './components/TuitionLedgerTable.jsx';
 import GradebookSection from './components/GradebookSection.jsx';
-
 const t = (text) => uiTextWith(text, educationEnglish);
-
 const localDate = formatLocalDate;
 const attendanceLabels = { present: t("Có mặt"), absent: t("Vắng"), late: t("Đi muộn"), excused: t("Có phép") };
 const sessionDate = () => businessDateTime(new Date(Date.now() + 60 * 60 * 1000));
-
 export default function EducationWorkbenchPage() {
+  useDocumentTitle(t("Lịch lớp và điểm danh · OSP Suite"));
   const [classes, setClasses] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
   const [students, setStudents] = useState(new Map());
@@ -43,7 +42,6 @@ export default function EducationWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
@@ -76,8 +74,7 @@ export default function EducationWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không tải được dữ liệu lớp học.")); }
     finally { setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = t("Lịch lớp và điểm danh · OSP Suite"); load(); }, [load]);
+  useEffect(() => { load(); }, [load]);
   const selected = sessions.find((session) => session.id === selectedId);
   const selectedClass = classes.find((item) => item.id === selected?.class);
   const roster = useMemo(() => enrollments.filter((item) => item.class === selected?.class && item.status === 'active')
@@ -101,7 +98,6 @@ export default function EducationWorkbenchPage() {
     .sort((a, b) => studentName(a.student, parties).localeCompare(studentName(b.student, parties), 'vi')), [enrollments, enrollmentClass, parties, students]);
   const activeEnrollmentStudents = new Set(enrollments.filter((item) => item.class === enrollmentForm.class && item.status === 'active').map((item) => item.student));
   const eligibleEnrollmentStudents = [...students.values()].filter((item) => !activeEnrollmentStudents.has(item.id));
-
   async function createFee(event) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
@@ -117,7 +113,6 @@ export default function EducationWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không thể tạo khoản học phí.")); }
     finally { setBusy(false); }
   }
-
   async function createTuitionBatch(event) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
@@ -127,7 +122,6 @@ export default function EducationWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không thể tạo đợt học phí.")); }
     finally { setBusy(false); }
   }
-
   async function generateTuitionBatch(batch) {
     setBusy(batch.id); setError(''); setNotice('');
     try {
@@ -136,7 +130,6 @@ export default function EducationWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không thể chạy đợt học phí.")); await load(); }
     finally { setBusy(false); }
   }
-
   async function createClass(event) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
@@ -154,7 +147,6 @@ export default function EducationWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không thể tạo lớp học.")); }
     finally { setBusy(false); }
   }
-
   async function createStudent(event) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
@@ -179,7 +171,6 @@ export default function EducationWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không thể tạo hồ sơ học viên.")); }
     finally { setBusy(false); }
   }
-
   async function issueFee(fee) {
     setBusy(fee.id); setError(''); setNotice('');
     try {
@@ -188,7 +179,6 @@ export default function EducationWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không thể phát hành học phí.")); await load(); }
     finally { setBusy(false); }
   }
-
   async function createSession(event) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
@@ -200,7 +190,6 @@ export default function EducationWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không thể lên lịch buổi học.")); }
     finally { setBusy(false); }
   }
-
   async function createEnrollment(event) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
@@ -210,7 +199,6 @@ export default function EducationWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Could not enroll this student.")); }
     finally { setBusy(false); }
   }
-
   async function changeEnrollment(enrollment, action) {
     setBusy(enrollment.id); setError(''); setNotice('');
     try {
@@ -219,7 +207,6 @@ export default function EducationWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Could not update this enrollment.")); }
     finally { setBusy(false); }
   }
-
   async function saveMark(enrollmentId, status) {
     setBusy(true); setError(''); setNotice('');
     try {
@@ -230,7 +217,6 @@ export default function EducationWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không thể lưu điểm danh.")); }
     finally { setBusy(false); }
   }
-
   async function saveGrade(enrollmentId, score) {
     const term = gradeTerm.trim(); const subject = gradeSubject.trim(); const numericScore = Number(score);
     if (!term || !subject || score === '' || !Number.isFinite(numericScore) || numericScore < 0 || numericScore > 100) {
@@ -246,7 +232,6 @@ export default function EducationWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không thể lưu điểm học viên.")); }
     finally { setBusy(false); }
   }
-
   async function transition(session, action) {
     setBusy(true); setError(''); setNotice('');
     try {
@@ -255,7 +240,6 @@ export default function EducationWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không thể cập nhật buổi học.")); }
     finally { setBusy(false); }
   }
-
   return <div className="page">
     <div className="page-head"><div><h1>{t("Lịch lớp và điểm danh")}</h1><p className="sub">{t("Lên lịch buổi học, ghi nhận từng học viên và chốt danh sách sau khi buổi học kết thúc.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={load}>{t("Làm mới")}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
@@ -321,7 +305,6 @@ export default function EducationWorkbenchPage() {
     </section>}
   </div>;
 }
-
 function studentName(student, parties) {
   const party = student && parties.get(student.party);
   return party ? recordLabel('master-data.party', party) : student?.student_code || '';

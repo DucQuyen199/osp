@@ -1,12 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localMonth } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import utilitiesEnglish from './utilities.en.js';
-
 const t = (text) => uiTextWith(text, utilitiesEnglish);
-
 const currentPeriod = localMonth;
 const nextPeriod = (period) => {
   const [year, month] = String(period || '').split('-').map(Number);
@@ -30,8 +29,8 @@ const estimateUtilityCharge = (consumption, meter) => {
   }
   return usageAmount + Number(meter?.fixed_charge || 0);
 };
-
 export default function UtilitiesWorkbenchPage() {
+  useDocumentTitle(t("Ghi chỉ số và hóa đơn tiện ích · OSP Suite"));
   const [meters, setMeters] = useState([]);
   const [readings, setReadings] = useState([]);
   const [bills, setBills] = useState([]);
@@ -48,7 +47,6 @@ export default function UtilitiesWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
@@ -66,8 +64,7 @@ export default function UtilitiesWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không tải được dữ liệu công tơ.")); }
     finally { setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = t("Ghi chỉ số và hóa đơn tiện ích · OSP Suite"); load(); }, [load]);
+  useEffect(() => { load(); }, [load]);
   const meter = meters.find((item) => item.id === selectedMeter);
   useEffect(() => {
     setRateDraft(meter?.rate == null ? '' : String(meter.rate));
@@ -85,7 +82,6 @@ export default function UtilitiesWorkbenchPage() {
   const invoiceByBill = new Map(invoices.filter((item) => item.source === 'utility_bill').map((item) => [item.source_id, item]));
   const isPeriodDuplicate = meterReadings.some((item) => item.period === period);
   const isPeriodBackdated = Boolean(latest && period < latest.period);
-
   async function createReading(event) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
@@ -94,7 +90,6 @@ export default function UtilitiesWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không thể ghi chỉ số.")); }
     finally { setBusy(false); }
   }
-
   async function createMeter(event) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
@@ -110,7 +105,6 @@ export default function UtilitiesWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không thể tạo công-tơ/thuê bao.")); }
     finally { setBusy(false); }
   }
-
   async function updateRate(event) {
     event.preventDefault(); if (!meter || rateDraft === '' || fixedChargeDraft === '') return;
     setBusy(true); setError(''); setNotice('');
@@ -123,7 +117,6 @@ export default function UtilitiesWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không thể cập nhật đơn giá.")); }
     finally { setBusy(false); }
   }
-
   async function createBill(reading) {
     setBusy(true); setError(''); setNotice('');
     try {
@@ -132,7 +125,6 @@ export default function UtilitiesWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không thể lập hóa đơn.")); }
     finally { setBusy(false); }
   }
-
   async function transition(bill, action) {
     setBusy(true); setError(''); setNotice('');
     try {
@@ -141,7 +133,6 @@ export default function UtilitiesWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không thể cập nhật hóa đơn.")); }
     finally { setBusy(false); }
   }
-
   return <div className="page">
     <div className="page-head"><div><h1>{t("Ghi chỉ số và hóa đơn tiện ích")}</h1><p className="sub">{t("Ghi lần lượt theo kỳ để giữ chính xác tiêu thụ lũy kế, sau đó phát hành và theo dõi thu tiền qua kế toán.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={load}>{t("Làm mới")}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}

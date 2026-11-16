@@ -1,15 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtDateTime, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadAllResponse } from '../../lib/state.js';
 import integrationEnglish from './integration.en.js';
-
 const t = (text) => uiTextWith(text, integrationEnglish);
-
 const items = (value) => Array.isArray(value?.items) ? value.items : [];
 const eventExamples = ['sales.sales_order.confirmed', 'inventory.stock_move.created'];
-
 export default function IntegrationHubPage() {
+  useDocumentTitle(`${t('Cổng tích hợp')} · OSP Suite`);
   const [connectors, setConnectors] = useState([]);
   const [webhooks, setWebhooks] = useState([]);
   const [connectorForm, setConnectorForm] = useState({ name: '', kind: '', config: '{\n  "adapter": "http_event_sink",\n  "url": "https://api.example.com/osp/events",\n  "events": ["sales.*"],\n  "headers": {},\n  "secret": ""\n}' });
@@ -19,7 +18,6 @@ export default function IntegrationHubPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -32,18 +30,14 @@ export default function IntegrationHubPage() {
     } catch (reason) { setError(t(reason.message || 'Không tải được cấu hình tích hợp.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = `${t('Cổng tích hợp')} · OSP Suite`; load(); }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   const availableEvents = app.meta?.events || [];
-
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); await load(true); setNotice(t(success)); }
     catch (reason) { setError(t(reason.message || 'Thao tác không thành công.')); }
     finally { setBusy(''); }
   }
-
   async function createConnector(event) {
     event.preventDefault();
     let config;
@@ -55,7 +49,6 @@ export default function IntegrationHubPage() {
       setConnectorForm({ name: '', kind: '', config: '{\n  "adapter": "http_event_sink",\n  "url": "https://api.example.com/osp/events",\n  "events": ["sales.*"],\n  "headers": {},\n  "secret": ""\n}' });
     }, 'Đã thêm connector.');
   }
-
   async function createWebhook(event) {
     event.preventDefault();
     const events = webhookForm.events.split(/[\n,;]/).map((value) => value.trim()).filter(Boolean);
@@ -68,7 +61,6 @@ export default function IntegrationHubPage() {
       setWebhookForm({ url: '', events: '', secret: '' });
     }, 'Đã tạo webhook. Bí mật ký chỉ được nhập lúc tạo và không hiển thị trong danh sách.');
   }
-
   function addCatalogEvent() {
     const eventType = eventSearch.trim();
     if (!eventType || !availableEvents.includes(eventType)) return;
@@ -77,12 +69,10 @@ export default function IntegrationHubPage() {
     setWebhookForm((current) => ({ ...current, events: selected.join('\n') }));
     setEventSearch('');
   }
-
   async function toggle(entity, row, field) {
     const next = !(row[field] === true);
     await run(`${row.id}:${field}`, () => api(dataPath(entity, row.id), { method: 'PATCH', body: { [field]: next } }), next ? 'Đã bật cấu hình.' : 'Đã tạm ngưng cấu hình.');
   }
-
   return <div className="page">
     <div className="page-head"><div><h1>{t('Cổng tích hợp')}</h1><p className="sub">{t('Quản lý connector và webhook để kết nối OSP với dịch vụ bên ngoài. Giao nhận webhook được theo dõi riêng trong Cài đặt → Outbox.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
@@ -101,9 +91,7 @@ export default function IntegrationHubPage() {
         <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy)}>{t('Tạo webhook')}</button></div>
       </form></section>}
     </div>}
-
     {can('integration-hub.connector.read') && <section className="card card-pad"><h2>{t('Connectors')}</h2>{loading ? <div className="skeleton" data-h="row"/> : !connectors.length ? <div className="empty">{t('Chưa có connector.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Tên')}</th><th>{t('Loại')}</th><th>{t('Trạng thái')}</th><th>{t('Cập nhật')}</th><th><span className="sr-only">{t('Thao tác')}</span></th></tr></thead><tbody>{connectors.map((row) => { const runnable = row.config?.adapter === 'http_event_sink'; const enabled = row.enabled && runnable; return <tr key={row.id}><td><strong>{row.name}</strong></td><td><span className="chip neutral">{row.kind}</span></td><td><span className={`badge ${enabled ? 'success' : row.enabled ? 'warning' : 'plain'}`}>{t(enabled ? 'Đang gửi' : row.enabled ? 'Thiếu adapter' : 'Đã tắt')}</span></td><td>{fmtDateTime(row.updatedAt || row.createdAt)}</td><td className="right">{can('tenant.admin') && runnable && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => run(`${row.id}:test`, () => api(tenantPath(`/connectors/${row.id}/test`), { method: 'POST', body: {} }), 'Đã kết nối thử thành công.')}>{t('Gửi thử')}</button>} {can('integration-hub.connector.update') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => toggle('integration-hub.connector', row, 'enabled')}>{t(row.enabled ? 'Tạm ngưng' : 'Bật lại')}</button>}</td></tr>; })}</tbody></table></div>}</section>}
-
     {can('integration-hub.webhook.read') && <section className="card card-pad"><h2>{t('Webhook gửi sự kiện')}</h2>{loading ? <div className="skeleton" data-h="row"/> : !webhooks.length ? <div className="empty">{t('Chưa đăng ký webhook.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Endpoint')}</th><th>{t('Sự kiện')}</th><th>{t('Trạng thái')}</th><th>{t('Cập nhật')}</th><th><span className="sr-only">{t('Thao tác')}</span></th></tr></thead><tbody>{webhooks.map((row) => <tr key={row.id}><td className="mono small">{row.url}</td><td>{Array.isArray(row.events) ? row.events.join(', ') : t('Chưa chọn sự kiện')}</td><td><span className={`badge ${row.active ? 'success' : 'plain'}`}>{t(row.active ? 'Đang gửi' : 'Đã tắt')}</span></td><td>{fmtDateTime(row.updatedAt || row.createdAt)}</td><td className="right">{can('tenant.admin') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => run(`${row.id}:test`, () => api(tenantPath(`/webhooks/${row.id}/test`), { method: 'POST', body: {} }), 'Đã gửi thử thành công.')}>{t('Gửi thử')}</button>} {can('integration-hub.webhook.update') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => toggle('integration-hub.webhook', row, 'active')}>{t(row.active ? 'Tạm ngưng' : 'Bật lại')}</button>}</td></tr>)}</tbody></table></div>}</section>}
     <p className="small muted">{t('Ví dụ sự kiện:')} {eventExamples.join(' · ')}. {t('Theo dõi và thử lại lần gửi tới webhook hoặc connector trong')} <a href="#/settings/outbox">{t('Outbox tích hợp')}</a>. {can('tenant.admin') && <>{t('Tạo token tích hợp giới hạn quyền tại')} <a href="#/settings/tokens">{t('Cài đặt API token')}</a>.</>}</p>
   </div>;

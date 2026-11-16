@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { can, loadRefs, recordLabel, app, loadAllResponse } from '../../lib/state.js';
 import { listHref, recordHref } from '../../lib/routes.js';
-
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
-
 export default function ExpenseWorkbenchPage() {
+  useDocumentTitle(`${uiText('Chi phí và hoàn ứng nhân viên')} · OSP Suite`);
   const [claims, setClaims] = useState([]);
   const [employees, setEmployees] = useState(new Map());
   const [accounts, setAccounts] = useState([]);
@@ -22,7 +22,6 @@ export default function ExpenseWorkbenchPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const workflowApproval = app.meta?.modules?.some((module) => module.id === 'workflow-approval') || false;
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -42,19 +41,16 @@ export default function ExpenseWorkbenchPage() {
     } catch (reason) { setError(reason.message || uiText('Không tải được đề nghị chi phí.')); }
     finally { if (!quiet) setLoading(false); }
   }, [workflowApproval]);
-
-  useEffect(() => { document.title = `${uiText('Chi phí và hoàn ứng nhân viên')} · OSP Suite`; load(); }, [load]);
+  useEffect(() => { load(); }, [load]);
   const selected = claims.find((row) => row.id === selectedId);
   const stats = useMemo(() => ({ draft: claims.filter((row) => ['draft', 'rejected'].includes(row.status)).length, pending: claims.filter((row) => row.status === 'submitted').length, approved: claims.filter((row) => row.status === 'approved').length, paid: claims.filter((row) => row.status === 'paid').length }), [claims]);
   const total = lines.reduce((sum, line) => sum + (Number(line.amount) || 0), 0);
-
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); setNotice(success); await load(true); }
     catch (reason) { setError(reason.message || uiText('Thao tác không thành công.')); await load(true); }
     finally { setBusy(''); }
   }
-
   async function createClaim(event) {
     event.preventDefault();
     const claimItems = lines.filter((line) => line.account_code && Number(line.amount) > 0).map((line) => ({ description: line.description.trim() || undefined, amount: Number(line.amount), account_code: line.account_code }));
@@ -65,28 +61,23 @@ export default function ExpenseWorkbenchPage() {
       setForm((current) => ({ ...current, payment_date: '', note: '' })); setLines([{ description: '', amount: '', account_code: accounts[0]?.code || '' }]);
     }, uiText('Đã gửi đề nghị chi. Tổng tiền được tính từ các khoản chi; tài khoản và nhân viên được kiểm tra trước khi phê duyệt.'));
   }
-
   async function claimAction(row, verb) {
     const messages = { submitted: 'Đã gửi lại đề nghị chi.', approved: 'Đã duyệt; kế toán đã ghi bút toán chi phí và công nợ nhân viên.', rejected: 'Đã từ chối đề nghị chi.', paid: 'Đã ghi nhận hoàn ứng/thanh toán và tạo payment kế toán.' };
     await run(`${row.id}:${verb}`, () => action('expense.expense_claim', row, verb), uiText(messages[verb]));
   }
-
   const requestFor = (row) => approvalRequests.find((request) => request.entity === 'expense.expense_claim' && request.record_id === row.id);
   const paymentFor = (row) => payments.find((payment) => payment.source === 'expense_claim' && payment.source_id === row.id);
   const updateLine = (index, field, value) => setLines((current) => current.map((line, i) => i === index ? { ...line, [field]: value } : line));
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText("Chi phí và hoàn ứng nhân viên")}</h1><p className="sub">{uiText("Lập khoản chi theo tài khoản kế toán, gửi duyệt, ghi nhận chi phí và xác nhận thanh toán.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{uiText("Làm mới")}</button></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
     <div className="stats u-legacy-bf4a218e05" ><div className="card stat"><span className="stat-label">{uiText("Nháp / bị từ chối")}</span><strong className="stat-value">{stats.draft}</strong></div><div className="card stat"><span className="stat-label">{uiText("Chờ phê duyệt")}</span><strong className="stat-value">{stats.pending}</strong></div><div className="card stat"><span className="stat-label">{uiText("Đã duyệt / chờ chi")}</span><strong className="stat-value">{stats.approved}</strong></div><div className="card stat"><span className="stat-label">{uiText("Đã thanh toán")}</span><strong className="stat-value">{stats.paid}</strong></div></div>
-
     {can('expense.expense_claim.create') && <section className="card card-pad"><h2>{uiText("Lập đề nghị chi phí")}</h2><form onSubmit={createClaim}><div className="form-grid"><label className="field"><span className="label">{uiText("Nhân viên *")}</span><select className="select" required value={form.employee} onChange={(event) => setForm({ ...form, employee: event.target.value })}><option value="">{uiText("Chọn nhân viên")}</option>{[...employees.values()].filter((row) => row.status === 'active').map((row) => <option key={row.id} value={row.id}>{recordLabel('hrm.employee', row)}</option>)}</select></label><label className="field"><span className="label">{uiText("Ngày dự kiến thanh toán *")}</span><input className="input" required type="date" value={form.payment_date} onChange={(event) => setForm({ ...form, payment_date: event.target.value })}/></label><label className="field"><span className="label">{uiText("Phương thức chi *")}</span><select className="select" required value={form.payment_method} onChange={(event) => setForm({ ...form, payment_method: event.target.value })}><option value="bank">{uiText("Chuyển khoản")}</option><option value="cash">{uiText("Tiền mặt")}</option></select></label></div>
       <div className="row wrap u-legacy-0ee7f66ad9" ><strong>{uiText("Các khoản chi")}</strong><span className="grow"/><button className="btn btn-secondary btn-sm" type="button" onClick={() => setLines((current) => [...current, { description: '', amount: '', account_code: accounts[0]?.code || '' }])} disabled={!accounts.length}>{uiText("Thêm khoản")}</button></div>
       {lines.map((line, index) => <div className="row wrap u-legacy-43a97fe494" key={index} ><input className="input grow" aria-label={uiText("Nội dung khoản chi")} placeholder={uiText("Nội dung / chứng từ")} value={line.description} onChange={(event) => updateLine(index, 'description', event.target.value)}/><input className="input num u-legacy-ce4214af00" aria-label={uiText("Số tiền khoản chi")} required type="number" min="0.01" step="any" value={line.amount} onChange={(event) => updateLine(index, 'amount', event.target.value)} /><select className="select" aria-label={uiText("Tài khoản chi phí")} required value={line.account_code} onChange={(event) => updateLine(index, 'account_code', event.target.value)}><option value="">{uiText("Chọn tài khoản chi")}</option>{accounts.map((account) => <option key={account.id} value={account.code}>{account.code} · {recordLabel('accounting.account', account)}</option>)}</select>{lines.length > 1 && <button className="btn btn-ghost btn-sm" type="button" onClick={() => setLines((current) => current.filter((_, i) => i !== index))}>{uiText("Bỏ")}</button>}</div>)}
       <label className="field u-legacy-df928149c5" ><span className="label">{uiText("Ghi chú / thông tin chứng từ")}</span><textarea className="input" rows="2" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })}/></label>
       <div className="row wrap u-legacy-df928149c5" ><span className="grow"/><strong>{uiText('Tổng đề nghị: {amount}').replace('{amount}', fmtMoney(total))}</strong><button className="btn btn-primary" disabled={Boolean(busy) || !accounts.length || !employees.size || total <= 0}>{uiText("Gửi duyệt")}</button></div>
     </form></section>}
-
     {loading ? <div className="skeleton" data-h="row"/> : !claims.length ? <div className="card card-pad empty u-legacy-92c18f6bda" >{uiText('Chưa có đề nghị chi phí.')}</div> : <div className="layout-split u-legacy-92c18f6bda" >
       <section className="card card-pad"><h2>{uiText("Đề nghị chi phí")}</h2><div className="table-wrap"><table className="table"><thead><tr><th>{uiText("Nhân viên / ghi chú")}</th><th>{uiText("Ngày chi")}</th><th>{uiText("Tổng")}</th><th>{uiText("Trạng thái")}</th></tr></thead><tbody>{claims.map((row) => <tr {...selectableTableRowProps} key={row.id} aria-selected={selectedId === row.id} className={[selectedId === row.id ? 'selected' : '', 'u-legacy-9463ff4798'].filter(Boolean).join(' ')} onClick={() => setSelectedId(row.id)} ><td><strong>{employees.has(row.employee) ? recordLabel('hrm.employee', employees.get(row.employee)) : uiText('Nhân viên')}</strong><div className="small muted">{row.note || String(row.id).slice(0, 8)}</div></td><td>{fmtDate(row.payment_date)}</td><td>{fmtMoney(row.total || 0)}</td><td>{statusLabel(row.status)}</td></tr>)}</tbody></table></div></section>
       {selected && <section className="card card-pad"><div className="row wrap"><div><h2>{employees.has(selected.employee) ? recordLabel('hrm.employee', employees.get(selected.employee)) : uiText('Đề nghị chi phí')}</h2><div className="small muted">{uiText('Thanh toán {date} · {method} · {amount}').replace('{date}', fmtDate(selected.payment_date)).replace('{method}', uiText(selected.payment_method === 'bank' ? 'Chuyển khoản' : 'Tiền mặt')).replace('{amount}', fmtMoney(selected.total || 0))}</div></div><span className="grow"/><span className="badge warning">{statusLabel(selected.status)}</span></div>

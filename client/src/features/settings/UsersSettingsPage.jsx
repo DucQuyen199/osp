@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { toast } from '../../lib/feedback.js';
 import { uiText } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
 import SettingsTabs from './SettingsTabs.jsx';
-
 const roles = () => Object.entries(app.meta.roles || {});
-
 export default function UsersSettingsPage() {
+  useDocumentTitle(`${uiText('Người dùng')} · ${uiText('Cài đặt')} · OSP Suite`);
   const [users, setUsers] = useState([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
@@ -18,15 +18,12 @@ export default function UsersSettingsPage() {
   const [newPassword, setNewPassword] = useState('');
   const [mfaResetUser, setMfaResetUser] = useState('');
   const [mfaResetReason, setMfaResetReason] = useState('');
-
   const reload = useCallback(async () => {
     setError('');
     try { setUsers(await api(tenantPath('/users'))); }
     catch (reason) { setError(reason.message || uiText('Không tải được người dùng.')); }
   }, []);
-
-  useEffect(() => { document.title = `${uiText('Người dùng')} · ${uiText('Cài đặt')} · OSP Suite`; reload(); }, [reload]);
-
+  useEffect(() => {  reload(); }, [reload]);
   const saveRoles = async (user) => {
     setBusy(user.id);
     try {
@@ -37,7 +34,6 @@ export default function UsersSettingsPage() {
     } catch (reason) { setError(reason.message || uiText('Không cập nhật được vai trò.')); }
     finally { setBusy(''); }
   };
-
   const createUser = async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -58,7 +54,6 @@ export default function UsersSettingsPage() {
     } catch (reason) { setError(reason.message || uiText('Không tạo được người dùng.')); }
     finally { setBusy(''); }
   };
-
   const toggleDisabled = async (user) => {
     setBusy(user.id);
     setError('');
@@ -69,7 +64,6 @@ export default function UsersSettingsPage() {
     } catch (reason) { setError(reason.message || uiText('Không đổi được trạng thái tài khoản.')); }
     finally { setBusy(''); }
   };
-
   const savePassword = async (user) => {
     setBusy(user.id);
     setError('');
@@ -82,7 +76,6 @@ export default function UsersSettingsPage() {
     } catch (reason) { setError(reason.message || uiText('Không đặt lại được mật khẩu.')); }
     finally { setBusy(''); }
   };
-
   const resetMfa = async (user) => {
     setBusy(user.id); setError('');
     try {
@@ -95,9 +88,7 @@ export default function UsersSettingsPage() {
     } catch (reason) { setError(reason.message || uiText('Không đặt lại được MFA.')); }
     finally { setBusy(''); }
   };
-
   if (!can('tenant.admin')) return <div className="page"><div className="alert danger" role="alert">{uiText('Chỉ quản trị viên mới được quản lý người dùng.')}</div></div>;
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Cài đặt')}</h1><p className="sub">{uiText('Quản trị người dùng của doanh nghiệp')} “{app.meta.name}”.</p></div></div>
     <SettingsTabs active="users" />

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { textDialog } from '../../lib/feedback.js';
@@ -6,13 +7,11 @@ import { fmtDateTime, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.
 import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import pharmacyEnglish from './pharmacy.en.js';
 import PrescriptionForm from './components/PrescriptionForm.jsx';
-
 const t = (text) => uiTextWith(text, pharmacyEnglish);
-
 const today = localDate;
 const newLine = () => ({ product: '', uom: '', qty: '1', dosage: '' });
-
 export default function PharmacyWorkbenchPage() {
+  useDocumentTitle(`${t('Quản lý đơn thuốc')} · OSP Suite`);
   const [products, setProducts] = useState([]);
   const [units, setUnits] = useState(new Map());
   const [parties, setParties] = useState(new Map());
@@ -28,7 +27,6 @@ export default function PharmacyWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
@@ -58,8 +56,7 @@ export default function PharmacyWorkbenchPage() {
     } catch (reason) { setError(t(reason.message || 'Không tải được danh sách đơn thuốc.')); }
     finally { setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = `${t('Quản lý đơn thuốc')} · OSP Suite`; load(); }, [load]);
+  useEffect(() => { load(); }, [load]);
   const activeLines = useMemo(() => lines.filter((line) => line.product), [lines]);
   const updateForm = (field, value) => setForm((current) => ({ ...current, [field]: value }));
   const updateLine = (index, field, value) => setLines((current) => current.map((line, i) => i === index ? { ...line, [field]: value, ...(field === 'product' ? { uom: products.find((product) => product.id === value)?.uom || '' } : {}) } : line));
@@ -67,7 +64,6 @@ export default function PharmacyWorkbenchPage() {
     const baseUnit = products.find((product) => product.id === productId)?.uom;
     return baseUnit ? [...units.values()].filter((unit) => unit.active !== false && (unit.id === baseUnit || unit.base_uom === baseUnit)) : [];
   };
-
   const createPrescription = async (event) => {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
@@ -86,7 +82,6 @@ export default function PharmacyWorkbenchPage() {
     } catch (reason) { setError(t(reason.message || 'Không lưu được đơn thuốc.')); }
     finally { setBusy(false); }
   };
-
   const editPrescription = (prescription) => {
     setEditingId(prescription.id);
     setForm({
@@ -104,7 +99,6 @@ export default function PharmacyWorkbenchPage() {
     setForm({ prescription_no: '', party: '', prescriber: '', prescriber_license: '', issued_at: today(), valid_until: today(), notes: '' });
     setLines([newLine()]); setError(''); setNotice('');
   };
-
   const transition = async (prescription, action) => {
     setBusy(true); setError(''); setNotice('');
     try {
@@ -113,7 +107,6 @@ export default function PharmacyWorkbenchPage() {
     } catch (reason) { setError(t(reason.message || 'Không cập nhật được trạng thái đơn thuốc.')); }
     finally { setBusy(false); }
   };
-
   const failReturnedMedicine = async (inspection) => {
     const note = await textDialog({ title: t('Xác nhận thuốc trả không đạt'), message: t('Ghi rõ đánh giá tình trạng thuốc. Thuốc khách trả không được giải phóng để bán lại.'), label: t('Lý do không đạt'), minLength: 5, maxLength: 500, confirmLabel: t('Cách ly') });
     if (!note) return;
@@ -126,7 +119,6 @@ export default function PharmacyWorkbenchPage() {
     } catch (reason) { setError(t(reason.message || 'Không thể ghi nhận kết quả kiểm tra thuốc trả.')); }
     finally { setBusy(false); }
   };
-
   const disposeReturnedMedicine = async (event, inspection) => {
     event.preventDefault();
     const draft = disposalDrafts[inspection.id] || {};
@@ -154,7 +146,6 @@ export default function PharmacyWorkbenchPage() {
     } catch (reason) { setError(t(reason.message || 'Không thể ghi sổ hủy thuốc. Phiếu nháp được giữ để thử lại.')); }
     finally { setBusy(false); }
   };
-
   const productName = (id) => products.find((product) => product.id === id)?.name || `${t('Sản phẩm')} ${String(id || '').slice(0, 8)}`;
   const prescriptionLines = (prescription) => {
     const items = Array.isArray(prescription.items) ? prescription.items : [];
@@ -184,7 +175,6 @@ export default function PharmacyWorkbenchPage() {
       };
     });
   };
-
   return <div className="page">
     <div className="page-head"><div><h1>{t('Đơn thuốc nhà thuốc')}</h1><p className="sub">{t('Ghi nhận đơn, kiểm tra thông tin và xác minh trước khi bán thuốc kê đơn tại POS.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={load}>{t('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
@@ -207,7 +197,6 @@ export default function PharmacyWorkbenchPage() {
       onSubmit={createPrescription}
       onCancel={cancelEdit}
     />
-
     <section className="card card-pad stack">
       <div className="row wrap"><div><h2>{t('Thuốc khách trả đang cách ly')}</h2><p className="small muted">{t('Thuốc trả từ đơn thuốc được giữ ngoài tồn bán. Dược sĩ ghi nhận không đạt, sau đó ghi sổ hủy có lý do.')}</p></div><span className="grow" /><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={load}>{t('Làm mới')}</button></div>
       {!can('quality.inspection.read') ? <div className="empty">{t('Cần quyền đọc phiếu chất lượng để xem thuốc trả đang cách ly.')}</div> : loading ? <div className="skeleton" data-h="row" /> : returnInspections.length === 0 ? <div className="empty">{t('Chưa có thuốc khách trả đang cách ly.')}</div> : returnInspections.map((inspection) => {
@@ -227,7 +216,6 @@ export default function PharmacyWorkbenchPage() {
         </article>;
       })}
     </section>
-
     <section className="card card-pad u-legacy-eee3f850c9" ><div className="row wrap"><h2>{t('Danh sách đơn thuốc')}</h2><span className="grow" /><a className="btn btn-secondary" href="#/pos">{t('Mở quầy POS')}</a></div>
       {loading ? <div className="skeleton" data-h="row" /> : prescriptions.length === 0 ? <div className="empty">{t('Chưa có đơn thuốc.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Số đơn')}</th><th>{t('Khách hàng')}</th><th>{t('Ngày kê')}</th><th>{t('Hiệu lực đến')}</th><th>{t('Thuốc')}</th><th>{t('Trạng thái')}</th><th>{t('Thao tác')}</th></tr></thead><tbody>{prescriptions.map((rx) => <tr key={rx.id}>
         <td><strong>{rx.prescription_no}</strong><div className="small muted">{rx.prescriber}{rx.prescriber_license ? ` · ${rx.prescriber_license}` : ''}</div></td>

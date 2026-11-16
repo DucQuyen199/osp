@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
@@ -6,14 +7,12 @@ import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import MaintenancePartsEditor from './components/MaintenancePartsEditor.jsx';
 import maintenanceEnglish from './maintenance.en.js';
-
 const t = (text) => uiTextWith(text, maintenanceEnglish);
-
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
 const today = localDate;
-
 export default function MaintenanceWorkbenchPage() {
+  useDocumentTitle(`${t('Bảo trì tài sản')} · OSP Suite`);
   const [plans, setPlans] = useState([]);
   const [requests, setRequests] = useState([]);
   const [assets, setAssets] = useState(new Map());
@@ -37,7 +36,6 @@ export default function MaintenanceWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -59,8 +57,7 @@ export default function MaintenanceWorkbenchPage() {
     } catch (reason) { setError(t(reason.message || 'Không tải được lịch bảo trì và lệnh công việc.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = `${t('Bảo trì tài sản')} · OSP Suite`; load(); }, [load]);
+  useEffect(() => { load(); }, [load]);
   const selected = requests.find((row) => row.id === selectedId);
   useEffect(() => { setAssignedTechnician(selected?.technician || ''); }, [selectedId, selected?.technician]);
   const openRequests = requests.filter((row) => ['open', 'in_progress'].includes(row.status));
@@ -72,14 +69,12 @@ export default function MaintenanceWorkbenchPage() {
     const baseUnit = products.get(productId)?.uom;
     return baseUnit ? [...units.values()].filter((unit) => unit.id === baseUnit || unit.base_uom === baseUnit) : [];
   };
-
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); setNotice(t(success)); await load(true); }
     catch (reason) { setError(t(reason.message || 'Thao tác không thành công.')); await load(true); }
     finally { setBusy(''); }
   }
-
   async function createRequest(event) {
     event.preventDefault();
     const materialLines = parts.filter((line) => line.product && Number(line.qty) > 0).map((line) => ({ product: line.product, qty: Number(line.qty), ...(line.uom ? { uom: line.uom } : {}) }));
@@ -93,7 +88,6 @@ export default function MaintenanceWorkbenchPage() {
       setSelectedId(row.id); setDescription(''); setPriority('normal'); setParts([]);
     }, 'Đã ghi nhận yêu cầu bảo trì. Lệnh được đưa vào hàng đợi để kỹ thuật viên tiếp nhận.');
   }
-
   async function createTechnician(event) {
     event.preventDefault();
     await run('technician', async () => {
@@ -104,21 +98,17 @@ export default function MaintenanceWorkbenchPage() {
       setTechnicianForm({ name: '', kind: 'internal', specialty: '', phone: '' });
     }, 'Đã thêm kỹ thuật viên vào danh mục phân công.');
   }
-
   async function saveAssignment(row) {
     await run(`${row.id}:assignment`, () => api(dataPath('maintenance.maintenance_request', row.id), {
       method: 'PATCH', body: { technician: assignedTechnician || null },
     }), 'Đã cập nhật người phụ trách lệnh bảo trì.');
   }
-
   async function runPlan(plan) {
     await run(`${plan.id}:due`, () => action('maintenance.maintenance_plan', plan, 'due'), 'Đã đưa lệnh bảo trì định kỳ vào hàng đợi. Kỳ kế tiếp sẽ tính sau khi lệnh được hoàn tất.');
   }
-
   async function startRequest(row) {
     await run(`${row.id}:started`, () => action('maintenance.maintenance_request', row, 'started'), 'Kỹ thuật viên đã bắt đầu xử lý lệnh.');
   }
-
   async function completeRequest(event, row) {
     event.preventDefault();
     if ((laborHours === '') !== (laborRate === '')) {
@@ -133,17 +123,13 @@ export default function MaintenanceWorkbenchPage() {
       setResolution(''); setLaborHours(''); setLaborRate('');
     }, 'Đã hoàn tất lệnh. Vật tư được xuất khỏi kho đã chọn và kế hoạch định kỳ được cập nhật.');
   }
-
   const addPart = () => setParts((current) => [...current, { product: [...products.keys()][0] || '', qty: '1', uom: '' }]);
   const updatePart = (index, field, value) => setParts((current) => current.map((row, i) => i === index ? { ...row, [field]: value, ...(field === 'product' ? { uom: '' } : {}) } : row));
-
   return <div className="page">
     <div className="page-head"><div><h1>{t('Bảo trì tài sản và thiết bị')}</h1><p className="sub">{t('Theo dõi lịch bảo trì định kỳ, tiếp nhận sự cố, phân công kỹ thuật, xuất vật tư và lưu kết quả sửa chữa.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     <div className="stats u-legacy-bf4a218e05" ><div className="card stat"><span className="stat-label">{t('Lịch đã đến hạn')}</span><strong className="stat-value">{overduePlans.length}</strong></div><div className="card stat"><span className="stat-label">{t('Lệnh đang mở')}</span><strong className="stat-value">{openRequests.length}</strong></div><div className="card stat"><span className="stat-label">{t('Đang xử lý')}</span><strong className="stat-value">{requests.filter((row) => row.status === 'in_progress').length}</strong></div><div className="card stat"><span className="stat-label">{t('Đã hoàn tất')}</span><strong className="stat-value">{requests.filter((row) => row.status === 'done').length}</strong></div></div>
-
     {can('maintenance.maintenance_technician.create') && <section className="card card-pad u-legacy-bf4a218e05" ><h2>{t('Danh mục kỹ thuật viên')}</h2><form className="form-grid" onSubmit={createTechnician}><label className="field"><span className="label">{t('Tên *')}</span><input className="input" required maxLength="200" value={technicianForm.name} onChange={(event) => setTechnicianForm((form) => ({ ...form, name: event.target.value }))}/></label><label className="field"><span className="label">{t('Loại')}</span><select className="select" value={technicianForm.kind} onChange={(event) => setTechnicianForm((form) => ({ ...form, kind: event.target.value }))}><option value="internal">{t('Nội bộ')}</option><option value="contractor">{t('Nhà thầu')}</option></select></label><label className="field"><span className="label">{t('Chuyên môn')}</span><input className="input" maxLength="200" value={technicianForm.specialty} onChange={(event) => setTechnicianForm((form) => ({ ...form, specialty: event.target.value }))}/></label><label className="field"><span className="label">{t('Điện thoại')}</span><input className="input" maxLength="50" value={technicianForm.phone} onChange={(event) => setTechnicianForm((form) => ({ ...form, phone: event.target.value }))}/></label><div className="row"><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy)}>{t('Thêm kỹ thuật viên')}</button></div></form></section>}
-
     {can('maintenance.maintenance_request.create') && <section className="card card-pad"><h2>{t('Tiếp nhận yêu cầu bảo trì')}</h2><form onSubmit={createRequest}><div className="form-grid">
       <label className="field"><span className="label">{t('Tài sản / thiết bị *')}</span><select className="select" required value={assetId} onChange={(event) => setAssetId(event.target.value)}><option value="">{t('Chọn tài sản')}</option>{[...assets.values()].filter((row) => row.active !== false).map((row) => <option key={row.id} value={row.id}>{recordLabel('asset.asset', row)}</option>)}</select></label>
       <label className="field"><span className="label">{t('Mức ưu tiên')}</span><select className="select" value={priority} onChange={(event) => setPriority(event.target.value)}><option value="low">{t('Thấp')}</option><option value="normal">{t('Bình thường')}</option><option value="high">{t('Cao')}</option></select></label>
@@ -153,7 +139,6 @@ export default function MaintenanceWorkbenchPage() {
       <MaintenancePartsEditor parts={parts} products={products} unitsFor={unitsFor} onAdd={addPart} onUpdate={updatePart} onRemove={(index) => setParts((current) => current.filter((_, i) => i !== index))} t={t} />
       <div className="row u-legacy-0ee7f66ad9" ><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !assetId}>{t('Ghi nhận yêu cầu')}</button></div>
     </form></section>}
-
     <div className="layout-split u-legacy-92c18f6bda" >
       <section className="card card-pad"><h2>{t('Kế hoạch định kỳ')}</h2>{loading ? <div className="skeleton" data-h="row"/> : !plans.length ? <div className="empty">{t('Chưa có kế hoạch bảo trì. Tạo kế hoạch trong module Tài sản và bảo trì.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Kế hoạch / tài sản')}</th><th>{t('Đến hạn')}</th><th>{t('Trạng thái')}</th><th/></tr></thead><tbody>{plans.map((row) => { const activeRequest = requestForPlan(row); return <tr key={row.id}><td><strong>{row.title}</strong><div className="small muted">{assets.get(row.asset) ? recordLabel('asset.asset', assets.get(row.asset)) : t('Tài sản')}</div></td><td>{fmtDate(row.next_due)}</td><td>{statusLabel(row.status)}{row.status === 'active' && row.next_due && row.next_due <= today() && <span className="badge danger u-legacy-4b17347c23" >{t('Quá hạn')}</span>}</td><td>{activeRequest ? <button className="btn btn-secondary btn-sm" type="button" onClick={() => setSelectedId(activeRequest.id)}>{t('Mở lệnh ·')} {statusLabel(activeRequest.status)}</button> : row.status === 'active' && can('maintenance.maintenance_plan.due') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy) || !row.next_due || row.next_due > today()} onClick={() => runPlan(row)}>{t('Tạo lệnh')}</button>}</td></tr>; })}</tbody></table></div>}</section>
       <section className="card card-pad"><h2>{t('Hàng đợi lệnh bảo trì')}</h2>{loading ? <div className="skeleton" data-h="row"/> : !requests.length ? <div className="empty">{t('Chưa có lệnh bảo trì.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Tài sản / mô tả')}</th><th>{t('Kỹ thuật viên')}</th><th>{t('Ưu tiên')}</th><th>{t('Ngày')}</th><th>{t('Trạng thái')}</th></tr></thead><tbody>{requests.map((row) => <tr {...selectableTableRowProps} key={row.id} aria-selected={selectedId === row.id} className={[selectedId === row.id ? 'selected' : '', 'u-legacy-9463ff4798'].filter(Boolean).join(' ')} onClick={() => setSelectedId(row.id)} ><td><strong>{assets.get(row.asset) ? recordLabel('asset.asset', assets.get(row.asset)) : t('Tài sản')}</strong><div className="small muted">{row.description || (row.source_plan ? t('Bảo trì định kỳ') : t('Yêu cầu mới'))}</div></td><td>{technicians.get(row.technician)?.name || t('Chưa phân công')}</td><td>{statusLabel(row.priority)}</td><td>{fmtDate(row.scheduled_for || row.created_at)}</td><td>{statusLabel(row.status)}</td></tr>)}</tbody></table></div>}</section>

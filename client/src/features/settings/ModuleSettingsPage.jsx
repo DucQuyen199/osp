@@ -1,11 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { toast } from '../../lib/feedback.js';
 import { CATEGORY_ORDER, categoryLabel, moduleDescription, moduleName, uiText } from '../../lib/i18n.js';
 import { app, can, loadMeta, resetCaches } from '../../lib/state.js';
 import SettingsTabs from './SettingsTabs.jsx';
-
 export default function ModuleSettingsPage() {
+  useDocumentTitle(`${uiText('Cài đặt module')} · OSP Suite`);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
@@ -13,9 +14,6 @@ export default function ModuleSettingsPage() {
   const groups = useMemo(() => CATEGORY_ORDER
     .map((category) => [category, app.meta.allModules.filter((module) => module.category === category)])
     .filter(([, modules]) => modules.length), [revision]);
-
-  useEffect(() => { document.title = `${uiText('Cài đặt module')} · OSP Suite`; }, []);
-
   const toggle = async (module, turnOn) => {
     setBusy(module.id);
     setError('');
@@ -38,9 +36,7 @@ export default function ModuleSettingsPage() {
       setBusy('');
     }
   };
-
   if (!can('tenant.admin')) return <div className="page"><div className="alert danger" role="alert">{uiText('Chỉ quản trị viên mới được thay đổi module.')}</div></div>;
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Cài đặt')}</h1><p className="sub">{uiText('Quản trị doanh nghiệp')} “{app.meta.name}”.</p></div></div>
     <SettingsTabs active="modules" />

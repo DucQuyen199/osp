@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { confirmDialog, toast } from '../../lib/feedback.js';
@@ -11,9 +12,7 @@ import {
   actionLabel, fmtDate, fmtDateTime, fmtMoney, fmtNumber, statusLabel, tone, uiText,
 } from '../../lib/i18n.js';
 import { recordHref } from '../../lib/routes.js';
-
 const PAGE_SIZE = 25;
-
 function FieldValue({ qname, field, record, definition, refs }) {
   const value = record[field.name];
   if (value == null || value === '') return <span className="faint">—</span>;
@@ -46,8 +45,8 @@ function FieldValue({ qname, field, record, definition, refs }) {
   }
   return String(value);
 }
-
 export default function EntityListPage({ qname }) {
+  useDocumentTitle(`${uiText(entityLabel(qname))} · OSP Suite`);
   const definition = entity(qname);
   const module = moduleOf(qname);
   const columns = useMemo(() => (definition ? listColumns(definition) : []), [definition]);
@@ -65,25 +64,20 @@ export default function EntityListPage({ qname }) {
   const [importOpen, setImportOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkAction, setBulkAction] = useState('');
-
   useEffect(() => {
     setSelectedIds(new Set());
   }, [qname, page, status, debouncedQuery, reloadKey]);
-
   useEffect(() => {
     const timeout = setTimeout(() => setDebouncedQuery(query.trim()), 250);
     return () => clearTimeout(timeout);
   }, [query]);
-
   useEffect(() => {
     const changed = (event) => {
       if (!event.detail || event.detail === qname) setReloadKey((value) => value + 1);
     };
     window.addEventListener('osp:entity-changed', changed);
-    document.title = `${entityLabel(qname)} · OSP Suite`;
     return () => window.removeEventListener('osp:entity-changed', changed);
   }, [qname]);
-
   useEffect(() => {
     if (!definition) return undefined;
     const controller = new AbortController();
@@ -100,7 +94,6 @@ export default function EntityListPage({ qname }) {
     if (debouncedQuery) params.set('q', debouncedQuery);
     const refsToLoad = new Set(columns.filter((field) => field.type === 'ref').map((field) => field.ref));
     if (qname.startsWith('accounting.')) refsToLoad.add('master-data.currency');
-
     Promise.all([
       api(`${dataPath(qname)}?${params}`, { signal: controller.signal }),
       Promise.all([...refsToLoad].map(async (ref) => [ref, await loadRefs(ref)])),
@@ -114,19 +107,16 @@ export default function EntityListPage({ qname }) {
     }).finally(() => {
       if (active) setLoading(false);
     });
-
     return () => {
       active = false;
       controller.abort();
     };
   }, [definition, qname, columns, page, status, debouncedQuery, reloadKey]);
-
   if (!definition) return <div className="page"><div className="empty">
     <h3>{uiText('Không tìm thấy dữ liệu này')}</h3>
     <p>{uiText('Module có thể chưa được bật cho doanh nghiệp của bạn.')}</p>
     <a className="btn" href="#/">{uiText('Về trang chủ')}</a>
   </div></div>;
-
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const canCreate = !definition.systemManaged && can(`${qname}.create`);
   const selectable = Boolean(definition.states && Object.keys(definition.states.actions).some((action) => can(`${qname}.${action}`)));
@@ -197,7 +187,6 @@ export default function EntityListPage({ qname }) {
       setBulkAction('');
     }
   };
-
   return <>
   <div className="page">
     <div className="page-head">

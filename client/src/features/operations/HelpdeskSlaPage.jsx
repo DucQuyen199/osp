@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { fmtDateTime, fmtNumber, uiTextWith } from '../../lib/i18n.js';
-
 const helpdeskSlaEnglish = {
   'Đạt': 'Met', 'Đang trong hạn': 'Within target', 'Quá hạn': 'Breached', 'Chưa gán SLA': 'No SLA assigned',
   'Mở': 'Open', 'Đang xử lý': 'In progress', 'Đã xử lý': 'Resolved', 'Đã đóng': 'Closed',
@@ -15,7 +15,6 @@ const helpdeskSlaEnglish = {
   'Hạn phản hồi': 'Response due', 'SLA phản hồi': 'Response SLA', 'Hạn giải quyết': 'Resolution due', 'SLA giải quyết': 'Resolution SLA',
 };
 const t = (text) => uiTextWith(text, helpdeskSlaEnglish);
-
 const labels = {
   met: 'Đạt',
   pending: 'Đang trong hạn',
@@ -26,20 +25,17 @@ const labels = {
   resolved: 'Đã xử lý',
   closed: 'Đã đóng',
 };
-
 export default function HelpdeskSlaPage() {
+  useDocumentTitle(`${t('SLA hỗ trợ')} · OSP Suite`);
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
-
   useEffect(() => {
     let active = true;
-    document.title = `${t('SLA hỗ trợ')} · OSP Suite`;
     api(tenantPath('/reports/helpdesk/sla'))
       .then((data) => { if (active) setReport(data); })
       .catch((reason) => { if (active) setError(t(reason.message || 'Không tải được báo cáo SLA.')); });
     return () => { active = false; };
   }, []);
-
   const stats = report ? [
     [t('Phản hồi đạt'), report.responseMet],
     [t('Phản hồi đang trong hạn'), report.responsePending],
@@ -48,7 +44,6 @@ export default function HelpdeskSlaPage() {
     [t('Giải quyết đang trong hạn'), report.resolutionPending],
     [t('Giải quyết quá hạn'), report.resolutionBreached],
   ] : [];
-
   return <div className="page">
     <div className="page-head"><div><h1>{t('SLA hỗ trợ')}</h1><p className="sub">{t('Đo phản hồi đầu tiên và thời hạn giải quyết theo chính sách gắn trên ticket.')}</p></div><a className="btn btn-secondary" href="#/e/helpdesk/ticket">{t('Ticket hỗ trợ')}</a></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}

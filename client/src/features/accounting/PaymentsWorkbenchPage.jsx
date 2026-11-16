@@ -1,16 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath } from '../../lib/api.js';
 import { textDialog } from '../../lib/feedback.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
-
 const rows = (response) => Array.isArray(response?.items) ? response.items : [];
 const providerLabels = { vnpay: 'VNPay', momo: 'MoMo', zalopay: 'ZaloPay', stripe: 'Stripe', bank: 'Ngân hàng' };
 const methodLabels = { cash: 'Tiền mặt', card: 'Thẻ', transfer: 'Chuyển khoản', ewallet: 'Ví điện tử', bank: 'Ngân hàng' };
 const transactionLabels = { pending: 'Chờ xác nhận', succeeded: 'Thành công', failed: 'Thất bại', partially_refunded: 'Hoàn một phần', refunded: 'Đã hoàn' };
 const refundLabels = { pending: 'Chờ xử lý', succeeded: 'Đã hoàn', failed: 'Thất bại' };
-
 export default function PaymentsWorkbenchPage() {
+  useDocumentTitle(`${uiText('Giao dịch thanh toán')} · OSP Suite`);
   const [transactions, setTransactions] = useState([]);
   const [refunds, setRefunds] = useState([]);
   const [parties, setParties] = useState(new Map());
@@ -23,7 +23,6 @@ export default function PaymentsWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -41,21 +40,17 @@ export default function PaymentsWorkbenchPage() {
     } catch (reason) { setError(reason.message || uiText('Không tải được giao dịch thanh toán.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = `${uiText('Giao dịch thanh toán')} · OSP Suite`; load(); }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   const visible = useMemo(() => transactions.filter((row) => filter === 'all' || row.status === filter), [transactions, filter]);
   const paidCount = transactions.filter((row) => row.status === 'succeeded').length;
   const pendingCount = transactions.filter((row) => row.status === 'pending').length;
   const refundTotal = refunds.filter((row) => row.status === 'succeeded').reduce((sum, row) => sum + Number(row.amount || 0), 0);
-
   async function run(key, operation, message) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); await load(true); setNotice(message); }
     catch (reason) { setError(reason.message || uiText('Thao tác không thành công.')); }
     finally { setBusy(''); }
   }
-
   async function createTransaction(event) {
     event.preventDefault();
     if (!(Number(form.amount) > 0) || !form.party || Boolean(form.invoice) === Boolean(form.bill)) { setError(uiText('Chọn đúng một hóa đơn bán hoặc hóa đơn mua và nhập số tiền hợp lệ.')); return; }
@@ -65,7 +60,6 @@ export default function PaymentsWorkbenchPage() {
       setForm((current) => ({ ...current, amount: '', reference: '', invoice: '', bill: '' }));
     }, uiText('Đã tạo giao dịch chờ kết quả nhà cung cấp.'));
   }
-
   async function recordOutcome(transaction, action) {
     const reference = await textDialog({ title: uiText(action === 'succeeded' ? 'Ghi nhận thanh toán thành công' : 'Ghi nhận giao dịch thất bại'), message: '', label: uiText(action === 'succeeded' ? 'Mã giao dịch nhà cung cấp trả về' : 'Mã tham chiếu (nếu đã có)'), initialValue: transaction.reference || '', minLength: 0, maxLength: 500, confirmLabel: uiText('Lưu') });
     if (reference === null) return;
@@ -78,7 +72,6 @@ export default function PaymentsWorkbenchPage() {
       });
     }, uiText(action === 'succeeded' ? 'Đã ghi nhận thanh toán thành công và cập nhật công nợ.' : 'Đã ghi nhận giao dịch thất bại.'));
   }
-
   async function createRefund(event) {
     event.preventDefault();
     if (!refundForm.payment_txn || !(Number(refundForm.amount) > 0)) return;
@@ -87,7 +80,6 @@ export default function PaymentsWorkbenchPage() {
       setRefundForm({ payment_txn: '', amount: '', reference: '' });
     }, uiText('Đã tạo hồ sơ hoàn tiền chờ xử lý.'));
   }
-
   async function recordRefund(refund, action) {
     const reference = await textDialog({ title: uiText(action === 'succeeded' ? 'Ghi nhận hoàn tiền thành công' : 'Ghi nhận hoàn tiền thất bại'), message: '', label: uiText(action === 'succeeded' ? 'Mã hoàn tiền nhà cung cấp trả về' : 'Ghi chú hoặc mã tham chiếu (nếu có)'), initialValue: refund.reference || '', minLength: 0, maxLength: 500, confirmLabel: uiText('Lưu') });
     if (reference === null) return;
@@ -100,12 +92,10 @@ export default function PaymentsWorkbenchPage() {
       });
     }, uiText(action === 'succeeded' ? 'Đã ghi nhận hoàn tiền; sổ kế toán được cập nhật.' : 'Đã ghi nhận hoàn tiền thất bại.'));
   }
-
   const partyLabel = (id) => parties.has(id) ? recordLabel('master-data.party', parties.get(id)) : '—';
   const documentLabel = (txn) => txn.invoice ? uiText('HĐ bán · {number}').replace('{number}', invoices.get(txn.invoice)?.invoice_number || String(txn.invoice).slice(0, 8)) : txn.bill ? uiText('HĐ mua · {number}').replace('{number}', bills.get(txn.bill)?.bill_number || String(txn.bill).slice(0, 8)) : uiText('Chưa gắn hóa đơn');
   const refundsFor = (txn) => refunds.filter((refund) => refund.payment_txn === txn.id);
   const refundable = (txn) => Math.max(0, Number(txn.amount || 0) - refundsFor(txn).filter((row) => row.status === 'succeeded').reduce((sum, row) => sum + Number(row.amount || 0), 0));
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText("Giao dịch thanh toán")}</h1><p className="sub">{uiText("Tạo giao dịch chờ, đối chiếu kết quả từ VNPay, MoMo, ZaloPay, Stripe hoặc ngân hàng, và theo dõi hoàn tiền. Thành công chỉ ghi nhận sau khi xác minh mã tham chiếu từ nhà cung cấp.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{uiText("Làm mới")}</button></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}

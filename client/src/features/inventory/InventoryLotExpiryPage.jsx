@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, fmtNumber, statusLabel, uiText } from '../../lib/i18n.js';
 import { can } from '../../lib/state.js';
-
 const quantity = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
-
 export default function InventoryLotExpiryPage() {
+  useDocumentTitle(`${uiText('Lô sắp hết hạn')} · OSP Suite`);
   const [days, setDays] = useState(90);
   const [offset, setOffset] = useState(0);
   const [report, setReport] = useState(null);
@@ -13,7 +13,6 @@ export default function InventoryLotExpiryPage() {
   const [loading, setLoading] = useState(false);
   const [creatingWarehouse, setCreatingWarehouse] = useState('');
   const [notice, setNotice] = useState(null);
-
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -25,9 +24,6 @@ export default function InventoryLotExpiryPage() {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [days, offset]);
-
-  useEffect(() => { document.title = `${uiText('Lô sắp hết hạn')} · OSP Suite`; }, []);
-
   const changeDays = (value) => { setDays(value); setOffset(0); };
   const createWriteoff = async (warehouse) => {
     setCreatingWarehouse(warehouse.id);
@@ -44,14 +40,12 @@ export default function InventoryLotExpiryPage() {
       setCreatingWarehouse('');
     }
   };
-
   const expiredByWarehouse = (report?.items || []).reduce((groups, item) => {
     if (!item.expired || !item.warehouseId) return groups;
     const group = groups.get(item.warehouseId) || { id: item.warehouseId, name: item.warehouse };
     groups.set(item.warehouseId, group);
     return groups;
   }, new Map());
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Lô sắp hết hạn')}</h1><p className="sub">{uiText('Tồn dương của các lô đã hết hạn hoặc sẽ hết hạn trong kỳ đã chọn, theo kho.')}</p></div></div>
     <section className="card"><div className="toolbar">

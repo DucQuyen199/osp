@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath, session, tenantPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { can, loadRefs, recordLabel } from '../../lib/state.js';
 import { listHref, recordHref } from '../../lib/routes.js';
-
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 async function listAll(qname) {
   const rows = [];
@@ -20,8 +20,8 @@ const today = localDate;
 const num = (value) => Number(value || 0);
 const storageKey = `osp.adjustment-refund-requests:${session.current()?.tenantId || 'tenant'}`;
 const readRequests = () => { try { return JSON.parse(sessionStorage.getItem(storageKey) || '{}'); } catch { return {}; } };
-
 export default function AccountingAdjustmentRefundsPage() {
+  useDocumentTitle(`${uiText('Hoàn tiền và thu tiền hoàn')} · OSP Suite`);
   const [notes, setNotes] = useState({ credit: [], debit: [] });
   const [invoices, setInvoices] = useState([]);
   const [bills, setBills] = useState([]);
@@ -34,7 +34,6 @@ export default function AccountingAdjustmentRefundsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
@@ -51,8 +50,7 @@ export default function AccountingAdjustmentRefundsPage() {
     } catch (e) { setError(e.message || uiText('Không tải được danh sách phiếu điều chỉnh.')); }
     finally { setLoading(false); }
   }, []);
-  useEffect(() => { document.title = `${uiText('Hoàn tiền và thu tiền hoàn')} · OSP Suite`; load(); }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   const docs = useMemo(() => ({ invoice: new Map(invoices.map((row) => [row.id, row])), bill: new Map(bills.map((row) => [row.id, row])) }), [invoices, bills]);
   const rows = useMemo(() => [
     ...notes.credit.map((note) => ({ ...note, kind: 'credit_note', title: 'Hoàn tiền khách hàng', sourceDoc: docs.invoice.get(note.invoice), docKind: 'invoice', party: docs.invoice.get(note.invoice)?.party, refundRef: 'refund_credit_note', docRef: 'invoice' })),
@@ -68,7 +66,6 @@ export default function AccountingAdjustmentRefundsPage() {
     return { ...note, refundable: Math.max(0, Math.min(num(note.total) - alreadyRefunded, availableCredit)), alreadyRefunded };
   }), [notes, payments, docs]);
   const active = rows.find((row) => row.id === selected);
-
   const submit = async (event) => {
     event.preventDefault();
     if (!active || Number(form.amount) <= 0 || Number(form.amount) > active.refundable) return;
@@ -86,7 +83,6 @@ export default function AccountingAdjustmentRefundsPage() {
     } catch (e) { setError(e.message || uiText('Không tạo được payment hoàn tiền. Có thể gửi lại an toàn.')); }
     finally { setBusy(false); }
   };
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText("Hoàn tiền và thu tiền hoàn")}</h1><p className="sub">{uiText("Thực hiện chi tiền cho khách theo credit note hoặc nhận tiền nhà cung cấp theo debit note; hệ thống giới hạn số dư, ghi payment âm và tự tạo bút toán tiền mặt/ngân hàng.")}</p></div><button className="btn btn-secondary" onClick={load} disabled={loading || busy}>{uiText("Làm mới")}</button></div>
     {error && <div className="alert error">{uiText(error)}</div>}{notice && <div className="alert success">{uiText(notice)}</div>}

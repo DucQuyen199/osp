@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
-
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const today = localDate;
 const num = (value) => Number(value || 0);
@@ -17,8 +17,8 @@ async function listAll(qname) {
   }
   return rows;
 }
-
 export default function AccountingSettlementWorkbenchPage() {
+  useDocumentTitle(`${uiText('Thu/chi phân bổ công nợ')} · OSP Suite`);
   const [batches, setBatches] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [bills, setBills] = useState([]);
@@ -33,7 +33,6 @@ export default function AccountingSettlementWorkbenchPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const workflowApproval = app.meta?.modules?.some((module) => module.id === 'workflow-approval');
-
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
@@ -52,8 +51,7 @@ export default function AccountingSettlementWorkbenchPage() {
     } catch (reason) { setError(reason.message || uiText('Không tải được phiếu thu/chi công nợ.')); }
     finally { setLoading(false); }
   }, [workflowApproval]);
-  useEffect(() => { document.title = `${uiText('Thu/chi phân bổ công nợ')} · OSP Suite`; load(); }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   const docs = form.direction === 'receipt' ? invoices : bills;
   const partyField = form.direction === 'receipt' ? 'party' : 'supplier';
   const available = useMemo(() => docs.filter((doc) => doc[partyField] === form.party && ['posted', 'partially_paid', 'partially_settled'].includes(doc.status) && num(doc.balance_due) > 0.005), [docs, partyField, form.party]);
@@ -68,7 +66,6 @@ export default function AccountingSettlementWorkbenchPage() {
   const currencyDocs = available.filter((doc) => (doc.currency || currencyOptions.find((currency) => currency.code?.toUpperCase() === String(app.meta?.settings?.baseCurrency || 'VND').toUpperCase())?.id) === selectedCurrency);
   const selectedAllocations = currencyDocs.filter((doc) => num(allocations[doc.id]) > 0);
   const total = selectedAllocations.reduce((sum, doc) => sum + num(allocations[doc.id]), 0);
-
   function changeForm(key, value) {
     setForm((current) => ({ ...current, [key]: value }));
     if (['direction', 'party', 'currency'].includes(key)) setAllocations({});
@@ -100,7 +97,6 @@ export default function AccountingSettlementWorkbenchPage() {
       return `${doc?.number || String(allocation[name] || '').slice(0, 8)} · ${fmtMoney(allocation.amount)}`;
     }).join(' | ');
   }
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText("Thu/chi phân bổ công nợ")}</h1><p className="sub">{uiText("Gom một lần thu hoặc chi để phân bổ vào nhiều hóa đơn cùng đối tác và tiền tệ. Mỗi hóa đơn vẫn có payment riêng; sổ cái nhận một bút toán tổng hợp để đối soát giao dịch ngân hàng.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={load}>{uiText("Làm mới")}</button></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}

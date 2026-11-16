@@ -1,17 +1,16 @@
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { fmtNumber, uiText } from '../../lib/i18n.js';
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, tenantPath } from '../../lib/api.js';
 import { can } from '../../lib/state.js';
-
 const quantity = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
-
 export default function InventoryReplenishmentPage() {
+  useDocumentTitle(`${uiText('Đề xuất bổ sung tồn kho')} · OSP Suite`);
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [creatingWarehouse, setCreatingWarehouse] = useState('');
   const [notice, setNotice] = useState(null);
-
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -24,9 +23,7 @@ export default function InventoryReplenishmentPage() {
       setLoading(false);
     }
   }, []);
-
-  useEffect(() => { document.title = `${uiText('Đề xuất bổ sung tồn kho')} · OSP Suite`; load(); }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   const createRequisition = async (warehouseId) => {
     setCreatingWarehouse(warehouseId);
     setError('');
@@ -47,7 +44,6 @@ export default function InventoryReplenishmentPage() {
       setCreatingWarehouse('');
     }
   };
-
   const suggestedByWarehouse = (report?.items || []).reduce((groups, item) => {
     if (Number(item.suggestedQty) > 0.000001) {
       const group = groups.get(item.warehouseId) || { id: item.warehouseId, name: item.warehouse, count: 0 };
@@ -56,7 +52,6 @@ export default function InventoryReplenishmentPage() {
     }
     return groups;
   }, new Map());
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Đề xuất bổ sung tồn kho')}</h1><p className="sub">{uiText('Tồn khả dụng loại trừ lô hết hạn và hàng giữ để kiểm tra chất lượng; tồn dự kiến tính thêm đơn bán còn phải giao, đơn mua chờ nhận và đề nghị mua mở.')}</p></div><a className="btn btn-secondary" href="#/e/inventory/reorder_rule">{uiText('Định mức bổ sung')}</a></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}

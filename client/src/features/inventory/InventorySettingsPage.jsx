@@ -1,18 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { toast } from '../../lib/feedback.js';
 import { uiText } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
 import SettingsTabs from '../settings/SettingsTabs.jsx';
-
 export default function InventorySettingsPage() {
+  useDocumentTitle(`${uiText('Chính sách kho')} · ${uiText('Cài đặt')} · OSP Suite`);
   const [allowNegative, setAllowNegative] = useState(app.meta.settings?.allowNegativeStock === true);
   const [costMethod, setCostMethod] = useState(app.meta.settings?.inventoryCostMethod || 'moving_average');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => { document.title = `${uiText('Chính sách kho')} · ${uiText('Cài đặt')} · OSP Suite`; }, []);
-
   const changePolicy = async (event) => {
     const next = event.target.checked;
     setBusy(true);
@@ -26,7 +24,6 @@ export default function InventorySettingsPage() {
     } catch (reason) { setError(reason.message || uiText('Không cập nhật được chính sách kho.')); }
     finally { setBusy(false); }
   };
-
   const changeCostMethod = async (event) => {
     const next = event.target.value;
     setBusy(true);
@@ -40,9 +37,7 @@ export default function InventorySettingsPage() {
     } catch (reason) { setError(reason.message || uiText('Không cập nhật được phương pháp giá vốn.')); }
     finally { setBusy(false); }
   };
-
   if (!can('tenant.admin')) return <div className="page"><div className="alert danger" role="alert">{uiText('Chỉ quản trị viên mới được đổi chính sách kho.')}</div></div>;
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Cài đặt')}</h1><p className="sub">{uiText('Chính sách kho của doanh nghiệp')} “{app.meta.name}”.</p></div></div>
     <SettingsTabs active="inventory" />

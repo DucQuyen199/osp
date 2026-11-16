@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
-
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
-
 export default function SalesReturnsWorkbenchPage() {
+  useDocumentTitle(`${uiText('Trả hàng bán')} · OSP Suite`);
   const [orders, setOrders] = useState([]);
   const [returns, setReturns] = useState([]);
   const [products, setProducts] = useState(new Map());
@@ -31,7 +31,6 @@ export default function SalesReturnsWorkbenchPage() {
   const [notice, setNotice] = useState('');
   const workflowApproval = app.meta?.modules?.some((module) => module.id === 'workflow-approval') || false;
   const logisticsEnabled = app.meta?.modules?.some((module) => module.id === 'logistics') || false;
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -56,8 +55,7 @@ export default function SalesReturnsWorkbenchPage() {
     } catch (reason) { setError(reason.message || uiText('Không tải được đơn bán và phiếu trả hàng.')); }
     finally { if (!quiet) setLoading(false); }
   }, [logisticsEnabled, workflowApproval]);
-
-  useEffect(() => { document.title = `${uiText('Trả hàng bán')} · OSP Suite`; load(); }, [load]);
+  useEffect(() => { load(); }, [load]);
   const orderById = useMemo(() => new Map(orders.map((row) => [row.id, row])), [orders]);
   const returnableOrders = orders.filter((row) => ['confirmed','partially_delivered','delivered'].includes(row.status));
   const formOrder = orderById.get(orderId);
@@ -66,14 +64,12 @@ export default function SalesReturnsWorkbenchPage() {
   const selectedReturnInvoices = selectedOrder ? invoicesFor(selectedOrder) : [];
   const unitName = (line) => line.uom_name || units.get(line.uom)?.name || '';
   const stats = useMemo(() => ({ pending: returns.filter((row) => row.status === 'submitted').length, approved: returns.filter((row) => row.status === 'approved').length, received: returns.filter((row) => row.status === 'received').length, draft: returns.filter((row) => ['draft','rejected'].includes(row.status)).length }), [returns]);
-
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); setNotice(success); await load(true); }
     catch (reason) { setError(reason.message || uiText('Thao tác không thành công.')); await load(true); }
     finally { setBusy(''); }
   }
-
   function shipmentsFor(order) { return shipments.filter((shipment) => shipment.source === 'sales_order' && shipment.source_id === order.id); }
   function invoicesFor(order) { return order ? invoices.filter((invoice) => invoice.source === 'sales_order' && invoice.source_id === order.id && ['posted', 'partially_paid', 'partially_settled', 'paid', 'settled'].includes(invoice.status)) : []; }
   function invoiceFor(order, preferredId) {
@@ -83,7 +79,6 @@ export default function SalesReturnsWorkbenchPage() {
   }
   function creditFor(row) { return creditNotes.find((credit) => credit.source === 'sales_return' && credit.source_id === row.id); }
   function approvalFor(row) { return approvalRequests.find((request) => request.entity === 'sales.sales_return' && request.record_id === row.id); }
-
   function eligibleLines(order) {
     const groups = new Map();
     for (const line of order?.lines || []) {
@@ -106,20 +101,17 @@ export default function SalesReturnsWorkbenchPage() {
       return { ...line, delivered: Math.min(line.ordered, delivered), remaining: Math.max(0, Math.min(line.ordered, delivered) - reserved) };
     }).filter((line) => line.remaining > .000001);
   }
-
   const eligible = formOrder ? eligibleLines(formOrder) : [];
   const formInvoices = formOrder ? invoicesFor(formOrder) : [];
   const selectedInvoice = formOrder ? invoiceFor(formOrder, returnInvoiceId) : null;
   const linkedInvoice = selected ? invoiceFor(selectedOrder, selected.invoice || linkedInvoiceId) : null;
   const returnedTotal = selected ? (selected.lines || []).reduce((sum, line) => sum + Number(line.line_total ?? Number(line.price || 0) * Number(line.qty || 0)), 0) : 0;
-
   useEffect(() => {
     setReturnInvoiceId((current) => formInvoices.some((invoice) => invoice.id === current) ? current : formInvoices.length === 1 ? formInvoices[0].id : '');
   }, [orderId, invoices]);
   useEffect(() => {
     setLinkedInvoiceId(selected?.invoice || (selectedOrder && invoicesFor(selectedOrder).length === 1 ? invoicesFor(selectedOrder)[0].id : ''));
   }, [selectedId, selected?.invoice, invoices]);
-
   async function createReturn(event) {
     event.preventDefault(); if (!formOrder) return;
     if (!selectedInvoice) { setError(uiText('Chọn một hóa đơn đã ghi sổ của đơn bán trước khi gửi duyệt phiếu trả.')); return; }
@@ -131,26 +123,21 @@ export default function SalesReturnsWorkbenchPage() {
       await action('sales.sales_return', row, 'submitted');
     }, uiText('Đã lập và gửi duyệt phiếu trả. Số lượng được đối chiếu với hàng đã giao và các phiếu đang xử lý.'));
   }
-
   async function transition(row, verb) {
     const messages = { submitted: uiText('Đã gửi phiếu trả duyệt.'), approved: uiText('Đã duyệt phiếu trả; kho có thể tiếp nhận hàng.'), rejected: uiText('Đã từ chối phiếu trả.'), received: uiText('Đã nhập lại hàng và tạo credit note để điều chỉnh công nợ khách hàng.'), cancelled: uiText('Đã hủy phiếu trả.') };
     await run(`${row.id}:${verb}`, () => action('sales.sales_return', row, verb), messages[verb]);
   }
-
   async function assignReturnInvoice(row) {
     if (!linkedInvoiceId) return;
     await run(`${row.id}:invoice`, () => api(dataPath('sales.sales_return', row.id), { method: 'PATCH', body: { invoice: linkedInvoiceId } }), uiText('Đã gắn hóa đơn gốc vào phiếu trả.'));
   }
-
   async function decideApproval(request, verb) {
     await run(`${request.id}:${verb}`, () => action('workflow-approval.approval_request', request, verb), uiText(verb === 'approved' ? 'Đã duyệt phiếu trả.' : 'Đã từ chối phiếu trả.'));
   }
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Trả hàng và điều chỉnh doanh thu')}</h1><p className="sub">{uiText('Chỉ nhận trả trên số lượng đủ điều kiện, phê duyệt trước khi nhập kho và tạo credit note theo hóa đơn gốc.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{uiText('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
     <div className="stats u-legacy-bf4a218e05" ><div className="card stat"><span className="stat-label">{uiText('Nháp / bị từ chối')}</span><strong className="stat-value">{stats.draft}</strong></div><div className="card stat"><span className="stat-label">{uiText('Chờ duyệt')}</span><strong className="stat-value">{stats.pending}</strong></div><div className="card stat"><span className="stat-label">{uiText('Đã duyệt / chờ nhận')}</span><strong className="stat-value">{stats.approved}</strong></div><div className="card stat"><span className="stat-label">{uiText('Đã nhập và điều chỉnh')}</span><strong className="stat-value">{stats.received}</strong></div></div>
-
     {can('sales.sales_return.create') && <section className="card card-pad"><h2>{uiText('Lập phiếu trả hàng')}</h2><form onSubmit={createReturn}><label className="field"><span className="label">{uiText('Đơn bán nguồn')} *</span><select className="select" required value={orderId} onChange={(event) => { setOrderId(event.target.value); setQuantities({}); }}><option value="">{uiText('Chọn đơn đã xác nhận')}</option>{returnableOrders.map((order) => <option key={order.id} value={order.id}>{order.number || String(order.id).slice(0, 8)} · {parties.get(order.party) ? recordLabel('master-data.party', parties.get(order.party)) : uiText('Khách hàng')} · {statusLabel(order.status)}</option>)}</select></label>
       {formOrder && <><div className="small muted u-legacy-43a97fe494" >{uiText('Kho nhận hàng trả')}: {warehouses.get(formOrder.warehouse)?.name || uiText('Kho của đơn bán')} · {uiText('Hóa đơn gốc')}: {selectedInvoice ? `${selectedInvoice.number || String(selectedInvoice.id).slice(0, 8)} (${statusLabel(selectedInvoice.status)})` : uiText('chưa chọn')}</div>
         {formInvoices.length > 1 && <label className="field u-legacy-df928149c5" ><span className="label">{uiText('Hóa đơn gốc cho credit note')} *</span><select className="select" required value={returnInvoiceId} onChange={(event) => setReturnInvoiceId(event.target.value)}><option value="">{uiText('Chọn hóa đơn đã ghi sổ')}</option>{formInvoices.map((invoice) => <option key={invoice.id} value={invoice.id}>{invoice.number || String(invoice.id).slice(0, 8)} · {statusLabel(invoice.status)} · {fmtMoney(invoice.total || 0)}</option>)}</select></label>}
@@ -160,7 +147,6 @@ export default function SalesReturnsWorkbenchPage() {
       <div className="row u-legacy-df928149c5" ><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !eligible.some((line) => Number(quantities[line.key]) > 0) || !reason.trim() || !selectedInvoice}>{uiText('Lập và gửi duyệt')}</button></div>
       {formOrder && !selectedInvoice && <p className="small muted">{uiText('Cần chọn hóa đơn đã ghi sổ của đơn bán trước khi gửi duyệt để credit note gắn đúng chứng từ.')}</p>}
     </form></section>}
-
     <div className="layout-split u-legacy-92c18f6bda" >
       <section className="card card-pad"><h2>{uiText('Phiếu trả hàng')}</h2>{loading ? <div className="skeleton" data-h="row"/> : !returns.length ? <div className="empty">{uiText('Chưa có phiếu trả hàng.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{uiText('Đơn / khách hàng')}</th><th>{uiText('Lý do')}</th><th>{uiText('Tổng giảm')}</th><th>{uiText('Trạng thái')}</th></tr></thead><tbody>{returns.map((row) => { const order = orderById.get(row.sales_order); return <tr {...selectableTableRowProps} key={row.id} aria-selected={row.id === selectedId} className={[row.id === selectedId ? 'selected' : '', 'u-legacy-9463ff4798'].filter(Boolean).join(' ')} onClick={() => setSelectedId(row.id)} ><td><strong>{order ? recordLabel('master-data.party', parties.get(order.party)) : uiText('Khách hàng')}</strong><div className="small muted">{uiText('Đơn')} {String(row.sales_order || '').slice(0, 8)}</div></td><td>{row.reason || '—'}</td><td>{fmtMoney(row.total || 0)}</td><td>{statusLabel(row.status)}</td></tr>; })}</tbody></table></div>}</section>
       {selected && <section className="card card-pad"><div className="row wrap"><div><h2>{uiText('Phiếu trả')} {String(selected.id).slice(0, 8)}</h2><div className="small muted">{uiText('Đơn bán')} {selectedOrder?.number || String(selected.sales_order).slice(0, 8)} · {selected.reason}</div><div className="small muted">{uiText('Hóa đơn gốc')}: {linkedInvoice ? `${linkedInvoice.number || String(linkedInvoice.id).slice(0, 8)} · ${statusLabel(linkedInvoice.status)}` : uiText('chưa chọn')}</div></div><span className="grow"/><span className="badge warning">{statusLabel(selected.status)}</span></div>

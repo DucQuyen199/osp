@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { fmtMoney, fmtNumber, uiText } from '../../lib/i18n.js';
-
 export default function AssetDepreciationSchedulePage() {
+  useDocumentTitle(`${uiText('Lịch khấu hao tài sản')} · OSP Suite`);
   const [months, setMonths] = useState('12');
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -21,16 +21,13 @@ export default function AssetDepreciationSchedulePage() {
       setLoading(false);
     }
   }, [months]);
-
-  useEffect(() => { document.title = `${uiText('Lịch khấu hao tài sản')} · OSP Suite`; load(); }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   const rows = (report?.assets || []).flatMap((asset) => (asset.schedule || []).map((period) => ({
     assetId: asset.assetId,
     code: asset.code,
     name: asset.name,
     ...period,
   })));
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Lịch khấu hao tài sản')}</h1><p className="sub">{uiText('Dự báo theo phương pháp khấu hao đã cấu hình và hao mòn lũy kế hiện tại.')}</p></div></div>
     <section className="card">

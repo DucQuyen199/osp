@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
@@ -7,9 +8,7 @@ import { recordHref } from '../../lib/routes.js';
 import hotelEnglish from './hotel.en.js';
 import ReservationCreateForm from './components/ReservationCreateForm.jsx';
 import ReservationDatesForm from './components/ReservationDatesForm.jsx';
-
 const t = (text) => uiTextWith(text, hotelEnglish);
-
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const today = localDate;
 const activeStay = (reservation) => ['booked', 'checked_in'].includes(reservation.status);
@@ -19,8 +18,8 @@ const nextDay = (value) => {
   date.setUTCDate(date.getUTCDate() + 1);
   return date.toISOString().slice(0, 10);
 };
-
 export default function HotelFrontDeskPage() {
+  useDocumentTitle(`${t('Lễ tân khách sạn')} · OSP Suite`);
   const [reservations, setReservations] = useState([]);
   const [parties, setParties] = useState(new Map());
   const [rooms, setRooms] = useState(new Map());
@@ -44,7 +43,6 @@ export default function HotelFrontDeskPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async (preserveNotice = false) => {
     setLoading(true); setError(''); if (!preserveNotice) setNotice('');
     try {
@@ -61,9 +59,7 @@ export default function HotelFrontDeskPage() {
     } catch (reason) { setError(t(reason.message || 'Không tải được dữ liệu lễ tân.')); }
     finally { setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = `${t('Lễ tân khách sạn')} · OSP Suite`; load(); }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   const selected = reservations.find((item) => item.id === selectedId) || null;
   const noShowReason = selected ? noShowReasons[selected.id] ?? selected.no_show_reason ?? '' : '';
   const selectedCharges = useMemo(() => charges.filter((item) => item.reservation === selectedId), [charges, selectedId]);
@@ -88,7 +84,6 @@ export default function HotelFrontDeskPage() {
   const departuresToday = reservations.filter((item) => item.status === 'checked_in' && item.check_out === today()).length;
   const occupiedRooms = [...rooms.values()].filter((room) => room.status === 'occupied').length;
   const occupancy = rooms.size ? Math.round(occupiedRooms / rooms.size * 100) : 0;
-
   const createReservation = async (event) => {
     event.preventDefault(); setBusy('create'); setError(''); setNotice('');
     try {
@@ -97,7 +92,6 @@ export default function HotelFrontDeskPage() {
     } catch (reason) { setError(t(reason.message || 'Không tạo được đặt phòng. Kiểm tra sức chứa và lịch phòng.')); }
     finally { setBusy(''); }
   };
-
   const assignRoom = async (reservation) => {
     if (!assignment) return;
     setBusy(`${reservation.id}:assign`); setError(''); setNotice('');
@@ -105,7 +99,6 @@ export default function HotelFrontDeskPage() {
     catch (reason) { setError(t(reason.message || 'Không phân được phòng. Hệ thống kiểm tra trùng lịch và loại phòng.')); }
     finally { setBusy(''); }
   };
-
   const transition = async (reservation, action) => {
     setBusy(`${reservation.id}:${action}`); setError(''); setNotice('');
     try {
@@ -123,7 +116,6 @@ export default function HotelFrontDeskPage() {
     } catch (reason) { setError(t(reason.message || (action === 'checked_in' ? 'Chưa thể nhận phòng. Cần phòng trống và đúng ngày nhận.' : 'Không cập nhật được đặt phòng.'))); }
     finally { setBusy(''); }
   };
-
   const addCharge = async (event) => {
     event.preventDefault(); if (!selected) return;
     setBusy('charge'); setError(''); setNotice('');
@@ -133,7 +125,6 @@ export default function HotelFrontDeskPage() {
     } catch (reason) { setError(t(reason.message || 'Không ghi được khoản phí. Chỉ thêm phí trước khi trả phòng.')); }
     finally { setBusy(''); }
   };
-
   const extendStay = async (event) => {
     event.preventDefault(); if (!selected) return;
     const newCheckout = extendedCheckout[selected.id] || '';
@@ -147,11 +138,9 @@ export default function HotelFrontDeskPage() {
     } catch (reason) { setError(t(reason.message || 'Không gia hạn được. Phòng có thể đã được đặt cho khoảng thời gian mới.')); }
     finally { setBusy(''); }
   };
-
   const startReservationEdit = (reservation) => {
     setReservationEdit({ reservationId: reservation.id, check_in: reservation.check_in, check_out: reservation.check_out, guest_count: String(reservation.guest_count || 1) });
   };
-
   const updateReservationEdit = (field, value) => {
     setReservationEdit((current) => ({
       ...current,
@@ -159,7 +148,6 @@ export default function HotelFrontDeskPage() {
       ...(field === 'check_in' && current.check_out <= value ? { check_out: '' } : {}),
     }));
   };
-
   const saveReservationEdit = async (event) => {
     event.preventDefault();
     if (!selected || reservationEdit?.reservationId !== selected.id || reservationEdit.check_out <= reservationEdit.check_in) return;
@@ -176,9 +164,7 @@ export default function HotelFrontDeskPage() {
       setError(t(reason.message || 'Không cập nhật được đặt phòng. Kiểm tra sức chứa và lịch phòng.'));
     } finally { setBusy(''); }
   };
-
   const reservationStatus = (status) => status === 'booked' ? 'warning' : status === 'checked_in' ? 'success' : status === 'checked_out' ? 'plain' : 'danger';
-
   return <div className="page hotel-frontdesk-page">
     <div className="page-head"><div><h1>{t('Lễ tân khách sạn')}</h1><p className="sub">{t('Đặt phòng theo loại phòng, phân phòng, nhận/trả khách và cộng phí phát sinh vào folio. Hóa đơn được tạo khi trả phòng.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{loading ? t('Đang tải…') : t('Làm mới')}</button></div>
     <div className="row wrap hotel-frontdesk-summary"><span className="badge warning">{t("Nhận phòng hôm nay")}: {arrivalsToday}</span><span className="badge plain">{t("Trả phòng hôm nay")}: {departuresToday}</span><span className="badge success">{t("Công suất hiện tại")}: {occupancy}%</span><a className="small" href="#/reports/hotel/housekeeping-board">{t('Mở bảng buồng phòng')}</a></div>

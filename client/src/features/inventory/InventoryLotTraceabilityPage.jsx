@@ -1,26 +1,23 @@
 import React, { useEffect, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, fmtNumber, uiText } from '../../lib/i18n.js';
 import { recordHref } from '../../lib/routes.js';
 import { can, entityLabel } from '../../lib/state.js';
-
 const quantity = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
-
 export default function InventoryLotTraceabilityPage({ lotId }) {
+  useDocumentTitle(`${uiText('Truy xuất lô hàng')} · OSP Suite`);
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
   const [offset, setOffset] = useState(0);
-
   useEffect(() => {
     let active = true;
-    document.title = `${uiText('Truy xuất lô hàng')} · OSP Suite`;
     const params = new URLSearchParams({ limit: '100', offset: String(offset) });
     api(tenantPath(`/reports/inventory/lots/${encodeURIComponent(lotId)}/traceability?${params}`))
       .then((data) => { if (active) setReport(data); })
       .catch((reason) => { if (active) setError(reason.message || uiText('Không tải được lịch sử lô hàng.')); });
     return () => { active = false; };
   }, [lotId, offset]);
-
   return <div className="page">
     <div className="page-head"><div><a className="back-link" href={recordHref('inventory.lot', lotId)}>← {uiText('Mở thẻ lô')}</a><h1>{uiText('Truy xuất lô hàng')}</h1>
       {report && <p className="sub">{report.lot.product} · {report.lot.sku || uiText('Không có SKU')} · {uiText('Lô')} {report.lot.code}{report.lot.expiry ? ` · ${uiText('Hạn dùng')} ${fmtDate(report.lot.expiry)}` : ''}</p>}

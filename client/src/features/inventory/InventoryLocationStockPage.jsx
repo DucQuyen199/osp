@@ -1,19 +1,17 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { fmtMoney, fmtNumber, uiText } from '../../lib/i18n.js';
 import { loadRefs } from '../../lib/state.js';
-
 const quantity = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
-
 export default function InventoryLocationStockPage() {
+  useDocumentTitle(`${uiText('Tồn theo vị trí')} · OSP Suite`);
   const [warehouses, setWarehouses] = useState(new Map());
   const [warehouse, setWarehouse] = useState('');
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
   useEffect(() => { loadRefs('inventory.warehouse').then(setWarehouses); }, []);
-
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -28,9 +26,7 @@ export default function InventoryLocationStockPage() {
       setLoading(false);
     }
   }, [warehouse]);
-
-  useEffect(() => { document.title = `${uiText('Tồn theo vị trí')} · OSP Suite`; load(); }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Tồn kho theo vị trí')}</h1><p className="sub">{uiText('Số lượng và giá trị được tổng hợp từ phiếu kho theo từng bin.')}</p></div></div>
     <section className="card"><form className="toolbar" onSubmit={(event) => { event.preventDefault(); load(); }}>

@@ -1,26 +1,23 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { fetchEvents } from '../../lib/events.js';
 import { uiText } from '../../lib/i18n.js';
 import { EventTimeline } from '../entities/EntityDetailPage.jsx';
-
 export default function EventsPage() {
+  useDocumentTitle(`${uiText('Dòng sự kiện')} · OSP Suite`);
   const [events, setEvents] = useState(null);
   const [error, setError] = useState('');
   const [rootsOnly, setRootsOnly] = useState(true);
-
   useEffect(() => {
-    document.title = `${uiText('Dòng sự kiện')} · OSP Suite`;
     let active = true;
     fetchEvents(300).then((items) => { if (active) setEvents(items); })
       .catch((reason) => { if (active) setError(reason.message || uiText('Không tải được dòng sự kiện.')); });
     return () => { active = false; };
   }, []);
-
   const displayed = useMemo(() => {
     if (!events) return [];
     return [...events].reverse().filter((event) => !rootsOnly || event.depth === 0).slice(0, 200);
   }, [events, rootsOnly]);
-
   return <div className="page">
     <div className="page-head">
       <div>

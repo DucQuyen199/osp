@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localMonth } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
@@ -6,9 +7,7 @@ import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import { listHref } from '../../lib/routes.js';
 import payrollEnglish from './payroll.en.js';
-
 const t = (text) => uiTextWith(text, payrollEnglish);
-
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
 const weekdayOptions = [[1, 'T2'], [2, 'T3'], [3, 'T4'], [4, 'T5'], [5, 'T6'], [6, 'T7'], [7, 'CN']];
@@ -17,8 +16,8 @@ const csvCell = (value) => {
   const safe = typeof value === 'string' && (/^[\s]*[=+@]/.test(text) || /^[\s]*-/.test(text)) ? `'${text}` : text;
   return `"${safe.replaceAll('"', '""')}"`;
 };
-
 export default function PayrollWorkbenchPage() {
+  useDocumentTitle(`${t('Bảng lương')} · OSP Suite`);
   const [runs, setRuns] = useState([]);
   const [payslips, setPayslips] = useState([]);
   const [taxDeductions, setTaxDeductions] = useState([]);
@@ -33,7 +32,6 @@ export default function PayrollWorkbenchPage() {
   const [notice, setNotice] = useState('');
   const [reportYear, setReportYear] = useState(localMonth().slice(0, 4));
   const workflowApproval = app.meta?.modules?.some((module) => module.id === 'workflow-approval') || false;
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -52,8 +50,7 @@ export default function PayrollWorkbenchPage() {
     } catch (reason) { setError(t(reason.message || 'Không tải được bảng lương.')); }
     finally { if (!quiet) setLoading(false); }
   }, [workflowApproval]);
-
-  useEffect(() => { document.title = `${t('Bảng lương')} · OSP Suite`; load(); }, [load]);
+  useEffect(() => { load(); }, [load]);
   const selected = runs.find((row) => row.id === selectedId);
   const runSlips = useMemo(() => payslips.filter((row) => row.run === selectedId).sort((a, b) => String(employees.get(a.employee)?.name || '').localeCompare(String(employees.get(b.employee)?.name || ''), 'vi')), [payslips, selectedId, employees]);
   const annualDeductionCaps = useMemo(() => {
@@ -108,14 +105,12 @@ export default function PayrollWorkbenchPage() {
     approved: runs.filter((row) => row.status === 'approved').length,
     paid: runs.filter((row) => row.status === 'paid').length,
   }), [runs]);
-
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); setNotice(t(success)); await load(true); }
     catch (reason) { setError(t(reason.message || 'Thao tác không thành công.')); await load(true); }
     finally { setBusy(''); }
   }
-
   async function createRun(event) {
     event.preventDefault();
     await run('create', async () => {
@@ -123,7 +118,6 @@ export default function PayrollWorkbenchPage() {
       setSelectedId(row.id); setForm((current) => ({ ...current, period: '', payment_date: '' }));
     }, 'Đã mở bảng lương nháp. Hãy hoàn tất chấm công, nghỉ phép và các khoản điều chỉnh trước khi tính.');
   }
-
   async function doAction(row, verb) {
     const messages = {
       calculated: 'Đã tính phiếu lương theo nhân viên, lương hiệu lực, chấm công, nghỉ phép, ngày lễ, tăng ca và chính sách thuế/đóng góp đã duyệt.',
@@ -135,7 +129,6 @@ export default function PayrollWorkbenchPage() {
     };
     await run(`${row.id}:${verb}`, () => action('payroll.payroll_run', row, verb), messages[verb]);
   }
-
   function exportAnnualReport() {
     const columns = ['Mã nhân viên', 'Nhân viên', 'Số bảng lương đã chi', 'Lương gộp', 'Thu nhập tính thuế', 'Thuế TNCN đã khấu trừ', 'Khoản đóng góp của nhân viên', 'Thực nhận', 'Giảm trừ y tế đã duyệt', 'Giảm trừ giáo dục đã duyệt'].map(t);
     const rows = annualReport.map((row) => {
@@ -148,7 +141,6 @@ export default function PayrollWorkbenchPage() {
     link.href = url; link.download = `payroll-withholding-${reportYear}.csv`; link.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-
   const runApproval = (row) => approvalRequests.find((item) => item.entity === 'payroll.payroll_run' && item.record_id === row.id);
   const canDirectApprove = !workflowApproval && can('payroll.payroll_run.approved');
   const inputLinks = [
@@ -161,20 +153,15 @@ export default function PayrollWorkbenchPage() {
     ['hrm.attendance.read', 'hrm.attendance', 'Chấm công'],
     ['hrm.leave_request.read', 'hrm.leave_request', 'Nghỉ phép'],
   ].filter(([permission]) => can(permission));
-
   return <div className="page">
     <div className="page-head"><div><h1>{t('Điều hành bảng lương')}</h1><p className="sub">{t('Chốt kỳ lương từ chấm công, phép, tăng ca và chính sách đã duyệt; gửi phê duyệt, ghi sổ kế toán và xác nhận chi trả.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     <div className="stats u-legacy-bf4a218e05" ><div className="card stat"><span className="stat-label">{t('Nháp / cần xử lý')}</span><strong className="stat-value">{totals.draft}</strong></div><div className="card stat"><span className="stat-label">{t('Chờ duyệt')}</span><strong className="stat-value">{totals.pending}</strong></div><div className="card stat"><span className="stat-label">{t('Đã duyệt / chờ trả')}</span><strong className="stat-value">{totals.approved}</strong></div><div className="card stat"><span className="stat-label">{t('Đã chi trả')}</span><strong className="stat-value">{totals.paid}</strong></div></div>
-
     {can('payroll.payroll_run.create') && <section className="card card-pad"><h2>{t('Mở kỳ lương')}</h2><form className="form-grid" onSubmit={createRun}><label className="field"><span className="label">{t('Kỳ lương *')}</span><input className="input" required type="month" value={form.period} onChange={(event) => setForm({ ...form, period: event.target.value })}/></label><label className="field"><span className="label">{t('Giờ chuẩn mặc định mỗi ngày')}</span><input className="input num" type="number" min="1" max="24" step="0.25" value={form.hours_per_day} onChange={(event) => setForm({ ...form, hours_per_day: event.target.value })}/><span className="small muted">{t('Giờ chuẩn riêng trong hồ sơ nhân viên được ưu tiên; giá trị này dùng khi nhân viên chưa cấu hình. Thời gian vượt chuẩn tính qua tăng ca đã duyệt.')}</span></label><fieldset className="field u-legacy-d865c2ed50" ><legend className="label">{t('Ngày làm việc mặc định trong tuần *')}</legend><div className="row wrap u-legacy-d5a33b90d3" >{weekdayOptions.map(([day, label]) => <label className="row small u-legacy-0d6046eefe" key={day} ><input type="checkbox" checked={form.working_weekdays.includes(day)} onChange={() => setForm((current) => ({ ...current, working_weekdays: current.working_weekdays.includes(day) ? current.working_weekdays.filter((value) => value !== day) : [...current.working_weekdays, day].sort((a, b) => a - b) }))}/>{t(label)}</label>)}</div><span className="small muted">{t('Mặc định thứ Hai–thứ Sáu. Hệ thống ưu tiên lịch tuần của từng nhân viên và lịch theo ngày/ca xoay đã áp dụng trong HRM; lịch của kỳ dùng làm giá trị mặc định khi nhân viên chưa cấu hình.')}</span></fieldset><label className="field"><span className="label">{t('Ngày dự kiến chi *')}</span><input className="input" required type="date" value={form.payment_date} onChange={(event) => setForm({ ...form, payment_date: event.target.value })}/></label><label className="field"><span className="label">{t('Phương thức chi *')}</span><select className="select" required value={form.payment_method} onChange={(event) => setForm({ ...form, payment_method: event.target.value })}><option value="bank">{t('Chuyển khoản')}</option><option value="cash">{t('Tiền mặt')}</option></select></label><div className="row"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !form.period || !form.payment_date || !form.working_weekdays.length}>{t('Tạo kỳ lương nháp')}</button></div></form></section>}
-
     <section className="card card-pad u-legacy-92c18f6bda" ><div className="row wrap"><h2>{t('Đầu vào và chính sách')}</h2><span className="grow"/><span className="small muted">{t('Hoàn tất và duyệt dữ liệu nguồn trước khi tính kỳ lương.')}</span></div><div className="row wrap u-legacy-43a97fe494" >{inputLinks.map(([, entity, label]) => <a className="btn btn-secondary btn-sm" key={entity} href={listHref(entity)}>{t(label)}</a>)}</div></section>
-
     {can('payroll.payroll_run.read') && can('payroll.payslip.read') && <section className="card card-pad u-legacy-92c18f6bda" ><div className="row wrap"><div><h2>{t('Tổng hợp lương và thuế theo năm')}</h2><p className="small muted">{t('Cộng phiếu từ bảng lương có ngày chi trong năm. Các khoản y tế/giáo dục là hồ sơ đã duyệt, giới hạn theo chính sách thuế năm. Nếu dùng các khoản giảm trừ này để quyết toán, cá nhân phải tự quyết toán; báo cáo không tính nghĩa vụ thuế cuối cùng.')}</p></div><span className="grow"/><label className="field"><span className="label">{t('Năm')}</span><select className="select" value={reportYear} onChange={(event) => setReportYear(event.target.value)}>{reportYears.map((year) => <option key={year} value={year}>{year}</option>)}</select></label><button className="btn btn-secondary" type="button" disabled={!annualReport.length} onClick={exportAnnualReport}>{t('Tải CSV')}</button></div>
       {loading ? <div className="skeleton" data-h="row"/> : annualReport.length ? <div className="table-wrap"><table className="table"><thead><tr><th>{t('Nhân viên')}</th><th>{t('Số bảng lương đã chi')}</th><th>{t('Lương gộp')}</th><th>{t('Thu nhập tính thuế')}</th><th>{t('Thuế đã khấu trừ')}</th><th>{t('Đóng góp nhân viên')}</th><th>{t('Thực nhận')}</th><th>{t('Giảm trừ y tế')}</th><th>{t('Giảm trừ giáo dục')}</th></tr></thead><tbody>{annualReport.map((row) => <tr key={row.employee}><td>{employees.get(row.employee) ? recordLabel('hrm.employee', employees.get(row.employee)) : t('Nhân viên')}</td><td>{row.paidRuns}</td><td>{fmtMoney(row.gross)}</td><td>{fmtMoney(row.taxable_income)}</td><td>{fmtMoney(row.income_tax)}</td><td>{fmtMoney(row.employee_contribution)}</td><td><strong>{fmtMoney(row.net)}</strong></td><td>{row.medical_deduction === null ? '—' : fmtMoney(row.medical_deduction)}</td><td>{row.education_deduction === null ? '—' : fmtMoney(row.education_deduction)}</td></tr>)}</tbody><tfoot><tr><th>{t('Tổng')}</th><th>—</th>{['gross', 'taxable_income', 'income_tax', 'employee_contribution', 'net', 'medical_deduction', 'education_deduction'].map((field) => <th key={field}>{annualReport.some((row) => row[field] === null) ? '—' : fmtMoney(annualReport.reduce((sum, row) => sum + (Number(row[field]) || 0), 0))}</th>)}</tr></tfoot></table></div> : <div className="empty">{t('Chưa có payroll hoặc hồ sơ giảm trừ đã duyệt trong năm')} {reportYear}.</div>}
     </section>}
-
     {loading ? <div className="skeleton" data-h="row"/> : !runs.length ? <div className="card card-pad empty u-legacy-92c18f6bda" >{t('Chưa có kỳ lương. Mở kỳ mới sau khi xác nhận kỳ chấm công và chính sách lương.')}</div> : <div className="layout-split u-legacy-92c18f6bda" >
       <section className="card card-pad"><h2>{t('Các kỳ lương')}</h2><div className="table-wrap"><table className="table"><thead><tr><th>{t('Kỳ')}</th><th>{t('Ngày chi')}</th><th>{t('Thực nhận')}</th><th>{t('Trạng thái')}</th></tr></thead><tbody>{runs.map((row) => <tr {...selectableTableRowProps} key={row.id} aria-selected={selectedId === row.id} className={[selectedId === row.id ? 'selected' : '', 'u-legacy-9463ff4798'].filter(Boolean).join(' ')} onClick={() => setSelectedId(row.id)} ><td><strong>{row.period}</strong><div className="small muted">{runSlips.length && selectedId === row.id ? `${runSlips.length} ${t('phiếu lương')}` : ''}</div></td><td>{fmtDate(row.payment_date)}</td><td>{fmtMoney(row.total_net || 0)}</td><td>{t(statusLabel(row.status))}</td></tr>)}</tbody></table></div></section>
       {selected && <section className="card card-pad"><div className="row wrap"><div><h2>{t('Bảng lương')} {selected.period}</h2><div className="small muted">{runSlips.length} {t('nhân viên')} · {fmtMoney(selected.total_net || 0)} {t('thực nhận')} · {t('Chi ngày')} {fmtDate(selected.payment_date)} {t('bằng')} {t(selected.payment_method === 'cash' ? 'tiền mặt' : 'chuyển khoản')} · {t('Ngày làm việc mặc định:')} {(Array.isArray(selected.working_weekdays) ? selected.working_weekdays : [1, 2, 3, 4, 5]).map((day) => t(weekdayOptions.find(([number]) => number === Number(day))?.[1] || '')).filter(Boolean).join(', ')}</div></div><span className="grow"/><span className="badge warning">{t(statusLabel(selected.status))}</span></div>

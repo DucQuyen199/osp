@@ -1,17 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, fmtNumber, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import agricultureEnglish from './agriculture.en.js';
-
 const t = (text) => uiTextWith(text, agricultureEnglish);
-
 const listItems = (response) => Array.isArray(response?.items) ? response.items : [];
 const today = localDate;
-
 export default function AgricultureOperationsPage() {
+  useDocumentTitle(`${t('Điều hành mùa vụ')} · OSP Suite`);
   const [farms, setFarms] = useState([]);
   const [cycles, setCycles] = useState([]);
   const [harvests, setHarvests] = useState([]);
@@ -49,7 +48,6 @@ export default function AgricultureOperationsPage() {
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async (preserveNotice = false) => {
     setLoading(true); setError(''); if (!preserveNotice) setNotice('');
     try {
@@ -67,9 +65,7 @@ export default function AgricultureOperationsPage() {
     } catch (reason) { setError(reason.message || t('Không tải được dữ liệu mùa vụ.')); }
     finally { setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = `${t('Điều hành mùa vụ')} · OSP Suite`; load(); }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   const selectedCycle = cycles.find((item) => item.id === cycleId) || null;
   const selectedFarm = selectedCycle && farms.find((farm) => farm.id === selectedCycle.farm);
   const unitsFor = (productId) => {
@@ -141,7 +137,6 @@ export default function AgricultureOperationsPage() {
   const hasArea = Number.isFinite(area) && area > 0;
   const activeCycles = cycles.filter((item) => item.status === 'growing').length;
   const upcomingCycles = cycles.filter((item) => item.status === 'growing' && item.expected_harvest && item.expected_harvest >= today()).length;
-
   const createFarm = async (event) => {
     event.preventDefault(); setBusy('farm'); setError(''); setNotice('');
     try {
@@ -151,7 +146,6 @@ export default function AgricultureOperationsPage() {
     } catch (reason) { setError(reason.message || t('Không tạo được trang trại.')); }
     finally { setBusy(''); }
   };
-
   const createCycle = async (event) => {
     event.preventDefault(); setBusy('cycle'); setError(''); setNotice('');
     try {
@@ -160,7 +154,6 @@ export default function AgricultureOperationsPage() {
     } catch (reason) { setError(reason.message || t('Không tạo được vụ mùa.')); }
     finally { setBusy(''); }
   };
-
   const createInput = async (event) => {
     event.preventDefault(); if (!selectedCycle) return;
     setBusy('input'); setError(''); setNotice('');
@@ -170,7 +163,6 @@ export default function AgricultureOperationsPage() {
     } catch (reason) { setError(reason.message || t('Không ghi được nhật ký vật tư. Kiểm tra kho và tồn khả dụng.')); }
     finally { setBusy(''); }
   };
-
   const createHarvest = async (event) => {
     event.preventDefault(); if (!selectedCycle) return;
     setBusy('harvest'); setError(''); setNotice('');
@@ -180,7 +172,6 @@ export default function AgricultureOperationsPage() {
     } catch (reason) { setError(reason.message || t('Không ghi nhận được thu hoạch. Kiểm tra ngày vụ mùa và kho nhận.')); }
     finally { setBusy(''); }
   };
-
   const closeCycle = async (action) => {
     if (!selectedCycle) return;
     setBusy(`cycle:${action}`); setError(''); setNotice('');
@@ -188,14 +179,12 @@ export default function AgricultureOperationsPage() {
     catch (reason) { setError(reason.message || t('Không cập nhật được trạng thái vụ mùa.')); }
     finally { setBusy(''); }
   };
-
   const inputKinds = [['fertilizer', 'Phân bón'], ['pesticide', 'Thuốc bảo vệ thực vật'], ['seed', 'Giống'], ['water', 'Nước tưới']];
   const requiresProduct = ['fertilizer', 'pesticide', 'seed'].includes(inputKind);
   const pesticideIntervalMissing = inputKind === 'pesticide' && Boolean(inputProduct)
     && (products.get(inputProduct)?.preharvest_interval_days == null
       || !Number.isInteger(Number(products.get(inputProduct)?.preharvest_interval_days))
       || Number(products.get(inputProduct)?.preharvest_interval_days) < 0);
-
   return <div className="page agriculture-page">
     <div className="page-head"><div><h1>{t('Điều hành mùa vụ')}</h1><p className="sub">{t('Quản lý trang trại, theo dõi vụ đang canh tác, ghi vật tư và nhập sản lượng thu hoạch vào kho.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{loading ? t('Đang tải…') : t('Làm mới')}</button></div>
     <div className="row wrap agriculture-summary"><span className="badge success">{t('Vụ đang canh tác')}: {activeCycles}</span><span className="badge warning">{t('Có ngày thu dự kiến')}: {upcomingCycles}</span><span className="badge plain">{t('Trang trại')}: {farms.length}</span></div>

@@ -1,15 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtMoney, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import ecommerceEnglish from './ecommerce.en.js';
 import WebOrderCard from './components/WebOrderCard.jsx';
 import WebOrderCreateForm from './components/WebOrderCreateForm.jsx';
-
 const t = (text) => uiTextWith(text, ecommerceEnglish);
-
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 export default function EcommerceOrderDeskPage() {
+  useDocumentTitle(`${t('Điều phối đơn online')} · OSP Suite`);
   const [storefronts, setStorefronts] = useState(new Map());
   const [parties, setParties] = useState(new Map());
   const [products, setProducts] = useState(new Map());
@@ -28,7 +28,6 @@ export default function EcommerceOrderDeskPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -46,14 +45,10 @@ export default function EcommerceOrderDeskPage() {
     } catch (reason) { setError(t(reason.message || 'Không tải được danh sách đơn online.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
-
-  useEffect(() => {
-    document.title = `${t('Điều phối đơn online')} · OSP Suite`;
-    load();
+  useEffect(() => { load();
     const timer = window.setInterval(() => load(true), 20000);
     return () => window.clearInterval(timer);
   }, [load]);
-
   const cartLines = useMemo(() => Object.entries(quantities).map(([id, qty]) => ({ product: products.get(id), qty: Number(qty) })).filter((line) => line.product && line.qty > 0), [quantities, products]);
   const filteredProducts = [...products.values()].filter((item) => item.active !== false && (!query || `${item.name} ${item.sku || ''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()))).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
   const relatedSalesOrder = (webOrderId) => salesOrders.find((item) => item.source === 'ecommerce' && item.source_id === webOrderId);
@@ -64,7 +59,6 @@ export default function EcommerceOrderDeskPage() {
     if (qty > 0) next[id] = qty; else delete next[id];
     return next;
   });
-
   const createCart = async (event) => {
     event.preventDefault(); if (!cartLines.length) return;
     setBusy('create'); setError(''); setNotice('');
@@ -78,7 +72,6 @@ export default function EcommerceOrderDeskPage() {
     } catch (reason) { setError(t(reason.message || 'Không tạo được giỏ hàng online.')); }
     finally { setBusy(''); }
   };
-
   const transition = async (order, action) => {
     setBusy(`${order.id}:${action}`); setError(''); setNotice('');
     try {
@@ -88,7 +81,6 @@ export default function EcommerceOrderDeskPage() {
     } catch (reason) { setError(t(reason.message || (action === 'placed' ? 'Không đặt được đơn. Kiểm tra giá, kho và tồn khả dụng.' : 'Không hủy được giỏ hàng.'))); await load(true); }
     finally { setBusy(''); }
   };
-
   const refreshCartPrice = async (order) => {
     setBusy(`${order.id}:reprice`); setError(''); setNotice('');
     try {
@@ -101,7 +93,6 @@ export default function EcommerceOrderDeskPage() {
     } catch (reason) { setError(t(reason.message || 'Không cập nhật được giá giỏ hàng.')); await load(true); }
     finally { setBusy(''); }
   };
-
   const renderOrder = (order) => {
     const currencyCode = currencies.get(order.currency)?.code;
     const sale = relatedSalesOrder(order.id);
@@ -130,11 +121,9 @@ export default function EcommerceOrderDeskPage() {
       t={t}
     />;
   };
-
   const draftCarts = orders.filter((order) => order.status === 'cart');
   const placedOrders = orders.filter((order) => order.status === 'placed');
   const cancelledOrders = orders.filter((order) => order.status === 'cancelled');
-
   return <div className="page ecommerce-page">
     <div className="page-head"><div><h1>{t('Điều phối đơn online')}</h1><p className="sub">{t('Giá đơn được lấy từ gian hàng và bảng giá. Đơn có vận đơn ghi nhận tồn kho theo từng lần giao và lập hóa đơn sau khi giao đủ; đơn bán trực tiếp tuân theo luồng bán hàng chuẩn.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{loading ? t('Đang tải…') : t('Làm mới')}</button></div>
     <div className="row wrap ecommerce-summary"><span className="badge warning">{t('Giỏ chờ đặt:')} {draftCarts.length}</span><span className="badge success">{t('Đã đặt:')} {placedOrders.length}</span><span className="badge plain">{t('Đã hủy:')} {cancelledOrders.length}</span></div>

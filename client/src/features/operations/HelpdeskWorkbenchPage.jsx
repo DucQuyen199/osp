@@ -1,15 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
 import helpdeskEnglish from './helpdesk.en.js';
-
 const t = (text) => uiTextWith(text, helpdeskEnglish);
-
 const emptyTicket = { subject: '', party: '', priority: 'normal', channel: 'email', sla_policy: '', description: '', assignee: '', assignee_employee: '' };
-
 export default function HelpdeskWorkbenchPage() {
+  useDocumentTitle(`${t('Hộp thư hỗ trợ')} · OSP Suite`);
   const [tickets, setTickets] = useState([]);
   const [messages, setMessages] = useState([]);
   const [parties, setParties] = useState(new Map());
@@ -26,7 +25,6 @@ export default function HelpdeskWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -44,30 +42,25 @@ export default function HelpdeskWorkbenchPage() {
     } catch (reason) { setError(t(reason.message || 'Không thể tải hộp thư hỗ trợ.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = `${t('Hộp thư hỗ trợ')} · OSP Suite`; load(); }, [load]);
+  useEffect(() => { load(); }, [load]);
   const selected = tickets.find((ticket) => ticket.id === selectedId);
   const thread = useMemo(() => messages.filter((message) => message.ticket === selectedId).sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || ''))), [messages, selectedId]);
   const visibleTickets = tickets.filter((ticket) => filter === 'all' || (filter === 'active' ? ['open', 'in_progress'].includes(ticket.status) : ticket.status === filter));
-
   useEffect(() => {
     if (!visibleTickets.some((ticket) => ticket.id === selectedId)) setSelectedId(visibleTickets[0]?.id || '');
   }, [filter, tickets, selectedId]);
-
   useEffect(() => {
     setAssignment(selected?.assignee || '');
     setAssignmentEmployee(selected?.assignee_employee || '');
     setResolution(selected?.resolution || '');
     setMessageForm((current) => ({ ...current, author: app.user?.name || current.author || '' }));
   }, [selectedId]);
-
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
     try { const result = await operation(); await load(true); if (success) setNotice(t(success)); return result; }
     catch (reason) { setError(t(reason.message || 'Không thể hoàn tất thao tác.')); await load(true); }
     finally { setBusy(''); }
   }
-
   async function createTicket(event) {
     event.preventDefault();
     const created = await run('ticket', async () => {
@@ -84,7 +77,6 @@ export default function HelpdeskWorkbenchPage() {
     }, 'Đã tiếp nhận ticket hỗ trợ.');
     if (created) { setFilter('active'); setSelectedId(created.id); }
   }
-
   async function saveAssignment(event) {
     event.preventDefault(); if (!selected) return;
     const employee = employees.get(assignmentEmployee);
@@ -93,7 +85,6 @@ export default function HelpdeskWorkbenchPage() {
       assignee_employee: assignmentEmployee || null,
     } }), 'Đã lưu người phụ trách.');
   }
-
   async function addMessage(event) {
     event.preventDefault(); if (!selected) return;
     const direction = messageForm.direction;
@@ -104,21 +95,17 @@ export default function HelpdeskWorkbenchPage() {
       setMessageForm((current) => ({ ...current, body: '' }));
     }, direction === 'outbound' ? 'Đã gửi phản hồi và cập nhật thời điểm phản hồi SLA.' : direction === 'internal' ? 'Đã lưu ghi chú nội bộ.' : 'Đã ghi nhận tin nhắn khách hàng.');
   }
-
   async function resolveTicket(event) {
     event.preventDefault(); if (!selected) return;
     await run(`${selected.id}:resolved`, () => api(dataPath('helpdesk.ticket', selected.id, 'resolved'), { method: 'POST', body: { resolution: resolution.trim() } }), 'Đã giải quyết ticket và ghi thời điểm SLA.');
   }
-
   async function transition(action, message) {
     if (!selected) return;
     await run(`${selected.id}:${action}`, () => api(dataPath('helpdesk.ticket', selected.id, action), { method: 'POST' }), message);
   }
-
   const partyName = (ticket) => ticket?.party ? recordLabel('master-data.party', parties.get(ticket.party) || { id: ticket.party }) : t('Khách chưa gắn hồ sơ');
   const activeEmployees = [...employees.values()].filter((employee) => employee.status === 'active');
   const directionLabel = { inbound: 'Khách hàng', outbound: 'Phản hồi', internal: 'Ghi chú nội bộ' };
-
   return <div className="page">
     <div className="page-head"><div><h1>{t('Hộp thư hỗ trợ')}</h1><p className="sub">{t('Tiếp nhận, phân công, trao đổi với khách hàng, theo dõi SLA và lưu kết quả xử lý trong cùng hồ sơ.')}</p></div><div className="row wrap"><a className="btn btn-secondary" href="#/reports/helpdesk/sla">{t('Báo cáo SLA')}</a><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}

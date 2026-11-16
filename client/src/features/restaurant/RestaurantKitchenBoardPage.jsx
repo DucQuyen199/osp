@@ -1,19 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtAgo, fmtDateTime, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { can, loadRefs, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import restaurantEnglish from './restaurant.en.js';
-
 const t = (text) => uiTextWith(text, restaurantEnglish);
-
 const STATIONS = [
       ['all', 'Tất cả trạm'],
   ['kitchen', 'Bếp'],
   ['bar', 'Quầy pha chế'],
 ];
-
 export default function RestaurantKitchenBoardPage() {
+  useDocumentTitle(`${t('Màn hình bếp')} · OSP Suite`);
   const [station, setStation] = useState('all');
   const [items, setItems] = useState([]);
   const [products, setProducts] = useState(new Map());
@@ -23,7 +22,6 @@ export default function RestaurantKitchenBoardPage() {
   const [busy, setBusy] = useState('');
   const [lastUpdated, setLastUpdated] = useState(null);
   const [printingTicketId, setPrintingTicketId] = useState('');
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setError(''); setLoading(true); }
     try {
@@ -42,20 +40,15 @@ export default function RestaurantKitchenBoardPage() {
       if (!quiet) setLoading(false);
     }
   }, [station, products]);
-
-  useEffect(() => {
-    document.title = `${t('Màn hình bếp')} · OSP Suite`;
-    load();
+  useEffect(() => { load();
     const timer = window.setInterval(() => load(true), 15000);
     return () => window.clearInterval(timer);
   }, [load]);
-
   const grouped = useMemo(() => ({
     queued: items.filter((item) => item.status === 'queued'),
     preparing: items.filter((item) => item.status === 'preparing'),
     ready: items.filter((item) => item.status === 'ready'),
   }), [items]);
-
   const transition = async (ticket, action) => {
     const key = `${ticket.id}:${action}`;
     setBusy(key);
@@ -70,14 +63,12 @@ export default function RestaurantKitchenBoardPage() {
       setBusy('');
     }
   };
-
   const printTicket = (ticket) => {
     setPrintingTicketId(ticket.id);
     const finishPrint = () => setPrintingTicketId('');
     window.addEventListener('afterprint', finishPrint, { once: true });
     window.requestAnimationFrame(() => window.print());
   };
-
   const renderTicket = (ticket) => <article className={`card kitchen-ticket${printingTicketId === ticket.id ? ' is-printing' : ''}`} key={ticket.id}>
     <header className="card-head">
       <div>{can('restaurant.table_order.read') ? <a href={recordHref('restaurant.table_order', ticket.orderId)}><strong>{ticket.table || t('Mang đi')}</strong></a> : <strong>{ticket.table || t('Mang đi')}</strong>}<div className="small muted">{fmtAgo(ticket.createdAt)} · {t(ticket.station === 'bar' ? 'Quầy pha chế' : 'Bếp')}</div></div>
@@ -97,7 +88,6 @@ export default function RestaurantKitchenBoardPage() {
       {ticket.status === 'preparing' && can('restaurant.kitchen_ticket.ready') && <button className="btn btn-primary" type="button" disabled={Boolean(busy)} onClick={() => transition(ticket, 'ready')}>{busy === `${ticket.id}:ready` ? t('Đang cập nhật…') : t('Báo món đã xong')}</button>}
     </footer>
   </article>;
-
   return <div className="page">
     <div className="page-head"><div><h1>{t('Màn hình bếp')}</h1><p className="sub">{t('Phiếu theo thứ tự nhận món. Bảng tự làm mới mỗi 15 giây; trạng thái món được dùng để cho phép phục vụ order.')}</p></div><div className="row wrap">
       <label className="field"><span className="label">{t('Trạm')}</span><select className="select" value={station} onChange={(event) => setStation(event.target.value)}>{STATIONS.map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}</select></label>

@@ -1,16 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, fmtNumber, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import autoServiceEnglish from './auto-service.en.js';
 import RepairQuoteEditor from './components/RepairQuoteEditor.jsx';
-
 const t = (text) => uiTextWith(text, autoServiceEnglish);
-
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
-
 export default function AutoServiceWorkshopPage() {
+  useDocumentTitle(`${t('Xưởng sửa chữa')} · OSP Suite`);
   const [vehicles, setVehicles] = useState([]);
   const [orders, setOrders] = useState([]);
   const [parties, setParties] = useState(new Map());
@@ -37,7 +36,6 @@ export default function AutoServiceWorkshopPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -56,9 +54,7 @@ export default function AutoServiceWorkshopPage() {
     } catch (reason) { setError(reason.message || t('Không tải được dữ liệu xưởng sửa chữa.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = `${t('Xưởng sửa chữa')} · OSP Suite`; load(); }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   const selected = orders.find((item) => item.id === selectedId) || null;
   const canCreateVehicle = can('auto-service.vehicle.create');
   const canCreateOrder = can('auto-service.repair_order.create');
@@ -94,7 +90,6 @@ export default function AutoServiceWorkshopPage() {
   });
   const vehicleOrders = selected ? orders.filter((item) => item.vehicle === selected.vehicle) : [];
   const selectedInvoice = selected && invoices.find((item) => item.source === 'repair_order' && item.source_id === selected.id);
-
   const createVehicle = async (event) => {
     event.preventDefault(); setBusy('vehicle'); setError(''); setNotice('');
     try {
@@ -107,7 +102,6 @@ export default function AutoServiceWorkshopPage() {
     } catch (reason) { setError(t(reason.message || 'Không tiếp nhận được xe.')); }
     finally { setBusy(''); }
   };
-
   const addLine = () => setDraftLines((current) => [...current, { product: productChoices[0]?.id || '', qty: '1', uom: '' }]);
   const updateLine = (index, key, value) => setDraftLines((current) => current.map((line, i) => i === index ? { ...line, [key]: value, ...(key === 'product' ? { uom: '' } : {}) } : line));
   const createOrder = async (event) => {
@@ -124,7 +118,6 @@ export default function AutoServiceWorkshopPage() {
     } catch (reason) { setError(t(reason.message || 'Không lập được lệnh sửa chữa. Kiểm tra phụ tùng, giá và kho.')); }
     finally { setBusy(''); }
   };
-
   const transition = async (order, action) => {
     if (action === 'quote_declined') {
       const reason = declineReasons[order.id]?.trim() || '';
@@ -145,7 +138,6 @@ export default function AutoServiceWorkshopPage() {
     } catch (reason) { setError(t(reason.message || 'Không chuyển được trạng thái. Kiểm tra tồn kho phụ tùng và dữ liệu liên quan.')); await load(true); }
     finally { setBusy(''); }
   };
-
   const startQuoteEdit = (order) => setQuoteDraft({
     repairOrderId: order.id,
     complaint: order.complaint || '',
@@ -185,7 +177,6 @@ export default function AutoServiceWorkshopPage() {
       setError(reason.message || t('Không cập nhật được báo giá. Kiểm tra phụ tùng, giá và kho.'));
     } finally { setBusy(''); }
   };
-
   const updateOdometer = async (event) => {
     event.preventDefault();
     if (!currentVehicle || odometerReading === '') return;
@@ -196,7 +187,6 @@ export default function AutoServiceWorkshopPage() {
     } catch (reason) { setError(t(reason.message || 'Không thể cập nhật số công-tơ-mét.')); }
     finally { setBusy(''); }
   };
-
   const orderVehicle = selected && vehicleById.get(selected.vehicle);
   return <div className="page-content workshop-page">
     <header className="page-header"><div><h1>{t('Xưởng sửa chữa')}</h1><p className="muted">{t('Tiếp nhận xe, báo giá theo danh mục, xác nhận khách hàng, sửa chữa và bàn giao.')}</p></div><button className="button" onClick={() => load()} disabled={loading}>{t('Làm mới')}</button></header>
@@ -210,7 +200,6 @@ export default function AutoServiceWorkshopPage() {
       <label className="field"><span>{t('Số km hiện tại')}</span><input className="input" type="number" min="0" value={odometer} onChange={(event) => setOdometer(event.target.value)} /></label>
       <button className="button primary" disabled={busy === 'vehicle' || !party}>{busy === 'vehicle' ? t('Đang lưu…') : t('Lưu xe')}</button>
     </form></section>}
-
     {canCreateOrder && <section className="workshop-intake card"><h2>{t('Lập lệnh và báo giá')}</h2><form onSubmit={createOrder}>
       <div className="workshop-form">
         <label className="field"><span>{t('Xe')}</span><select className="select" required value={vehicleId} onChange={(event) => setVehicleId(event.target.value)}><option value="">{t('Chọn xe')}</option>{vehicles.map((item) => <option key={item.id} value={item.id}>{item.plate} · {[item.make, item.model].filter(Boolean).join(' ')}</option>)}</select></label>
@@ -229,7 +218,6 @@ export default function AutoServiceWorkshopPage() {
       {needsWarehouse && !warehouseId && <p className="small muted">{t('Lệnh có phụ tùng theo dõi tồn kho cần chọn kho trước khi lập.')}</p>}
       <button className="button primary" disabled={busy === 'order' || !vehicleId || intakeOdometer === '' || !draftLines.length || (needsWarehouse && !warehouseId)}>{busy === 'order' ? t('Đang lập…') : t('Lập báo giá chờ khách duyệt')}</button>
     </form></section>}
-
     <div className="workshop-layout">
       <section className="workshop-order-list"><header><h2>{t('Lệnh sửa chữa')}</h2><span className="badge warning">{openOrders.length} {t('đang xử lý')}</span></header>
         {loading ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : orders.length ? <div className="workshop-orders">{orders.map((order) => { const vehicle = vehicleById.get(order.vehicle); return <button key={order.id} className={`card workshop-order${selectedId === order.id ? ' selected' : ''}`} onClick={() => setSelectedId(order.id)}>
@@ -237,7 +225,6 @@ export default function AutoServiceWorkshopPage() {
           <span>{recordLabel('master-data.party', parties.get(order.party))}</span><span className="small muted">{fmtDateTime(order.created_at)}</span><strong className="num">{fmtMoney(order.total || 0)}</strong>
         </button>; })}</div> : <div className="card-pad muted">{t('Chưa có lệnh sửa chữa.')}</div>}
       </section>
-
       <section className="workshop-detail card">{selected ? <>
         <header className="workshop-section-head"><div><h2>{orderVehicle?.plate || t('Lệnh sửa chữa')}</h2><div className="muted">{recordLabel('master-data.party', parties.get(selected.party))} · {warehouses.get(selected.warehouse)?.name || t('Chưa chọn kho')}</div></div><span className={`badge ${['completed', 'delivered'].includes(selected.status) ? 'success' : selected.status === 'quote_declined' ? 'plain' : 'warning'}`}>{statusLabel(selected.status)}</span></header>
         <dl className="workshop-summary"><div><dt>{t('Xe')}</dt><dd>{[orderVehicle?.make, orderVehicle?.model].filter(Boolean).join(' ') || t('Chưa khai báo')}</dd></div><div><dt>{t('Km lúc tiếp nhận')}</dt><dd>{selected.odometer_reading == null ? t('Chưa ghi') : `${fmtNumber(selected.odometer_reading)} km`}</dd></div><div><dt>{t('Km ghi nhận gần nhất')}</dt><dd>{orderVehicle && lastOdometerByVehicle.has(orderVehicle.id) ? `${fmtNumber(lastOdometerByVehicle.get(orderVehicle.id))} km` : '—'}</dd></div><div><dt>{t('VIN')}</dt><dd>{orderVehicle?.vin || '—'}</dd></div><div><dt>{t('Ngày nhận')}</dt><dd>{fmtDateTime(selected.created_at)}</dd></div></dl>

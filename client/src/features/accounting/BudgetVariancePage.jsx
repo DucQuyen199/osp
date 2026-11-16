@@ -1,11 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { fmtMoney, fmtNumber, uiText } from '../../lib/i18n.js';
-
 const year = () => localDate().slice(0, 4);
 const amount = (value) => Number(value || 0);
-
 function VarianceStats({ summary }) {
   return <div className="stats">
     <div className="card stat"><span className="stat-label">{uiText('Chi phí dự toán')}</span><strong className="stat-value num">{fmtMoney(summary.expensePlannedTotal)}</strong></div>
@@ -17,13 +16,12 @@ function VarianceStats({ summary }) {
     <div className="card stat"><span className="stat-label">{uiText('Dòng bất lợi')}</span><strong className="stat-value num">{fmtNumber(Number(summary.unfavorableLines || summary.overBudgetLines || 0))}</strong></div>
   </div>;
 }
-
 export default function BudgetVariancePage() {
+  useDocumentTitle(`${uiText('Thực hiện ngân sách')} · OSP Suite`);
   const [period, setPeriod] = useState(year());
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -38,9 +36,7 @@ export default function BudgetVariancePage() {
       setLoading(false);
     }
   }, [period]);
-
-  useEffect(() => { document.title = `${uiText('Thực hiện ngân sách')} · OSP Suite`; load(); }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Thực hiện ngân sách')}</h1><p className="sub">{uiText('Đối chiếu kế hoạch doanh thu và chi phí với số phát sinh theo số dư tự nhiên trên sổ kế toán.')}</p></div></div>
     <section className="card"><form className="toolbar" onSubmit={(event) => { event.preventDefault(); load(); }}>

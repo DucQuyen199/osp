@@ -1,20 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtAgo, fmtDateTime, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { can } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import logisticsEnglish from './logistics.en.js';
-
 const t = (text) => uiTextWith(text, logisticsEnglish);
-
 const LANES = [
   ['failed', 'Giao thất bại · cần xử lý'],
   ['partial', 'Giao thiếu · cần giao bù'],
   ['created', 'Chờ xuất phát'],
   ['dispatched', 'Đang giao'],
 ];
-
 export default function LogisticsDeliveryBoardPage() {
+  useDocumentTitle(`${t('Điều phối giao hàng')} · OSP Suite`);
   const [items, setItems] = useState([]);
   const [counts, setCounts] = useState({ created: 0, dispatched: 0, failed: 0, partial: 0 });
   const [truncated, setTruncated] = useState(false);
@@ -23,7 +22,6 @@ export default function LogisticsDeliveryBoardPage() {
   const [busy, setBusy] = useState('');
   const [lastUpdated, setLastUpdated] = useState(null);
   const [deliveryProof, setDeliveryProof] = useState({});
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -38,18 +36,13 @@ export default function LogisticsDeliveryBoardPage() {
       if (!quiet) setLoading(false);
     }
   }, []);
-
-  useEffect(() => {
-    document.title = `${t('Điều phối giao hàng')} · OSP Suite`;
-    load();
+  useEffect(() => { load();
     const timer = window.setInterval(() => load(true), 15000);
     return () => window.clearInterval(timer);
   }, [load]);
-
   const grouped = useMemo(() => Object.fromEntries(
     LANES.map(([status]) => [status, items.filter((item) => item.status === status)]),
   ), [items]);
-
   const transition = async (shipment, action) => {
     const key = `${shipment.id}:${action}`;
     setBusy(key);
@@ -64,7 +57,6 @@ export default function LogisticsDeliveryBoardPage() {
       setBusy('');
     }
   };
-
   const confirmDelivered = async (shipment) => {
     const proof = deliveryProof[shipment.id] || {};
     const receivedBy = proof.receivedBy?.trim() || '';
@@ -125,7 +117,6 @@ export default function LogisticsDeliveryBoardPage() {
       setBusy('');
     }
   };
-
   const redeliver = async (shipment) => {
     setBusy(`${shipment.id}:redeliver`);
     setError('');
@@ -139,7 +130,6 @@ export default function LogisticsDeliveryBoardPage() {
       setBusy('');
     }
   };
-
   const renderShipment = (shipment) => <article className="card delivery-card" key={shipment.id}>
     <header className="card-head">
       <div>
@@ -186,7 +176,6 @@ export default function LogisticsDeliveryBoardPage() {
       {shipment.status === 'failed' && can('logistics.shipment.read') && <a className="btn btn-secondary" href={recordHref('logistics.shipment', shipment.id)}>{t('Xem lịch sử')}</a>}
     </footer>
   </article>;
-
   return <div className="page">
     <div className="page-head"><div><h1>{t('Điều phối giao hàng')}</h1><p className="sub">{t('Theo dõi vận đơn cần xử lý, chuyến đang giao và giao thất bại. Xác nhận giao thành công sẽ chạy luồng xuất kho và cập nhật tiến độ đơn bán.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading} onClick={() => load()}>{loading ? t('Đang tải…') : t('Làm mới')}</button></div>
     <div className="row wrap delivery-summary"><span className="badge plain">{t('Chờ xuất phát')}: {counts.created}</span><span className="badge warning">{t('Đang giao')}: {counts.dispatched}</span><span className="badge danger">{t('Giao thất bại')}: {counts.failed}</span><span className="badge warning">{t('Giao thiếu')}: {counts.partial}</span>{lastUpdated && <span className="small muted">{t('Cập nhật lúc')} {fmtDateTime(lastUpdated)}</span>}</div>

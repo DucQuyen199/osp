@@ -1,20 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
 import loyaltyEnglish from './loyalty.en.js';
-
 const t = (text) => uiTextWith(text, loyaltyEnglish);
-
 const rows = (response) => Array.isArray(response?.items) ? response.items : [];
 const tiers = ['bronze', 'silver', 'gold', 'platinum'];
 const tierLabels = { bronze: 'Đồng', silver: 'Bạc', gold: 'Vàng', platinum: 'Bạch kim' };
 const sourceLabels = { pos_order: 'Đơn POS', sales_order: 'Đơn bán hàng', pos_order_refund: 'Hoàn POS', sales_return: 'Trả hàng' };
 const points = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 2 });
-
 export default function LoyaltyWorkbenchPage() {
+  useDocumentTitle(`${t('Khách hàng thân thiết')} · OSP Suite`);
   const [members, setMembers] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [vouchers, setVouchers] = useState([]);
@@ -26,7 +25,6 @@ export default function LoyaltyWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -44,20 +42,17 @@ export default function LoyaltyWorkbenchPage() {
     } catch (reason) { setError(t(reason.message || 'Không tải được chương trình thành viên.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = `${t('Khách hàng thân thiết')} · OSP Suite`; load(); }, [load]);
+  useEffect(() => { load(); }, [load]);
   const selected = members.find((row) => row.id === selectedId);
   const ledger = useMemo(() => transactions.filter((row) => row.party === selected?.party), [transactions, selected]);
   const totalPoints = members.reduce((sum, member) => sum + Number(member.points || 0), 0);
   const partyName = (id) => parties.has(id) ? recordLabel('master-data.party', parties.get(id)) : t('Khách hàng');
-
   async function run(key, operation, message) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); await load(true); setNotice(t(message)); }
     catch (reason) { setError(t(reason.message || 'Thao tác không thành công.')); }
     finally { setBusy(''); }
   }
-
   async function enroll(event) {
     event.preventDefault();
     await run('member:create', async () => {
@@ -65,12 +60,10 @@ export default function LoyaltyWorkbenchPage() {
       setSelectedId(created.id); setForm((current) => ({ ...current, party: '' }));
     }, 'Đã đăng ký thành viên. Điểm sẽ được cộng tự động từ đơn hàng đủ điều kiện.');
   }
-
   async function changeTier(tier) {
     if (!selected || tier === selected.tier) return;
     await run(`${selected.id}:tier`, () => api(dataPath('loyalty.member', selected.id), { method: 'PATCH', body: { tier } }), 'Đã cập nhật hạng thành viên.');
   }
-
   async function createVoucher(event) {
     event.preventDefault();
     const value = Number(voucherForm.value);
@@ -81,7 +74,6 @@ export default function LoyaltyWorkbenchPage() {
       setVoucherForm({ code: '', kind: 'percent', value: '', valid_until: '' });
     }, 'Đã phát hành voucher đơn lẻ. Mã được đánh dấu đã dùng khi đơn bán hoặc POS hoàn tất.');
   }
-
   return <div className="page">
     <div className="page-head"><div><h1>{t('Khách hàng thân thiết')}</h1><p className="sub">{t('Đăng ký thành viên và tra cứu số dư, lịch sử điểm được ghi tự động từ bán hàng, POS và trả hàng.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}

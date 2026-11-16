@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtMoney, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
@@ -8,13 +9,11 @@ import ProductionOrderCard from './components/ProductionOrderCard.jsx';
 import ProductionOrderForm from './components/ProductionOrderForm.jsx';
 import ProductionInspectionQueue from './components/ProductionInspectionQueue.jsx';
 import ManufacturingWipReport from './components/ManufacturingWipReport.jsx';
-
 const t = (text) => uiTextWith(text, manufacturingEnglish);
-
 const today = localDate;
 const qty = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
-
 export default function ManufacturingWipPage() {
+  useDocumentTitle(t("WIP sản xuất · OSP Suite"));
   const [asOf, setAsOf] = useState(today());
   const [report, setReport] = useState(null);
   const [accounts, setAccounts] = useState(new Map());
@@ -62,7 +61,6 @@ export default function ManufacturingWipPage() {
   const [outputs, setOutputs] = useState({});
   const [busy, setBusy] = useState('');
   const [qcNotes, setQcNotes] = useState({});
-
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -98,7 +96,6 @@ export default function ManufacturingWipPage() {
       setLoading(false);
     }
   }, [asOf]);
-
   const unitsFor = (productId) => {
     const baseUnit = products.get(productId)?.uom;
     return baseUnit ? [...units.values()].filter((unit) => unit.id === baseUnit || unit.base_uom === baseUnit) : [];
@@ -172,7 +169,6 @@ export default function ManufacturingWipPage() {
     } catch (reason) { setError(reason.message || t("Không lưu được kết quả QC.")); }
     finally { setBusy(''); }
   };
-
   const createReworkOrder = async (event) => {
     event.preventDefault();
     const inspection = inspections.find((row) => row.id === reworkInspection);
@@ -187,7 +183,6 @@ export default function ManufacturingWipPage() {
     } catch (reason) { setError(reason.message || t("Không tạo được lệnh sửa.")); }
     finally { setBusy(''); }
   };
-
   const operateRework = async (order, action) => {
     setBusy(`${order.id}:${action}`); setError('');
     try {
@@ -196,7 +191,6 @@ export default function ManufacturingWipPage() {
     } catch (reason) { setError(reason.message || t("Không cập nhật được lệnh sửa.")); }
     finally { setBusy(''); }
   };
-
   const createProductionDisposition = async (event) => {
     event.preventDefault();
     if (!dispositionInspection) return;
@@ -215,7 +209,6 @@ export default function ManufacturingWipPage() {
     } catch (reason) { await load(); setError(reason.message || t("Không ghi nhận được lượng thành phẩm loại bỏ.")); }
     finally { setBusy(''); }
   };
-
   const submitConditionalAcceptance = async (event) => {
     event.preventDefault();
     const inspection = inspections.find((row) => row.id === acceptanceInspection);
@@ -235,7 +228,6 @@ export default function ManufacturingWipPage() {
     } catch (reason) { await load(); setError(reason.message || t("Không gửi được đề nghị chấp nhận có điều kiện.")); }
     finally { setBusy(''); }
   };
-
   const operateConditionalAcceptance = async (row, action) => {
     setBusy(`${row.id}:${action}`); setError(''); setNotice('');
     try {
@@ -245,7 +237,6 @@ export default function ManufacturingWipPage() {
     } catch (reason) { setError(reason.message || t("Không cập nhật được đề nghị chấp nhận có điều kiện.")); }
     finally { setBusy(''); }
   };
-
   const operateProductionDisposition = async (row, action) => {
     setBusy(`${row.id}:${action}`); setError('');
     try {
@@ -254,9 +245,7 @@ export default function ManufacturingWipPage() {
     } catch (reason) { setError(reason.message || t("Không cập nhật được phiếu xử lý thành phẩm.")); }
     finally { setBusy(''); }
   };
-
-  useEffect(() => { document.title = t("WIP sản xuất · OSP Suite"); load(); }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   const createDraft = async () => {
     setCreating(true);
     setError('');
@@ -275,7 +264,6 @@ export default function ManufacturingWipPage() {
       setCreating(false);
     }
   };
-
   return <div className="page">
     <div className="page-head"><div><h1>{t("WIP sản xuất")}</h1><p className="sub">{t("Đối chiếu giá trị vật tư theo lệnh sản xuất với số dư tài khoản 154 trên sổ cái.")}</p></div></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}

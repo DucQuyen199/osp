@@ -1,18 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, fmtNumber, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
 import projectEnglish from './project.en.js';
-
 const t = (text) => uiTextWith(text, projectEnglish);
-
 const emptyProject = { name: '', party: '', budget: '' };
 const emptyTask = { title: '', assignee: '', assignee_employee: '', due: '' };
 const emptyDependency = { predecessor: '', successor: '' };
 const emptyTimesheet = { task: '', employee: '', employee_ref: '', hours: '', date: localDate(), rate: '' };
-
 export default function ProjectWorkbenchPage() {
+  useDocumentTitle(t("Quản lý dự án · OSP Suite"));
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [dependencies, setDependencies] = useState([]);
@@ -29,7 +28,6 @@ export default function ProjectWorkbenchPage() {
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -49,8 +47,7 @@ export default function ProjectWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không tải được dữ liệu dự án.")); }
     finally { if (!quiet) setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = t("Quản lý dự án · OSP Suite"); load(); }, [load]);
+  useEffect(() => { load(); }, [load]);
   const selectedProject = projects.find((project) => project.id === projectId);
   const projectTasks = useMemo(() => tasks.filter((task) => task.project === projectId).sort((a, b) => String(a.due || '9999').localeCompare(String(b.due || '9999')) || String(a.title).localeCompare(String(b.title), 'vi')), [tasks, projectId]);
   const taskById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
@@ -60,14 +57,12 @@ export default function ProjectWorkbenchPage() {
   const projectLaborCost = projectTimesheets.reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
   const projectBudget = Number(selectedProject?.budget || 0);
   const pendingPredecessors = (task) => projectDependencies.filter((dependency) => dependency.successor === task.id).map((dependency) => taskById.get(dependency.predecessor)).filter((predecessor) => predecessor && predecessor.status !== 'done');
-
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); await load(true); setNotice(t(success)); }
     catch (reason) { setError(reason.message || t("Không thể hoàn tất thao tác.")); await load(true); }
     finally { setBusy(''); }
   }
-
   async function createProject(event) {
     event.preventDefault();
     await run('project', async () => {
@@ -75,7 +70,6 @@ export default function ProjectWorkbenchPage() {
       setProjectId(project.id); setProjectForm(emptyProject);
     }, t("Đã tạo dự án ở trạng thái dự kiến."));
   }
-
   async function createTask(event) {
     event.preventDefault(); if (!selectedProject) return;
     await run('task', async () => {
@@ -84,14 +78,12 @@ export default function ProjectWorkbenchPage() {
       setTaskForm(emptyTask);
     }, t("Đã thêm công việc vào dự án."));
   }
-
   function taskAssignment(task) {
     return taskAssignmentForms[task.id] || {
       employee: task.assignee_employee || '',
       assignee: task.assignee || '',
     };
   }
-
   async function saveTaskAssignment(event, task) {
     event.preventDefault();
     const assignment = taskAssignment(task);
@@ -104,11 +96,9 @@ export default function ProjectWorkbenchPage() {
       setTaskAssignmentForms((current) => { const next = { ...current }; delete next[task.id]; return next; });
     }, t("Đã cập nhật người phụ trách công việc."));
   }
-
   async function changeStatus(entity, row, action, message) {
     await run(`${row.id}:${action}`, () => api(dataPath(entity, row.id, action), { method: 'POST' }), message);
   }
-
   async function createDependency(event) {
     event.preventDefault();
     await run('dependency', async () => {
@@ -116,11 +106,9 @@ export default function ProjectWorkbenchPage() {
       setDependencyForm(emptyDependency);
     }, t("Đã lưu quan hệ tiên quyết. Hệ thống sẽ chặn vòng lặp và chỉ cho hoàn tất sau khi công việc trước đã xong."));
   }
-
   async function removeDependency(dependency) {
     await run(`dependency:${dependency.id}`, () => api(dataPath('project.task_dependency', dependency.id), { method: 'DELETE' }), t("Đã gỡ quan hệ phụ thuộc."));
   }
-
   async function createTimesheet(event) {
     event.preventDefault(); if (!selectedProject) return;
     await run('timesheet', async () => {
@@ -135,7 +123,6 @@ export default function ProjectWorkbenchPage() {
       setTimesheetForm({ ...emptyTimesheet, employee: app.user?.name || '' });
     }, t("Đã ghi timesheet; thành tiền được máy chủ tính theo số giờ và đơn giá."));
   }
-
   const dependencyOptions = projectTasks.filter((task) => task.status !== 'done');
   const activeEmployees = [...employees.values()].filter((employee) => employee.status === 'active');
   return <div className="page">

@@ -1,8 +1,7 @@
-import { useEffect } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { uiText } from '../../lib/i18n.js';
-
 export default function NotFoundPage() {
-  useEffect(() => { document.title = `${uiText('Không tìm thấy trang')} · OSP Suite`; }, []);
+  useDocumentTitle(`${uiText('Không tìm thấy trang')} · OSP Suite`);
   return <div className="page">
     <div className="card card-pad empty not-found-page">
       <span className="not-found-code">404</span>

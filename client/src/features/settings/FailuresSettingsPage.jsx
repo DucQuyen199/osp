@@ -1,24 +1,22 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { confirmDialog, toast } from '../../lib/feedback.js';
 import { fmtDateTime, uiText } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
 import SettingsTabs from './SettingsTabs.jsx';
-
 export default function FailuresSettingsPage() {
+  useDocumentTitle(`${uiText('Lỗi tích hợp')} · ${uiText('Cài đặt')} · OSP Suite`);
   const [status, setStatus] = useState('open');
   const [entries, setEntries] = useState([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
-
   const reload = useCallback(async (nextStatus = status) => {
     setError('');
     try { setEntries(await api(tenantPath(`/failures?status=${encodeURIComponent(nextStatus)}`))); }
     catch (reason) { setError(reason.message || uiText('Không tải được danh sách lỗi.')); }
   }, [status]);
-
-  useEffect(() => { document.title = `${uiText('Lỗi tích hợp')} · ${uiText('Cài đặt')} · OSP Suite`; reload(); }, [reload]);
-
+  useEffect(() => {  reload(); }, [reload]);
   const act = async (entry, action) => {
     if (action === 'dismiss' && !await confirmDialog({ title: uiText('Bỏ qua cảnh báo'), message: uiText('Bỏ qua cảnh báo này? Bạn vẫn có thể xem lại trong bộ lọc đã bỏ qua.'), confirmLabel: uiText('Bỏ qua') })) return;
     setBusy(entry.id);
@@ -30,9 +28,7 @@ export default function FailuresSettingsPage() {
     } catch (reason) { setError(reason.message || uiText('Không xử lý được cảnh báo.')); }
     finally { setBusy(''); }
   };
-
   if (!can('tenant.admin')) return <div className="page"><div className="alert danger" role="alert">{uiText('Chỉ quản trị viên mới được xem luồng lỗi.')}</div></div>;
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Cài đặt')}</h1><p className="sub">{uiText('Theo dõi và xử lý lỗi tích hợp của')} “{app.meta.name}”.</p></div></div>
     <SettingsTabs active="failures" />

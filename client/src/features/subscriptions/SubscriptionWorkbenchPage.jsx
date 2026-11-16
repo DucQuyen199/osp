@@ -1,12 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import subscriptionEnglish from './subscription.en.js';
-
 const t = (text) => uiTextWith(text, subscriptionEnglish);
-
 const today = localDate;
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const transition = (entity, row, action) => api(dataPath(entity, row.id, action), { method: 'POST' });
@@ -16,8 +15,8 @@ const normalizedMonthly = (plan) => {
   if (plan?.interval === 'yearly') return price / 12;
   return price;
 };
-
 export default function SubscriptionWorkbenchPage() {
+  useDocumentTitle(`${t('Quản lý thuê bao và gia hạn')} · OSP Suite`);
   const [plans, setPlans] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
   const [cycles, setCycles] = useState([]);
@@ -28,7 +27,6 @@ export default function SubscriptionWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -45,8 +43,7 @@ export default function SubscriptionWorkbenchPage() {
     } catch (reason) { setError(t(reason.message || 'Không tải được hồ sơ thuê bao.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = `${t('Quản lý thuê bao và gia hạn')} · OSP Suite`; load(); }, [load]);
+  useEffect(() => { load(); }, [load]);
   const planById = useMemo(() => new Map(plans.map((row) => [row.id, row])), [plans]);
   const invoiceByCycle = useMemo(() => new Map(invoices.filter((row) => row.source === 'subscription').map((row) => [row.source_id, row])), [invoices]);
   const cycleBySubscription = useMemo(() => {
@@ -59,19 +56,16 @@ export default function SubscriptionWorkbenchPage() {
   const mrr = activeSubscriptions.reduce((sum, row) => sum + normalizedMonthly(planById.get(row.plan)), 0);
   const annualRecurring = mrr * 12;
   const overdue = cycles.filter((cycle) => cycle.status === 'due' && cycle.due_date < today()).length;
-
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); setNotice(t(success)); await load(true); }
     catch (reason) { setError(t(reason.message || 'Thao tác không thành công.')); await load(true); }
     finally { setBusy(''); }
   }
-
   async function createSubscription(event) {
     event.preventDefault();
     await run('create', () => api(dataPath('subscription.subscription'), { method: 'POST', body: { ...form, status: 'active' } }), 'Đã kích hoạt thuê bao. Hệ thống tự tạo kỳ thu đầu tiên theo ngày bắt đầu và giá gói.');
   }
-
   async function changeStatus(row, action) {
     const messages = {
       paused: 'Đã tạm dừng; các kỳ chưa đến hạn được hủy.',
@@ -80,7 +74,6 @@ export default function SubscriptionWorkbenchPage() {
     };
     await run(`${row.id}:${action}`, () => transition('subscription.subscription', row, action), messages[action]);
   }
-
   return <div className="page">
     <div className="page-head"><div><h1>{t('Thuê bao và gia hạn')}</h1><p className="sub">{t('Theo dõi gói dịch vụ, doanh thu định kỳ, hóa đơn đến hạn và trạng thái khách hàng.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
@@ -91,7 +84,6 @@ export default function SubscriptionWorkbenchPage() {
       <label className="field"><span className="label">{t('Bắt đầu tính cước *')}</span><input className="input" required type="date" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })}/></label>
       <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !plans.length || !parties.size}>{t('Kích hoạt và lên lịch kỳ thu')}</button></div>
     </form>{!plans.length && <p className="small muted">{t('Chưa có gói dịch vụ. Người có quyền quản lý gói cần tạo gói trước khi tiếp nhận khách hàng.')}</p>}</section>}
-
     {loading ? <div className="skeleton" data-h="row" /> : <div className="layout-split u-legacy-92c18f6bda" >
       <section className="card card-pad"><h2>{t('Danh sách thuê bao')}</h2>{!subscriptions.length ? <p className="empty">{t('Chưa có thuê bao.')}</p> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Khách hàng / gói')}</th><th>{t('Bắt đầu')}</th><th>{t('Trạng thái')}</th><th>{t('Thao tác')}</th></tr></thead><tbody>{subscriptions.map((row) => <tr key={row.id}><td><strong>{parties.has(row.party) ? recordLabel('master-data.party', parties.get(row.party)) : t('Khách hàng')}</strong><div className="small muted">{planById.get(row.plan)?.name || t('Gói dịch vụ')} · {fmtMoney(planById.get(row.plan)?.price || 0)} / {({ monthly: t('tháng'), quarterly: t('quý'), yearly: t('năm') })[planById.get(row.plan)?.interval] || ''}</div></td><td>{fmtDate(row.start)}</td><td><span className="badge warning">{statusLabel(row.status)}</span></td><td>{row.status === 'active' && can('subscription.subscription.paused') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => changeStatus(row, 'paused')}>{t('Tạm dừng')}</button>}{row.status === 'paused' && can('subscription.subscription.resumed') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => changeStatus(row, 'resumed')}>{t('Tiếp tục')}</button>}{['active','paused'].includes(row.status) && can('subscription.subscription.cancelled') && <button className="btn btn-ghost btn-sm u-legacy-4b17347c23"  disabled={Boolean(busy)} onClick={() => changeStatus(row, 'cancelled')}>{t('Hủy thuê bao')}</button>}</td></tr>)}</tbody></table></div>}</section>
       <section className="card card-pad"><h2>{t('Kỳ thu và hóa đơn')}</h2>{!cycles.length ? <p className="empty">{t('Kỳ thu đầu tiên được tạo khi kích hoạt thuê bao có giá gói lớn hơn 0.')}</p> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Khách hàng')}</th><th>{t('Đến hạn')}</th><th>{t('Số tiền đã chụp')}</th><th>{t('Trạng thái / hóa đơn')}</th></tr></thead><tbody>{[...cycles].sort((a,b) => String(a.due_date || '').localeCompare(String(b.due_date || ''))).map((row) => <tr key={row.id}><td>{parties.has(row.party) ? recordLabel('master-data.party', parties.get(row.party)) : t('Khách hàng')}<div className="small muted">{planById.get(subscriptions.find((item) => item.id === row.subscription)?.plan)?.name || t('Thuê bao')}</div></td><td>{fmtDate(row.due_date)}</td><td>{fmtMoney(row.amount)}</td><td><span className="badge warning">{statusLabel(row.status)}</span>{invoiceByCycle.has(row.id) && <a className="btn btn-ghost btn-sm u-legacy-4b17347c23"  href={`#/e/accounting/invoice/${invoiceByCycle.get(row.id).id}`}>{statusLabel(invoiceByCycle.get(row.id).status)} · {t('mở hóa đơn')}</a>}{row.status === 'pending' && row.due_date <= today() && <span className="small muted u-legacy-4b17347c23" >{t('Hệ thống sẽ phát hành hóa đơn đến hạn.')}</span>}</td></tr>)}</tbody></table></div>}

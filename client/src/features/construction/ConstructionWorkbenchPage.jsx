@@ -1,19 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import constructionEnglish from './construction.en.js';
-
 const t = (text) => uiTextWith(text, constructionEnglish);
-
 const today = localDate;
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const runAction = (entity, row, action) => api(dataPath(entity, row.id, action), { method: 'POST' });
 const lineValue = (line) => (Number(line.qty) || 0) * (Number(line.unit_price) || 0);
 const totalOf = (lines) => lines.reduce((sum, line) => sum + lineValue(line), 0);
-
 export default function ConstructionWorkbenchPage() {
+  useDocumentTitle(`${t('Điều hành công trường')} · OSP Suite`);
   const [projects, setProjects] = useState([]);
   const [sites, setSites] = useState([]);
   const [diaries, setDiaries] = useState([]);
@@ -33,7 +32,6 @@ export default function ConstructionWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -61,8 +59,7 @@ export default function ConstructionWorkbenchPage() {
     } catch (reason) { setError(t(reason.message || 'Không tải được dữ liệu công trường.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = `${t('Điều hành công trường')} · OSP Suite`; load(); }, [load]);
+  useEffect(() => { load(); }, [load]);
   const selectedProject = projects.find((row) => row.id === projectId);
   const projectBoqs = useMemo(() => boqs.filter((row) => row.project === projectId).sort((a, b) => Number(b.revision) - Number(a.revision)), [boqs, projectId]);
   const projectSites = useMemo(() => sites.filter((row) => !row.project || row.project === projectId), [sites, projectId]);
@@ -73,26 +70,22 @@ export default function ConstructionWorkbenchPage() {
   const billByClaim = useMemo(() => new Map(bills.filter((row) => row.source === 'progress_claim').map((row) => [row.source_id, row])), [bills]);
   const projectClaims = useMemo(() => claims.filter((row) => projectSubcontracts.some((contract) => contract.id === row.subcontract)), [claims, projectSubcontracts]);
   const revisionSource = boqs.find((row) => row.id === boqForm.supersedes);
-
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); setNotice(t(success)); await load(true); }
     catch (reason) { setError(t(reason.message || 'Thao tác không thành công.')); await load(true); }
     finally { setBusy(''); }
   }
-
   async function createSite(event) {
     event.preventDefault();
     await run('site', () => api(dataPath('construction.site'), { method: 'POST', body: { ...siteForm, project: projectId || undefined } }), 'Đã tạo hồ sơ công trường.');
     setSiteForm((current) => ({ ...current, name: '', address: '' }));
   }
-
   async function createDiary(event) {
     event.preventDefault();
     await run('diary', () => api(dataPath('construction.site_diary'), { method: 'POST', body: { ...diaryForm, weather: diaryForm.weather || undefined, notes: diaryForm.notes || undefined } }), 'Đã ghi nhật ký thi công. Nhật ký được lưu thành lịch sử không thể sửa.');
     setDiaryForm((current) => ({ ...current, weather: '', notes: '' }));
   }
-
   async function createBoq(event) {
     event.preventDefault();
     await run('boq', async () => {
@@ -103,13 +96,11 @@ export default function ConstructionWorkbenchPage() {
     setBoqLines([{ description: '', unit: '', qty: '1', unit_price: '' }]);
     setBoqForm((current) => ({ ...current, supersedes: '', revision_reason: '' }));
   }
-
   async function createSubcontract(event) {
     event.preventDefault();
     await run('subcontract', () => api(dataPath('construction.subcontract'), { method: 'POST', body: { ...subcontractForm, project: projectId, value: Number(subcontractForm.value) } }), 'Đã lập dự thảo hợp đồng thầu phụ.');
     setSubcontractForm((current) => ({ ...current, value: '', scope: '' }));
   }
-
   async function createClaim(event) {
     event.preventDefault();
     const contract = subcontracts.find((row) => row.id === claimForm.subcontract);
@@ -117,14 +108,11 @@ export default function ConstructionWorkbenchPage() {
     await run('claim', () => api(dataPath('construction.progress_claim'), { method: 'POST', body: { ...claimForm, vendor: contract.vendor, amount: Number(claimForm.amount), notes: claimForm.notes || undefined } }), 'Đã lập hồ sơ nghiệm thu/đề nghị thanh toán nháp.');
     setClaimForm((current) => ({ ...current, amount: '', notes: '' }));
   }
-
   async function transition(entity, row, verb, success) {
     await run(`${row.id}:${verb}`, () => runAction(entity, row, verb), success);
   }
-
   const addBoqLine = () => setBoqLines((current) => [...current, { description: '', unit: '', qty: '1', unit_price: '' }]);
   const updateBoqLine = (index, field, value) => setBoqLines((current) => current.map((line, i) => i === index ? { ...line, [field]: value } : line));
-
   return <div className="page">
     <div className="page-head"><div><h1>{t("Điều hành công trường")}</h1><p className="sub">{t("Quản lý tiến độ dự án, dự toán BOQ theo phiên bản, nhật ký công trường và cam kết chi phí thầu phụ.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t("Làm mới")}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
@@ -132,7 +120,6 @@ export default function ConstructionWorkbenchPage() {
       <section className="card card-pad"><div className="form-grid"><label className="field"><span className="label">{t("Công trình đang xem")}</span><select className="select" value={projectId} onChange={(e) => { const id = e.target.value; setProjectId(id); setSiteForm((current) => ({ ...current, project: id })); setSubcontractForm((current) => ({ ...current, project: id })); setDiaryForm((current) => ({ ...current, site: sites.find((site) => site.project === id)?.id || sites.find((site) => !site.project)?.id || '' })); }}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name} · {statusLabel(project.status)}</option>)}</select></label><div className="field"><span className="label">{t("Ngân sách dự án")}</span><strong>{fmtMoney(selectedProject?.budget || 0)}</strong></div><div className="field"><span className="label">{t("Cam kết thầu phụ")}</span><strong>{fmtMoney(committedValue)}</strong></div><div className="field"><span className="label">{t("Dự toán đã duyệt")}</span><strong>{currentBoq ? fmtMoney(currentBoq.total || 0) : t('Chưa có baseline')}</strong></div></div>
         {selectedProject?.status === 'planned' && can('project.project.started') && <button className="btn btn-primary btn-sm u-legacy-0ee7f66ad9"  disabled={Boolean(busy)} onClick={() => transition('project.project', selectedProject, 'started', 'Đã khởi công dự án; có thể ký hợp đồng thầu phụ.')}>{t("Khởi công dự án")}</button>}
       </section>
-
       <div className="layout-split u-legacy-92c18f6bda" >
         <section className="card card-pad"><h2>{t("BOQ · Dự toán và phiên bản")}</h2>
           {can('construction.boq.create') && <form onSubmit={createBoq}>
@@ -145,14 +132,12 @@ export default function ConstructionWorkbenchPage() {
           </form>}
           <div className="table-wrap u-legacy-92c18f6bda" ><table className="table"><thead><tr><th>{t("Mã BOQ")}</th><th>{t("Phiên bản")}</th><th>{t("Tổng dự toán")}</th><th>{t("Trạng thái")}</th><th>{t("Thao tác")}</th></tr></thead><tbody>{projectBoqs.map((row) => <tr key={row.id}><td><strong>{row.number}</strong>{Number(row.revision) > 1 && <div className="small muted">{row.revision_reason}</div>}{(row.items || []).map((item, index) => <div className="small muted" key={index}>{item.description} {'\u00b7'} {item.qty} {item.unit} {'\u00d7'} {fmtMoney(item.unit_price)}</div>)}</td><td>R{row.revision}</td><td>{fmtMoney(row.total || 0)}</td><td>{statusLabel(row.status)}</td><td>{row.status === 'draft' && can('construction.boq.approved') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => transition('construction.boq', row, 'approved', 'Đã duyệt BOQ và xác lập baseline dự toán cho công trình.')}>{t("Duyệt baseline")}</button>}{row.status === 'approved' && can('construction.boq.create') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => { setBoqForm({ project: row.project, supersedes: row.id, revision_reason: '' }); setBoqLines((row.items || []).map((item) => ({ description: item.description || '', unit: item.unit || '', qty: String(item.qty || 1), unit_price: String(item.unit_price || 0) }))); }}>{t("Lập phiên bản điều chỉnh")}</button>}</td></tr>)}</tbody></table></div>
         </section>
-
         <section className="card card-pad"><h2>{t("Nhật ký công trường")}</h2>
           {can('construction.site.create') && <form className="form-grid" onSubmit={createSite}><h3 className="full">{t("Tạo công trường")}</h3><label className="field"><span className="label">{t("Tên công trường *")}</span><input className="input" required value={siteForm.name} onChange={(e) => setSiteForm({ ...siteForm, name: e.target.value })}/></label><label className="field"><span className="label">{t("Địa chỉ")}</span><input className="input" value={siteForm.address} onChange={(e) => setSiteForm({ ...siteForm, address: e.target.value })}/></label><label className="field full"><span className="label">{t("Dự án")}</span><select className="select" value={siteForm.project} onChange={(e) => setSiteForm({ ...siteForm, project: e.target.value })}><option value="">{t("Không gắn dự án")}</option>{projects.filter((project) => ['planned','active'].includes(project.status)).map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label><div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy) || !['planned','active'].includes(selectedProject?.status)}>{t("Tạo công trường")}</button></div></form>}
           {can('construction.site_diary.create') && projectSites.length > 0 && ['planned', 'active'].includes(selectedProject?.status) && <form className="form-grid u-legacy-c53ea1da23"  onSubmit={createDiary}><h3 className="full">{t("Ghi nhật ký thi công")}</h3><label className="field"><span className="label">{t("Công trường *")}</span><select className="select" required value={diaryForm.site} onChange={(e) => setDiaryForm({ ...diaryForm, site: e.target.value })}>{projectSites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</select></label><label className="field"><span className="label">{t("Ngày *")}</span><input className="input" required type="date" max={today()} value={diaryForm.date} onChange={(e) => setDiaryForm({ ...diaryForm, date: e.target.value })}/></label><label className="field"><span className="label">{t("Thời tiết")}</span><input className="input" value={diaryForm.weather} onChange={(e) => setDiaryForm({ ...diaryForm, weather: e.target.value })}/></label><label className="field"><span className="label">{t("Diễn biến, nhân lực, thiết bị")}</span><textarea className="input" rows="3" value={diaryForm.notes} onChange={(e) => setDiaryForm({ ...diaryForm, notes: e.target.value })}/></label><div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy)}>{t("Ghi nhật ký")}</button></div></form>}
           <div className="table-wrap u-legacy-92c18f6bda" ><table className="table"><thead><tr><th>{t("Ngày")}</th><th>{t("Công trường")}</th><th>{t("Thời tiết")}</th><th>{t("Ghi nhận")}</th></tr></thead><tbody>{diaries.filter((row) => projectSites.some((site) => site.id === row.site)).sort((a,b) => String(b.date).localeCompare(String(a.date))).map((row) => <tr key={row.id}><td>{fmtDate(row.date)}</td><td>{sites.find((site) => site.id === row.site)?.name || '—'}</td><td>{row.weather || '—'}</td><td>{row.notes || '—'}</td></tr>)}</tbody></table></div>
         </section>
       </div>
-
       <section className="card card-pad u-legacy-92c18f6bda" ><h2>{t("Thầu phụ · Cam kết chi phí")}</h2>
         {can('construction.subcontract.create') && <form className="form-grid" onSubmit={createSubcontract}><label className="field"><span className="label">{t("Nhà thầu *")}</span><select className="select" required value={subcontractForm.vendor} onChange={(e) => setSubcontractForm({ ...subcontractForm, vendor: e.target.value })}><option value="">{t("Chọn nhà thầu")}</option>{[...parties.values()].map((party) => <option key={party.id} value={party.id}>{recordLabel('master-data.party', party)}</option>)}</select></label><label className="field"><span className="label">{t("Giá trị hợp đồng *")}</span><input className="input" type="number" required min="0.01" step="any" value={subcontractForm.value} onChange={(e) => setSubcontractForm({ ...subcontractForm, value: e.target.value })}/></label><label className="field full"><span className="label">{t("Phạm vi công việc")}</span><textarea className="input" rows="2" value={subcontractForm.scope} onChange={(e) => setSubcontractForm({ ...subcontractForm, scope: e.target.value })}/></label><div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy) || !['planned','active'].includes(selectedProject?.status) || !subcontractForm.vendor}>{t("Lập dự thảo thầu phụ")}</button></div></form>}
         <p className="muted">{t("Ký hợp đồng ghi nhận cam kết chi phí và kiểm tra ngân sách. Hóa đơn phải trả được lập riêng khi có khối lượng nghiệm thu hoặc hồ sơ thanh toán.")}</p>

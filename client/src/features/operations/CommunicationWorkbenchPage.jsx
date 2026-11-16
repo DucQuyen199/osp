@@ -1,18 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDateTime, localDateTimeToIso } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
 import communicationEnglish from './communication.en.js';
-
 const t = (text) => uiTextWith(text, communicationEnglish);
-
 const rows = (response) => Array.isArray(response?.items) ? response.items : [];
 const channelLabels = { email: 'Email', sms: 'SMS' };
 const deliveryLabels = { queued: 'Đang chờ', processing: 'Đang gửi', retry: 'Chờ gửi lại', sent: 'Đã gửi', failed: 'Thất bại' };
 const reminderLabels = { pending: 'Đã lên lịch', queued: 'Đã xếp hàng gửi', cancelled: 'Đã hủy' };
-
 export default function CommunicationWorkbenchPage() {
+  useDocumentTitle(`${t('Lịch nhắc và nhật ký gửi')} · OSP Suite`);
   const [reminders, setReminders] = useState([]);
   const [messages, setMessages] = useState([]);
   const [parties, setParties] = useState(new Map());
@@ -22,7 +21,6 @@ export default function CommunicationWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -38,19 +36,15 @@ export default function CommunicationWorkbenchPage() {
     } catch (reason) { setError(t(reason.message || 'Không tải được lịch và nhật ký gửi.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = `${t('Lịch nhắc và nhật ký gửi')} · OSP Suite`; load(); }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   const visibleReminders = useMemo(() => reminders.filter((row) => filter === 'all' || row.status === filter), [reminders, filter]);
   const deliveryCounts = useMemo(() => messages.reduce((result, row) => { result[row.status] = (result[row.status] || 0) + 1; return result; }, {}), [messages]);
-
   async function run(key, operation, message) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); await load(true); setNotice(t(message)); }
     catch (reason) { setError(t(reason.message || 'Thao tác không thành công.')); }
     finally { setBusy(''); }
   }
-
   async function create(event) {
     event.preventDefault();
     if (!form.party || !form.send_at || !form.body.trim()) return;
@@ -63,10 +57,8 @@ export default function CommunicationWorkbenchPage() {
       setForm((current) => ({ ...current, subject: '', body: '', send_at: '' }));
     }, 'Đã lên lịch nhắc. Hệ thống sẽ xếp hàng gửi khi đến giờ.');
   }
-
   const cancel = (reminder) => run(`${reminder.id}:cancelled`, () => api(dataPath('communication.reminder', reminder.id, 'cancelled'), { method: 'POST' }), 'Đã hủy lịch nhắc.');
   const recipient = (id) => parties.has(id) ? recordLabel('master-data.party', parties.get(id)) : id || '—';
-
   return <div className="page">
     <div className="page-head"><div><h1>{t('Lịch nhắc và nhật ký gửi')}</h1><p className="sub">{t('Lên lịch email hoặc SMS cho liên hệ và theo dõi trạng thái gửi trong cùng một nơi.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}

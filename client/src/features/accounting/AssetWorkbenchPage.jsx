@@ -1,17 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate, localMonth } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { can, loadAllResponse } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
-
 const rows = (response) => Array.isArray(response?.items) ? response.items : [];
 const statuses = { draft: 'Bản nháp', active: 'Đang sử dụng', disposed: 'Đã thanh lý' };
 const methods = { straight_line: 'Đường thẳng', declining_balance: 'Số dư giảm dần' };
 const acquisitionMethods = { cash: 'Tiền mặt', bank: 'Ngân hàng', opening_balance: 'Số dư đầu kỳ' };
 const currentMonth = localMonth();
-
 export default function AssetWorkbenchPage() {
+  useDocumentTitle(`${uiText('Sổ tài sản cố định')} · OSP Suite`);
   const [assets, setAssets] = useState([]);
   const [depreciations, setDepreciations] = useState([]);
   const [form, setForm] = useState({ name: '', code: '', category: '', purchase_date: '', in_service_date: localDate(), cost: '', salvage_value: '0', useful_life_months: '60', depreciation_method: 'straight_line', declining_balance_factor: '2', acquisition_method: 'bank', opening_accumulated_depreciation: '0', location: '' });
@@ -22,7 +22,6 @@ export default function AssetWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -37,22 +36,18 @@ export default function AssetWorkbenchPage() {
     } catch (reason) { setError(reason.message || uiText('Không tải được sổ tài sản.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = `${uiText('Sổ tài sản cố định')} · OSP Suite`; load(); }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   const visibleAssets = useMemo(() => assets.filter((asset) => filter === 'all' || asset.status === filter), [assets, filter]);
   const activeAssets = assets.filter((asset) => asset.status === 'active');
   const activeBookValue = activeAssets.reduce((sum, asset) => sum + Number(asset.book_value ?? asset.cost ?? 0), 0);
   const draftDepreciations = depreciations.filter((row) => row.status === 'draft').length;
   const depreciationExists = (assetId, period) => depreciations.some((row) => row.asset === assetId && String(row.period || '').slice(0, 7) === period);
-
   async function run(key, operation, message) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); await load(true); setNotice(message); }
     catch (reason) { setError(reason.message || uiText('Thao tác không thành công.')); }
     finally { setBusy(''); }
   }
-
   async function createAsset(event) {
     event.preventDefault();
     if (Number(form.salvage_value) > Number(form.cost)) { setError(uiText('Giá trị thu hồi không thể lớn hơn nguyên giá.')); return; }
@@ -66,9 +61,7 @@ export default function AssetWorkbenchPage() {
       setForm((current) => ({ ...current, name: '', code: '', category: '', purchase_date: '', cost: '', location: '' }));
     }, uiText('Đã tạo tài sản nháp. Vốn hóa để bắt đầu theo dõi tài sản và khấu hao.'));
   }
-
   const activate = (asset) => run(`${asset.id}:activated`, () => api(dataPath('asset.asset', asset.id, 'activated'), { method: 'POST' }), uiText(asset.acquisition_method === 'opening_balance' ? 'Đã ghi sổ tài sản đầu kỳ.' : 'Đã vốn hóa tài sản và ghi nhận bút toán.'));
-
   async function dispose(asset) {
     const draft = disposals[asset.id] || {};
     const proceeds = Number(draft.proceeds || 0);
@@ -78,17 +71,14 @@ export default function AssetWorkbenchPage() {
       await api(dataPath('asset.asset', asset.id, 'disposed'), { method: 'POST' });
     }, uiText('Đã thanh lý tài sản và ghi nhận lãi/lỗ.'));
   }
-
   async function prepareDepreciation(event) {
     event.preventDefault();
     if (!depreciationForm.asset || !depreciationForm.period) return;
     if (depreciationExists(depreciationForm.asset, depreciationForm.period)) { setError(uiText('Tài sản đã có phiếu khấu hao cho kỳ này.')); return; }
     await run('depreciation:create', () => api(dataPath('asset.depreciation'), { method: 'POST', body: { asset: depreciationForm.asset, period: `${depreciationForm.period}-01` } }), uiText('Đã tính khấu hao theo phương pháp và giá trị còn lại của tài sản.'));
   }
-
   const postDepreciation = (row) => run(`${row.id}:posted`, () => api(dataPath('asset.depreciation', row.id, 'posted'), { method: 'POST' }), uiText('Đã ghi sổ khấu hao, cập nhật hao mòn và tạo bút toán kế toán.'));
   const removeDepreciation = (row) => run(`${row.id}:delete`, () => api(dataPath('asset.depreciation', row.id), { method: 'DELETE' }), uiText('Đã xóa phiếu khấu hao nháp.'));
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText("Sổ tài sản cố định")}</h1><p className="sub">{uiText("Đăng ký, vốn hóa, theo dõi hao mòn, ghi khấu hao và thanh lý tài sản có liên kết sổ cái.")}</p></div><div className="row"><a className="btn btn-ghost" href="#/reports/asset/depreciation-schedule">{uiText("Lịch khấu hao")}</a><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{uiText("Làm mới")}</button></div></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtAgo, fmtDate, fmtDateTime, uiTextWith } from '../../lib/i18n.js';
 import { can, loadRefs } from '../../lib/state.js';
@@ -8,6 +9,7 @@ import housekeepingEnglish from './housekeeping.en.js';
 const t = (text) => uiTextWith(text, housekeepingEnglish);
 
 export default function HotelHousekeepingBoardPage() {
+  useDocumentTitle(`${t('Buồng phòng')} · OSP Suite`);
   const [items, setItems] = useState([]);
   const [rooms, setRooms] = useState(new Map());
   const [totals, setTotals] = useState({ cleaningCount: 0, dueToday: 0, readyCount: 0, occupiedCount: 0, maintenanceCount: 0 });
@@ -45,9 +47,7 @@ export default function HotelHousekeepingBoardPage() {
     }
   }, []);
 
-  useEffect(() => {
-    document.title = `${t('Buồng phòng')} · OSP Suite`;
-    load();
+  useEffect(() => { load();
     const timer = window.setInterval(() => load(true), 30000);
     return () => window.clearInterval(timer);
   }, [load]);

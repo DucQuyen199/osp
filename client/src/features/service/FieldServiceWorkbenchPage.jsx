@@ -1,19 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDateTime as businessDateTime, localDateTimeToIso } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import fieldServiceEnglish from './field-service.en.js';
-
 const t = (text) => uiTextWith(text, fieldServiceEnglish);
-
 const localDateTime = (value) => value ? businessDateTime(new Date(value)) : '';
 const futureSlot = (hours) => businessDateTime(new Date(Date.now() + hours * 3600000));
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const lineTotal = (line, products, units) => (Number(line.qty) || 0) * (Number(products.get(line.product)?.price) || Number(line.price) || 0) * (units.get(line.uom || products.get(line.product)?.uom)?.ratio ?? line.uom_ratio ?? 1);
-
 export default function FieldServiceWorkbenchPage() {
+  useDocumentTitle(`${t('Điều phối dịch vụ hiện trường')} · OSP Suite`);
   const [orders, setOrders] = useState([]);
   const [parties, setParties] = useState(new Map());
   const [products, setProducts] = useState(new Map());
@@ -31,7 +30,6 @@ export default function FieldServiceWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -53,8 +51,7 @@ export default function FieldServiceWorkbenchPage() {
     } catch (reason) { setError(reason.message || t('Không tải được lệnh công việc.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = `${t('Điều phối dịch vụ hiện trường')} · OSP Suite`; load(); }, [load]);
+  useEffect(() => { load(); }, [load]);
   const selected = orders.find((order) => order.id === selectedId);
   const productChoices = [...products.values()].filter((item) => item.active !== false && ['goods', 'service', undefined].includes(item.kind)).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
   const unitsFor = (productId) => {
@@ -73,7 +70,6 @@ export default function FieldServiceWorkbenchPage() {
     return product && (product.tracked ?? product.kind === 'goods');
   });
   const openCount = orders.filter((order) => ['open', 'dispatched'].includes(order.status)).length;
-
   useEffect(() => {
     if (!selected) return;
     setEditLines((selected.lines || []).map((line) => ({ product: line.product || '', uom: line.uom || '', qty: String(line.qty || 1), price: line.price })));
@@ -83,12 +79,10 @@ export default function FieldServiceWorkbenchPage() {
       scheduled_at: localDateTime(selected.scheduled_at), scheduled_end: localDateTime(selected.scheduled_end), warehouse: selected.warehouse || '',
     }));
   }, [selectedId]);
-
   function updateForm(field, value) { setForm((current) => ({ ...current, [field]: value })); }
   function updateEditForm(field, value) { setEditForm((current) => ({ ...current, [field]: value })); }
   function updateNewLine(index, field, value) { setNewLines((current) => current.map((line, i) => i === index ? { ...line, [field]: value, ...(field === 'product' ? { uom: '' } : {}) } : line)); }
   function updateEditLine(index, field, value) { setEditLines((current) => current.map((line, i) => i === index ? { ...line, [field]: value, ...(field === 'product' ? { uom: '' } : {}) } : line)); }
-
   async function createOrder(event) {
     event.preventDefault(); setBusy('create'); setError(''); setNotice('');
     try {
@@ -109,7 +103,6 @@ export default function FieldServiceWorkbenchPage() {
     } catch (reason) { setError(reason.message || t('Không thể tạo lệnh công việc.')); }
     finally { setBusy(''); }
   }
-
   async function saveOpenOrder(order) {
     setBusy(`${order.id}:save`); setError(''); setNotice('');
     try {
@@ -130,7 +123,6 @@ export default function FieldServiceWorkbenchPage() {
     } catch (reason) { setError(reason.message || t('Không thể cập nhật lệnh.')); }
     finally { setBusy(''); }
   }
-
   async function transition(order, action) {
     setBusy(`${order.id}:${action}`); setError(''); setNotice('');
     try {
@@ -141,7 +133,6 @@ export default function FieldServiceWorkbenchPage() {
     } catch (reason) { setError(reason.message || t('Không thể cập nhật lệnh. Kiểm tra lịch, kho và tồn vật tư.')); await load(true); }
     finally { setBusy(''); }
   }
-
   const addNewLine = () => setNewLines((current) => [...current, { product: productChoices[0]?.id || '', qty: '1', uom: '' }]);
   const addEditLine = () => setEditLines((current) => [...current, { product: productChoices[0]?.id || '', qty: '1', uom: '' }]);
   const selectedTicket = selected?.source_ticket && tickets.get(selected.source_ticket);
@@ -150,11 +141,9 @@ export default function FieldServiceWorkbenchPage() {
     const employee = order?.technician_employee && employees.get(order.technician_employee);
     return employee ? recordLabel('hrm.employee', employee) : order?.technician || t('Chưa phân công');
   };
-
   return <div className="page">
     <div className="page-head"><div><h1>{t('Điều phối dịch vụ hiện trường')}</h1><p className="sub">{t('Tiếp nhận việc, chốt vật tư và giá theo danh mục, xếp lịch kỹ thuật viên, xuất kho và lập hóa đơn khi hoàn tất.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
-
     {can('field-service.work_order.create') && <section className="card card-pad"><h2>{t('Tạo lệnh công việc')}</h2><form className="form-grid" onSubmit={createOrder}>
       <label className="field"><span className="label">{t('Khách hàng *')}</span><select className="select" required value={form.party} onChange={(e) => updateForm('party', e.target.value)}><option value="">{t('Chọn khách hàng')}</option>{[...parties.values()].map((party) => <option key={party.id} value={party.id}>{recordLabel('master-data.party', party)}</option>)}</select></label>
       <label className="field"><span className="label">{t('Công việc *')}</span><input className="input" required value={form.title} onChange={(e) => updateForm('title', e.target.value)} /></label>
@@ -171,7 +160,6 @@ export default function FieldServiceWorkbenchPage() {
       </div>
       <div className="row full"><span className="grow" /><button className="btn btn-primary" disabled={Boolean(busy) || loading || !newLines.length || newTotal <= 0 || (hasTrackedNewLine && !form.warehouse)}>{t('Tạo lệnh và báo giá')}</button></div>
     </form></section>}
-
     <div className="row wrap u-legacy-f452aa85dd" ><h2>{t('Lệnh công việc')}</h2><span className="badge warning">{openCount} {t('đang xử lý')}</span></div>
     {loading ? <div className="skeleton" data-h="row" /> : !orders.length ? <div className="card card-pad empty">{t('Chưa có lệnh công việc.')}</div> : <div className="layout-split">
       <section className="card card-pad"><div className="table-wrap"><table className="table"><thead><tr><th>{t('Công việc')}</th><th>{t('Lịch')}</th><th>{t('Kỹ thuật viên')}</th><th>{t('Trạng thái')}</th></tr></thead><tbody>{orders.map((order) => <tr {...selectableTableRowProps} key={order.id} aria-selected={selectedId === order.id} className={[selectedId === order.id ? 'selected' : '', 'u-legacy-9463ff4798'].filter(Boolean).join(' ')} onClick={() => setSelectedId(order.id)} ><td><strong>{order.title}</strong><div className="small muted">{parties.get(order.party) ? recordLabel('master-data.party', parties.get(order.party)) : t('Khách hàng')}{order.address ? ` · ${order.address}` : ''}</div></td><td>{order.scheduled_at ? fmtDateTime(order.scheduled_at) : t('Chưa xếp lịch')}</td><td>{assignedTechnician(order)}</td><td>{statusLabel(order.status)}</td></tr>)}</tbody></table></div></section>

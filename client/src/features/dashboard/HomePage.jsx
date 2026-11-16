@@ -1,19 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { fetchEvents } from '../../lib/events.js';
 import { fmtNumber, uiText } from '../../lib/i18n.js';
 import { app, can, entity, entityLabel, isAdmin } from '../../lib/state.js';
 import { listHref } from '../../lib/routes.js';
 import { EventTimeline } from '../entities/EntityDetailPage.jsx';
-
 const PRIORITY = [
   'master-data.party', 'master-data.product', 'sales.sales_order', 'pos.pos_order', 'ecommerce.web_order', 'accounting.invoice', 'crm.deal', 'crm.lead',
   'clinic.encounter', 'school.student', 'hotel.reservation', 'restaurant.table_order', 'booking.booking', 'hrm.employee', 'helpdesk.ticket', 'project.project',
   'inventory.stock_level', 'purchasing.purchase_order', 'logistics.shipment',
 ];
 const EXCLUDED = new Set(['master-data.currency', 'master-data.tax', 'master-data.uom', 'accounting.account']);
-
 export default function HomePage({ summary }) {
+  useDocumentTitle(uiText('Trang chủ · OSP Suite'));
   const [events, setEvents] = useState(null);
   const [failures, setFailures] = useState(0);
   const [dead, setDead] = useState(0);
@@ -31,9 +31,7 @@ export default function HomePage({ summary }) {
   }).slice(0, 2), [app.meta.vertical]);
   const total = Object.entries(summary || {}).filter(([qname]) => !EXCLUDED.has(qname)).reduce((sum, [, count]) => sum + Number(count || 0), 0);
   const firstName = (app.user?.name || '').split(' ').slice(-1)[0];
-
   useEffect(() => {
-    document.title = uiText('Trang chủ · OSP Suite');
     let active = true;
     fetchEvents(60).then((items) => { if (active) setEvents(items); }).catch(() => { if (active) setEvents([]); });
     if (isAdmin()) api(tenantPath('/alerts')).then((result) => {
@@ -41,13 +39,11 @@ export default function HomePage({ summary }) {
     }).catch(() => {});
     return () => { active = false; };
   }, []);
-
   const roots = useMemo(() => {
     const rootEvents = (events || []).filter((event) => event.depth === 0);
     const withEffects = rootEvents.filter((event) => event.handled.some((effect) => effect.outcome === 'ok'));
     return (withEffects.length >= 3 ? withEffects : rootEvents).slice(-6).reverse();
   }, [events]);
-
   return <div className="page">
     <div className="page-head"><div>
       <h1>{uiText('Xin chào')}{firstName ? `, ${firstName}` : ''}</h1>

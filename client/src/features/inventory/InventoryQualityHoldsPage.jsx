@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtMoney, fmtNumber, uiText } from '../../lib/i18n.js';
 import { can, loadRefs } from '../../lib/state.js';
-
 const quantity = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
 const unitName = (item) => item.unit || uiText('Chưa đặt đơn vị');
 const statusLabel = (value) => uiText(value === 'failed' ? 'Không đạt' : 'Chờ kiểm tra');
 const sourceLabel = (value) => uiText(value === 'purchase_receipt' ? 'Phiếu nhận mua' : value === 'purchase_order' ? 'Đơn mua' : value);
-
 export default function InventoryQualityHoldsPage() {
+  useDocumentTitle(`${uiText('Hàng tồn đang giữ QC')} · OSP Suite`);
   const [warehouses, setWarehouses] = useState(new Map());
   const [warehouse, setWarehouse] = useState('');
   const [status, setStatus] = useState('all');
@@ -18,9 +18,7 @@ export default function InventoryQualityHoldsPage() {
   const [busy, setBusy] = useState('');
   const [notes, setNotes] = useState({});
   const [releaseDrafts, setReleaseDrafts] = useState({});
-
   useEffect(() => { loadRefs('inventory.warehouse').then(setWarehouses); }, []);
-
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -35,9 +33,7 @@ export default function InventoryQualityHoldsPage() {
       setLoading(false);
     }
   }, [status, warehouse]);
-
-  useEffect(() => { document.title = `${uiText('Hàng tồn đang giữ QC')} · OSP Suite`; load(); }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   const decide = async (item, action) => {
     setBusy(`${item.inspectionId}:${action}`); setError('');
     try {
@@ -64,7 +60,6 @@ export default function InventoryQualityHoldsPage() {
     } catch (reason) { setError(reason.message || uiText('Không giải phóng được một phần lô hàng.')); }
     finally { setBusy(''); }
   };
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Hàng tồn đang giữ QC')}</h1><p className="sub">{uiText('Theo dõi số lượng và giá trị còn bị giữ theo phiếu kiểm tra, lô và lớp nhập kho.')}</p></div></div>
     <section className="card"><form className="toolbar" onSubmit={(event) => { event.preventDefault(); load(); }}>

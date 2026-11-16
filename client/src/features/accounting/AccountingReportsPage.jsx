@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { fmtMoney, fmtNumber, uiText } from '../../lib/i18n.js';
 import { can } from '../../lib/state.js';
 import AccountingChartTemplateDialog from './AccountingChartTemplateDialog.jsx';
-
 const today = localDate;
 const yearStart = () => `${today().slice(0, 4)}-01-01`;
 const forecastEnd = (start) => {
@@ -13,7 +13,6 @@ const forecastEnd = (start) => {
   return date.toISOString().slice(0, 10);
 };
 const num = (value) => Number(value) || 0;
-
 function ReportTable({ headers, rows }) {
   if (!rows.length) return <div className="empty"><h3>{uiText("Chưa có phát sinh")}</h3><p>{uiText("Không có dữ liệu trong khoảng ngày đã chọn.")}</p></div>;
   return <div className="table-wrap"><table className="table">
@@ -21,18 +20,15 @@ function ReportTable({ headers, rows }) {
     <tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, index) => <td key={index} className={typeof cell === 'number' ? 'right money' : ''}>{typeof cell === 'number' ? fmtMoney(cell) : uiText(cell)}</td>)}</tr>)}</tbody>
   </table></div>;
 }
-
 function Stat({ label, value }) {
   return <div className="card stat"><span className="stat-label">{uiText(label)}</span><strong className="stat-value num">{fmtMoney(value)}</strong></div>;
 }
-
 const TAX_DOCUMENT_KIND = {
   invoice: 'Hóa đơn bán',
   credit_note: 'Điều chỉnh giảm bán',
   bill: 'Hóa đơn mua',
   debit_note: 'Điều chỉnh giảm mua',
 };
-
 function TaxDocumentTable({ rows }) {
   if (!rows?.length) return <div className="empty"><h3>{uiText("Chưa có chứng từ")}</h3><p>{uiText("Không có chứng từ thuế trong khoảng ngày đã chọn.")}</p></div>;
   return <div className="table-wrap"><table className="table">
@@ -57,8 +53,8 @@ function TaxDocumentTable({ rows }) {
     })}</tbody>
   </table></div>;
 }
-
 export default function AccountingReportsPage() {
+  useDocumentTitle(`${uiText('Báo cáo kế toán')} · OSP Suite`);
   const [mode, setMode] = useState('income');
   const [from, setFrom] = useState(yearStart());
   const [to, setTo] = useState(today());
@@ -70,7 +66,6 @@ export default function AccountingReportsPage() {
   const [fxJournal, setFxJournal] = useState(null);
   const [postingFx, setPostingFx] = useState(false);
   const [showChartTemplates, setShowChartTemplates] = useState(false);
-
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -100,9 +95,7 @@ export default function AccountingReportsPage() {
       setLoading(false);
     }
   }, [mode, from, to, asOf]);
-
-  useEffect(() => { document.title = `${uiText('Báo cáo kế toán')} · OSP Suite`; load(); }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   const createFxDraft = async () => {
     setPostingFx(true);
     setError('');
@@ -121,11 +114,9 @@ export default function AccountingReportsPage() {
       setPostingFx(false);
     }
   };
-
   const income = report?.revenue || [];
   const expense = report?.expense || [];
   const unclassified = report?.unclassified || [];
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText("Báo cáo kế toán")}</h1><p className="sub">{uiText("Số liệu lấy từ bút toán đã ghi sổ theo ngày hạch toán.")}</p></div>{can('accounting.account.read') && can('accounting.account.create') && <button className="btn btn-secondary" type="button" onClick={() => setShowChartTemplates(true)}>{uiText("Mẫu hệ thống tài khoản")}</button>}</div>
     {showChartTemplates && <AccountingChartTemplateDialog onClose={() => setShowChartTemplates(false)} />}

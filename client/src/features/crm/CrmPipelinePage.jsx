@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { confirmDialog, textDialog, toast } from '../../lib/feedback.js';
 import { fmtMoney, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { can } from '../../lib/state.js';
 import crmEnglish from './crm.en.js';
-
 const t = (text) => uiTextWith(text, crmEnglish);
-
 export default function CrmPipelinePage() {
+  useDocumentTitle(`${t('Pipeline bán hàng')} · OSP Suite`);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [report, setReport] = useState(null);
@@ -17,7 +17,6 @@ export default function CrmPipelinePage() {
   const [workingDeal, setWorkingDeal] = useState('');
   const boardTabRef = useRef(null);
   const listTabRef = useRef(null);
-
   const handleTabKeyDown = (event) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
@@ -28,7 +27,6 @@ export default function CrmPipelinePage() {
     setView(nextView);
     (nextView === 'board' ? boardTabRef : listTabRef).current?.focus();
   };
-
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -44,7 +42,6 @@ export default function CrmPipelinePage() {
       setLoading(false);
     }
   }, [from, to]);
-
   const moveDeal = async (deal, stage) => {
     setError('');
     try {
@@ -54,7 +51,6 @@ export default function CrmPipelinePage() {
       setError(t(reason.message || 'Không cập nhật được giai đoạn cơ hội.'));
     }
   };
-
   const closeDeal = async (deal, outcome) => {
     let body;
     if (outcome === 'lost') {
@@ -91,14 +87,11 @@ export default function CrmPipelinePage() {
       setWorkingDeal('');
     }
   };
-
   const outcomeButtons = (deal) => <div className="row wrap">
     {can('crm.deal.won') && <button className="btn btn-primary btn-sm" type="button" disabled={loading || Boolean(workingDeal) || Number(deal.amount || 0) <= 0} title={Number(deal.amount || 0) <= 0 ? t('Nhập giá trị dương trước khi thắng cơ hội.') : ''} onClick={() => closeDeal(deal, 'won')}>{t('Thắng · tạo đơn bán')}</button>}
     {can('crm.deal.update') && can('crm.deal.lost') && <button className="btn btn-ghost btn-sm" type="button" disabled={loading || Boolean(workingDeal)} onClick={() => closeDeal(deal, 'lost')}>Thua</button>}
   </div>;
-
-  useEffect(() => { document.title = `${t('Pipeline bán hàng')} · OSP Suite`; load(); }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   return <div className="page">
     <div className="page-head"><div><h1>{t('Pipeline bán hàng')}</h1><p className="sub">{t('Giá trị cơ hội mở và dự báo có trọng số theo xác suất; số liệu được tính ở Rust.')}</p></div>{can('crm.pipeline_stage.read') && <a className="btn btn-secondary" href="#/e/crm/pipeline_stage">{t('Cấu hình pipeline')}</a>}</div>
     <section className="card"><form className="toolbar" onSubmit={(event) => { event.preventDefault(); load(); }}>

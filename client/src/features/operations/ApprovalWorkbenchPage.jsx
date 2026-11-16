@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { app, can, loadAllResponse } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
-
 const targets = [
   'purchasing.purchase_order', 'purchasing.supplier_invoice', 'purchasing.purchase_requisition',
   'payroll.payroll_run', 'inventory.stock_count', 'sales.sales_return', 'purchasing.purchase_return',
@@ -12,7 +12,6 @@ const targets = [
 ];
 const requestRows = (response) => Array.isArray(response?.items) ? response.items : [];
 const blankRule = { name: '', entity: targets[0], min_amount: '', variance_tolerance: '', roles: [], users: [] };
-
 function ruleApprovers(value) {
   if (Array.isArray(value)) return {
     roles: value.filter((entry) => typeof entry === 'string' && app.meta?.roles?.[entry]),
@@ -24,8 +23,8 @@ function ruleApprovers(value) {
     users: [...(Array.isArray(value.users) ? value.users : []), ...(Array.isArray(value.userIds) ? value.userIds : [])].filter((entry) => typeof entry === 'string'),
   };
 }
-
 export default function ApprovalWorkbenchPage() {
+  useDocumentTitle(`${uiText('Phê duyệt tập trung')} · OSP Suite`);
   const [requests, setRequests] = useState([]);
   const [rules, setRules] = useState([]);
   const [selectedId, setSelectedId] = useState('');
@@ -37,7 +36,6 @@ export default function ApprovalWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -51,9 +49,7 @@ export default function ApprovalWorkbenchPage() {
     } catch (reason) { setError(reason.message || uiText('Không tải được hàng chờ phê duyệt.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = `${uiText('Phê duyệt tập trung')} · OSP Suite`; load(); }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   const visibleRequests = useMemo(() => requests.filter((row) => requestFilter === 'all' || row.status === requestFilter), [requests, requestFilter]);
   const selected = visibleRequests.find((row) => row.id === selectedId) || requests.find((row) => row.id === selectedId);
   const pendingCount = requests.filter((row) => row.status === 'pending').length;
@@ -63,32 +59,26 @@ export default function ApprovalWorkbenchPage() {
   const selectedApprovers = applicableRule ? ruleApprovers(applicableRule.approvers) : { roles: [], users: [] };
   const roleNames = Object.keys(app.meta?.roles || {}).sort((a, b) => a.localeCompare(b, 'vi'));
   const canManageRules = can('workflow-approval.approval_rule.create') || can('workflow-approval.approval_rule.update');
-
   useEffect(() => {
     if (!visibleRequests.some((row) => row.id === selectedId)) setSelectedId(visibleRequests[0]?.id || '');
   }, [visibleRequests, selectedId]);
-
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); await load(true); if (success) setNotice(success); }
     catch (reason) { setError(reason.message || uiText('Thao tác không thành công.')); await load(true); }
     finally { setBusy(''); }
   }
-
   async function decide(request, action) {
     const message = action === 'approved' ? uiText('Đã duyệt; hồ sơ nghiệp vụ được chuyển trạng thái tự động.') : uiText('Đã từ chối; hồ sơ nghiệp vụ được cập nhật theo luồng từ chối.');
     await run(`${request.id}:${action}`, () => api(dataPath('workflow-approval.approval_request', request.id, action), { method: 'POST' }), message);
   }
-
   function editRule(rule) {
     const approvers = ruleApprovers(rule.approvers);
     setEditingRuleId(rule.id);
     setRuleForm({ name: rule.name || '', entity: rule.entity || targets[0], min_amount: rule.min_amount ?? '', variance_tolerance: rule.variance_tolerance ?? '', roles: approvers.roles, users: approvers.users });
     setTab('rules');
   }
-
   function resetRule() { setEditingRuleId(''); setRuleForm(blankRule); }
-
   async function saveRule(event) {
     event.preventDefault();
     const payload = {
@@ -104,10 +94,8 @@ export default function ApprovalWorkbenchPage() {
       resetRule();
     }, editingRuleId ? uiText('Đã cập nhật quy tắc phê duyệt.') : uiText('Đã tạo quy tắc phê duyệt.'));
   }
-
   const sourceLabel = (entity) => app.meta?.modules?.flatMap((module) => module.entities.map((record) => [`${module.id}.${record.name}`, record.label]))
     .find(([qname]) => qname === entity)?.[1] || entity;
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText("Phê duyệt tập trung")}</h1><p className="sub">{uiText("Xử lý yêu cầu từ mua hàng, tài chính, nhân sự, kho và hợp đồng; quy tắc vai trò được kiểm tra lại ở máy chủ.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{uiText("Làm mới")}</button></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}

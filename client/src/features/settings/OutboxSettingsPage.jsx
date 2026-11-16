@@ -1,27 +1,24 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { confirmDialog, toast } from '../../lib/feedback.js';
 import { fmtDateTime, uiText } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
 import SettingsTabs from './SettingsTabs.jsx';
-
 const STATES = ['dead', 'retry', 'processing', 'pending', 'delivered', 'cancelled'];
 const LABELS = { dead: 'Dead-letter', retry: 'Đang chờ thử lại', processing: 'Đang gửi', pending: 'Đang chờ', delivered: 'Đã gửi', cancelled: 'Đã hủy' };
-
 export default function OutboxSettingsPage() {
+  useDocumentTitle(`${uiText('Outbox tích hợp')} · ${uiText('Cài đặt')} · OSP Suite`);
   const [status, setStatus] = useState('dead');
   const [entries, setEntries] = useState([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
-
   const reload = useCallback(async (nextStatus = status) => {
     setError('');
     try { setEntries(await api(tenantPath(`/outbox?status=${encodeURIComponent(nextStatus)}`))); }
     catch (reason) { setError(reason.message || uiText('Không tải được webhook outbox.')); }
   }, [status]);
-
-  useEffect(() => { document.title = `${uiText('Outbox tích hợp')} · ${uiText('Cài đặt')} · OSP Suite`; reload(); }, [reload]);
-
+  useEffect(() => {  reload(); }, [reload]);
   const act = async (entry, action) => {
     if (action === 'dismiss' && !await confirmDialog({ title: uiText('Hủy delivery'), message: uiText('Bỏ qua delivery này? Delivery sẽ bị hủy và không tự thử lại.'), danger: true, confirmLabel: uiText('Hủy delivery') })) return;
     setBusy(entry.id);
@@ -33,9 +30,7 @@ export default function OutboxSettingsPage() {
     } catch (reason) { setError(reason.message || uiText('Không xử lý được delivery.')); }
     finally { setBusy(''); }
   };
-
   if (!can('tenant.admin')) return <div className="page"><div className="alert danger" role="alert">{uiText('Chỉ quản trị viên mới được quản lý webhook outbox.')}</div></div>;
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Cài đặt')}</h1><p className="sub">{uiText('Theo dõi webhook của doanh nghiệp')} “{app.meta.name}”.</p></div></div>
     <SettingsTabs active="outbox" />

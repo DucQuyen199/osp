@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, statusLabel, uiText } from '../../lib/i18n.js';
 import { can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
-
 const rows = (response) => Array.isArray(response?.items) ? response.items : [];
-
 export default function QualityWorkbenchPage() {
+  useDocumentTitle(`${uiText('Sổ sự không phù hợp')} · OSP Suite`);
   const severityLabels = { minor: uiText('Nhẹ'), major: uiText('Nghiêm trọng'), critical: uiText('Tới hạn') };
   const [records, setRecords] = useState([]);
   const [inspections, setInspections] = useState(new Map());
@@ -16,7 +16,6 @@ export default function QualityWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -30,20 +29,16 @@ export default function QualityWorkbenchPage() {
     } catch (reason) { setError(reason.message || uiText('Không tải được sổ sự không phù hợp.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
-
-  useEffect(() => { document.title = `${uiText('Sổ sự không phù hợp')} · OSP Suite`; load(); }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   const visible = useMemo(() => records.filter((record) => filter === 'all' || record.status === filter), [records, filter]);
   const openCount = records.filter((record) => record.status === 'open').length;
   const criticalCount = records.filter((record) => record.status === 'open' && record.severity === 'critical').length;
-
   async function run(key, operation, message) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); await load(true); setNotice(message); }
     catch (reason) { setError(reason.message || uiText('Thao tác không thành công.')); }
     finally { setBusy(''); }
   }
-
   async function create(event) {
     event.preventDefault();
     const payload = { title: form.title.trim(), severity: form.severity };
@@ -54,9 +49,7 @@ export default function QualityWorkbenchPage() {
       setForm({ title: '', severity: 'major', description: '', inspection: '' });
     }, uiText('Đã ghi nhận sự không phù hợp.'));
   }
-
   const close = (record) => run(`${record.id}:closed`, () => api(dataPath('quality.nonconformance', record.id, 'closed'), { method: 'POST' }), uiText('Đã đóng hồ sơ NCR.'));
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Sổ sự không phù hợp')}</h1><p className="sub">{uiText('Theo dõi nguyên nhân, mức độ và trạng thái xử lý của các vấn đề chất lượng; NCR từ phiếu QC không đạt được ghi nhận tự động.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{uiText('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}

@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
-
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const number = (value) => Number(value || 0);
 async function listAll(qname) {
@@ -18,8 +18,8 @@ async function listAll(qname) {
   return rows;
 }
 const action = (row, verb) => api(dataPath('purchasing.rfq', row.id, verb), { method: 'POST' });
-
 export default function PurchasingSourcingWorkbenchPage() {
+  useDocumentTitle(`${uiText('RFQ và so sánh báo giá')} · OSP Suite`);
   const emailQueueEnabled = app.meta?.modules?.some((module) => module.id === 'communication') || false;
   const [requisitions, setRequisitions] = useState([]);
   const [rfqs, setRfqs] = useState([]);
@@ -37,7 +37,6 @@ export default function PurchasingSourcingWorkbenchPage() {
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
@@ -58,15 +57,13 @@ export default function PurchasingSourcingWorkbenchPage() {
     } catch (reason) { setError(reason.message || uiText('Không tải được hồ sơ RFQ và đề nghị mua cạnh tranh.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
-  useEffect(() => { document.title = `${uiText('RFQ và so sánh báo giá')} · OSP Suite`; load(); }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   const selected = requisitions.find((row) => row.id === selectedId);
   const quotes = useMemo(() => rfqs.filter((row) => row.purchase_requisition === selectedId).sort((a, b) => quoteTotal(a) - quoteTotal(b)), [rfqs, selectedId, taxes]);
   const winner = quotes.find((row) => row.status === 'accepted');
   const acceptedOrder = winner && orders.find((row) => row.source === 'rfq' && row.source_id === winner.id);
   const invitedSuppliers = new Set(quotes.map((row) => row.supplier));
   const eligibleSuppliers = [...suppliers.values()].filter((row) => row.active !== false && !invitedSuppliers.has(row.id));
-
   function quoteTotal(row) {
     return (row.quote_lines || []).reduce((sum, line) => {
       const rate = number(taxes.get(line.tax)?.rate);
@@ -124,7 +121,6 @@ export default function PurchasingSourcingWorkbenchPage() {
     };
     await run(`${row.id}:${verb}`, () => action(row, verb), messages[verb]);
   }
-
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('RFQ và so sánh báo giá')}</h1><p className="sub">{uiText('Mỗi nhà cung cấp nhận một hồ sơ riêng cho cùng danh sách hàng. So sánh tổng giá sau thuế, hạn hiệu lực và chọn duy nhất một báo giá để chuyển thành đơn mua.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{uiText('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, fmtNumber, uiText } from '../../lib/i18n.js';
@@ -10,7 +11,6 @@ import PurchaseReceiptForm from './components/PurchaseReceiptForm.jsx';
 import SupplierInvoiceAdjustmentsEditor from './components/SupplierInvoiceAdjustmentsEditor.jsx';
 import SupplierInvoiceDraftForm from './components/SupplierInvoiceDraftForm.jsx';
 import SupplierInvoicesPanel from './components/SupplierInvoicesPanel.jsx';
-
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
 const keyOf = (line) => `${line.product}|${Number(line.price || 0)}|${line.tax || ''}|${Number(line.tax_rate ?? 0)}|${line.uom || ''}`;
@@ -20,8 +20,8 @@ const lineValue = (line, taxes) => {
   const rate = Number(taxes.get(line.tax)?.rate ?? line.tax_rate) || 0;
   return net * (1 + rate / 100);
 };
-
 export default function PurchasingWorkbenchPage() {
+  useDocumentTitle(`${uiText('Mua hàng và nhận hàng')} · OSP Suite`);
   const [orders, setOrders] = useState([]);
   const [requisitions, setRequisitions] = useState([]);
   const [receipts, setReceipts] = useState([]);
@@ -60,7 +60,6 @@ export default function PurchasingWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-
   const workflowApproval = app.meta?.modules?.some((module) => module.id === 'workflow-approval') || false;
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
@@ -97,8 +96,7 @@ export default function PurchasingWorkbenchPage() {
     } catch (reason) { setError(reason.message || uiText('Không tải được đơn mua và phiếu nhận hàng.')); }
     finally { if (!quiet) setLoading(false); }
   }, [workflowApproval]);
-
-  useEffect(() => { document.title = `${uiText('Mua hàng và nhận hàng')} · OSP Suite`; load(); }, [load]);
+  useEffect(() => { load(); }, [load]);
   const taxById = useMemo(() => new Map(taxes.map((row) => [row.id, row])), [taxes]);
   const unitsFor = (productId) => {
     const baseUnit = products.get(productId)?.uom;
@@ -225,14 +223,12 @@ export default function PurchasingWorkbenchPage() {
     receiving: orders.filter((row) => ['approved','partially_received'].includes(row.status)).length,
     received: orders.filter((row) => row.status === 'received').length,
   }), [orders]);
-
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); setNotice(success); await load(true); }
     catch (reason) { setError(reason.message || uiText('Thao tác không thành công.')); await load(true); }
     finally { setBusy(''); }
   }
-
   async function saveOrder(event) {
     event.preventDefault();
     const payload = {
@@ -245,7 +241,6 @@ export default function PurchasingWorkbenchPage() {
     setEditingId(''); setLines([{ product: [...products.keys()][0] || '', qty: '1', price: '', tax: '' }]);
     if (!existing) setOrderForm((current) => ({ ...current, expected_date: '' }));
   }
-
   async function saveRequisition(event) {
     event.preventDefault();
     const payload = {
@@ -261,37 +256,30 @@ export default function PurchasingWorkbenchPage() {
     setEditingRequisitionId(''); setRequisitionLines([{ product: [...products.keys()][0] || '', uom: products.get([...products.keys()][0])?.uom || '', qty: '1' }]);
     setRequisitionForm((current) => ({ ...current, requested_by: '', reason: '' }));
   }
-
   function editRequisition(row) {
     setEditingRequisitionId(row.id);
     setRequisitionForm({ supplier: row.supplier || '', sourcing_method: row.sourcing_method || 'direct', warehouse: row.warehouse || '', requested_by: row.requested_by || '', reason: row.reason || '' });
     setRequisitionLines((row.lines || []).map((line) => ({ product: line.product || '', uom: line.uom || products.get(line.product)?.uom || '', qty: String(line.qty || 1) })));
   }
-
   async function requisitionAction(row, verb) {
     const messages = { submitted: uiText('Đã gửi đề nghị mua đi duyệt.'), approved: uiText('Đã duyệt đề nghị; hệ thống tạo đơn mua nháp để bổ sung báo giá và trình duyệt riêng.'), rejected: uiText('Đề nghị mua đã bị từ chối.') };
     await run(`${row.id}:${verb}`, () => action('purchasing.purchase_requisition', row, verb), messages[verb]);
   }
-
   function editOrder(row) {
     setEditingId(row.id); setSelectedId(row.id);
     setOrderForm({ supplier: row.supplier || '', warehouse: row.warehouse || '', expected_date: row.expected_date || '' });
     setLines((row.lines || []).map((line) => ({ product: line.product || '', uom: line.uom || products.get(line.product)?.uom || '', qty: String(line.qty || 1), price: String(line.price ?? ''), tax: line.tax || '' })));
   }
-
   async function submitOrder(row) {
     await run(`${row.id}:submitted`, () => action('purchasing.purchase_order', row, 'submitted'), uiText('Đã gửi đơn mua đi phê duyệt.'));
   }
-
   async function approveOrder(row) {
     await run(`${row.id}:approved`, () => action('purchasing.purchase_order', row, 'approved'), uiText('Đã duyệt đơn mua; kho có thể nhận hàng.'));
   }
-
   async function orderAction(row, verb) {
     const messages = { cancelled: uiText('Đã hủy đơn mua.'), rejected: uiText('Đơn mua đã bị từ chối.') };
     await run(`${row.id}:${verb}`, () => action('purchasing.purchase_order', row, verb), messages[verb]);
   }
-
   function prepareReceipt(row) {
     const ordered = new Map();
     for (const line of row.lines || []) {
@@ -305,7 +293,6 @@ export default function PurchasingWorkbenchPage() {
     const remaining = [...ordered.entries()].map(([key, line]) => ({ ...line, qty: Math.max(0, line.qty - (received.get(key) || 0)), key })).filter((line) => line.qty > 0.000001);
     setReceiptOrderId(row.id); setReceiptLines(remaining.map((line) => ({ ...line, qty: String(line.qty) }))); setReceiptNote('');
   }
-
   async function receiveGoods(event) {
     event.preventDefault();
     const order = orders.find((row) => row.id === receiptOrderId);
@@ -318,7 +305,6 @@ export default function PurchasingWorkbenchPage() {
     }, uiText('Đã ghi nhận hàng vào kho. Số lượng đã được đối chiếu với đơn mua; đơn tự cập nhật tiến độ nhận.'));
     setReceiptOrderId(''); setReceiptLines([]); setReceiptNote('');
   }
-
   async function createSupplierInvoice(event) {
     event.preventDefault();
     if (!selected || invoiceForeignPriceMissing || !supplierInvoiceRate) return;
@@ -335,41 +321,33 @@ export default function PurchasingWorkbenchPage() {
     setInvoiceQuantities({});
     setInvoicePrices({}); setInvoiceTaxes({}); setInvoiceAdjustments([]);
   }
-
   async function disputeSupplierInvoice(invoice) {
     const reason = String(invoiceDisputeReasons[invoice.id] ?? invoice.dispute_reason ?? '').trim();
     if (!reason || reason.length > 500) throw new Error(uiText('Lý do tranh chấp phải có từ 1 đến 500 ký tự.'));
     await api(dataPath('purchasing.supplier_invoice', invoice.id, 'disputed'), { method: 'POST', body: { dispute_reason: reason } });
   }
-
   async function resolveSupplierInvoiceDispute(invoice) {
     const note = String(invoiceResolutionNotes[invoice.id] ?? '').trim();
     if (!note || note.length > 1000) throw new Error(uiText('Ghi chú giải quyết phải có từ 1 đến 1.000 ký tự.'));
     await api(dataPath('purchasing.supplier_invoice', invoice.id, 'submitted'), { method: 'POST', body: { resolution_note: note } });
   }
-
   async function openSupplierInvoiceDispute(invoice) {
     await run(`${invoice.id}:invoice-disputed`, () => disputeSupplierInvoice(invoice), uiText('Đã chuyển hóa đơn sang trạng thái tranh chấp.'));
   }
-
   async function resolveSupplierInvoiceDisputeAndSubmit(invoice) {
     await run(`${invoice.id}:invoice-resubmitted`, () => resolveSupplierInvoiceDispute(invoice), uiText('Đã xử lý tranh chấp và gửi lại hóa đơn.'));
   }
-
   async function submitSupplierInvoice(invoice) {
     await run(`${invoice.id}:invoice-submitted`, () => action('purchasing.supplier_invoice', invoice, 'submitted'), uiText('Đã xử lý hóa đơn theo quy tắc dung sai và phê duyệt.'));
   }
-
   async function approveSupplierInvoice(invoice) {
     await run(`${invoice.id}:invoice-approved`, () => action('purchasing.supplier_invoice', invoice, 'approved'), uiText('Đã duyệt hóa đơn nhà cung cấp và ghi sổ công nợ phải trả.'));
   }
-
   const returnInspection = qualityInspections.find((row) => row.id === returnForm.inspection);
   const returnAlreadyQuantity = returnInspection ? selectedReturns
     .filter((row) => row.inspection === returnInspection.id && ['submitted', 'approved', 'dispatched'].includes(row.status))
     .reduce((sum, row) => sum + (row.lines || []).reduce((lineSum, line) => lineSum + Number(line.base_qty ?? line.qty ?? 0), 0), 0) : 0;
   const returnAvailableQuantity = returnInspection ? Math.max(0, Number(returnInspection.qty || 0) - returnAlreadyQuantity) / returnUnitRatioFor(returnInspection) : 0;
-
   async function createQualityReturn(event) {
     event.preventDefault();
     if (!selected || !returnInspection) return;
@@ -391,7 +369,6 @@ export default function PurchasingWorkbenchPage() {
     await run('return:create', () => api(dataPath('purchasing.purchase_return'), { method: 'POST', body: payload }), uiText('Đã tạo phiếu trả nhà cung cấp từ lượng không đạt trong kiểm tra chất lượng.'));
     setReturnForm({ inspection: '', qty: '', reason: '', supplier_invoice: '' });
   }
-
   async function createGeneralReturn(event) {
     event.preventDefault();
     if (!selected || !generalReturnLine) return;
@@ -411,12 +388,10 @@ export default function PurchasingWorkbenchPage() {
     await run('return:general:create', () => api(dataPath('purchasing.purchase_return'), { method: 'POST', body: payload }), uiText('Đã tạo phiếu trả hàng từ số lượng đã nhận.'));
     setGeneralReturnForm({ lineKey: '', qty: '', reason: '', supplier_invoice: '' });
   }
-
   async function purchaseReturnAction(row, verb) {
     const messages = { submitted: uiText('Đã gửi phiếu trả nhà cung cấp để phê duyệt.'), approved: uiText('Đã duyệt phiếu trả nhà cung cấp.'), rejected: uiText('Đã từ chối phiếu trả.'), dispatched: uiText('Đã xuất hàng trả lại nhà cung cấp.'), cancelled: uiText('Đã hủy phiếu trả nhà cung cấp.') };
     await run(`${row.id}:${verb}`, () => action('purchasing.purchase_return', row, verb), messages[verb] || uiText('Đã cập nhật phiếu trả nhà cung cấp.'));
   }
-
   const addLine = () => { const product = [...products.values()].find((row) => row.active !== false); setLines((current) => [...current, { product: product?.id || '', uom: product?.uom || '', qty: '1', price: '', tax: '' }]); };
   const updateLine = (index, field, value) => setLines((current) => current.map((line, i) => i === index ? { ...line, [field]: value, ...(field === 'product' ? { uom: products.get(value)?.uom || '' } : {}) } : line));
   const updateRequisitionProduct = (index, product) => setRequisitionLines((current) => current.map((line, i) => i === index ? { ...line, product, uom: products.get(product)?.uom || '' } : line));
@@ -424,14 +399,11 @@ export default function PurchasingWorkbenchPage() {
   const removeRequisitionLine = (index) => setRequisitionLines((current) => current.filter((_, i) => i !== index));
   const canReceive = (row) => ['approved','partially_received'].includes(row.status) && can('purchasing.purchase_receipt.create');
   const orderLinesTotal = lines.reduce((sum, line) => sum + lineValue(line, taxById), 0);
-
   return <div className="page">
-
     <div className="page-head"><div><h1>{uiText('Mua hàng và nhận hàng')}</h1><p className="sub">{uiText('Lập đơn mua, gửi duyệt, nhận đủ hoặc từng phần vào kho và theo dõi hóa đơn nhà cung cấp.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{uiText('Làm mới')}</button></div>
     {can('purchasing.rfq.read') && <div className="row u-legacy-41bc5191db" ><a className="btn btn-secondary btn-sm" href="#/sourcing">{uiText('RFQ và so sánh báo giá')}</a></div>}
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
     <div className="stats u-legacy-bf4a218e05" ><div className="card stat"><span className="stat-label">{uiText('Nháp / bị trả')}</span><strong className="stat-value">{totals.draft}</strong></div><div className="card stat"><span className="stat-label">{uiText('Chờ duyệt')}</span><strong className="stat-value">{totals.awaitingApproval}</strong></div><div className="card stat"><span className="stat-label">{uiText('Đang nhận hàng')}</span><strong className="stat-value">{totals.receiving}</strong></div><div className="card stat"><span className="stat-label">{uiText('Đã nhận đủ')}</span><strong className="stat-value">{totals.received}</strong></div></div>
-
     {can('purchasing.purchase_requisition.read') && <section className="card card-pad u-legacy-bf4a218e05" ><div className="row wrap"><h2>{uiText(editingRequisitionId ? 'Sửa đề nghị mua nháp' : 'Đề nghị mua nội bộ')}</h2><span className="grow"/>{editingRequisitionId && <button className="btn btn-ghost btn-sm" type="button" onClick={() => { setEditingRequisitionId(''); setRequisitionLines([{ product: [...products.keys()][0] || '', uom: products.get([...products.keys()][0])?.uom || '', qty: '1' }]); }}>{uiText('Thoát chỉnh sửa')}</button>}</div><p className="small muted">{uiText('Ghi nhu cầu hàng hóa và kho nhận. Sau khi phê duyệt, hệ thống sinh đơn mua nháp có liên kết nguồn; đơn mua vẫn cần giá và phê duyệt riêng trước khi đặt hàng.')}</p>
       {can('purchasing.purchase_requisition.create') && <><form onSubmit={saveRequisition}><div className="form-grid">
 <label className="field"><span className="label">{uiText('Phương thức mua')} *</span><select className="select" value={requisitionForm.sourcing_method} onChange={(event) => setRequisitionForm((current) => ({ ...current, sourcing_method: event.target.value, supplier: event.target.value === 'competitive' ? '' : current.supplier }))}><option value="direct">{uiText('Mua trực tiếp')}</option><option value="competitive">{uiText('So sánh báo giá nhà cung cấp')}</option></select></label>
@@ -444,7 +416,6 @@ export default function PurchasingWorkbenchPage() {
       <div className="row u-legacy-0ee7f66ad9" ><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !products.size || !warehouses.size}>{uiText(editingRequisitionId ? 'Lưu đề nghị nháp' : 'Tạo đề nghị nháp')}</button></div></form>
       </>}<PurchaseRequisitionsTable requisitions={requisitions} suppliers={suppliers} warehouses={warehouses} products={products} units={units} approvalByRequisition={approvalByRequisition} orderByRequisition={orderByRequisition} workflowApproval={workflowApproval} busy={busy} can={can} onEdit={editRequisition} onAction={requisitionAction} />
     </section>}
-
     {can('purchasing.purchase_order.create') && <section className="card card-pad"><div className="row wrap"><h2>{uiText(editingId ? 'Sửa đơn mua nháp' : 'Lập đơn mua trực tiếp')}</h2><span className="grow"/>{editingId && <button className="btn btn-ghost btn-sm" type="button" onClick={() => { setEditingId(''); setLines([{ product: [...products.keys()][0] || '', qty: '1', price: '', tax: '' }]); }}>{uiText('Thoát chỉnh sửa')}</button>}</div>
       <form onSubmit={saveOrder}><div className="form-grid"><label className="field"><span className="label">{uiText("Nhà cung cấp *")}</span><select className="select" required value={orderForm.supplier} onChange={(e) => setOrderForm({ ...orderForm, supplier: e.target.value })}><option value="">{uiText("Chọn nhà cung cấp")}</option>{[...suppliers.values()].map((row) => <option key={row.id} value={row.id}>{recordLabel('master-data.party', row)}</option>)}</select></label><label className="field"><span className="label">{uiText("Kho nhận *")}</span><select className="select" required value={orderForm.warehouse} onChange={(e) => setOrderForm({ ...orderForm, warehouse: e.target.value })}><option value="">{uiText("Chọn kho")}</option>{[...warehouses.values()].filter((row) => row.active !== false).map((row) => <option key={row.id} value={row.id}>{recordLabel('inventory.warehouse', row)}</option>)}</select></label><label className="field"><span className="label">{uiText("Ngày giao dự kiến")}</span><input className="input" type="date" value={orderForm.expected_date} onChange={(e) => setOrderForm({ ...orderForm, expected_date: e.target.value })}/></label></div>
         <div className="row wrap u-legacy-c53ea1da23" ><strong>{uiText("Vật tư / hàng hóa")}</strong><span className="grow"/><button className="btn btn-secondary btn-sm" type="button" disabled={!products.size} onClick={addLine}>{uiText("Thêm dòng")}</button></div>
@@ -452,7 +423,6 @@ export default function PurchasingWorkbenchPage() {
         <div className="row wrap u-legacy-0ee7f66ad9" ><span className="grow"/><strong>{uiText("Tổng dự kiến có thuế:")} {fmtMoney(orderLinesTotal)}</strong><button className="btn btn-primary" disabled={Boolean(busy) || !products.size || !warehouses.size || orderLinesTotal <= 0}>{uiText(editingId ? 'Lưu đơn mua nháp' : 'Tạo đơn mua nháp')}</button></div>
       </form>
     </section>}
-
     {loading ? <div className="skeleton" data-h="row"/> : !orders.length ? <div className="card card-pad empty u-legacy-92c18f6bda" >{uiText('Chưa có đơn mua. Tạo đơn mua nháp, gửi duyệt rồi nhận hàng theo số lượng thực tế.')}</div> : <div className="layout-split u-legacy-92c18f6bda" >
       <PurchaseOrdersList orders={orders} suppliers={suppliers} selectedId={selectedId} onSelect={setSelectedId} />
       {selected && <section className="card card-pad"><div className="row wrap"><div><h2>{suppliers.has(selected.supplier) ? recordLabel('master-data.party', suppliers.get(selected.supplier)) : uiText('Đơn mua hàng')}</h2><div className="small muted">{uiText("Kho nhận:")} {warehouses.get(selected.warehouse)?.name || '—'} · Giao dự kiến: {fmtDate(selected.expected_date)}</div></div><span className="grow"/><span className="badge warning">{statusLabel(selected.status)}</span></div>
@@ -460,7 +430,6 @@ export default function PurchasingWorkbenchPage() {
         {selected.status === 'submitted' && workflowApproval && approvalByOrder.get(selected.id) && <p className="small muted u-legacy-df928149c5" >{uiText("Yêu cầu phê duyệt:")} <a href={`#/e/workflow-approval/approval_request/${approvalByOrder.get(selected.id).id}`}>{statusLabel(approvalByOrder.get(selected.id).status)} · {uiText('mở yêu cầu')}</a></p>}
         <div className="row wrap u-legacy-0ee7f66ad9" >{['draft','rejected'].includes(selected.status) && can('purchasing.purchase_order.update') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => editOrder(selected)}>{uiText("Sửa nháp")}</button>}{['draft','rejected'].includes(selected.status) && can('purchasing.purchase_order.submitted') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy) || !(selected.lines || []).length || Number(selected.total) <= 0} onClick={() => submitOrder(selected)}>{uiText("Gửi duyệt")}</button>}{selected.status === 'submitted' && !workflowApproval && can('purchasing.purchase_order.approved') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => approveOrder(selected)}>{uiText("Duyệt đơn")}</button>}{['draft','submitted','approved','rejected'].includes(selected.status) && !(approvalByOrder.get(selected.id)?.status === 'pending') && can('purchasing.purchase_order.cancelled') && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => orderAction(selected, 'cancelled')}>{uiText("Hủy đơn")}</button>}{canReceive(selected) && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => prepareReceipt(selected)}>{uiText("Nhận hàng")}</button>}{billByOrder.has(selected.id) && <a className="btn btn-secondary btn-sm" href={`#/e/accounting/bill/${billByOrder.get(selected.id).id}`}>{uiText("Mở hóa đơn")} {statusLabel(billByOrder.get(selected.id).status)}</a>}</div>
     {['partially_received','received'].includes(selected.status) && selectedReceipts.some((receipt) => receipt.status === 'received') && can('purchasing.supplier_invoice.create') && <SupplierInvoiceDraftForm onSubmit={createSupplierInvoice} lines={invoiceableLines} products={products} currencies={currencies} taxes={taxes} taxById={taxById} selectedReceipts={selectedReceipts} invoiceQuantities={invoiceQuantities} invoicePrices={invoicePrices} invoiceTaxes={invoiceTaxes} invoiceAdjustments={invoiceAdjustments} supplierInvoiceForm={supplierInvoiceForm} supplierInvoiceCurrency={supplierInvoiceCurrency} supplierInvoiceIsBaseCurrency={supplierInvoiceIsBaseCurrency} supplierInvoiceRate={supplierInvoiceRate} baseCurrencyCode={baseCurrencyCode} invoiceableVariance={invoiceableVariance} invoiceableTotal={invoiceableTotal} invoiceAdjustmentsInvalid={invoiceAdjustmentsInvalid} invoiceForeignPriceMissing={invoiceForeignPriceMissing} busy={busy} lineKey={keyOf} fmtMoney={fmtMoney} t={uiText} onQuantityChange={(key, value) => setInvoiceQuantities((current) => ({ ...current, [key]: value }))} onPriceChange={(key, value) => setInvoicePrices((current) => ({ ...current, [key]: value }))} onCurrencyChange={(value) => { setSupplierInvoiceForm((current) => ({ ...current, currency: value })); setInvoicePrices({}); }} onTaxChange={(key, value) => setInvoiceTaxes((current) => ({ ...current, [key]: value }))} onAdjustmentsChange={setInvoiceAdjustments} onFormChange={(field, value) => setSupplierInvoiceForm((current) => ({ ...current, [field]: value }))} />}
-
         <SupplierInvoicesPanel invoices={selectedSupplierInvoices} bills={bills} approvalByInvoice={approvalByInvoice} currencies={currencies} baseCurrencyCode={baseCurrencyCode} workflowApproval={workflowApproval} busy={busy} disputeReasons={invoiceDisputeReasons} resolutionNotes={invoiceResolutionNotes} canDispute={can('purchasing.supplier_invoice.update') && can('purchasing.supplier_invoice.disputed')} canResolve={can('purchasing.supplier_invoice.update') && can('purchasing.supplier_invoice.submitted')} canSubmit={can('purchasing.supplier_invoice.submitted')} canApprove={can('purchasing.supplier_invoice.approved')} onDisputeReasonChange={(id, value) => setInvoiceDisputeReasons((current) => ({ ...current, [id]: value }))} onResolutionNoteChange={(id, value) => setInvoiceResolutionNotes((current) => ({ ...current, [id]: value }))} onDispute={openSupplierInvoiceDispute} onResolve={resolveSupplierInvoiceDisputeAndSubmit} onSubmit={submitSupplierInvoice} onApprove={approveSupplierInvoice} />
 
         {receiptOrderId === selected.id && <PurchaseReceiptForm lines={receiptLines} products={products} note={receiptNote} busy={busy} onClose={() => setReceiptOrderId('')} onLineChange={(index, value) => setReceiptLines((current) => current.map((item, rowIndex) => rowIndex === index ? { ...item, received: value } : item))} onNoteChange={setReceiptNote} onSubmit={receiveGoods} />}
