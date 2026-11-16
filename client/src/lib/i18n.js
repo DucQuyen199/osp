@@ -652,7 +652,82 @@ const UI_TEXT_EN = {
   'Tên hiển thị': 'Display name', 'Quyền, mỗi dòng một quyền': 'Permissions, one per line',
   'Dạng module.dữ_liệu.hành_động. Dấu * khớp mọi giá trị, ví dụ crm.* hoặc *.*.read.': 'Format: module.entity.action. An asterisk matches any value, for example crm.* or *.*.read.',
   'Lưu vai trò': 'Save role', 'Vai trò hiện có': 'Existing roles', 'Vai trò': 'Role', 'Quyền': 'Permissions', 'Hệ thống': 'System', 'Sửa': 'Edit',
+  'Cài đặt module': 'Module settings', 'Đã bật module': 'Enabled module', 'Đã tắt module': 'Disabled module', 'cùng': 'and', 'module phụ thuộc': 'dependent modules',
+  'dữ liệu được giữ lại.': 'existing data was kept.', 'Không thay đổi được trạng thái module.': 'Could not change the module status.',
+  'Chỉ quản trị viên mới được thay đổi module.': 'Only administrators can change modules.', 'Quản trị doanh nghiệp': 'Company administration', 'Quản lý module': 'Manage modules',
+  'Bật module để nối các luồng liên mô-đun. Tắt module không xóa dữ liệu; bật lại sẽ tiếp tục dùng dữ liệu cũ.': 'Enable modules to connect cross-module workflows. Disabling a module keeps its data; enabling it again restores access to that data.',
+  'Phụ thuộc': 'Dependencies', 'Luôn bật': 'Always on',
 };
+
+const MODULE_NAME_EN = {
+  accounting: 'Accounting', agriculture: 'Agriculture', asset: 'Fixed assets', 'auto-service': 'Auto service', bi: 'Reports & analytics',
+  booking: 'Booking & resources', budget: 'Budgets', 'case-management': 'Case management', charity: 'Charity / nonprofit',
+  clinic: 'Clinic / healthcare', communication: 'Communications & notifications', construction: 'Construction', contract: 'Contracts',
+  crm: 'CRM', document: 'Document management', ecommerce: 'E-commerce', einvoice: 'E-invoicing', events: 'Events & ticketing',
+  expense: 'Employee expenses', 'field-service': 'Field service', helpdesk: 'Customer support', hotel: 'Hotel & lodging', hrm: 'Human resources',
+  insurance: 'Insurance', 'integration-hub': 'Integration hub', inventory: 'Inventory', lending: 'Lending / microfinance', lms: 'Learning management',
+  logistics: 'Logistics & delivery', loyalty: 'Loyalty', maintenance: 'Maintenance', manufacturing: 'Manufacturing', marketing: 'Marketing',
+  'master-data': 'Master data', payments: 'Payment gateway', payroll: 'Payroll', performance: 'Performance management', pharmacy: 'Pharmacy',
+  pos: 'Point of sale', project: 'Projects', purchasing: 'Purchasing', quality: 'Quality management', 'real-estate': 'Real estate',
+  recruitment: 'Recruitment', restaurant: 'Restaurant / F&B', sales: 'Sales', school: 'School / training center',
+  subscription: 'Subscriptions & recurring billing', utilities: 'Utilities / telecom', 'workflow-approval': 'Approvals',
+};
+
+const MODULE_DESCRIPTION_EN = {
+  accounting: 'Chart of accounts, invoices, credit adjustments, payments, and balanced journal entries for cross-module workflows.',
+  agriculture: 'Farm operations, crop seasons, cultivation supplies, harvests, and traceability. Harvests are received into inventory automatically.',
+  asset: 'Register, capitalize, depreciate using the straight-line method, and dispose of fixed assets.',
+  'auto-service': 'Track vehicles with increasing odometer readings. Repair orders record intake mileage and parts; completion consumes parts and creates an invoice.',
+  bi: 'Dashboards, reports, and KPIs for reading data across modules.',
+  booking: 'Book rooms, staff, equipment, tables, and courts for clinics, spas, gyms, salons, and other services.',
+  budget: 'Create budgets by period and department, then track actuals.',
+  'case-management': 'Manage cases, notes, and billable time for legal, consulting, accounting, government, and nonprofit work.',
+  charity: 'Manage programs, donors, and beneficiaries. Donations automatically create receipts.',
+  clinic: 'Manage patients, visits, prescriptions, and lab orders. Completed visits create invoices; dispensing reduces inventory.',
+  communication: 'Configure email, SMS, Zalo, push, and webhook channels, message templates, and delivery logs. Key events create notifications automatically.',
+  construction: 'Manage estimates, job sites, subcontractors, quantity acceptance, and cost commitments.',
+  contract: 'Manage contracts, terms, and approved appendices across their effective and expiry dates.',
+  crm: 'Manage leads, sales opportunities, and customer activities. Winning an opportunity creates a sales order; converting a lead creates a customer.',
+  document: 'Manage folders, versioned documents, and signature requests.',
+  ecommerce: 'Manage online stores and web, app, or marketplace orders. Orders can create sales orders, invoices, stock issues, and shipments.',
+  einvoice: 'Create issuance requests when accounting invoices are posted. The Rust worker issues or cancels them through a configured HTTPS provider and stores results in PostgreSQL.',
+  events: 'Manage events, tickets, and check-in. Published ticket prices include configured tax; ticket sales record revenue and tax.',
+  expense: 'Submit, approve, and reimburse employee expense claims.',
+  'field-service': 'Manage work orders, technician dispatch, and used materials. Completion consumes inventory and creates an invoice.',
+  helpdesk: 'Manage support tickets, SLA policies, and the knowledge base.',
+  hotel: 'Manage room types, rooms, reservations, and incidental charges. Checkout creates an invoice and marks the room for cleaning.',
+  hrm: 'Manage employee records, departments, job titles, leave, and attendance.',
+  insurance: 'Manage policies and claims. Activating a policy collects its premium; paying a claim creates accounting entries.',
+  'integration-hub': 'Connect external services such as banks, carriers, e-invoice providers, and Zalo using connectors, webhooks, and API keys.',
+  inventory: 'Manage multi-location stock, receipts, issues, lots and expiry, counts, and transfers. Inventory changes stay synchronized with operational modules.',
+  lending: 'Manage loans with a nominal annual rate and monthly declining-balance annuities. Generate installments, track overdue debt, and post principal and interest on disbursement and collection.',
+  lms: 'Manage courses, lessons, enrollment, and learner progress.',
+  logistics: 'Manage vehicles, drivers, routes, and shipments. Orders with a delivery address create shipments; delivery updates the order.',
+  loyalty: 'Manage members, reward points, and vouchers. Purchases at POS or confirmed sales orders earn points automatically.',
+  maintenance: 'Schedule preventive maintenance and manage repair requests for assets and equipment.',
+  manufacturing: 'Manage bills of materials and production orders by work center and daily capacity. Starting an order issues materials to WIP; passed QC receives finished goods. Partial rework, scrap, and independently approved concessions are supported.',
+  marketing: 'Manage campaigns, customer segments, and content. Attribute leads to campaigns and measure their performance.',
+  'master-data': 'Shared catalogs for all modules: parties, products, branches, units of measure, currencies, and taxes.',
+  payments: 'Process transactions through VNPay, MoMo, ZaloPay, Stripe, and bank transfer. Successful payments are recorded in accounting.',
+  payroll: 'Manage payroll and payslips. Payslips are locked to a draft run; submitting a run creates an approval request, approval posts journals, and marking it paid creates a payment.',
+  performance: 'Manage objectives, key results, and periodic reviews.',
+  pharmacy: 'Manage retail prescriptions, pharmacist verification, and dispensing linked to POS transactions.',
+  pos: 'Manage sales shifts and counter sales. Completing a sale reduces stock, records payment, and awards loyalty points.',
+  project: 'Manage projects, tasks, and timesheets.',
+  purchasing: 'Manage purchase requests, quotations, orders, receipts, and supplier invoices. Returns update inventory and adjust the original bill.',
+  quality: 'Inspect incoming goods and finished products, retain results, and manage defective quantities through separate reinspection rounds.',
+  'real-estate': 'Manage properties, viewings, and leases. A completed sale creates an invoice; activating a rental creates a lease.',
+  recruitment: 'Manage job postings, candidates, and applications. Hiring creates an employee record.',
+  restaurant: 'Manage tables, menus, recipes, table orders, and kitchen screens. Sending an order to the kitchen creates a kitchen ticket; payment consumes inventory and records revenue.',
+  sales: 'Manage quotations, sales orders, price lists, and returns. Shipped orders issue stock after successful delivery; direct sales issue stock when confirmed.',
+  school: 'Manage learners, classes, enrollment, grades, and tuition. Issuing tuition creates an invoice; payment updates tuition status.',
+  subscription: 'Manage service plans, subscriptions, and billing cycles. Due subscriptions generate invoices automatically.',
+  utilities: 'Manage meters, readings, and consumption invoices. Issuing an invoice posts it to accounting; payment updates its status.',
+  'workflow-approval': 'Shared approval workflows. Purchase orders and expense requests create approval requests when enabled; approval updates the source document.',
+};
+
+export const moduleName = (id, name) => uiLocale === 'en-US' ? (MODULE_NAME_EN[id] || uiText(name)) : name;
+export const moduleDescription = (id, description) => uiLocale === 'en-US' ? (MODULE_DESCRIPTION_EN[id] || uiText(description)) : description;
 
 const storedUiLocale = () => {
   try { return localStorage.getItem('osp.uiLocale') === 'en-US' ? 'en-US' : 'vi-VN'; }
@@ -674,7 +749,7 @@ export const fieldLabel = (name) => uiLocale === 'en-US' ? (FIELD_LABEL_EN[name]
 export const statusLabel = (v) => uiText(STATUS[v] || humanize(v));
 export const actionLabel = (v) => uiText(ACTIONS[v] || STATUS[v] || humanize(v));
 export const tone = (v) => TONE_LOOKUP[v] || '';
-export const categoryLabel = (c) => CATEGORY[c] || humanize(c);
+export const categoryLabel = (c) => uiText(CATEGORY[c] || humanize(c));
 
 const FORMAT_LOCALES = new Set(['vi-VN', 'en-US']);
 const storedFormatLocale = () => {

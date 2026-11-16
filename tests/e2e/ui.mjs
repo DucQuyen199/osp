@@ -250,6 +250,11 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   await page.waitForSelector('#main h2');
   must((await page.$eval('#main h2', (heading) => heading.textContent)) === 'Users', 'user settings are not translated');
   await axe('user settings tiếng Anh');
+  await page.goto(`${BASE}/#/settings/modules`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#main h2');
+  must((await page.$eval('#main h2', (heading) => heading.textContent)) === 'Master data', 'module settings are not translated');
+  must((await page.$eval('#main', (main) => main.innerText)).includes('Chart of accounts, invoices'), 'module catalog descriptions are not translated');
+  await axe('module settings tiếng Anh');
   await page.goto(`${BASE}/#/period-close`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Accounting period close', 'accounting period close title is not translated');
