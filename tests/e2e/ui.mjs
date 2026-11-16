@@ -241,6 +241,14 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   await page.waitForSelector('#main h2');
   must((await page.$eval('#main h2', (heading) => heading.textContent)) === 'Audit log', 'audit log is not translated');
   await axe('audit settings tiếng Anh');
+  await page.goto(`${BASE}/#/settings/failures`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#main h2');
+  must((await page.$eval('#main h2', (heading) => heading.textContent)) === 'Integration failure queue', 'integration failures are not translated');
+  await axe('integration failures tiếng Anh');
+  await page.goto(`${BASE}/#/settings/outbox`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#main h2');
+  must((await page.$eval('#main h2', (heading) => heading.textContent)) === 'Integration outbox', 'integration outbox is not translated');
+  await axe('integration outbox tiếng Anh');
   await page.goto(`${BASE}/#/unknown`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Page not found', 'not-found page is not translated');
