@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, fmtNumber, uiText } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import { PurchaseOrderLinesEditor, RequisitionLinesEditor } from './components/PurchaseLineEditors.jsx';
+import PurchaseOrdersList from './components/PurchaseOrdersList.jsx';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
@@ -434,7 +434,7 @@ export default function PurchasingWorkbenchPage() {
     </section>}
 
     {loading ? <div className="skeleton" data-h="row"/> : !orders.length ? <div className="card card-pad empty" style={{ marginTop: 16 }}>{uiText('Chưa có đơn mua. Tạo đơn mua nháp, gửi duyệt rồi nhận hàng theo số lượng thực tế.')}</div> : <div className="layout-split" style={{ marginTop: 16 }}>
-      <section className="card card-pad"><h2>{uiText('Đơn mua hàng')}</h2><div className="table-wrap"><table className="table"><thead><tr><th>{uiText('Nhà cung cấp')}</th><th>{uiText('Giao dự kiến')}</th><th>{uiText('Tổng')}</th><th>{uiText('Trạng thái')}</th></tr></thead><tbody>{orders.map((row) => <tr {...selectableTableRowProps} key={row.id} aria-selected={selectedId === row.id} className={selectedId === row.id ? 'selected' : ''} onClick={() => setSelectedId(row.id)} style={{ cursor: 'pointer' }}><td><strong>{suppliers.has(row.supplier) ? recordLabel('master-data.party', suppliers.get(row.supplier)) : uiText('Nhà cung cấp')}</strong><div className="small muted">{row.source ? `${uiText('Nguồn')}: ${row.source}` : String(row.id).slice(0, 8)}</div></td><td>{fmtDate(row.expected_date)}</td><td>{fmtMoney(row.total || 0)}</td><td>{statusLabel(row.status)}</td></tr>)}</tbody></table></div></section>
+      <PurchaseOrdersList orders={orders} suppliers={suppliers} selectedId={selectedId} onSelect={setSelectedId} />
       {selected && <section className="card card-pad"><div className="row wrap"><div><h2>{suppliers.has(selected.supplier) ? recordLabel('master-data.party', suppliers.get(selected.supplier)) : 'Đơn mua hàng'}</h2><div className="small muted">{uiText("Kho nhận:")} {warehouses.get(selected.warehouse)?.name || '—'} · Giao dự kiến: {fmtDate(selected.expected_date)}</div></div><span className="grow"/><span className="badge warning">{statusLabel(selected.status)}</span></div>
         <div className="table-wrap" style={{ marginTop: 12 }}><table className="table"><thead><tr><th>{uiText("Hàng")}</th><th>{uiText("Đặt")}</th><th>{uiText("Đã nhận")}</th><th>{uiText("Đơn giá")}</th><th>{uiText("Thành tiền")}</th></tr></thead><tbody>{(selected.lines || []).map((line, index) => { const receivedQty = selectedReceipts.filter((receipt) => receipt.status === 'received').flatMap((receipt) => receipt.lines || []).filter((receiptLine) => keyOf(receiptLine) === keyOf(line)).reduce((sum, receiptLine) => sum + Number(receiptLine.qty || 0), 0); return <tr key={`${line.product}-${index}`}><td>{products.get(line.product)?.name || uiText('Hàng hóa')}</td><td>{line.qty} {line.uom_name || units.get(line.uom)?.name || ''}</td><td>{receivedQty} {line.uom_name || units.get(line.uom)?.name || ''}</td><td>{fmtMoney(line.price)}</td><td>{fmtMoney(line.line_total || Number(line.qty || 0) * Number(line.price || 0))}</td></tr>; })}</tbody><tfoot><tr><th colSpan="4">{uiText("Tổng có thuế")}</th><th>{fmtMoney(selected.total || 0)}</th></tr></tfoot></table></div>
         {selected.status === 'submitted' && workflowApproval && approvalByOrder.get(selected.id) && <p className="small muted" style={{ marginTop: 10 }}>{uiText("Yêu cầu phê duyệt:")} <a href={`#/e/workflow-approval/approval_request/${approvalByOrder.get(selected.id).id}`}>{statusLabel(approvalByOrder.get(selected.id).status)} · {uiText('mở yêu cầu')}</a></p>}
