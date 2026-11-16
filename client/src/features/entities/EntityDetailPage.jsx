@@ -151,11 +151,13 @@ export default function EntityDetailPage({ qname, id }) {
       const all = await fetchEvents(1000).catch(() => []);
       const roots = all.filter((event) => event.recordId === id && event.type === `${qname}.${action}`).slice(-1).map((event) => event.id);
       const chain = descendants(all, roots).filter((event) => !roots.includes(event.id));
-      toast(chain.length ? `${actionLabel(action)} xong. ${chain.length} bước liên mô-đun đã chạy.` : `${actionLabel(action)} xong.`, 'success');
+      toast(chain.length
+        ? uiText('Đã hoàn tất {action}; {count} bước liên mô-đun đã chạy.').replace('{action}', actionLabel(action)).replace('{count}', String(chain.length))
+        : uiText('Đã hoàn tất {action}.').replace('{action}', actionLabel(action)), 'success');
       if (chain.length) setTab('flow');
       await reload();
     } catch (reason) {
-      toast(reason.message || 'Không thực hiện được thao tác.', 'danger');
+      toast(uiText(reason.message || 'Không thực hiện được thao tác.'), 'danger');
     } finally {
       setWorking('');
     }
@@ -163,9 +165,9 @@ export default function EntityDetailPage({ qname, id }) {
 
   const remove = async () => {
     const confirmed = await confirmDialog({
-      title: 'Xóa bản ghi này?',
-      message: 'Thao tác không thể hoàn tác. Nếu bản ghi đang được dùng, máy chủ sẽ từ chối xóa.',
-      confirmLabel: 'Xóa',
+      title: uiText('Xóa bản ghi này?'),
+      message: uiText('Thao tác không thể hoàn tác. Nếu bản ghi đang được dùng, máy chủ sẽ từ chối xóa.'),
+      confirmLabel: uiText('Xóa'),
       danger: true,
     });
     if (!confirmed) return;
@@ -174,10 +176,10 @@ export default function EntityDetailPage({ qname, id }) {
       await api(dataPath(qname, id), { method: 'DELETE' });
       invalidateRefs(qname);
       entityChanged(qname);
-      toast('Đã xóa bản ghi.', 'success');
+      toast(uiText('Đã xóa bản ghi.'), 'success');
       location.hash = listHref(qname);
     } catch (reason) {
-      toast(reason.message || 'Không xóa được bản ghi.', 'danger');
+      toast(uiText(reason.message || 'Không xóa được bản ghi.'), 'danger');
     } finally {
       setWorking('');
     }
@@ -196,10 +198,11 @@ export default function EntityDetailPage({ qname, id }) {
       });
       setStatementFile(null);
       entityChanged('accounting.bank_statement_line');
-      toast(`Đã nhập ${result.imported} dòng; bỏ qua ${result.skipped} dòng trùng.`, 'success');
+      toast(uiText('Đã nhập {imported} dòng; bỏ qua {skipped} dòng trùng.')
+        .replace('{imported}', String(result.imported)).replace('{skipped}', String(result.skipped)), 'success');
       await reload();
     } catch (reason) {
-      toast(reason.message || 'Không nhập được tệp sao kê.', 'danger');
+      toast(uiText(reason.message || 'Không nhập được tệp sao kê.'), 'danger');
     } finally {
       setWorking('');
     }

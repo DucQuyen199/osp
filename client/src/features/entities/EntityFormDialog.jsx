@@ -321,7 +321,7 @@ export default function EntityFormDialog({ qname, record, onClose, onSaved }) {
         ? await api(dataPath(qname, record.id), { method: 'PATCH', body: payload })
         : await api(dataPath(qname), { method: 'POST', body: payload });
       invalidateRefs(qname);
-      toast(editing ? 'Đã lưu thay đổi.' : `Đã tạo ${entityLabel(qname).toLowerCase()}.`, 'success');
+      toast(editing ? uiText('Đã lưu thay đổi.') : uiText('Đã tạo {entity}.').replace('{entity}', uiText(entityLabel(qname).toLowerCase())), 'success');
       dialog.current?.close();
       onSaved?.(saved);
     } catch (reason) {

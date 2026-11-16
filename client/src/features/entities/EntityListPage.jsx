@@ -173,8 +173,8 @@ export default function EntityListPage({ qname }) {
   const runBulkAction = async (action, transition) => {
     if (selectedRows.length > 1 || tone(transition.to) === 'danger') {
       const confirmed = await confirmDialog({
-        title: `${actionLabel(action)} ${selectedRows.length} bản ghi?`,
-        message: `Trạng thái sẽ chuyển sang “${statusLabel(transition.to)}”. Các mô-đun khác có thể chạy phản ứng theo từng bản ghi; nếu một bản ghi lỗi, cả lô sẽ được hoàn tác.`,
+        title: uiText('{action} {count} bản ghi?').replace('{action}', actionLabel(action)).replace('{count}', String(selectedRows.length)),
+        message: uiText('Trạng thái sẽ chuyển sang “{status}”. Các mô-đun khác có thể chạy phản ứng theo từng bản ghi; nếu một bản ghi lỗi, cả lô sẽ được hoàn tác.').replace('{status}', statusLabel(transition.to)),
         confirmLabel: actionLabel(action),
         danger: true,
       });
@@ -190,7 +190,7 @@ export default function EntityListPage({ qname }) {
       invalidateRefs(qname);
       window.dispatchEvent(new CustomEvent('osp:entity-changed', { detail: qname }));
       setSelectedIds(new Set());
-      toast(`${actionLabel(action)}: đã xử lý ${fmtNumber(result.count)} bản ghi.`, 'success');
+      toast(uiText('Đã xử lý {action}: {count} bản ghi.').replace('{action}', actionLabel(action)).replace('{count}', fmtNumber(result.count)), 'success');
     } catch (reason) {
       setError(reason.message || 'Không xử lý được các bản ghi đã chọn.');
     } finally {
