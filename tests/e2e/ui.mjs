@@ -200,6 +200,10 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Stock counts', 'màn hình kiểm kê kho chưa được dịch');
   await axe('stock count workbench tiếng Anh');
+  await page.goto(`${BASE}/#/reports/inventory/lot-expiry`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('#main h1');
+  must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Expiring lots', 'màn hình lô cận hạn chưa được dịch');
+  await axe('inventory lot expiry workbench tiếng Anh');
   await page.goto(`${BASE}/#/`, { waitUntil: 'networkidle0' });
   await page.click('.menu > button');
   must(await clickText('Vietnamese', 'button'), 'không có lựa chọn tiếng Việt sau khi chuyển ngôn ngữ');
