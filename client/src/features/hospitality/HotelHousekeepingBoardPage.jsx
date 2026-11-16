@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtAgo, fmtDate, fmtDateTime, uiTextWith } from '../../lib/i18n.js';
-import { can } from '../../lib/state.js';
+import { can, loadRefs } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import housekeepingEnglish from './housekeeping.en.js';
 
@@ -9,19 +9,26 @@ const t = (text) => uiTextWith(text, housekeepingEnglish);
 
 export default function HotelHousekeepingBoardPage() {
   const [items, setItems] = useState([]);
+  const [rooms, setRooms] = useState(new Map());
   const [totals, setTotals] = useState({ cleaningCount: 0, dueToday: 0, readyCount: 0, occupiedCount: 0, maintenanceCount: 0 });
   const [truncated, setTruncated] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState('');
   const [maintenanceReasons, setMaintenanceReasons] = useState({});
+  const [maintenanceRoom, setMaintenanceRoom] = useState('');
+  const [maintenanceReason, setMaintenanceReason] = useState('');
   const [lastUpdated, setLastUpdated] = useState(null);
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
-      const result = await api(tenantPath('/reports/hotel/housekeeping-board'));
+      const [result, roomMap] = await Promise.all([
+        api(tenantPath('/reports/hotel/housekeeping-board')),
+        loadRefs('hotel.room'),
+      ]);
       setItems(result.items || []);
+      setRooms(roomMap);
       setTotals({
         cleaningCount: result.cleaningCount || 0,
         dueToday: result.dueToday || 0,
@@ -45,22 +52,25 @@ export default function HotelHousekeepingBoardPage() {
     return () => window.clearInterval(timer);
   }, [load]);
 
-  const roomAction = async (room, action) => {
-    const maintenanceReason = maintenanceReasons[room.id]?.trim() || '';
-    if (action === 'maintenance' && !maintenanceReason) return;
+  const roomAction = async (room, action, reasonOverride) => {
+    const reason = (reasonOverride ?? maintenanceReasons[room.id] ?? '').trim();
+    if (action === 'maintenance' && !reason) return false;
     setBusy(room.id);
     setError('');
     try {
-      await api(dataPath('hotel.room', room.id, action), { method: 'POST', body: action === 'maintenance' ? { maintenance_reason: maintenanceReason } : undefined });
+      await api(dataPath('hotel.room', room.id, action), { method: 'POST', body: action === 'maintenance' ? { maintenance_reason: reason } : undefined });
       if (action === 'maintenance') setMaintenanceReasons((current) => ({ ...current, [room.id]: '' }));
       await load(true);
+      return true;
     } catch (reason) {
       setError(t(reason.message || (action === 'maintenance' ? 'Không thể chuyển phòng sang bảo trì.' : 'Không thể chuyển phòng sang trạng thái sẵn sàng.')));
       await load(true);
+      return false;
     } finally {
       setBusy('');
     }
   };
+  const vacantRooms = [...rooms.values()].filter((room) => room.status === 'vacant');
 
   return <div className="page">
     <div className="page-head"><div><h1>{t('Bảng buồng phòng')}</h1><p className="sub">{t('Phòng vừa trả được xếp theo khách đến tiếp theo. Chỉ đánh dấu sẵn sàng sau khi hoàn tất dọn và kiểm tra phòng.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading} onClick={() => load()}>{loading ? t('Đang tải…') : t('Làm mới')}</button></div>
@@ -72,6 +82,18 @@ export default function HotelHousekeepingBoardPage() {
       <span className="badge plain">{t('Đang có khách:')} {totals.occupiedCount}</span>
       {lastUpdated && <span className="small muted">{t('Cập nhật lúc')} {fmtDateTime(lastUpdated)}</span>}
     </div>
+    {can('hotel.room.maintenance') && <section className="card card-pad housekeeping-maintenance-form">
+      <h2>{t('\u0110\u01b0a ph\u00f2ng tr\u1ed1ng v\u00e0o b\u1ea3o tr\u00ec')}</h2>
+      {vacantRooms.length ? <form className="row wrap" onSubmit={async (event) => {
+        event.preventDefault(); const room = rooms.get(maintenanceRoom); if (!room) return;
+        const saved = await roomAction(room, 'maintenance', maintenanceReason);
+        if (saved) { setMaintenanceRoom(''); setMaintenanceReason(''); }
+      }}>
+        <label className="field"><span className="label">{t('Ph\u00f2ng tr\u1ed1ng')}</span><select className="select" required value={maintenanceRoom} onChange={(event) => setMaintenanceRoom(event.target.value)}><option value="">{t('Ch\u1ecdn ph\u00f2ng c\u1ea7n b\u1ea3o tr\u00ec')}</option>{vacantRooms.map((room) => <option key={room.id} value={room.id}>{room.number}{room.floor ? ` \u00b7 ${t('T\u1ea7ng')} ${room.floor}` : ''}</option>)}</select></label>
+        <label className="field grow"><span className="label">{t('L\u00fd do b\u1ea3o tr\u00ec *')}</span><input className="input" required maxLength="500" value={maintenanceReason} onChange={(event) => setMaintenanceReason(event.target.value)} placeholder={t('M\u00f4 t\u1ea3 v\u1ea5n \u0111\u1ec1 c\u1ea7n x\u1eed l\u00fd')} /></label>
+        <button className="btn btn-secondary" type="submit" disabled={Boolean(busy) || !maintenanceRoom || !maintenanceReason.trim()}>{t('\u0110\u01b0a v\u00e0o b\u1ea3o tr\u00ec')}</button>
+      </form> : <p className="small muted">{t('Kh\u00f4ng c\u00f3 ph\u00f2ng tr\u1ed1ng \u0111\u1ec3 \u0111\u01b0a v\u00e0o b\u1ea3o tr\u00ec.')}</p>}
+    </section>}
     {error && <div className="alert danger" role="alert">{t(error)}</div>}
     {truncated && <div className="alert warning" role="status">{t('Đang hiển thị tối đa 500 phòng đang chờ dọn.')}</div>}
     {loading && !lastUpdated ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : items.length ? <div className="housekeeping-grid">

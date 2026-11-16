@@ -35,6 +35,12 @@ const housekeepingEnglish = {
   '\u0110\u01b0a v\u00e0o b\u1ea3o tr\u00ec': 'Place under maintenance',
   'Ch\u1ec9 \u0111\u00e1nh d\u1ea5u s\u1eb5n s\u00e0ng sau khi s\u1eeda ch\u1eefa v\u00e0 ki\u1ec3m tra': 'Mark ready after repair and inspection',
   'Kh\u00f4ng th\u1ec3 chuy\u1ec3n ph\u00f2ng sang b\u1ea3o tr\u00ec.': 'Could not place the room under maintenance.',
+  '\u0110\u01b0a ph\u00f2ng tr\u1ed1ng v\u00e0o b\u1ea3o tr\u00ec': 'Place a vacant room under maintenance',
+  'Ph\u00f2ng tr\u1ed1ng': 'Vacant room',
+  'Ch\u1ecdn ph\u00f2ng c\u1ea7n b\u1ea3o tr\u00ec': 'Select a room for maintenance',
+  'L\u00fd do b\u1ea3o tr\u00ec *': 'Maintenance reason *',
+  'Kh\u00f4ng c\u00f3 ph\u00f2ng tr\u1ed1ng \u0111\u1ec3 \u0111\u01b0a v\u00e0o b\u1ea3o tr\u00ec.': 'No vacant rooms are available for maintenance.',
+  '?ang hi?n th? t?i ?a 500 ph?ng c?n x? l?.': 'Showing up to 500 rooms needing attention.',
 };
 
 export default housekeepingEnglish;

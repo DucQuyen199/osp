@@ -97,6 +97,7 @@
      },
      "maintenance": {
       "from": [
+       "vacant",
        "cleaning"
       ],
       "to": "maintenance"

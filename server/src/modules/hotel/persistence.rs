@@ -82,9 +82,9 @@ pub async fn validate_persistence(
         else {
             return Ok(vec!["Room was not found in this tenant".into()]);
         };
-        if room.get::<_, String>(0) != "cleaning" {
+        if !matches!(room.get::<_, String>(0).as_str(), "vacant" | "cleaning") {
             return Ok(vec![
-                "Only a room awaiting cleaning can be placed into maintenance".into(),
+                "Only a vacant or cleaning room can be placed into maintenance".into(),
             ]);
         }
         if tx
