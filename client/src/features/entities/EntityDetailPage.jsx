@@ -137,7 +137,8 @@ export default function EntityDetailPage({ qname, id }) {
     if (tone(targetStatus) === 'danger') {
       const confirmed = await confirmDialog({
         title: `${actionLabel(action)}?`,
-        message: `Trạng thái sẽ chuyển sang “${statusLabel(targetStatus)}”. Các mô-đun khác có thể phản ứng theo.`,
+        message: uiText('Trạng thái sẽ chuyển sang “{status}”. Các mô-đun khác có thể phản ứng theo.')
+          .replace('{status}', statusLabel(targetStatus)),
         confirmLabel: actionLabel(action),
         danger: true,
       });
