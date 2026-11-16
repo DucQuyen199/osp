@@ -330,6 +330,7 @@
     ]
   }
 },
+ "summaryEntities": ["school.student", "school.class_enrollment", "school.class_session", "school.fee", "lms.course", "accounting.invoice"],
  "kpis": [
   "Tỷ lệ chuyển đổi tuyển sinh",
   "Tỷ lệ giữ chân học viên",

@@ -324,6 +324,7 @@
     ]
   }
 },
+ "summaryEntities": ["utilities.meter", "utilities.utility_bill", "utilities.meter_reading", "field-service.work_order", "accounting.invoice"],
  "kpis": [
   "ARPU",
   "Churn",

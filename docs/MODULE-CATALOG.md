@@ -439,7 +439,7 @@ Tổng: **50 module**, **199 loại dữ liệu**, **903 sự kiện**.
 | `input_application` Vật tư canh tác | — |
 
 ### auto-service
-**Garage / Dịch vụ ô tô-xe máy** — Hồ sơ xe, lệnh sửa chữa kèm phụ tùng. Hoàn tất sửa chữa tự trừ kho phụ tùng và lập hóa đơn.
+**Garage / Dịch vụ ô tô-xe máy** — Hồ sơ xe theo dõi số công-tơ-mét tăng dần, lệnh sửa chữa lưu số km lúc tiếp nhận kèm phụ tùng. Hoàn tất sửa chữa tự trừ kho phụ tùng và lập hóa đơn.
 
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|

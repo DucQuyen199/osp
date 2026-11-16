@@ -325,6 +325,7 @@
     ]
   }
 },
+ "summaryEntities": ["case-management.case", "case-management.time_entry", "project.project", "crm.deal", "accounting.invoice"],
  "kpis": [
   "Tỷ lệ giờ tính phí",
   "Doanh thu theo vụ việc",

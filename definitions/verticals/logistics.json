@@ -386,6 +386,7 @@
     ]
   }
 },
+ "summaryEntities": ["logistics.shipment", "logistics.route", "inventory.stock_move", "sales.sales_order", "accounting.invoice"],
  "kpis": [
   "Tỷ lệ giao đúng hẹn",
   "Chi phí/km",

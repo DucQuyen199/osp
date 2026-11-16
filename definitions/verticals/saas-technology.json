@@ -321,6 +321,7 @@
     ]
   }
 },
+ "summaryEntities": ["subscription.subscription", "helpdesk.ticket", "payments.payment_txn", "project.project", "accounting.invoice"],
  "kpis": [
   "MRR / ARR",
   "Churn",

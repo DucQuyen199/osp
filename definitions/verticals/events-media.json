@@ -314,6 +314,7 @@
     ]
   }
 },
+ "summaryEntities": ["events.event", "events.ticket", "crm.deal", "project.project", "accounting.invoice"],
  "kpis": [
   "Tỷ lệ lấp đầy sự kiện",
   "Doanh thu vé",

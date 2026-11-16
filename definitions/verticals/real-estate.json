@@ -320,6 +320,7 @@
     ]
   }
 },
+ "summaryEntities": ["real-estate.property", "real-estate.reservation", "real-estate.lease", "real-estate.rent_cycle", "accounting.invoice"],
  "kpis": [
   "Tỷ lệ chốt giao dịch",
   "Thời gian bán trung bình",

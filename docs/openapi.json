@@ -2224,6 +2224,9 @@
           "lines": {
             "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
           },
+          "odometer_reading": {
+            "type": "number"
+          },
           "party": {
             "description": "Tham chiếu tới master-data.party",
             "format": "uuid",
@@ -2275,6 +2278,9 @@
           },
           "lines": {
             "description": "JSON tuỳ ý (ví dụ mảng dòng hàng)"
+          },
+          "odometer_reading": {
+            "type": "number"
           },
           "party": {
             "description": "Tham chiếu tới master-data.party",

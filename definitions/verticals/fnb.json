@@ -407,6 +407,7 @@
     ]
   }
 },
+ "summaryEntities": ["restaurant.table_order", "restaurant.kitchen_ticket", "pos.pos_order", "inventory.stock_level", "purchasing.purchase_order"],
  "kpis": [
   "Doanh thu theo ca",
   "Thời gian lên món",

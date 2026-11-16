@@ -412,6 +412,7 @@
     ]
   }
 },
+ "summaryEntities": ["agriculture.crop_cycle", "agriculture.harvest", "agriculture.farm", "inventory.stock_level", "purchasing.purchase_order"],
  "kpis": [
   "Năng suất/ha",
   "Chi phí vật tư/ha",

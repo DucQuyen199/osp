@@ -357,6 +357,7 @@
     ]
   }
 },
+ "summaryEntities": ["clinic.encounter", "clinic.prescription", "booking.booking", "inventory.stock_level", "accounting.invoice"],
  "kpis": [
   "Lượt khám/ngày",
   "Thời gian chờ trung bình",

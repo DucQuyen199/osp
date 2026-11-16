@@ -218,21 +218,21 @@ for (const [hash, label] of retailScreens) {
 }
 
 const verticalScreens = [
-  ['agriculture', '#/agriculture', 'Agriculture'], ['automotive', '#/workshop', 'Automotive'],
-  ['beauty-wellness', '#/wellness', 'Beauty and wellness'], ['construction', '#/construction', 'Construction'],
-  ['ecommerce', '#/ecommerce', 'Ecommerce'], ['education', '#/education', 'Education'],
-  ['events-media', '#/event-ops', 'Events and media'], ['finance', '#/finance', 'Finance'],
-  ['fnb', '#/restaurant', 'Food and beverage'], ['healthcare', '#/clinic', 'Healthcare'],
-  ['home-services', '#/field-service', 'Home services'], ['hospitality', '#/hotel', 'Hospitality'],
-  ['logistics', '#/reports/logistics/delivery-board', 'Logistics'],
-  ['manufacturing', '#/reports/manufacturing/wip', 'Manufacturing'],
-  ['ngo-government', '#/charity', 'Nonprofit'], ['pharmacy', '#/pharmacy', 'Pharmacy'],
-  ['professional-services', '#/cases', 'Professional services'], ['real-estate', '#/real-estate', 'Real estate'],
-  ['retail', '#/pos', 'Retail'], ['saas-technology', '#/subscriptions', 'SaaS'],
-  ['utilities-isp', '#/utilities', 'Utilities'], ['wholesale', '#/wholesale', 'Wholesale'],
+  ['agriculture', '#/agriculture', 'Agriculture', 'agriculture.crop_cycle'], ['automotive', '#/workshop', 'Automotive', 'auto-service.repair_order'],
+  ['beauty-wellness', '#/wellness', 'Beauty and wellness', 'booking.booking'], ['construction', '#/construction', 'Construction', 'construction.site'],
+  ['ecommerce', '#/ecommerce', 'Ecommerce', 'ecommerce.web_order'], ['education', '#/education', 'Education', 'school.student'],
+  ['events-media', '#/event-ops', 'Events and media', 'events.event'], ['finance', '#/finance', 'Finance', 'lending.loan'],
+  ['fnb', '#/restaurant', 'Food and beverage', 'restaurant.table_order'], ['healthcare', '#/clinic', 'Healthcare', 'clinic.encounter'],
+  ['home-services', '#/field-service', 'Home services', 'field-service.work_order'], ['hospitality', '#/hotel', 'Hospitality', 'hotel.reservation'],
+  ['logistics', '#/reports/logistics/delivery-board', 'Logistics', 'logistics.shipment'],
+  ['manufacturing', '#/reports/manufacturing/wip', 'Manufacturing', 'manufacturing.production_order'],
+  ['ngo-government', '#/charity', 'Nonprofit', 'charity.program'], ['pharmacy', '#/pharmacy', 'Pharmacy', 'pharmacy.prescription'],
+  ['professional-services', '#/cases', 'Professional services', 'case-management.case'], ['real-estate', '#/real-estate', 'Real estate', 'real-estate.property'],
+  ['retail', '#/pos', 'Retail', 'pos.pos_order'], ['saas-technology', '#/subscriptions', 'SaaS', 'subscription.subscription'],
+  ['utilities-isp', '#/utilities', 'Utilities', 'utilities.meter'], ['wholesale', '#/wholesale', 'Wholesale', 'crm.deal'],
 ];
 const requestedVerticals = new Set((process.env.E2E_VERTICALS || '').split(',').map((name) => name.trim()).filter(Boolean));
-for (const [vertical, hash, label] of verticalScreens.filter(([name]) => !requestedVerticals.size || requestedVerticals.has(name))) {
+for (const [vertical, hash, label, summaryEntity] of verticalScreens.filter(([name]) => !requestedVerticals.size || requestedVerticals.has(name))) {
   await step(`${label} vertical: route and accessibility`, async () => {
     await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
     await page.goto(`${BASE}/?demo=${encodeURIComponent(vertical)}&go=${encodeURIComponent(hash.slice(1))}`, { waitUntil: 'networkidle0' });
@@ -240,6 +240,13 @@ for (const [vertical, hash, label] of verticalScreens.filter(([name]) => !reques
     must(!(await page.$('.route-error')), `${label} vertical route failed to render`);
     must(!(await page.$('.not-found-page')), `${label} vertical route resolved to not found`);
     await axe(`${label} vertical`);
+  });
+  await step(`${label} dashboard uses vertical summary entities`, async () => {
+    await page.goto(`${BASE}/#/`, { waitUntil: 'networkidle0' });
+    await page.waitForSelector('.stats');
+    const href = `#/e/${summaryEntity.replace('.', '/')}`;
+    const visible = await page.$$eval('.stats a', (links, expected) => links.some((link) => link.getAttribute('href') === expected), href);
+    must(visible, `${label} dashboard is missing ${summaryEntity}`);
   });
   if (process.env.E2E_ALL_NAV === '1') {
     const navigationRoutes = await page.$$eval('.sidebar a.nav-link', (links) => [...new Set(links

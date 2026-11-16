@@ -393,6 +393,7 @@
     ]
   }
 },
+ "summaryEntities": ["pharmacy.prescription", "pos.pos_order", "inventory.stock_level", "purchasing.purchase_order", "accounting.invoice"],
  "kpis": [
   "Hàng cận date",
   "Doanh thu theo nhóm thuốc",

@@ -2380,7 +2380,7 @@ fn catalog(st: &AppState) -> Value {
         .into_iter()
         .map(|v| {
             let installed: Vec<String> = v.modules.iter().filter(|m| k.reg.modules.contains_key(*m)).cloned().collect();
-            json!({ "id": v.id, "name": v.name, "description": v.description, "modules": k.reg.closure(&installed).unwrap_or_default(), "kpis": v.kpis })
+            json!({ "id": v.id, "name": v.name, "description": v.description, "modules": k.reg.closure(&installed).unwrap_or_default(), "summaryEntities": v.summary_entities, "kpis": v.kpis })
         })
         .collect();
     json!({ "demo": st.cfg.demo, "signup": st.cfg.signup, "modules": modules, "verticals": verticals })

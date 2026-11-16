@@ -17,7 +17,12 @@ export default function HomePage({ summary }) {
   const [events, setEvents] = useState(null);
   const [failures, setFailures] = useState(0);
   const [dead, setDead] = useState(0);
-  const picks = useMemo(() => PRIORITY.filter((qname) => app.entities.has(qname) && can(`${qname}.read`)).slice(0, 8), []);
+  const picks = useMemo(() => {
+    const candidates = [...(app.meta.summaryEntities || []), ...PRIORITY];
+    return [...new Set(candidates)]
+      .filter((qname) => app.entities.has(qname) && can(`${qname}.read`))
+      .slice(0, 8);
+  }, [app.meta.vertical]);
   const total = Object.entries(summary || {}).filter(([qname]) => !EXCLUDED.has(qname)).reduce((sum, [, count]) => sum + Number(count || 0), 0);
   const firstName = (app.user?.name || '').split(' ').slice(-1)[0];
 

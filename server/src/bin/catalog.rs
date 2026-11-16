@@ -668,6 +668,11 @@ fn lint(
         }
     }
     for vertical in verticals {
+        let vertical_modules: HashSet<String> = registry
+            .closure(&vertical.modules)
+            .unwrap_or_default()
+            .into_iter()
+            .collect();
         for module in &vertical.modules {
             if !registry.modules.contains_key(module) {
                 issues.push(format!(
@@ -686,6 +691,19 @@ fn lint(
                     "[vertical:{}] entity {qname} không tồn tại",
                     vertical.id
                 ));
+            }
+        }
+        for qname in &vertical.summary_entities {
+            match registry.entities.get(qname) {
+                None => issues.push(format!(
+                    "[vertical:{}] summary entity {qname} khÃ´ng tá»“n táº¡i",
+                    vertical.id
+                )),
+                Some(entity) if !vertical_modules.contains(&entity.module) => issues.push(format!(
+                    "[vertical:{}] summary entity {qname} khÃ´ng thuá»™c gÃ³i module Ä‘Ã£ báº­t",
+                    vertical.id
+                )),
+                Some(_) => {}
             }
         }
     }
@@ -931,6 +949,10 @@ fn run_docs() -> Result<(), String> {
                 .map(|role| role.name.as_str())
                 .collect::<Vec<_>>()
                 .join(", ")
+        ));
+        vm.push_str(&format!(
+            "- **Dashboard summary entities:** {}\n",
+            vertical.summary_entities.join(", ")
         ));
         vm.push_str(&format!("- **KPI:** {}\n\n", vertical.kpis.join("; ")));
     }
