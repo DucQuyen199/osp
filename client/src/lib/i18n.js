@@ -178,6 +178,7 @@ const UI_TEXT_EN = {
   'luồng lỗi cần xử lý': 'failed flows need attention', 'giao nhận tích hợp lỗi': 'failed integration deliveries',
   'Mở báo cáo & phân tích': 'Open reports & analytics',
   'Không tải được dữ liệu doanh nghiệp. Vui lòng tải lại trang.': 'Could not load company data. Please reload the page.',
+  'Đang tải màn hình…': 'Loading screen…',
   'Đang ngoại tuyến. Dữ liệu nghiệp vụ không được lưu trên thiết bị; không thể ghi giao dịch cho đến khi kết nối lại.': 'You are offline. Business data is not stored on this device; transactions cannot be saved until you reconnect.',
   'Đã đăng xuất': 'Signed out', 'Phòng ban': 'Department', 'Nhân viên': 'Employee', 'Trạng thái': 'Status',
   'Ngày tạo': 'Created at', 'Cập nhật': 'Updated at', 'Mã': 'Code', 'Tên': 'Name', 'Mô tả': 'Description',

@@ -1,5 +1,7 @@
 ﻿import { lazy, Suspense } from 'react';
 import RouteErrorBoundary from '../components/RouteErrorBoundary.jsx';
+import { uiText } from '../lib/i18n.js';
+
 const EntityListPage = lazy(() => import('../features/entities/EntityListPage.jsx'));
 const EntityDetailPage = lazy(() => import('../features/entities/EntityDetailPage.jsx'));
 const EventsPage = lazy(() => import('../features/events/EventsPage.jsx'));
@@ -170,16 +172,22 @@ const SETTINGS_ROUTES = Object.freeze({
   data: DataSettingsPage,
 });
 
+function RouteLoading() {
+  return <div className="card-pad" role="status" aria-busy="true" aria-label={uiText('Đang tải màn hình…')}>
+    <div className="skeleton" data-h="row" aria-hidden="true" />
+  </div>;
+}
+
 function ResolvedPage({ route, meta, summary }) {
   if (route.name === 'entity') {
-    return <Suspense fallback={<div className="card-pad"><div className="skeleton" data-h="row" /></div>}>
+    return <Suspense fallback={<RouteLoading />}>
       <EntityListPage key={route.qname} qname={route.qname} />
       {route.id && <EntityDetailPage key={`${route.qname}:${route.id}`} qname={route.qname} id={route.id} />}
     </Suspense>;
   }
 
   const Page = route.name === 'settings' ? SETTINGS_ROUTES[route.tab] : ROUTES[route.name];
-  if (!Page) return <Suspense fallback={<div className="card-pad"><div className="skeleton" data-h="row" /></div>}><NotFoundPage /></Suspense>;
+  if (!Page) return <Suspense fallback={<RouteLoading />}><NotFoundPage /></Suspense>;
 
   const props = route.name === 'home'
     ? { summary }
@@ -193,7 +201,7 @@ function ResolvedPage({ route, meta, summary }) {
             ? { healthcare: meta.modules.some((module) => module.id === 'clinic') }
             : {};
 
-  return <Suspense fallback={<div className="card-pad"><div className="skeleton" data-h="row" /></div>}>
+  return <Suspense fallback={<RouteLoading />}>
     <Page {...props} />
   </Suspense>;
 }
