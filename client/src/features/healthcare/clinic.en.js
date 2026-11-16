@@ -10,6 +10,7 @@ const clinicEnglish = {
   'Làm mới': 'Refresh', 'Lượt khám đang mở': 'Open encounters', 'Lưu đơn thuốc nháp': 'Save draft prescription', 'Lưu hồ sơ': 'Save patient record', 'Lý do khám': 'Reason for visit', 'Ngày sinh': 'Date of birth', 'Người liên hệ *': 'Contact *', 'Nhóm máu': 'Blood type', 'Nữ': 'Female', 'Phát thuốc': 'Dispense medicine', 'Phí khám': 'Consultation fee', 'Phí khám *': 'Consultation fee *', 'Số bảo hiểm': 'Insurance number', 'Tạo chỉ định': 'Create test order',
   'Tạo hồ sơ bệnh nhân và thông tin liên hệ; dị ứng, nhóm máu và bảo hiểm sẽ gắn với hồ sơ y tế.': 'Create a patient record and contact. Allergies, blood type, and insurance are stored on the medical record.', 'Tạo người liên hệ mới': 'Create a new contact', 'Thêm thuốc': 'Add medicine', 'Thông tin liên hệ *': 'Contact details *', 'Tiếp nhận': 'Open encounter', 'Tiếp nhận bệnh nhân, hoàn tất lượt khám, theo dõi xét nghiệm và phát thuốc theo kho. Hồ sơ được hiển thị theo quyền clinic của tài khoản.': 'Register patients, manage encounters, track tests, and dispense medicines from inventory. Records are shown according to the account’s clinic permissions.', 'Tiếp nhận lượt khám': 'Open encounter', 'Xác nhận kết quả': 'Confirm result', 'Xét nghiệm': 'Test',
   'Đang chờ': 'Pending', 'Đang xử lý': 'In progress', 'Hoàn tất': 'Completed', 'Đã xác nhận': 'Confirmed', 'Thao tác không thành công.': 'The operation could not be completed.',
+  'Mỗi thuốc kê đơn cần hướng dẫn sử dụng': 'Every prescribed medicine needs dosage instructions.',
 };
 
 export default clinicEnglish;

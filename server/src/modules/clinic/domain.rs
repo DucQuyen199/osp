@@ -91,9 +91,9 @@ fn validate_items(items: &[Value], require_nonempty: bool) -> Vec<String> {
         if item
             .get("dosage")
             .and_then(Value::as_str)
-            .is_some_and(|dosage| dosage.trim().is_empty())
+            .is_none_or(|dosage| dosage.trim().is_empty())
         {
-            errors.push(format!("{line} có hướng dẫn dùng thuốc rỗng"));
+            errors.push("Mỗi thuốc kê đơn cần hướng dẫn sử dụng".into());
         }
     }
     errors
