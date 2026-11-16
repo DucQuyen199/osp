@@ -8,6 +8,7 @@ import ecommerceEnglish from './ecommerce.en.js';
 const t = (text) => uiTextWith(text, ecommerceEnglish);
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
+const channelLabel = (value) => value === 'web' ? 'Website' : value === 'app' ? 'Ứng dụng' : value === 'marketplace' ? 'Sàn thương mại' : value || '—';
 
 export default function EcommerceOrderDeskPage() {
   const [storefronts, setStorefronts] = useState(new Map());
@@ -108,7 +109,7 @@ export default function EcommerceOrderDeskPage() {
     const orderShipments = sale ? relatedShipments(sale.id) : [];
     const invoice = sale && relatedInvoice(sale.id);
     return <article className="card ecommerce-order" key={order.id}>
-      <header className="card-head"><div><strong>{recordLabel('master-data.party', parties.get(order.party))}</strong><div className="small muted">{storefronts.get(order.storefront)?.name || t('Gian hàng')} · {order.channel || 'web'} · {fmtDateTime(order.created_at)}</div></div><span className={`badge ${order.status === 'placed' ? 'success' : order.status === 'cancelled' ? 'plain' : 'warning'}`}>{statusLabel(order.status)}</span></header>
+      <header className="card-head"><div><strong>{recordLabel('master-data.party', parties.get(order.party))}</strong><div className="small muted">{storefronts.get(order.storefront)?.name || t('Gian hàng')} · {t(channelLabel(order.channel || 'web'))} · {fmtDateTime(order.created_at)}</div></div><span className={`badge ${order.status === 'placed' ? 'success' : order.status === 'cancelled' ? 'plain' : 'warning'}`}>{statusLabel(order.status)}</span></header>
       <ul className="ecommerce-order-lines">{(order.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{products.get(line.product)?.name || t('Sản phẩm')} × {line.qty}</span><strong className="num">{fmtMoney(line.line_total ?? (Number(line.price || 0) * Number(line.qty || 0)), currencyCode)}</strong></li>)}</ul>
       <div className="ecommerce-order-total"><span>{t('Tổng đơn')}{currencyCode ? ` (${currencyCode})` : ''}</span><strong className="num">{fmtMoney(order.total || 0, currencyCode)}</strong></div>
       {order.shipping_address && <div className="small muted ecommerce-address">{t('Giao đến:')} {order.shipping_address}</div>}
