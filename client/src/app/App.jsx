@@ -7,7 +7,7 @@ import Icon from '../components/Icon.jsx';
 import Sidebar from '../components/Sidebar.jsx';
 import { api, onUnauthorized, session } from '../lib/api.js';
 import { setBusinessTimezone } from '../lib/dates.js';
-import { formatLocale, setFormatLocale, setUiLocale, uiLocale, uiText } from '../lib/i18n.js';
+import { ensureUiTranslations, formatLocale, setFormatLocale, setUiLocale, uiLocale, uiText } from '../lib/i18n.js';
 import { app, loadMeta, loadSummary, resetCaches } from '../lib/state.js';
 export default function App() {
   const [route, setRoute] = useState(() => parseRoute());
@@ -83,6 +83,7 @@ export default function App() {
   useEffect(() => {
     let alive = true;
     (async () => {
+      if (uiLocale === 'en-US') await ensureUiTranslations().catch(() => {});
       const params = new URLSearchParams(location.search);
       if (params.get('demo') && !session.current()) {
         try {
@@ -129,8 +130,9 @@ export default function App() {
     try { localStorage.setItem('osp.formatLocale', next); } catch { /* preference remains active in memory */ }
   };
 
-  const changeInterfaceLanguage = (next) => {
-    setUiLocale(next);
+  const changeInterfaceLanguage = async (next) => {
+    try { if (!await setUiLocale(next)) return; }
+    catch { setError('Không tải được dữ liệu ngôn ngữ.'); return; }
     setInterfaceLanguage(next);
     try { localStorage.setItem('osp.uiLocale', next); } catch { /* preference remains active in memory */ }
   };
