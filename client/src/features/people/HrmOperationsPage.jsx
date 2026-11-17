@@ -11,9 +11,9 @@ import EmployeeIntakeForm from './components/EmployeeIntakeForm.jsx';
 import LeaveRequestForm from './components/LeaveRequestForm.jsx';
 import SalaryRevisionForm from './components/SalaryRevisionForm.jsx';
 import WorkScheduleEntriesPanel from './components/WorkScheduleEntriesPanel.jsx';
+import WorkSchedulePatternsTable from './components/WorkSchedulePatternsTable.jsx';
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const fmtTime = (value) => value ? localTime(new Date(value)) : '--';
-const rotationEmployees = (row) => Array.isArray(row?.employees) ? row.employees : row?.employee ? [row.employee] : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
 const MAX_ROTATION_DAYS = 3653;
 const MAX_GENERATED_SCHEDULE_ROWS = 40_000;
@@ -307,7 +307,12 @@ export default function HrmOperationsPage() {
         onCycleDayRemove={removePatternCycleDay}
         onCycleDayAdd={addPatternCycleDay}
       />}
-      {can('hrm.work_schedule_pattern.read') && <div className="table-wrap u-legacy-2bdf8e45fd" ><table className="table"><thead><tr><th>{uiText("Nhân viên")}</th><th>{uiText("Khoảng ngày")}</th><th>{uiText("Chu kỳ / múi giờ")}</th><th>{uiText("Trạng thái")}</th><th scope="col">{uiText("Thao tác")}</th></tr></thead><tbody>{schedulePatterns.map((row) => <tr key={row.id}><td>{rotationEmployees(row).map((id) => employeeMap.get(id) ? recordLabel('hrm.employee', employeeMap.get(id)) : uiText('Nhân viên')).join(', ')}</td><td>{fmtDate(row.start_date)} – {fmtDate(row.end_date)}</td><td>{Array.isArray(row.cycle) ? `${row.cycle.length} ${uiText('ngày')}` : '—'} · {row.timezone}</td><td>{statusLabel(row.status)}</td><td><div className="row wrap">{row.status === 'draft' && can('hrm.work_schedule_pattern.applied') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => applySchedulePattern(row)}>{uiText("Áp dụng")}</button>}{row.status === 'draft' && can('hrm.work_schedule_pattern.delete') && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => removeSchedulePattern(row)}>{uiText("Xóa nháp")}</button>}</div></td></tr>)}</tbody></table>{!schedulePatterns.length && <p className="small muted">{uiText("Chưa có mẫu ca luân phiên.")}</p>}</div>}
+      {can('hrm.work_schedule_pattern.read') && <WorkSchedulePatternsTable
+        patterns={schedulePatterns} employeeMap={employeeMap} busy={busy}
+        canApply={can('hrm.work_schedule_pattern.applied')} canDelete={can('hrm.work_schedule_pattern.delete')}
+        onApply={applySchedulePattern} onDelete={removeSchedulePattern}
+        formatDate={fmtDate} statusLabel={statusLabel} recordLabel={recordLabel}
+      />}
     </section>}
     {(can('hrm.work_schedule_entry.create') || can('hrm.work_schedule_entry.read')) && <WorkScheduleEntriesPanel
       canCreate={can('hrm.work_schedule_entry.create')} canRead={can('hrm.work_schedule_entry.read')} canDelete={can('hrm.work_schedule_entry.delete')}
