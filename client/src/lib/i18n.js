@@ -115,6 +115,52 @@ let UI_TEXT_EN = {};
 let uiTranslationsPromise;
 let uiTranslationsLoaded = false;
 let uiLocaleRequest = 0;
+const INTEGRATION_ERROR_VI = {
+  'Webhook URL must use HTTPS': 'URL webhook phải dùng HTTPS.',
+  'Webhook URL must have a host and cannot include credentials': 'URL webhook phải có máy chủ và không được chứa thông tin đăng nhập.',
+  'Webhook URL cannot contain a fragment': 'URL webhook không được chứa fragment.',
+  'Webhook URL cannot target a local or private IP address': 'URL webhook không được trỏ tới địa chỉ IP nội bộ hoặc riêng tư.',
+  'Webhook URL must be a valid absolute URL': 'URL webhook phải là URL tuyệt đối hợp lệ.',
+  'Webhook can subscribe to at most 100 event types': 'Webhook chỉ được đăng ký tối đa 100 loại sự kiện.',
+  'Webhook events must be a list of event names': 'Sự kiện webhook phải là danh sách tên sự kiện.',
+  'Webhook signing secret must contain 16 to 256 bytes': 'Bí mật ký webhook phải có từ 16 đến 256 byte.',
+  'Connector kind must contain 1 to 64 characters': 'Loại connector phải có từ 1 đến 64 ký tự.',
+  'Connector name must contain 1 to 120 characters': 'Tên connector phải có từ 1 đến 120 ký tự.',
+  'Connector configuration must be an object': 'Cấu hình connector phải là một đối tượng.',
+  'Enabled connectors must use the supported http_event_sink adapter': 'Connector đang bật phải dùng adapter http_event_sink được hỗ trợ.',
+  'An enabled connector requires the http_event_sink adapter configuration': 'Connector đang bật cần cấu hình adapter http_event_sink.',
+  'HTTP connector URL must be a public HTTPS URL without embedded credentials or fragments': 'URL HTTP connector phải là HTTPS công khai, không có thông tin đăng nhập nhúng hoặc fragment.',
+  'HTTP connector URL must be a valid absolute URL': 'URL HTTP connector phải là URL tuyệt đối hợp lệ.',
+  'HTTP connector requires a URL': 'HTTP connector cần có URL.',
+  'HTTP connector must subscribe to 1 to 100 event types': 'HTTP connector phải đăng ký từ 1 đến 100 loại sự kiện.',
+  'HTTP connector events must be a list of event names': 'Sự kiện HTTP connector phải là danh sách tên sự kiện.',
+  'HTTP connector signing secret must contain 16 to 256 bytes': 'Bí mật ký HTTP connector phải có từ 16 đến 256 byte.',
+  'HTTP connector can configure at most 32 headers': 'HTTP connector chỉ được cấu hình tối đa 32 header.',
+  'HTTP connector headers must be an object of string values': 'Header HTTP connector phải là đối tượng gồm các giá trị chuỗi.',
+  'API key name must contain 1 to 120 characters': 'Tên API key phải có từ 1 đến 120 ký tự.',
+  'API key can have at most 100 scopes': 'API key chỉ được có tối đa 100 phạm vi quyền.',
+  'API key scopes must be a list': 'Phạm vi API key phải là danh sách.',
+  'API key scopes must be valid permission names': 'Phạm vi API key phải là tên quyền hợp lệ.',
+  'API key name must be unique within the tenant': 'Tên API key phải là duy nhất trong doanh nghiệp.',
+  'Webhook configuration not found': 'Không tìm thấy cấu hình webhook.',
+  'Connector configuration not found': 'Không tìm thấy cấu hình connector.',
+  'Connector does not have a supported HTTP event adapter': 'Connector không có adapter sự kiện HTTP được hỗ trợ.',
+  'Outbox item not found': 'Không tìm thấy mục outbox.',
+  'Dead-letter item not found': 'Không tìm thấy mục trong danh sách lỗi cần xử lý.',
+  'Unsupported outbox status': 'Trạng thái outbox không được hỗ trợ.',
+  'invalid webhook URL': 'URL webhook không hợp lệ.',
+  'webhook URL violates HTTPS policy': 'URL webhook không đáp ứng chính sách HTTPS.',
+  'webhook URL has no host': 'URL webhook không có tên máy chủ.',
+  'webhook DNS resolution failed': 'Không phân giải được DNS của webhook.',
+  'webhook host is not publicly routable': 'Máy chủ webhook không thể truy cập công khai.',
+  'webhook HTTP client initialization failed': 'Không thể khởi tạo HTTP client cho webhook.',
+  'webhook event serialization failed': 'Không thể chuyển sự kiện webhook thành dữ liệu gửi đi.',
+  'connector config contains an invalid or reserved HTTP header': 'Cấu hình connector chứa header HTTP không hợp lệ hoặc bị dành riêng.',
+  'connector has an invalid HTTP header name': 'Connector có tên header HTTP không hợp lệ.',
+  'connector has an invalid HTTP header value': 'Connector có giá trị header HTTP không hợp lệ.',
+  'webhook signing configuration is invalid': 'Cấu hình chữ ký webhook không hợp lệ.',
+  'webhook connection or TLS request failed': 'Kết nối webhook hoặc yêu cầu TLS không thành công.',
+};
 
 const MODULE_NAME_EN = {
   accounting: 'Accounting', agriculture: 'Agriculture', asset: 'Fixed assets', 'auto-service': 'Auto service', bi: 'Reports & analytics',
@@ -248,12 +294,24 @@ function dynamicEnglishText(text) {
   return undefined;
 }
 
+function dynamicVietnameseText(text) {
+  const integrationEvent = String(text).match(/^events\[(\d+)\] must be a valid event name$/);
+  if (integrationEvent) return `Sự kiện dòng ${integrationEvent[1]} phải là tên sự kiện hợp lệ.`;
+  const duplicateHeader = String(text).match(/^HTTP connector header (.+) duplicates another header$/);
+  if (duplicateHeader) return `Header HTTP connector ${duplicateHeader[1]} bị trùng.`;
+  const invalidHeader = String(text).match(/^HTTP connector header name (.+) is invalid or reserved$/);
+  if (invalidHeader) return `Tên header HTTP connector ${invalidHeader[1]} không hợp lệ hoặc bị dành riêng.`;
+  const invalidHeaderValue = String(text).match(/^HTTP connector header (.+) must be a string without line breaks and at most 8192 bytes$/);
+  if (invalidHeaderValue) return `Header HTTP connector ${invalidHeaderValue[1]} phải là chuỗi không có xuống dòng và tối đa 8192 byte.`;
+  return undefined;
+}
+
 export const uiText = (text) => uiLocale === 'en-US'
   ? (UI_TEXT_EN[text] || dynamicEnglishText(text) || text)
-  : text;
+  : (INTEGRATION_ERROR_VI[text] || dynamicVietnameseText(text) || text);
 export const uiTextWith = (text, featureTranslations) => uiLocale === 'en-US'
   ? (featureTranslations?.[text] || uiText(text))
-  : text;
+  : uiText(text);
 
 const humanize = (s) => {
   const t = String(s).replace(/[_-]+/g, ' ').trim();
