@@ -1,0 +1,1 @@
+import{H as e,U as t}from"./jsx-runtime-DY6DFpu_.js";var n=t(e(),1);function r(e){(0,n.useEffect)(()=>{typeof document<`u`&&(document.title=e)},[e])}export{r as t};

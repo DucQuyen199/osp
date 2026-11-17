@@ -32,6 +32,10 @@ Gửi: `Authorization: Bearer osp_…`. Token chỉ hiện **một lần** khi t
 ### `GET /api/auth/me` · `POST /api/auth/logout`
 `me` trả `{ tenantId, user }`. `logout` thu hồi chính token đang dùng.
 
+### OpenID Connect single sign-on
+
+When the operator has configured OIDC, `GET /api/catalog` includes `oidc: true` and the login page offers the provider button. The browser starts with `POST /api/auth/oidc/start` and `{ "tenantId": "t_..." }`; the server responds with `{ "authorizationUrl" }` and sets a short-lived HttpOnly flow cookie. The browser follows the authorization URL to the provider, which must redirect to the configured callback page `/oidc-callback.html`. That page posts the returned `{ "code", "state" }` to `POST /api/auth/oidc/complete`; on success it receives the normal session response, or an MFA challenge when the account requires MFA. Flow state expires after five minutes and the authorization code can be redeemed once. Account linking requires an existing active account with the same verified email; OIDC does not provision accounts or assign roles. See [deployment configuration](DEPLOYMENT.md#optional-single-sign-on-oidc).
+
 ### MFA tài khoản
 
 Các endpoint `/api/t/{tenantId}/auth/mfa/*` chỉ tác động tới người dùng của token hiện tại. `GET /status` trả trạng thái và số mã khôi phục còn lại. `POST /setup` nhận mật khẩu hiện tại và trả khóa TOTP tạm cùng URI `otpauth` có hiệu lực 10 phút; `POST /confirm` nhận mã 6 chữ số đang hoạt động, bật MFA và trả 10 mã khôi phục đúng một lần. `POST /disable` cần mật khẩu cùng mã TOTP/mã khôi phục, rồi thu hồi các phiên và API token khác. Mã TOTP bị phát lại bị từ chối.

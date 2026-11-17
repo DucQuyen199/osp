@@ -116,6 +116,16 @@ export default function AuthPage({ route, onSignedIn }) {
     finally { setBusy(''); }
   };
 
+  const startOidc = async () => {
+    const tenantId = String(document.getElementById('auth-tenant')?.value || '').trim();
+    if (!tenantId) { setError('Nhập mã doanh nghiệp trước khi đăng nhập bằng tài khoản doanh nghiệp.'); return; }
+    setBusy('oidc'); setError('');
+    try {
+      const result = await api('/api/auth/oidc/start', { method: 'POST', body: { tenantId } });
+      location.assign(result.authorizationUrl);
+    } catch (reason) { setError(reason.message || 'Không bắt đầu được đăng nhập doanh nghiệp.'); setBusy(''); }
+  };
+
   const chooseMode = (next) => {
     setError('');
     setNotice('');
@@ -224,6 +234,7 @@ export default function AuthPage({ route, onSignedIn }) {
         <div className="field"><label htmlFor="confirm-password">{t('Nhập lại mật khẩu')}</label><input className="input" id="confirm-password" name="confirm" type="password" autoComplete="new-password" minLength="8" maxLength="200" required /></div>
         <button className="btn btn-primary" type="submit" disabled={Boolean(busy)}>{t(busy === 'reset' ? 'Đang cập nhật…' : 'Đặt lại mật khẩu')}</button>
       </form>}
+      {mode === 'login' && catalog.oidc && <div className="stack-sm"><button className="btn" type="button" disabled={Boolean(busy)} onClick={startOidc}>{t(busy === 'oidc' ? 'Đang chuyển tới nhà cung cấp…' : 'Đăng nhập bằng tài khoản doanh nghiệp')}</button></div>}
       {catalog.demo && <div className="stack-sm"><hr /><p className="hint">{t('Chỉ muốn xem thử? Không cần đăng ký — tạo sẵn doanh nghiệp mẫu có dữ liệu để bạn thao tác.')}</p><button className="btn" type="button" disabled={Boolean(busy)} onClick={demo}>{t(busy === 'demo' ? 'Đang tạo dữ liệu…' : 'Dùng thử ngay với dữ liệu mẫu')}</button></div>}
     </main>
   </div>;

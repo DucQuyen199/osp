@@ -78,6 +78,23 @@ ALTER TABLE osp_users ADD COLUMN IF NOT EXISTS totp_disable_attempts integer NOT
 ALTER TABLE osp_users ADD COLUMN IF NOT EXISTS totp_disable_locked_until timestamptz;
 CREATE UNIQUE INDEX IF NOT EXISTS osp_users_email ON osp_users (tenant_id, lower(email)) WHERE email IS NOT NULL;
 
+CREATE TABLE IF NOT EXISTS osp_user_identities (
+  tenant_id text NOT NULL REFERENCES osp_tenants(id) ON DELETE CASCADE,
+  user_id text NOT NULL,
+  issuer text NOT NULL,
+  subject text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (tenant_id, issuer, subject),
+  UNIQUE (tenant_id, user_id, issuer),
+  FOREIGN KEY (tenant_id, user_id) REFERENCES osp_users(tenant_id, id) ON DELETE CASCADE
+);
+ALTER TABLE osp_user_identities ENABLE ROW LEVEL SECURITY;
+ALTER TABLE osp_user_identities FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON osp_user_identities;
+CREATE POLICY tenant_isolation ON osp_user_identities
+  USING (tenant_id = current_setting('app.tenant_id', true))
+  WITH CHECK (tenant_id = current_setting('app.tenant_id', true));
+
 CREATE TABLE IF NOT EXISTS osp_sessions (
   hash text PRIMARY KEY,
   tenant_id text NOT NULL REFERENCES osp_tenants(id) ON DELETE CASCADE,

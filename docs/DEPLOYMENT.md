@@ -207,3 +207,8 @@ tạm riêng; không triển khai lên môi trường production hiện có.
 - [ ] HTTPS, HSTS, giới hạn tốc độ ở proxy
 - [ ] Đã quyết định `OSP_SIGNUP`, `OSP_DEMO`
 - [ ] Có người nhận cảnh báo khi dịch vụ ngừng
+# Optional single sign-on (OIDC)
+
+OSP can use one OpenID Connect provider for all tenant accounts. Set `OSP_OIDC_ISSUER_URL`, `OSP_OIDC_CLIENT_ID`, and `OSP_OIDC_CLIENT_SECRET`, then set `OSP_OIDC_REDIRECT_URI` to the public callback page, normally `https://your-host/oidc-callback.html`. Register that exact redirect URI at the provider and keep `OSP_PUBLIC_URL` on the same HTTPS origin. The provider must return an ID token with a verified email claim. The sign-in button appears when all settings are valid.
+
+The authorization-code flow uses PKCE, state, nonce, TLS discovery, and a short-lived encrypted HttpOnly cookie. The first sign-in links only to an existing, active account in the entered tenant with an exactly matching verified email; it never creates accounts or assigns roles. Later sign-ins use the provider issuer and subject pair. Existing MFA remains required. The OIDC client secret must contain at least 32 bytes and is also used to encrypt the short-lived flow cookie, so keep it stable across replicas and deployments.

@@ -85,7 +85,7 @@ Giao diện chỉ chèn dữ liệu vào DOM bằng `textContent`; không dùng 
 
 | Giới hạn | Ảnh hưởng | Hướng xử lý |
 |---|---|---|
-| Chưa có **SSO/OIDC** | Đăng nhập bằng email và mật khẩu nội bộ | Tích hợp IdP theo OIDC và quy trình provisioning |
+| OIDC SSO is available when an operator configures one trusted provider | Accounts must already exist and have verified email; provisioning and provider-specific tenant mapping remain manual | Configure OIDC variables in DEPLOYMENT.md and review provider claims |
 | Giới hạn tốc độ **trong bộ nhớ, theo IP hiệu dụng** | Có thể nhận IP client qua `X-Forwarded-For` khi peer trực tiếp thuộc `OSP_TRUSTED_PROXIES`; bộ đếm mất khi khởi động lại và không chia sẻ giữa replica | Dùng Redis hoặc reverse proxy để giới hạn đồng bộ khi mở rộng nhiều replica |
 | **Không mã hóa dữ liệu khi lưu** (at-rest) | Ai có quyền đọc volume có thể đọc dữ liệu | Mã hóa đĩa (BitLocker/LUKS), hoặc mã hóa volume PostgreSQL |
 | Audit append-only chưa chống được DBA/superuser có quyền đổi schema hoặc vô hiệu hóa trigger | Người có quyền quản trị PostgreSQL vẫn có thể thay đổi dữ liệu | Sao chép định kỳ sang kho WORM/độc lập nếu cần bằng chứng chống quản trị DB |

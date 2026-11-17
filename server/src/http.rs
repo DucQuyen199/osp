@@ -632,6 +632,78 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     .await?,
             );
         }
+        (&Method::POST, Some("auth"), Some("oidc")) if seg(3) == Some("start") => {
+            if !st.auth_limiter.take(ip) {
+                return Err(ApiError::new(
+                    429,
+                    "RATE_LIMITED",
+                    "Quá nhiều lần đăng nhập, thử lại sau",
+                ));
+            }
+            let body = json_obj(&bytes)?;
+            let tenant_id = s(&body, "tenantId");
+            let result = k.oidc_begin(&tenant_id).await?;
+            let Some(result) = result else {
+                return Err(ApiError::new(
+                    404,
+                    "OIDC_DISABLED",
+                    "Đăng nhập doanh nghiệp hiện chưa được cấu hình",
+                ));
+            };
+            return Ok(Reply::Raw {
+                status: 200,
+                content_type: "application/json",
+                body: serde_json::to_vec(&json!({ "authorizationUrl": result.authorization_url }))
+                    .map_err(ApiError::internal)?,
+                extra: vec![("set-cookie", result.set_cookie)],
+            });
+        }
+        (&Method::POST, Some("auth"), Some("oidc")) if seg(3) == Some("complete") => {
+            if !st.auth_limiter.take(ip) {
+                return Err(ApiError::new(
+                    429,
+                    "RATE_LIMITED",
+                    "Quá nhiều lần đăng nhập, thử lại sau",
+                ));
+            }
+            let body = json_obj(&bytes)?;
+            let cookie_header = parts
+                .headers
+                .get(header::COOKIE)
+                .and_then(|value| value.to_str().ok())
+                .unwrap_or("");
+            let flow_cookie = cookie_header
+                .split(';')
+                .find_map(|part| {
+                    let (name, value) = part.trim().split_once('=')?;
+                    (name == "osp_oidc").then_some(value)
+                })
+                .unwrap_or("");
+            let identity = k
+                .oidc_finish(flow_cookie, &s(&body, "code"), &s(&body, "state"))
+                .await?
+                .ok_or_else(|| {
+                    ApiError::new(
+                        404,
+                        "OIDC_DISABLED",
+                        "Đăng nhập doanh nghiệp hiện chưa được cấu hình",
+                    )
+                })?;
+            let result = k
+                .login_oidc(
+                    &identity.tenant_id,
+                    &identity.issuer,
+                    &identity.subject,
+                    &identity.email,
+                )
+                .await?;
+            return Ok(Reply::Raw {
+                status: 200,
+                content_type: "application/json",
+                body: serde_json::to_vec(&result).map_err(ApiError::internal)?,
+                extra: vec![("set-cookie", crate::kernel::auth::oidc::clear_cookie())],
+            });
+        }
         (&Method::POST, Some("auth"), Some("mfa")) if seg(3) == Some("complete") => {
             if !st.auth_limiter.take(ip) {
                 return Err(ApiError::new(
@@ -2517,5 +2589,5 @@ fn catalog(st: &AppState) -> Value {
             json!({ "id": v.id, "name": v.name, "description": v.description, "modules": k.reg.closure(&installed).unwrap_or_default(), "summaryEntities": v.summary_entities, "setupEntities": v.setup_entities, "kpis": v.kpis })
         })
         .collect();
-    json!({ "demo": st.cfg.demo, "signup": st.cfg.signup, "modules": modules, "verticals": verticals })
+    json!({ "demo": st.cfg.demo, "signup": st.cfg.signup, "oidc": crate::kernel::auth::oidc::enabled(), "modules": modules, "verticals": verticals })
 }

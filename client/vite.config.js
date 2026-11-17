@@ -17,5 +17,6 @@ export default defineConfig({
   build: {
     outDir: resolve(root, '..', 'client-dist'),
     emptyOutDir: true,
+    rollupOptions: { input: { app: resolve(root, 'index.html'), oidcCallback: resolve(root, 'oidc-callback.html') } },
   },
 });

@@ -43,6 +43,8 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/api/tenants", post(http::handle))
         .route("/api/demo", post(http::handle))
         .route("/api/auth/login", post(http::handle))
+        .route("/api/auth/oidc/start", post(http::handle))
+        .route("/api/auth/oidc/complete", post(http::handle))
         .route("/api/auth/password-reset/request", post(http::handle))
         .route("/api/auth/password-reset/complete", post(http::handle))
         .route("/api/auth/email-verification/request", post(http::handle))

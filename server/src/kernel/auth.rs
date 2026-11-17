@@ -13,6 +13,7 @@ use subtle::ConstantTimeEq;
 use uuid::Uuid;
 
 pub(crate) mod mfa;
+pub(crate) mod oidc;
 
 const LOGIN_MAX_FAILS: u32 = 5;
 const LOGIN_WINDOW: Duration = Duration::from_secs(15 * 60);
@@ -133,6 +134,27 @@ fn valid_email(e: &str) -> bool {
 }
 
 impl Kernel {
+    pub async fn oidc_begin(&self, tenant_id: &str) -> R<Option<oidc::StartResult>> {
+        let tenant = self.tenant(tenant_id).await?;
+        if tenant.suspended {
+            return Err(ApiError::new(
+                403,
+                "TENANT_SUSPENDED",
+                "Doanh nghiệp đang bị tạm ngưng",
+            ));
+        }
+        oidc::begin(tenant_id).await
+    }
+
+    pub async fn oidc_finish(
+        &self,
+        cookie: &str,
+        code: &str,
+        state: &str,
+    ) -> R<Option<oidc::Identity>> {
+        oidc::finish(cookie, code, state).await
+    }
+
     pub(crate) async fn insert_user(
         &self,
         tx: &Tx<'_>,
@@ -645,6 +667,147 @@ impl Kernel {
             created_at: r.get(6),
         };
         Ok(json!({ "token": token, "expiresAt": exp, "user": user }))
+    }
+
+    /// Complete a verified OIDC login. Existing users are linked by verified email once;
+    /// later logins use the issuer/subject pair and remain valid if the provider changes email.
+    pub async fn login_oidc(
+        &self,
+        tenant_id: &str,
+        issuer: &str,
+        subject: &str,
+        email: &str,
+    ) -> R<Value> {
+        if tenant_id.is_empty()
+            || issuer.is_empty()
+            || subject.is_empty()
+            || email.is_empty()
+            || tenant_id.len() > 120
+            || issuer.len() > 2048
+            || subject.len() > 512
+            || email.len() > 320
+        {
+            return Err(ApiError::new(
+                401,
+                "OIDC_LOGIN_FAILED",
+                "Đăng nhập doanh nghiệp không hợp lệ",
+            ));
+        }
+        let tenant = self.tenant(tenant_id).await?;
+        if tenant.suspended {
+            return Err(ApiError::new(
+                403,
+                "TENANT_SUSPENDED",
+                "Doanh nghiệp đang bị tạm ngưng",
+            ));
+        }
+        let mut conn = self.pool.get().await?;
+        let tx = Tx::begin(&mut conn, tenant_id, true).await?;
+        let query = "SELECT u.id,u.name,u.email,u.roles,u.disabled,u.email_verified,u.password_hash IS NOT NULL,u.totp_enabled,to_char(u.created_at AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') FROM osp_user_identities i JOIN osp_users u ON u.tenant_id=i.tenant_id AND u.id=i.user_id WHERE i.tenant_id=$1 AND i.issuer=$2 AND i.subject=$3 FOR UPDATE OF u";
+        let mut row = tx
+            .query_opt(query, &[&tenant_id, &issuer, &subject])
+            .await?;
+        if row.is_none() {
+            row = tx.query_opt(
+                "SELECT id,name,email,roles,disabled,email_verified,password_hash IS NOT NULL,totp_enabled,to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') FROM osp_users WHERE tenant_id=$1 AND lower(email)=$2 FOR UPDATE",
+                &[&tenant_id, &email.to_lowercase()],
+            ).await?;
+            let Some(user) = row.as_ref() else {
+                return Err(ApiError::new(
+                    401,
+                    "OIDC_ACCOUNT_NOT_LINKED",
+                    "Tài khoản chưa được tạo trong doanh nghiệp này",
+                ));
+            };
+            if user.get::<_, bool>(4)
+                || !user.get::<_, bool>(5)
+                || user
+                    .get::<_, Option<String>>(2)
+                    .as_deref()
+                    .is_none_or(|value| value.to_lowercase() != email.to_lowercase())
+            {
+                return Err(ApiError::new(
+                    401,
+                    "OIDC_ACCOUNT_NOT_LINKED",
+                    "Email chưa được xác minh hoặc tài khoản không hoạt động",
+                ));
+            }
+            let user_id: String = user.get(0);
+            tx.execute(
+                "INSERT INTO osp_user_identities (tenant_id,user_id,issuer,subject) VALUES ($1,$2,$3,$4) ON CONFLICT (tenant_id,issuer,subject) DO NOTHING",
+                &[&tenant_id, &user_id, &issuer, &subject],
+            ).await?;
+            let linked_user: Option<String> = tx.query_opt(
+                "SELECT user_id FROM osp_user_identities WHERE tenant_id=$1 AND issuer=$2 AND subject=$3",
+                &[&tenant_id, &issuer, &subject],
+            ).await?.map(|identity| identity.get(0));
+            if linked_user.as_deref() != Some(user_id.as_str()) {
+                return Err(ApiError::new(
+                    409,
+                    "OIDC_IDENTITY_LINKED",
+                    "Danh tính doanh nghiệp này đã được liên kết với tài khoản khác",
+                ));
+            }
+        }
+        let user = row.expect("OIDC account row is present after verified link");
+        if user.get::<_, bool>(4) || !user.get::<_, bool>(5) {
+            return Err(ApiError::new(
+                401,
+                "OIDC_ACCOUNT_NOT_LINKED",
+                "Email chưa được xác minh hoặc tài khoản không hoạt động",
+            ));
+        }
+        let user_id: String = user.get(0);
+        let mfa_enabled: bool = user.get(7);
+        if mfa_enabled {
+            tx.commit().await?;
+            let challenge = mfa::create_login_challenge(self, &tenant, &user_id)
+                .await?
+                .ok_or_else(|| {
+                    ApiError::new(
+                        401,
+                        "OIDC_LOGIN_FAILED",
+                        "Không thể tạo thử thách xác thực đa yếu tố",
+                    )
+                })?;
+            let mut result = challenge;
+            result["tenantId"] = json!(tenant.id);
+            return Ok(result);
+        }
+        let (token, _, expires_at) = self
+            .insert_token(
+                &tx,
+                &tenant.id,
+                &user_id,
+                "session",
+                Some("OIDC login"),
+                Some(self.cfg.session_ttl),
+                None,
+            )
+            .await?;
+        self.audit_raw(
+            &tx,
+            &tenant.id,
+            &user_id,
+            "login",
+            None,
+            Some("oidc".into()),
+        )
+        .await?;
+        tx.commit().await?;
+        let public_user = PublicUser {
+            id: user_id,
+            name: user.get(1),
+            email: user.get(2),
+            roles: user.get(3),
+            disabled: false,
+            has_password: user.get(6),
+            mfa_enabled: false,
+            created_at: user.get(8),
+        };
+        Ok(
+            json!({ "tenantId": tenant.id, "token": token, "expiresAt": expires_at, "user": public_user }),
+        )
     }
 
     /// Queue a generic, one-time password reset email without revealing whether the account exists.
