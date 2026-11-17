@@ -51,8 +51,9 @@ export default function UtilitiesWorkbenchPage() {
     setLoading(true); setError('');
     try {
       const [meterRes, readingRes, partyMap, billRes, invoiceRes] = await Promise.all([
-        loadAllResponse('utilities.meter'), loadAllResponse('utilities.meter_reading'),
-        loadRefs('master-data.party'),
+        can('utilities.meter.read') ? loadAllResponse('utilities.meter') : Promise.resolve({ items: [] }),
+        can('utilities.meter_reading.read') ? loadAllResponse('utilities.meter_reading') : Promise.resolve({ items: [] }),
+        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
         can('utilities.utility_bill.read') ? loadAllResponse('utilities.utility_bill') : Promise.resolve({ items: [] }),
         can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
       ]);
