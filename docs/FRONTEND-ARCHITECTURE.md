@@ -26,7 +26,7 @@ Feature-local English dictionaries are used for the authentication flow, lazy-lo
 5. Use semantic headings, labels, accessible names, visible focus, and the existing CSS tokens. Selectable table rows expose their selected state and use `selectableTableRowProps` so Enter and Space activate them without changing table semantics. Add reusable styles to shared components only when more than one screen needs them.
 6. Keep generated `client-dist/` output out of commits. `npm run build` copies the public assets and creates deployable output.
 
-For translations used only by a lazy-loaded feature, keep its English text map in that feature directory and use `uiTextWith()` to fall back to the shared dictionary. This keeps feature vocabulary out of the startup bundle.
+For translations used only by a lazy-loaded feature, keep its English text map in that feature directory and use `uiTextWith()` to fall back to the shared dictionary. This keeps feature vocabulary out of the startup bundle. Shared API errors pass through `uiText()`; stable platform messages use exact translations and interpolated permission, constraint, request-size and HTTP-status messages use shared patterns.
 Wrap every user-visible literal with `uiText()` or the feature-local translator, including text chosen by conditional branches and fallback labels; raw Vietnamese JSX text will stay untranslated in `en-US`.
 
 Run `npm run lint:translations` while changing a screen or dictionary. The check verifies that literal `uiText()` and feature `t()` calls resolve through the shared or feature-local English dictionary, and catches raw Vietnamese JSX text, accessible text attributes, and static page titles. It is part of `npm run check`.

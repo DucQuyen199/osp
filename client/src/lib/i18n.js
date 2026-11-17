@@ -212,7 +212,21 @@ export const setUiLocale = async (locale) => {
   uiLocale = locale;
   return true;
 };
-export const uiText = (text) => uiLocale === 'en-US' ? (UI_TEXT_EN[text] || text) : text;
+function dynamicEnglishText(text) {
+  const permission = String(text).match(/^Không đủ quyền: (.+)$/);
+  if (permission) return `Insufficient permission: ${permission[1]}`;
+  const constraint = String(text).match(/^Giá trị vi phạm ràng buộc: (.*)$/);
+  if (constraint) return `Value violates a database constraint: ${constraint[1]}`;
+  const bodySize = String(text).match(/^Body quá lớn \(>([\d.,]+)KB\)$/);
+  if (bodySize) return `Request body is too large (>${bodySize[1]} KB)`;
+  const httpStatus = String(text).match(/^Lỗi (\d{3})$/);
+  if (httpStatus) return `Request failed (HTTP ${httpStatus[1]})`;
+  return undefined;
+}
+
+export const uiText = (text) => uiLocale === 'en-US'
+  ? (UI_TEXT_EN[text] || dynamicEnglishText(text) || text)
+  : text;
 export const uiTextWith = (text, featureTranslations) => uiLocale === 'en-US'
   ? (featureTranslations?.[text] || uiText(text))
   : text;
