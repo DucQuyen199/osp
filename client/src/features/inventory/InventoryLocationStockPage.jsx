@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { fmtMoney, fmtNumber, uiText } from '../../lib/i18n.js';
-import { loadRefs } from '../../lib/state.js';
+import { can, loadRefs } from '../../lib/state.js';
 const quantity = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
 export default function InventoryLocationStockPage() {
   useDocumentTitle(`${uiText('Tồn theo vị trí')} · OSP Suite`);
@@ -11,7 +11,17 @@ export default function InventoryLocationStockPage() {
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  useEffect(() => { loadRefs('inventory.warehouse').then(setWarehouses); }, []);
+  useEffect(() => {
+    let active = true;
+    if (!can('inventory.warehouse.read')) {
+      setWarehouses(new Map());
+      return () => { active = false; };
+    }
+    loadRefs('inventory.warehouse')
+      .then((rows) => { if (active) setWarehouses(rows); })
+      .catch(() => { if (active) setWarehouses(new Map()); });
+    return () => { active = false; };
+  }, []);
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
