@@ -33,9 +33,12 @@ export default function EcommerceOrderDeskPage() {
     try {
       const logisticsEnabled = app.meta?.modules?.some((module) => module.id === 'logistics') && can('logistics.shipment.read');
       const [storefrontMap, partyMap, productMap, currencyMap, orderResponse, salesResponse, shipmentResponse, invoiceResponse] = await Promise.all([
-        loadRefs('ecommerce.storefront'), loadRefs('master-data.party'), loadRefs('master-data.product'),
+        can('ecommerce.storefront.read') ? loadRefs('ecommerce.storefront') : Promise.resolve(new Map()),
+        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
+        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
         can('master-data.currency.read') ? loadRefs('master-data.currency') : Promise.resolve(new Map()),
-        loadAllResponse('ecommerce.web_order'), can('sales.sales_order.read') ? loadAllResponse('sales.sales_order') : Promise.resolve({ items: [] }),
+        can('ecommerce.web_order.read') ? loadAllResponse('ecommerce.web_order') : Promise.resolve({ items: [] }),
+        can('sales.sales_order.read') ? loadAllResponse('sales.sales_order') : Promise.resolve({ items: [] }),
         logisticsEnabled ? loadAllResponse('logistics.shipment') : Promise.resolve({ items: [] }),
         can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
       ]);
