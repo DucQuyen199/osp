@@ -172,7 +172,12 @@ pub fn request_for_event(event_type: &str, event: &Value) -> Option<Map<String, 
                     total.checked_add(debit)
                 })
             })?;
-        request.insert("amount".into(), json!(amount.normalize().to_string()));
+        let amount = amount
+            .normalize()
+            .to_string()
+            .parse::<serde_json::Number>()
+            .ok()?;
+        request.insert("amount".into(), Value::Number(amount));
     }
     if let Some(requested_by) = requested_by.filter(|value| !value.is_null()) {
         request.insert("requested_by".into(), requested_by.clone());
@@ -209,7 +214,11 @@ pub fn decision_for_event(event_type: &str, event: &Value) -> Option<(&'static s
         "contract.amendment" => "contract.amendment",
         _ => return None,
     };
-    Some((entity, action))
+    let target_action = match (entity, action) {
+        ("accounting.journal_entry", "approved") => "posted",
+        _ => action,
+    };
+    Some((entity, target_action))
 }
 
 pub fn is_optional_target(entity: &str) -> bool {

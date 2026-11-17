@@ -55,20 +55,54 @@ impl Kernel {
             .get_row(tx, t, &qname, id)
             .await?
             .ok_or_else(|| ApiError::not_found(format!("Không tìm thấy {qname} {id}")))?;
-        if qname == "accounting.journal_entry"
-            && matches!(actor, Actor::User { .. })
-            && ((action == "posted"
+        if qname == "accounting.journal_entry" && matches!(actor, Actor::User { .. }) {
+            if action == "rejected" {
+                return Err(ApiError::forbidden(
+                    "Journal rejection must come from an approval decision",
+                ));
+            }
+            if action == "posted"
                 && cur
                     .get("source")
                     .and_then(Value::as_str)
-                    .is_none_or(|source| source.trim().is_empty()))
-                || action == "rejected")
-        {
-            return Err(ApiError::forbidden(if action == "rejected" {
-                "Journal rejection must come from an approval decision"
-            } else {
-                "Submit manual journal entries for independent approval before posting"
-            }));
+                    .is_none_or(|source| source.trim().is_empty())
+                && t.has_module("workflow-approval")
+            {
+                tx.query_opt(
+                    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                    &[&format!(
+                        "workflow-approval:{}:accounting.journal_entry",
+                        t.id
+                    )],
+                )
+                .await?;
+                let amount = cur
+                    .get("lines")
+                    .and_then(Value::as_array)
+                    .and_then(|lines| {
+                        lines
+                            .iter()
+                            .try_fold(rust_decimal::Decimal::ZERO, |total, line| {
+                                let debit = crate::money::decimal(line.get("debit")?)?;
+                                total.checked_add(debit)
+                            })
+                    })
+                    .unwrap_or_default()
+                    .normalize()
+                    .to_string();
+                if tx
+                    .query_opt(
+                        "SELECT 1 FROM workflow_approval__approval_rule WHERE tenant_id = $1 AND entity = 'accounting.journal_entry' AND (min_amount IS NULL OR min_amount <= $2::text::numeric) LIMIT 1",
+                        &[&t.id, &amount],
+                    )
+                    .await?
+                    .is_some()
+                {
+                    return Err(ApiError::forbidden(
+                        "Submit manual journal entries for independent approval before posting",
+                    ));
+                }
+            }
         }
         if let (
             Actor::User {

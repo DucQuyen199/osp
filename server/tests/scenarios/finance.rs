@@ -1,5 +1,5 @@
 //! Financial lifecycle regressions using the same public kernel as HTTP.
-use super::{Ctx, f, id};
+use super::{Ctx, f, id, o};
 use osp_server::{kernel::Kernel, money};
 use rust_decimal::Decimal;
 use serde_json::json;
@@ -27,6 +27,7 @@ async fn balanced_journals(context: &Ctx, minimum: usize) {
 
 #[async_recursion::async_recursion]
 pub(super) async fn run(kernel: &Arc<Kernel>) {
+    manual_journal_approvals(kernel).await;
     {
         let context = Ctx::new(kernel, None, &["asset"]).await;
         let asset = context
@@ -204,4 +205,177 @@ pub(super) async fn run(kernel: &Arc<Kernel>) {
             "✔ payroll: attendance valuation, immutable calculation, approval and payment journals"
         );
     }
+}
+
+async fn manual_journal_approvals(kernel: &Arc<Kernel>) {
+    let t = Ctx::new(kernel, None, &["accounting", "workflow-approval"]).await;
+    let (reviewer, token) = kernel
+        .add_user(
+            &t.t,
+            "Independent journal reviewer",
+            None,
+            None,
+            &["admin".into()],
+        )
+        .await
+        .unwrap();
+    let (_, reviewer_actor, _) = kernel.authenticate(&token.unwrap()).await.unwrap();
+    t.create(
+        "workflow-approval.approval_rule",
+        json!({
+            "name": "Manual journal review",
+            "entity": "accounting.journal_entry",
+            "min_amount": 50,
+            "approvers": { "users": [reviewer.id] }
+        }),
+    )
+    .await;
+    let expense = t
+        .list("accounting.account", &[("code", "642")])
+        .await
+        .remove(0);
+    let cash = t
+        .list("accounting.account", &[("code", "112")])
+        .await
+        .remove(0);
+    let below_threshold = t
+        .create(
+            "accounting.journal_entry",
+            json!({
+                "memo": "Below approval threshold",
+                "amount": 20,
+                "lines": [
+                    { "account": id(&expense), "debit": 20, "credit": 0 },
+                    { "account": id(&cash), "debit": 0, "credit": 20 }
+                ]
+            }),
+        )
+        .await;
+    t.act("accounting.journal_entry", &id(&below_threshold), "posted")
+        .await;
+    assert_eq!(
+        t.get("accounting.journal_entry", &id(&below_threshold))
+            .await["status"],
+        "posted"
+    );
+    let journal = t
+        .create(
+            "accounting.journal_entry",
+            json!({
+                "memo": "Manual accrual",
+                "amount": 100,
+                "posting_date": chrono::Utc::now().date_naive().to_string(),
+                "lines": [
+                    { "account": id(&expense), "debit": 100, "credit": 0 },
+                    { "account": id(&cash), "debit": 0, "credit": 100 }
+                ]
+            }),
+        )
+        .await;
+    assert!(
+        kernel
+            .act(
+                &t.a,
+                &t.t,
+                "accounting.journal_entry",
+                &id(&journal),
+                "posted"
+            )
+            .await
+            .is_err(),
+        "a user cannot directly post a manual journal"
+    );
+    assert!(
+        kernel
+            .update(
+                &t.a,
+                &t.t,
+                "accounting.journal_entry",
+                &id(&journal),
+                o(json!({ "status": "posted" }))
+            )
+            .await
+            .is_err(),
+        "a user cannot bypass the state machine through a status patch"
+    );
+    t.act("accounting.journal_entry", &id(&journal), "submitted")
+        .await;
+    let request = t
+        .list(
+            "workflow-approval.approval_request",
+            &[("record_id", &id(&journal)), ("status", "pending")],
+        )
+        .await
+        .remove(0);
+    assert_eq!(money::decimal(&request["amount"]), Some(Decimal::from(100)));
+    assert!(
+        kernel
+            .act(
+                &t.a,
+                &t.t,
+                "workflow-approval.approval_request",
+                &id(&request),
+                "approved"
+            )
+            .await
+            .is_err(),
+        "the submitter cannot approve their own journal"
+    );
+    assert!(
+        kernel
+            .act(
+                &t.a,
+                &t.t,
+                "accounting.journal_entry",
+                &id(&journal),
+                "rejected"
+            )
+            .await
+            .is_err(),
+        "users cannot reject a journal outside the approval request"
+    );
+    kernel
+        .act(
+            &reviewer_actor,
+            &t.t,
+            "workflow-approval.approval_request",
+            &id(&request),
+            "rejected",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        t.get("accounting.journal_entry", &id(&journal)).await["status"],
+        "rejected"
+    );
+    t.update(
+        "accounting.journal_entry",
+        &id(&journal),
+        json!({ "memo": "Revised manual accrual" }),
+    )
+    .await;
+    t.act("accounting.journal_entry", &id(&journal), "submitted")
+        .await;
+    let pending = t
+        .list(
+            "workflow-approval.approval_request",
+            &[("record_id", &id(&journal)), ("status", "pending")],
+        )
+        .await
+        .remove(0);
+    kernel
+        .act(
+            &reviewer_actor,
+            &t.t,
+            "workflow-approval.approval_request",
+            &id(&pending),
+            "approved",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        t.get("accounting.journal_entry", &id(&journal)).await["status"],
+        "posted"
+    );
+    println!("✔ manual journals: rule threshold, separation of duties, no bypass and resubmission");
 }

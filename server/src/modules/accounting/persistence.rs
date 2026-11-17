@@ -144,23 +144,33 @@ pub async fn validate_persistence(
             }
             if !tenant.has_module("workflow-approval") {
                 errors.push("Enable workflow-approval before submitting a manual journal".into());
-            } else if let Some(total) =
-                document
-                    .get("lines")
-                    .and_then(Value::as_array)
-                    .and_then(|lines| {
-                        lines.iter().try_fold(Decimal::ZERO, |total, line| {
-                            let debit = money::decimal(line.get("debit")?)?;
-                            total.checked_add(debit)
+            } else {
+                tx.query_opt(
+                    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                    &[&format!(
+                        "workflow-approval:{}:accounting.journal_entry",
+                        tenant.id
+                    )],
+                )
+                .await?;
+                if let Some(total) =
+                    document
+                        .get("lines")
+                        .and_then(Value::as_array)
+                        .and_then(|lines| {
+                            lines.iter().try_fold(Decimal::ZERO, |total, line| {
+                                let debit = money::decimal(line.get("debit")?)?;
+                                total.checked_add(debit)
+                            })
                         })
-                    })
-            {
-                let amount = total.normalize().to_string();
-                if tx.query_opt(
-                    "SELECT 1 FROM workflow_approval__approval_rule WHERE tenant_id = $1 AND entity = 'accounting.journal_entry' AND (min_amount IS NULL OR min_amount <= $2::text::numeric) LIMIT 1",
-                    &[&tenant.id, &amount],
-                ).await?.is_none() {
-                    errors.push("Configure an applicable journal entry approval rule before submitting".into());
+                {
+                    let amount = total.normalize().to_string();
+                    if tx.query_opt(
+                        "SELECT 1 FROM workflow_approval__approval_rule WHERE tenant_id = $1 AND entity = 'accounting.journal_entry' AND (min_amount IS NULL OR min_amount <= $2::text::numeric) LIMIT 1",
+                        &[&tenant.id, &amount],
+                    ).await?.is_none() {
+                        errors.push("Configure an applicable journal entry approval rule before submitting".into());
+                    }
                 }
             }
         }
