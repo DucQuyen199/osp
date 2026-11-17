@@ -47,6 +47,7 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 - The manufacturing workbench keeps production commands and output drafts in `ManufacturingWipPage`; `ProductionOrderCard` renders the controlled output fields and emits requested transitions.
 - The manufacturing workbench owns production-order permissions and creation; `ProductionOrderForm` renders the controlled BOM, warehouse, work-center, lot and scrap-account fields and emits changes through a callback.
 - The manufacturing workbench owns BOM permissions and persistence; `BillOfMaterialsSection` renders controlled BOM and component fields and emits edits through callbacks.
+- The clinic workbench owns encounter status, prescription permissions and dispensing; `EncounterPrescriptionsPanel` renders encounter prescriptions and the controlled draft form, then emits medication edits and actions through callbacks.
 - The manufacturing workbench keeps QC permissions and inspection actions in `ManufacturingWipPage`; `ProductionInspectionQueue` renders pending production inspections and emits pass/fail decisions through callbacks.
 - The manufacturing workbench owns failed-quantity accounting, rework permissions and API actions; `ReworkOrdersPanel` renders controlled failed inspection selection, repair quantity and reason fields, plus rework orders and their available actions.
 - The manufacturing workbench owns WIP report filters and reconciliation actions; `ManufacturingWipReport` renders the order level WIP table and its reconciliation context.
