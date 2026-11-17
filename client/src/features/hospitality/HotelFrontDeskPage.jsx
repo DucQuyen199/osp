@@ -48,8 +48,11 @@ export default function HotelFrontDeskPage() {
     try {
       const accountingEnabled = app.meta?.modules?.some((module) => module.id === 'accounting') && can('accounting.invoice.read');
       const [reservationResponse, partyMap, roomMap, roomTypeMap, chargeResponse, invoiceResponse] = await Promise.all([
-        loadAllResponse('hotel.reservation'), loadRefs('master-data.party'),
-        loadRefs('hotel.room'), loadRefs('hotel.room_type'), loadAllResponse('hotel.folio_charge'),
+        can('hotel.reservation.read') ? loadAllResponse('hotel.reservation') : Promise.resolve({ items: [] }),
+        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
+        can('hotel.room.read') ? loadRefs('hotel.room') : Promise.resolve(new Map()),
+        can('hotel.room_type.read') ? loadRefs('hotel.room_type') : Promise.resolve(new Map()),
+        can('hotel.folio_charge.read') ? loadAllResponse('hotel.folio_charge') : Promise.resolve({ items: [] }),
         accountingEnabled ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
       ]);
       const next = itemsOf(reservationResponse).sort((a, b) => String(a.check_in || '').localeCompare(String(b.check_in || '')) || String(a.created_at || '').localeCompare(String(b.created_at || '')));
