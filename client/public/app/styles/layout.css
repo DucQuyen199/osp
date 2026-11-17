@@ -14,7 +14,7 @@
 .global-search > .icon { position: absolute; left: var(--sp-3); top: 50%; transform: translateY(-50%); color: var(--text-faint); pointer-events: none; }
 .global-search-input { min-height: 2.25rem; padding-left: 2.25rem; background: var(--surface-2); border-color: transparent; }
 .global-search-input:focus { background: var(--surface); border-color: var(--accent); }
-.global-search-results { position: absolute; top: calc(100% + var(--sp-2)); left: 0; right: 0; z-index: 60; padding: var(--sp-2); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--shadow-3); }
+.global-search-results { position: absolute; top: calc(100% + var(--sp-2)); left: 0; right: 0; z-index: 60; margin: 0; padding: var(--sp-2); list-style: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--shadow-3); }
 .global-search-result { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3); border-radius: var(--r-sm); color: var(--text); }
 .global-search-result:hover { background: var(--surface-2); text-decoration: none; }
 .global-search-result .icon { color: var(--accent); }

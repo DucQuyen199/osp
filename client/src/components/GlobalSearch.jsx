@@ -23,9 +23,16 @@ export default function GlobalSearch({ meta, onNavigate }) {
   return <div className="global-search">
     <Icon name="search" />
     <input className="input global-search-input" type="search" placeholder={uiText('Tìm module hoặc dữ liệu…')} aria-label={uiText('Tìm module hoặc dữ liệu')} aria-keyshortcuts="Control+K" value={query} onChange={(event) => setQuery(event.target.value)} />
-    {query.trim() && <div className="global-search-results" role="listbox" aria-label={uiText('Kết quả tìm kiếm')}>
-      {matches.length ? matches.map((match) => <a key={match.href} className="global-search-result" href={match.href} role="option" onClick={() => { setQuery(''); onNavigate(); }}><Icon name={match.icon} /><span><strong>{match.title}</strong><small>{match.sub}</small></span></a>) : <div className="global-search-empty">{uiText('Không tìm thấy module hoặc dữ liệu phù hợp.')}</div>}
-    </div>}
+    {query.trim() && <>
+      <div className="sr-only" role="status" aria-live="polite">
+        {matches.length ? uiText('Kết quả: {count}').replace('{count}', String(matches.length)) : uiText('Không tìm thấy module hoặc dữ liệu phù hợp.')}
+      </div>
+      <ul className="global-search-results" aria-label={uiText('Kết quả tìm kiếm')}>
+        {matches.length ? matches.map((match) => <li key={match.href}>
+          <a className="global-search-result" href={match.href} onClick={() => { setQuery(''); onNavigate(); }}><Icon name={match.icon} /><span><strong>{match.title}</strong><small>{match.sub}</small></span></a>
+        </li>) : <li className="global-search-empty" aria-hidden="true">{uiText('Không tìm thấy module hoặc dữ liệu phù hợp.')}</li>}
+      </ul>
+    </>}
   </div>;
 }
 

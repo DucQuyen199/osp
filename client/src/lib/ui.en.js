@@ -49,7 +49,7 @@ const uiTextEnglish = {
   'Pipeline bán hàng': 'Sales pipeline', 'Hiệu quả chiến dịch': 'Campaign performance', 'SLA hỗ trợ': 'Support SLA',
   'Hộp thư hỗ trợ': 'Support inbox', 'Dữ liệu gốc': 'Master data', 'Quản trị': 'Administration', 'Cài đặt': 'Settings',
   'Tổng quan': 'Overview', 'Tìm module hoặc dữ liệu…': 'Search modules or records…',
-  'Tìm module hoặc dữ liệu': 'Search modules or records', 'Kết quả tìm kiếm': 'Search results',
+  'Tìm module hoặc dữ liệu': 'Search modules or records', 'Kết quả tìm kiếm': 'Search results', 'Kết quả: {count}': 'Results: {count}',
   'loại dữ liệu': 'data types', 'Không tìm thấy module hoặc dữ liệu phù hợp.': 'No matching modules or records found.',
   'Định dạng ngày và số': 'Date and number format', 'Ngôn ngữ giao diện': 'Interface language',
   'Tiếng Việt': 'Vietnamese', 'Tiếng Anh': 'English', 'Bảo mật tài khoản': 'Account security',
