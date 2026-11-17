@@ -12,15 +12,19 @@ import PurchaseReceiptForm from './components/PurchaseReceiptForm.jsx';
 import SupplierInvoiceAdjustmentsEditor from './components/SupplierInvoiceAdjustmentsEditor.jsx';
 import SupplierInvoiceDraftForm from './components/SupplierInvoiceDraftForm.jsx';
 import SupplierInvoicesPanel from './components/SupplierInvoicesPanel.jsx';
+import {
+  calculateInvoiceableLines,
+  calculateReturnableLines,
+  invoiceLineForReturn as findInvoiceLineForReturn,
+  keyOf,
+  lineValue,
+  orderPriceKeyOf,
+  returnSourceLineFor as findReturnSourceLine,
+  returnUnitRatioFor as getReturnUnitRatio,
+  selectReturnableInspections,
+} from './domain/purchasingSelectors.js';
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
-const keyOf = (line) => `${line.product}|${Number(line.price || 0)}|${line.tax || ''}|${Number(line.tax_rate ?? 0)}|${line.uom || ''}`;
-const orderPriceKeyOf = (line) => `${line.product}|${Number(line.price || 0)}|${line.uom || ''}|${line.po_tax ?? line.tax ?? ''}|${Number(line.po_tax_rate ?? line.tax_rate ?? 0)}`;
-const lineValue = (line, taxes) => {
-  const net = (Number(line.qty) || 0) * (Number(line.price) || 0);
-  const rate = Number(taxes.get(line.tax)?.rate ?? line.tax_rate) || 0;
-  return net * (1 + rate / 100);
-};
 export default function PurchasingWorkbenchPage() {
   useDocumentTitle(`${uiText('Mua hàng và nhận hàng')} · OSP Suite`);
   const [orders, setOrders] = useState([]);
@@ -105,87 +109,25 @@ export default function PurchasingWorkbenchPage() {
   };
   const selected = orders.find((row) => row.id === selectedId);
   const selectedReceipts = useMemo(() => receipts.filter((row) => row.purchase_order === selectedId).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))), [receipts, selectedId]);
-  const returnSourceLineFor = (inspection) => {
-    const receipt = receipts.find((row) => row.id === inspection?.source_id);
-    const receiptLine = receipt?.lines?.find((line) => line.product === inspection.product && (line.lot || null) === (inspection.lot || null));
-    const matchingOrderLine = selected?.lines?.find((line) => line.product === inspection?.product
-      && (!receiptLine || ((line.uom || null) === (receiptLine.uom || null)
-        && Math.abs(Number(line.price || 0) - Number(receiptLine.price || 0)) <= 0.005
-        && (line.tax || '') === (receiptLine.tax || '')
-        && Number(line.tax_rate || 0) === Number(receiptLine.tax_rate || 0))));
-    return matchingOrderLine || (!receiptLine ? selected?.lines?.find((line) => line.product === inspection?.product) : undefined);
-  };
-  const returnUnitRatioFor = (inspection) => {
-    const unitId = returnSourceLineFor(inspection)?.uom;
-    const ratio = Number(units.get(unitId)?.ratio || 1);
-    return Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
-  };
+  const returnSourceLineFor = (inspection) => findReturnSourceLine(inspection, receipts, selected);
+  const returnUnitRatioFor = (inspection) => getReturnUnitRatio(inspection, receipts, selected, units);
   const billByOrder = useMemo(() => new Map(bills.filter((row) => row.source === 'purchase_order').map((row) => [row.source_id, row])), [bills]);
   const selectedSupplierInvoices = useMemo(() => supplierInvoices.filter((row) => row.purchase_order === selectedId).sort((a, b) => String(a.issue_date).localeCompare(String(b.issue_date))), [supplierInvoices, selectedId]);
-  const invoiceLineForReturn = (invoiceId, orderLine) => {
-    const invoice = selectedSupplierInvoices.find((row) => row.id === invoiceId);
-    return invoice?.lines?.find((line) => line.product === orderLine.product
-      && (line.uom || null) === (orderLine.uom || null)
-      && Math.abs(Number(line.po_price ?? line.order_price ?? line.price) - Number(orderLine.price)) <= 0.005
-      && ((line.po_tax !== undefined && (line.po_tax || '') === (orderLine.tax || '')
-        && Number(line.po_tax_rate || 0) === Number(orderLine.tax_rate || 0))
-        || (line.po_tax === undefined && line.po_tax_rate === undefined))) || null;
-  };
+  const invoiceLineForReturn = (invoiceId, orderLine) => findInvoiceLineForReturn(invoiceId, orderLine, selectedSupplierInvoices);
   const selectedReturns = useMemo(() => purchaseReturns.filter((row) => row.purchase_order === selectedId), [purchaseReturns, selectedId]);
-  const returnableLines = useMemo(() => {
-    const received = new Map();
-    for (const receipt of selectedReceipts.filter((row) => row.status === 'received')) {
-      for (const line of receipt.lines || []) {
-        const key = orderPriceKeyOf(line); const entry = received.get(key) || { ...line, qty: 0 };
-        entry.qty += Number(line.qty || 0); received.set(key, entry);
-      }
-    }
-    for (const purchaseReturn of selectedReturns.filter((row) => ['submitted', 'approved', 'dispatched'].includes(row.status))) {
-      for (const line of purchaseReturn.lines || []) {
-        const key = orderPriceKeyOf({ ...line, price: line.po_price ?? line.price });
-        const entry = received.get(key);
-        if (entry) entry.qty = Math.max(0, entry.qty - Number(line.qty || 0));
-      }
-    }
-    return [...received.entries()].map(([key, line]) => ({ ...line, key }))
-      .filter((line) => line.qty > 0.000001);
-  }, [selectedReceipts, selectedReturns]);
+  const returnableLines = useMemo(() => calculateReturnableLines(selectedReceipts, selectedReturns), [selectedReceipts, selectedReturns]);
   const generalReturnLine = returnableLines.find((line) => line.key === generalReturnForm.lineKey) || null;
-  const selectedReturnInspections = useMemo(() => qualityInspections.filter((inspection) => {
-    if (inspection.status !== 'failed' || !['purchase_order', 'purchase_receipt'].includes(inspection.source)) return false;
-    const belongsToOrder = inspection.source === 'purchase_order'
-      ? inspection.source_id === selectedId
-      : selectedReceipts.some((receipt) => receipt.id === inspection.source_id);
-    if (!belongsToOrder) return false;
-    const alreadyReturned = selectedReturns.filter((row) => row.inspection === inspection.id && ['submitted', 'approved', 'dispatched'].includes(row.status))
-      .reduce((sum, row) => sum + (row.lines || []).reduce((lineSum, line) => lineSum + Number(line.base_qty ?? line.qty ?? 0), 0), 0);
-    return Number(inspection.qty || 0) - alreadyReturned > 0.000001;
-  }), [qualityInspections, selectedId, selectedReceipts, selectedReturns]);
+  const selectedReturnInspections = useMemo(
+    () => selectReturnableInspections(qualityInspections, selectedId, selectedReceipts, selectedReturns),
+    [qualityInspections, selectedId, selectedReceipts, selectedReturns],
+  );
   const approvalByInvoice = useMemo(() => new Map(approvalRequests.filter((request) => request.entity === 'purchasing.supplier_invoice').map((request) => [request.record_id, request])), [approvalRequests]);
   const approvalByReturn = useMemo(() => new Map(approvalRequests.filter((request) => request.entity === 'purchasing.purchase_return').map((request) => [request.record_id, request])), [approvalRequests]);
-  const invoiceableLines = useMemo(() => {
-    const received = new Map();
-    for (const receipt of selectedReceipts.filter((row) => row.status === 'received')) {
-      for (const line of receipt.lines || []) {
-        const key = orderPriceKeyOf(line); const entry = received.get(key) || { ...line, qty: 0 };
-        entry.qty += Number(line.qty || 0); received.set(key, entry);
-      }
-    }
-    for (const purchaseReturn of purchaseReturns.filter((row) => row.purchase_order === selectedId && row.status === 'dispatched')) {
-      for (const line of purchaseReturn.lines || []) {
-        const key = orderPriceKeyOf(line); const entry = received.get(key);
-        if (entry) entry.qty = Math.max(0, entry.qty - Number(line.qty || 0));
-      }
-    }
-    const reserved = new Map();
-    for (const invoice of selectedSupplierInvoices.filter((row) => ['draft','submitted','disputed','approved'].includes(row.status))) {
-      for (const line of invoice.lines || []) {
-        const key = orderPriceKeyOf({ ...line, price: line.po_price ?? line.order_price ?? line.price });
-        reserved.set(key, (reserved.get(key) || 0) + Number(line.qty || 0));
-      }
-    }
-    return [...received.entries()].map(([key, line]) => ({ ...line, qty: Math.max(0, line.qty - (reserved.get(key) || 0)) })).filter((line) => line.qty > 0.000001);
-  }, [selectedReceipts, selectedSupplierInvoices, purchaseReturns, selectedId]);
+  const invoiceableReturns = useMemo(() => purchaseReturns.filter((row) => row.purchase_order === selectedId), [purchaseReturns, selectedId]);
+  const invoiceableLines = useMemo(
+    () => calculateInvoiceableLines(selectedReceipts, selectedSupplierInvoices, invoiceableReturns),
+    [selectedReceipts, selectedSupplierInvoices, invoiceableReturns],
+  );
   const invoiceAdjustmentTotals = invoiceAdjustments.reduce((totals, line) => {
     const amount = Number(line.amount) || 0;
     const rate = Number(taxById.get(line.tax)?.rate) || 0;
