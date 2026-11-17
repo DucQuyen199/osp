@@ -329,14 +329,21 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
             "source",
             "source_id",
         ],
-        "journal_entry" if current.get("status").and_then(Value::as_str) != Some("draft") => &[
-            "memo",
-            "amount",
-            "posting_date",
-            "lines",
-            "source",
-            "source_id",
-        ],
+        "journal_entry"
+            if !matches!(
+                current.get("status").and_then(Value::as_str),
+                Some("draft" | "rejected")
+            ) =>
+        {
+            &[
+                "memo",
+                "amount",
+                "posting_date",
+                "lines",
+                "source",
+                "source_id",
+            ]
+        }
         "credit_note" if current.get("status").and_then(Value::as_str) != Some("draft") => &[
             "invoice",
             "currency",
@@ -478,7 +485,7 @@ pub fn validate_action_at(
                 Vec::new()
             }
         }
-        ("journal_entry", "posted" | "reversed") => journal::validate_lines(document),
+        ("journal_entry", "submitted" | "posted" | "reversed") => journal::validate_lines(document),
         ("invoice" | "bill" | "credit_note" | "debit_note", "posted") => {
             if !amount(document, "total").is_some_and(|value| value > Decimal::ZERO) {
                 vec!["Chỉ ghi sổ hóa đơn có tổng tiền lớn hơn 0".into()]

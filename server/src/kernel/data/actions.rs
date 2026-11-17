@@ -55,6 +55,21 @@ impl Kernel {
             .get_row(tx, t, &qname, id)
             .await?
             .ok_or_else(|| ApiError::not_found(format!("Không tìm thấy {qname} {id}")))?;
+        if qname == "accounting.journal_entry"
+            && matches!(actor, Actor::User { .. })
+            && ((action == "posted"
+                && cur
+                    .get("source")
+                    .and_then(Value::as_str)
+                    .is_none_or(|source| source.trim().is_empty()))
+                || action == "rejected")
+        {
+            return Err(ApiError::forbidden(if action == "rejected" {
+                "Journal rejection must come from an approval decision"
+            } else {
+                "Submit manual journal entries for independent approval before posting"
+            }));
+        }
         if let (
             Actor::User {
                 id: acting_user, ..

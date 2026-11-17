@@ -420,7 +420,7 @@ Tổng: **50 module**, **202 loại dữ liệu**, **921 sự kiện**.
 | `api_key` API key | — |
 
 ### workflow-approval
-**Phê duyệt** — Luồng duyệt dùng chung. Đơn mua, đề nghị chi phí... tự sinh yêu cầu duyệt khi module này được bật; duyệt xong tự chuyển trạng thái chứng từ gốc.
+**Phê duyệt** — Luồng duyệt dùng chung. Đơn mua, đề nghị chi phí và bút toán thủ công tự sinh yêu cầu duyệt khi module này được bật; duyệt xong tự chuyển trạng thái chứng từ gốc. Bút toán thủ công phải có quy tắc duyệt áp dụng theo tổng bên Nợ, chỉ người khác người gửi mới được duyệt; sau khi bị từ chối, người lập có thể sửa và gửi lại. Bút toán do nghiệp vụ khác tự sinh tiếp tục theo luồng ghi sổ của nghiệp vụ đó.
 
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|

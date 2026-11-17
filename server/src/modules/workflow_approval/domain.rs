@@ -13,6 +13,7 @@ const APPROVAL_TARGETS: &[&str] = &[
     "expense.expense_claim",
     "hrm.leave_request",
     "accounting.settlement_batch",
+    "accounting.journal_entry",
     "contract.amendment",
     "manufacturing.conditional_acceptance",
 ];
@@ -139,6 +140,12 @@ pub fn request_for_event(event_type: &str, event: &Value) -> Option<Map<String, 
             event.get("amount"),
             None,
         ),
+        "accounting.journal_entry.submitted" => (
+            "accounting.journal_entry",
+            "Duyệt bút toán thủ công",
+            None,
+            None,
+        ),
         "contract.amendment.submitted" => (
             "contract.amendment",
             "Duyệt phụ lục hợp đồng",
@@ -154,6 +161,18 @@ pub fn request_for_event(event_type: &str, event: &Value) -> Option<Map<String, 
     request.insert("record_id".into(), json!(record_id));
     if let Some(amount) = amount.filter(|value| !value.is_null()) {
         request.insert("amount".into(), amount.clone());
+    }
+    if event_type == "accounting.journal_entry.submitted" {
+        let amount = event
+            .get("lines")
+            .and_then(Value::as_array)
+            .and_then(|lines| {
+                lines.iter().try_fold(Decimal::ZERO, |total, line| {
+                    let debit = money::decimal(line.get("debit")?)?;
+                    total.checked_add(debit)
+                })
+            })?;
+        request.insert("amount".into(), json!(amount.normalize().to_string()));
     }
     if let Some(requested_by) = requested_by.filter(|value| !value.is_null()) {
         request.insert("requested_by".into(), requested_by.clone());
@@ -186,6 +205,7 @@ pub fn decision_for_event(event_type: &str, event: &Value) -> Option<(&'static s
         "expense.expense_claim" => "expense.expense_claim",
         "hrm.leave_request" => "hrm.leave_request",
         "accounting.settlement_batch" => "accounting.settlement_batch",
+        "accounting.journal_entry" => "accounting.journal_entry",
         "contract.amendment" => "contract.amendment",
         _ => return None,
     };

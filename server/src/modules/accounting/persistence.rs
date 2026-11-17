@@ -134,6 +134,36 @@ pub async fn validate_persistence(
     let mut errors = Vec::new();
     if entity == "journal_entry" {
         errors.extend(journals::validate_journal_line_references(tx, tenant, document).await?);
+        if action == "submitted" {
+            if document
+                .get("source")
+                .and_then(Value::as_str)
+                .is_some_and(|source| !source.trim().is_empty())
+            {
+                errors.push("Only manual journal entries can be submitted for approval".into());
+            }
+            if !tenant.has_module("workflow-approval") {
+                errors.push("Enable workflow-approval before submitting a manual journal".into());
+            } else if let Some(total) =
+                document
+                    .get("lines")
+                    .and_then(Value::as_array)
+                    .and_then(|lines| {
+                        lines.iter().try_fold(Decimal::ZERO, |total, line| {
+                            let debit = money::decimal(line.get("debit")?)?;
+                            total.checked_add(debit)
+                        })
+                    })
+            {
+                let amount = total.normalize().to_string();
+                if tx.query_opt(
+                    "SELECT 1 FROM workflow_approval__approval_rule WHERE tenant_id = $1 AND entity = 'accounting.journal_entry' AND (min_amount IS NULL OR min_amount <= $2::text::numeric) LIMIT 1",
+                    &[&tenant.id, &amount],
+                ).await?.is_none() {
+                    errors.push("Configure an applicable journal entry approval rule before submitting".into());
+                }
+            }
+        }
         if matches!(action, "created" | "updated" | "posted")
             && document.get("source").and_then(Value::as_str) == Some("ticket_refund")
         {

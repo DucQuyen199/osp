@@ -94,7 +94,7 @@ export default function EntityListPage({ qname }) {
   const selectedRows = rows.filter((record) => selectedIds.has(record.id));
   const bulkActions = definition.states && selectedRows.length
     ? Object.entries(definition.states.actions).filter(([action, transition]) =>
-      can(`${qname}.${action}`) && selectedRows.every((record) => transition.from.includes(record[definition.states.field])))
+      can(`${qname}.${action}`) && !(qname === 'accounting.journal_entry' && ['posted', 'rejected'].includes(action)) && !(qname === 'accounting.journal_entry' && action === 'submitted' && selectedRows.some((record) => record.source)) && selectedRows.every((record) => transition.from.includes(record[definition.states.field])))
     : [];
   const allRowsSelected = rows.length > 0 && rows.every((record) => selectedIds.has(record.id));
   const states = definition.states

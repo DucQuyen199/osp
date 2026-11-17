@@ -908,6 +908,8 @@
      "required": false,
      "options": [
       "draft",
+      "submitted",
+      "rejected",
       "posted",
       "reversed"
      ]
@@ -919,9 +921,23 @@
     "actions": {
      "posted": {
       "from": [
-       "draft"
+       "draft",
+       "submitted"
       ],
       "to": "posted"
+     },
+     "submitted": {
+      "from": [
+       "draft",
+       "rejected"
+      ],
+      "to": "submitted"
+     },
+     "rejected": {
+      "from": [
+       "submitted"
+      ],
+      "to": "rejected"
      },
      "reversed": {
       "from": [

@@ -11,7 +11,7 @@ const t = (text) => uiTextWith(text, approvalEnglish);
 const targets = [
   'purchasing.purchase_order', 'purchasing.supplier_invoice', 'purchasing.purchase_requisition',
   'payroll.payroll_run', 'inventory.stock_count', 'sales.sales_return', 'purchasing.purchase_return',
-  'expense.expense_claim', 'hrm.leave_request', 'accounting.settlement_batch', 'contract.amendment',
+  'expense.expense_claim', 'hrm.leave_request', 'accounting.settlement_batch', 'accounting.journal_entry', 'contract.amendment',
   'manufacturing.conditional_acceptance',
 ];
 const requestRows = (response) => Array.isArray(response?.items) ? response.items : [];

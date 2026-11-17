@@ -199,6 +199,7 @@ pub fn table_for(entity: &str) -> Option<&'static str> {
         "expense.expense_claim" => Some("expense__expense_claim"),
         "hrm.leave_request" => Some("hrm__leave_request"),
         "accounting.settlement_batch" => Some("accounting__settlement_batch"),
+        "accounting.journal_entry" => Some("accounting__journal_entry"),
         "contract.amendment" => Some("contract__amendment"),
         _ => None,
     }

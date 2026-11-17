@@ -1433,5 +1433,10 @@ const uiTextEnglish = {
   'Không thể tính tổng tiền lệnh sửa chữa': 'Could not calculate the repair order total.',
   "hàng hóa": "Goods",
   "Hợp đồng độc lập": "Standalone contract",
+  'Only manual journal entries can be submitted for approval': 'Chỉ bút toán thủ công mới có thể gửi phê duyệt.',
+  'Enable workflow-approval before submitting a manual journal': 'Hãy bật module phê duyệt trước khi gửi bút toán thủ công.',
+  'Configure an applicable journal entry approval rule before submitting': 'Hãy cấu hình quy tắc phê duyệt phù hợp trước khi gửi bút toán.',
+  'Submit manual journal entries for independent approval before posting': 'Hãy gửi bút toán thủ công để người khác phê duyệt trước khi ghi sổ.',
+  'Journal rejection must come from an approval decision': 'Bút toán chỉ bị từ chối theo quyết định trong luồng phê duyệt.',
 };
 export default uiTextEnglish;
