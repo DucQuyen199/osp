@@ -207,7 +207,7 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Contract register', 'contract workbench is not translated');
   const contractText = await page.$eval('#main', (main) => main.innerText);
-  must(contractText.includes('Create contract draft') && contractText.includes('Contract list'), 'contract workflows are not translated');
+  must(contractText.includes('Create draft contract') && contractText.includes('Contract register'), 'contract workflows are not translated');
   await axe('contract workbench tiếng Anh');
   const approvalModule = await page.evaluate(async () => {
     const session = JSON.parse(sessionStorage.getItem('osp.session') || localStorage.getItem('osp.session') || 'null');
@@ -319,7 +319,7 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   await page.waitForSelector('#main h1');
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Bank reconciliation', 'bank reconciliation workbench is not translated');
   const bankReconciliationText = await page.$eval('#main', (main) => main.innerText);
-  must(bankReconciliationText.includes('Open bank statement') && bankReconciliationText.includes('Statement periods'), 'bank reconciliation workflow is not translated');
+  must(bankReconciliationText.includes('New bank statement') && bankReconciliationText.includes('Statement periods'), 'bank reconciliation workflow is not translated');
   await axe('bank reconciliation workbench tiếng Anh');
   await page.goto(`${BASE}/#/einvoices`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('#main h1');
