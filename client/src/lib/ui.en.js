@@ -126,7 +126,7 @@ const uiTextEnglish = {
   'Lương cơ bản': 'Base salary', 'Năm': 'Year', 'Kỳ': 'Period', 'Bảng lương': 'Payroll run', 'Lương gộp': 'Gross pay',
   'Khấu trừ': 'Deductions', 'Thực nhận': 'Net pay', 'Vị trí': 'Position', 'Ứng viên': 'Candidate', 'Học viên': 'Learner',
   'Tiến độ (%)': 'Progress (%)', 'Điểm': 'Score', 'Dự án': 'Project', 'Công việc': 'Task', 'Số giờ': 'Hours',
-  'Bắt đầu lúc': 'Starts at', 'Kết thúc lúc': 'Ends at', 'Lý do': 'Reason', 'Lô': 'Lot', 'Hạn dùng': 'Expiry date',
+  'Bắt đầu lúc': 'Starts at', 'Kết thúc lúc': 'Ends at', 'Lý do': 'Reason', 'Lô': 'Lot', 'Mã lô nhà cung cấp': 'Supplier lot code', 'Hạn dùng': 'Expiry date',
   'Tài sản': 'Asset', 'Vị trí': 'Location', 'Nhân viên': 'Employee', 'Phòng ban': 'Department', 'Chức danh': 'Job title',
   'Không tìm thấy dữ liệu này': 'Record type not found', 'Module có thể chưa được bật cho doanh nghiệp của bạn.': 'This module may not be enabled for your company.',
   'Về trang chủ': 'Back to home', 'Trang chủ': 'Home', 'Không thể tải màn hình': 'Could not load this screen',

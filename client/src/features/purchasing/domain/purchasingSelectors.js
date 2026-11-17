@@ -42,7 +42,7 @@ export function calculateReturnableLines(receipts, returns) {
   const received = new Map();
   for (const receipt of receipts.filter((row) => row.status === 'received')) {
     for (const line of receipt.lines || []) {
-      const key = orderPriceKeyOf(line);
+      const key = `${orderPriceKeyOf(line)}|${line.lot || ''}`;
       const entry = received.get(key) || { ...line, qty: 0 };
       entry.qty += Number(line.qty || 0);
       received.set(key, entry);
@@ -50,7 +50,7 @@ export function calculateReturnableLines(receipts, returns) {
   }
   for (const purchaseReturn of returns.filter((row) => ACTIVE_RETURN_STATUSES.has(row.status))) {
     for (const line of purchaseReturn.lines || []) {
-      const key = orderPriceKeyOf({ ...line, price: line.po_price ?? line.price });
+      const key = `${orderPriceKeyOf({ ...line, price: line.po_price ?? line.price })}|${line.lot || ''}`;
       const entry = received.get(key);
       if (entry) entry.qty = Math.max(0, entry.qty - Number(line.qty || 0));
     }

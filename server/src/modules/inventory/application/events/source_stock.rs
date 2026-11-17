@@ -318,7 +318,7 @@ pub async fn handle_source_stock_event(
         causation: Some(event_id),
         silent: false,
     };
-    let lot_entity = if source == "harvest" {
+    let lot_entity = if matches!(source, "harvest" | "purchase_receipt") {
         Some(kernel.ent(tenant, "inventory.lot")?)
     } else {
         None
@@ -401,6 +401,99 @@ pub async fn handle_source_stock_event(
                     })?
             };
             line["lot"] = json!(lot_id);
+        }
+        if source == "purchase_receipt"
+            && let Ok(product_id) = Uuid::parse_str(&product)
+            && tx
+                .query_opt(
+                    "SELECT COALESCE(lot_tracked, false) FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                    &[&tenant.id, &product_id],
+                )
+                .await?
+                .is_some_and(|row| row.get::<_, bool>(0))
+        {
+            let code = line
+                .get("lot_code")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|code| !code.is_empty())
+                .map(str::to_owned)
+                .ok_or_else(|| {
+                    crate::error::ApiError::validation(
+                        event_type,
+                        vec!["Lot-tracked receipts require a supplier lot code".into()],
+                    )
+                })?;
+            let expiry = line
+                .get("expiry")
+                .and_then(Value::as_str)
+                .filter(|value| !value.is_empty())
+                .map(str::to_owned);
+            let lock_key = format!("inventory.lot-code:{}:{}:{}", tenant.id, product_id, code);
+            tx.query_opt(
+                "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                &[&lock_key],
+            )
+            .await?;
+            let lot_id = if let Some(row) = tx
+                .query_opt(
+                    "SELECT id, expiry::text FROM inventory__lot WHERE tenant_id = $1 AND product = $2 AND code = $3 FOR SHARE",
+                    &[&tenant.id, &product_id, &code],
+                )
+                .await?
+            {
+                let existing_expiry: Option<String> = row.get(1);
+                if expiry
+                    .as_deref()
+                    .is_some_and(|value| Some(value) != existing_expiry.as_deref())
+                {
+                    return Err(crate::error::ApiError::validation(
+                        event_type,
+                        vec!["Supplier lot code already exists with a different expiry date".into()],
+                    ));
+                }
+                row.get::<_, Uuid>(0)
+            } else {
+                let mut lot_data = Map::new();
+                lot_data.insert("product".into(), json!(product_id));
+                lot_data.insert("code".into(), json!(code));
+                if let Some(expiry) = &expiry {
+                    lot_data.insert("expiry".into(), json!(expiry));
+                }
+                let lot = kernel
+                    .create_in(
+                        tx,
+                        &Actor::System,
+                        tenant,
+                        lot_entity.as_ref().ok_or_else(|| {
+                            crate::error::ApiError::internal(
+                                "Inventory lot entity is unavailable for a purchase receipt",
+                            )
+                        })?,
+                        lot_data,
+                        &opts,
+                    )
+                    .await?;
+                lot.get("id")
+                    .and_then(Value::as_str)
+                    .and_then(|id| Uuid::parse_str(id).ok())
+                    .ok_or_else(|| {
+                        crate::error::ApiError::internal("Created receipt lot has no valid id")
+                    })?
+            };
+            line["lot"] = json!(lot_id);
+            if let Some(receipt_id) = document
+                .get("id")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+            {
+                let lot_id_text = lot_id.to_string();
+                tx.execute(
+                    "UPDATE purchasing__purchase_receipt AS receipt SET lines = (SELECT jsonb_agg(CASE WHEN item->>'product' = $3 AND btrim(item->>'lot_code') = $4 THEN jsonb_set(item, '{lot}', to_jsonb($5::text), true) ELSE item END) FROM jsonb_array_elements(COALESCE(receipt.lines, '[]'::jsonb)) AS receipt_line(item)) WHERE tenant_id = $1 AND id = $2",
+                    &[&tenant.id, &receipt_id, &product, &code, &lot_id_text],
+                )
+                .await?;
+            }
         }
         let line_direction = if source == "stock_count" {
             line.get("direction")
