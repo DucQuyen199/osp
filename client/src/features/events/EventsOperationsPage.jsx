@@ -30,8 +30,10 @@ export default function EventsOperationsPage() {
     setLoading(true); setError('');
     try {
       const [eventRes, ticketRes, partyMap, taxMap] = await Promise.all([
-        loadAllResponse('events.event'), loadAllResponse('events.ticket'),
-        loadRefs('master-data.party'), loadRefs('master-data.tax'),
+        can('events.event.read') ? loadAllResponse('events.event') : Promise.resolve({ items: [] }),
+        can('events.ticket.read') ? loadAllResponse('events.ticket') : Promise.resolve({ items: [] }),
+        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
+        can('master-data.tax.read') ? loadRefs('master-data.tax') : Promise.resolve(new Map()),
       ]);
       const eventItems = eventRes.items || [];
       setEvents(eventItems.sort((a, b) => String(a.starts_at || '').localeCompare(String(b.starts_at || ''))));
