@@ -314,6 +314,19 @@
      "label": "Ghi chú",
      "type": "text",
      "required": false
+    },
+    {
+     "name": "status",
+     "type": "enum",
+     "required": false,
+     "options": [
+      "requested",
+      "confirmed",
+      "arrived",
+      "cancelled",
+      "no_show",
+      "completed"
+     ]
     }
    ],
    "states": {

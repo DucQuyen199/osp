@@ -1028,7 +1028,7 @@ async fn run(k: Arc<Kernel>, url: String, defs: PathBuf) {
         let rx = t
             .create(
                 "clinic.prescription",
-                json!({ "encounter": id(&enc), "warehouse": warehouse, "items": [{ "product": id(&drug), "qty": 20 }] }),
+                json!({ "encounter": id(&enc), "warehouse": warehouse, "items": [{ "product": id(&drug), "qty": 20, "dosage": "Take as directed" }] }),
             )
             .await;
         t.act("clinic.encounter", &id(&enc), "completed").await;

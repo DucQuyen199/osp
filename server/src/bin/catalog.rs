@@ -530,6 +530,35 @@ fn lint(
                 .iter()
                 .map(|field| field.name.as_str())
                 .collect::<HashSet<_>>();
+            if let Some(states) = &entity.states {
+                match entity.field(&states.field) {
+                    None => issues.push(format!(
+                        "[{id}] {qname}: state field {} is missing from fields",
+                        states.field
+                    )),
+                    Some(field) if field.ty != "enum" => issues.push(format!(
+                        "[{id}] {qname}: state field {} must be an enum",
+                        states.field
+                    )),
+                    Some(field) => {
+                        let options = field.options.as_deref().unwrap_or_default();
+                        let state_values = std::iter::once(states.initial.as_str()).chain(
+                            states.actions.values().flat_map(|transition| {
+                                std::iter::once(transition.to.as_str())
+                                    .chain(transition.from.iter().map(String::as_str))
+                            }),
+                        );
+                        for value in state_values {
+                            if !options.iter().any(|option| option == value) {
+                                issues.push(format!(
+                                    "[{id}] {qname}: state value {value} is missing from {} options",
+                                    states.field
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
             for computed in entity.computed.keys() {
                 if !field_names.contains(computed.as_str()) {
                     issues.push(format!(

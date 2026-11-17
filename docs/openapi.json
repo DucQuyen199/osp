@@ -4594,6 +4594,7 @@
               "draft",
               "submitted",
               "approved",
+              "applied",
               "rejected",
               "effective",
               "cancelled"
@@ -16026,6 +16027,18 @@
           },
           "starts_at": {
             "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "requested",
+              "confirmed",
+              "arrived",
+              "cancelled",
+              "no_show",
+              "completed"
+            ],
+            "readOnly": true,
             "type": "string"
           },
           "table": {

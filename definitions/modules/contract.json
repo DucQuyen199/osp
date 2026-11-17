@@ -188,6 +188,7 @@
           "draft",
           "submitted",
           "approved",
+          "applied",
           "rejected",
           "effective",
           "cancelled"
