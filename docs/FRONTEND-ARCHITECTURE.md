@@ -36,6 +36,7 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 - Keep business rules, API calls, and cross-module coordination out of presentational line editors and panels. Promote a component to `components/` only when more than one domain uses it.
 - The ecommerce order desk follows this boundary: `EcommerceOrderDeskPage` owns loading, permissions, API actions and cart state; `WebOrderCreateForm` edits controlled values through callbacks, and `WebOrderCard` renders an order and emits requested actions.
 - The school workbench keeps attendance persistence and permission checks in `EducationWorkbenchPage`; `AttendanceRosterTable` renders the roster and requests marks through a callback.
+- The school workbench owns class and session permissions, validation, and persistence; `CourseClassForm` and `ClassSessionForm` render controlled schedule fields and submit through callbacks.
 - The school workbench owns the atomic contact-and-student creation flow and pending-contact recovery; `StudentIntakeForm` renders controlled learner fields and submits through a callback.
 - The school workbench owns tuition issuance permissions and invoice actions; `TuitionLedgerTable` renders controlled fee and invoice records and emits issuance requests through a callback.
 - The school workbench owns grade filters, permissions and persistence; `GradebookSection` renders controlled class, term and subject filters with editable grade rows.
