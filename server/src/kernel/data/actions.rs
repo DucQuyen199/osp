@@ -16,6 +16,14 @@ impl Kernel {
     ) -> R<Value> {
         let qname = ent.qname();
         if matches!(actor, Actor::User { .. })
+            && ((qname == "consolidation.member" && matches!(action, "accepted" | "revoked"))
+                || (qname == "consolidation.shared_company" && action == "revoked"))
+        {
+            return Err(ApiError::forbidden(
+                "Company membership changes must use the tenant-consent endpoints",
+            ));
+        }
+        if matches!(actor, Actor::User { .. })
             && ((qname == "contract.amendment" && action == "applied")
                 || (qname == "contract.contract" && action == "amended")
                 || (qname == "workflow-approval.approval_request" && action == "cancelled"))

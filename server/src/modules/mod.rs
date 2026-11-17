@@ -14,6 +14,7 @@ pub mod case_management;
 pub mod charity;
 pub mod clinic;
 pub mod communication;
+pub mod consolidation;
 pub mod construction;
 pub mod contract;
 pub mod crm;

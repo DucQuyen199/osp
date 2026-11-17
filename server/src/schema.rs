@@ -26,6 +26,24 @@ CREATE TABLE IF NOT EXISTS osp_tenants (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS consolidation_invite_tokens (
+  tenant_id text NOT NULL REFERENCES osp_tenants(id) ON DELETE CASCADE,
+  member_id uuid NOT NULL,
+  token_hash text NOT NULL CHECK (token_hash ~ '^[a-f0-9]{64}$'),
+  expires_at timestamptz NOT NULL,
+  used_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (tenant_id, member_id)
+);
+CREATE INDEX IF NOT EXISTS consolidation_invite_expiry
+  ON consolidation_invite_tokens (tenant_id, expires_at) WHERE used_at IS NULL;
+ALTER TABLE consolidation_invite_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE consolidation_invite_tokens FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON consolidation_invite_tokens;
+CREATE POLICY tenant_isolation ON consolidation_invite_tokens
+  USING (tenant_id = current_setting('app.tenant_id', true))
+  WITH CHECK (tenant_id = current_setting('app.tenant_id', true));
+
 CREATE TABLE IF NOT EXISTS osp_idempotency_keys (
   tenant_id text NOT NULL REFERENCES osp_tenants(id) ON DELETE CASCADE,
   actor_id text NOT NULL,

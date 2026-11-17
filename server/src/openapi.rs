@@ -699,6 +699,50 @@ pub fn build(reg: &Registry) -> Value {
         } }),
     );
     paths.insert(
+        "/api/t/{tenantId}/consolidation/groups/{groupId}/invites".into(),
+        json!({ "post": {
+            "tags": ["consolidation"], "summary": "Invite another tenant to a company group", "security": sec,
+            "parameters": [tid, { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                "type": "object", "required": ["memberTenantId"], "additionalProperties": false,
+                "properties": { "memberTenantId": { "type": "string" } }
+            } } } },
+            "responses": with_common(Map::from_iter([("201".to_string(), json!({ "description": "One-time invite token, valid for 48 hours" })), ("409".to_string(), err("Tenant unavailable or already a member"))]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/consolidation/invites/accept".into(),
+        json!({ "post": {
+            "tags": ["consolidation"], "summary": "Accept a company-group invitation and grant consent", "security": sec,
+            "parameters": [tid],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                "type": "object", "required": ["ownerTenantId", "memberId", "inviteToken"], "additionalProperties": false,
+                "properties": { "ownerTenantId": { "type": "string" }, "memberId": { "type": "string", "format": "uuid" }, "inviteToken": { "type": "string" } }
+            } } } },
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Consent recorded in both tenant scopes" })), ("403".to_string(), err("Invitation token is invalid or expired")), ("409".to_string(), err("Invitation or consent has been revoked"))]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/consolidation/members/{memberId}/revoke".into(),
+        json!({ "post": {
+            "tags": ["consolidation"], "summary": "Revoke a company-group membership", "security": sec,
+            "parameters": [tid, { "name": "memberId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Membership revoked and outstanding invitation invalidated" }))]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/consolidation/shared/revoke".into(),
+        json!({ "post": {
+            "tags": ["consolidation"], "summary": "Revoke this tenant's consent to share company information", "security": sec,
+            "parameters": [tid],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                "type": "object", "required": ["ownerTenantId", "memberId"], "additionalProperties": false,
+                "properties": { "ownerTenantId": { "type": "string" }, "memberId": { "type": "string", "format": "uuid" } }
+            } } } },
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Consent revoked in both tenant scopes" })), ("404".to_string(), err("Membership not found"))]))
+        } }),
+    );
+    paths.insert(
         "/api/t/{tenantId}/auth/sessions".into(),
         json!({ "get": {
             "tags": ["auth"], "summary": "List the current user's active browser sessions", "security": sec,

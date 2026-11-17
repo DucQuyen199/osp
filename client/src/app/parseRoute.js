@@ -9,6 +9,7 @@ export function parseRoute(hash = location.hash) {
   if (a === 'reset-password' && b) return { name: 'reset-password', token: b };
   if (a === 'verify-email' && b) return { name: 'verify-email', token: b };
   if (a === 'm' && b) return { name: 'module', module: b };
+  if (a === 'consolidation') return { name: 'consolidation-workbench' };
   if (a === 'e' && b && c) return { name: 'entity', qname: `${b}.${c}`, id: d };
   if (WORKBENCH_ROUTES[a]) return { name: WORKBENCH_ROUTES[a] };
   if (a === 'reports' && b === 'accounting') return { name: 'accounting-reports' };

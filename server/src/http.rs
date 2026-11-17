@@ -857,6 +857,41 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
     };
 
     match (&method, rest.as_slice()) {
+        (&Method::POST, ["consolidation", "groups", group_id, "invites"]) => {
+            let body = json_obj(&bytes)?;
+            let result = k
+                .invite_company_group_member(&actor, &t, group_id, &s(&body, "memberTenantId"))
+                .await?;
+            return Ok(Reply::Json(201, result));
+        }
+        (&Method::POST, ["consolidation", "invites", "accept"]) => {
+            let body = json_obj(&bytes)?;
+            return json_ok(
+                k.accept_company_group_invite(
+                    &actor,
+                    &t,
+                    &s(&body, "ownerTenantId"),
+                    &s(&body, "memberId"),
+                    &s(&body, "inviteToken"),
+                )
+                .await?,
+            );
+        }
+        (&Method::POST, ["consolidation", "members", member_id, "revoke"]) => {
+            return json_ok(k.revoke_company_group_member(&actor, &t, member_id).await?);
+        }
+        (&Method::POST, ["consolidation", "shared", "revoke"]) => {
+            let body = json_obj(&bytes)?;
+            return json_ok(
+                k.revoke_shared_company(
+                    &actor,
+                    &t,
+                    &s(&body, "ownerTenantId"),
+                    &s(&body, "memberId"),
+                )
+                .await?,
+            );
+        }
         (&Method::GET, ["auth", "sessions"]) => {
             return json_ok(k.list_my_sessions(&t, &actor, &token).await?);
         }

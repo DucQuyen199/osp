@@ -84,6 +84,7 @@ const LmsWorkbenchPage = lazy(() => import('../features/education/LmsWorkbenchPa
 const QualityWorkbenchPage = lazy(() => import('../features/quality/QualityWorkbenchPage.jsx'));
 const CommunicationWorkbenchPage = lazy(() => import('../features/operations/CommunicationWorkbenchPage.jsx'));
 const PaymentsWorkbenchPage = lazy(() => import('../features/accounting/PaymentsWorkbenchPage.jsx'));
+const ConsolidationWorkbenchPage = lazy(() => import('../features/consolidation/ConsolidationWorkbenchPage.jsx'));
 const AssetWorkbenchPage = lazy(() => import('../features/accounting/AssetWorkbenchPage.jsx'));
 const ROUTES = Object.freeze({
   home: HomePage,
@@ -111,6 +112,7 @@ const ROUTES = Object.freeze({
   'quality-workbench': QualityWorkbenchPage,
   'communication-workbench': CommunicationWorkbenchPage,
   'payments-workbench': PaymentsWorkbenchPage,
+  'consolidation-workbench': ConsolidationWorkbenchPage,
   'asset-workbench': AssetWorkbenchPage,
   'utilities-workbench': UtilitiesWorkbenchPage,
   'finance-operations': FinanceOperationsPage,

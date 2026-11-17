@@ -28,6 +28,7 @@ async fn balanced_journals(context: &Ctx, minimum: usize) {
 #[async_recursion::async_recursion]
 pub(super) async fn run(kernel: &Arc<Kernel>) {
     manual_journal_approvals(kernel).await;
+    company_group_consent(kernel).await;
     {
         let context = Ctx::new(kernel, None, &["asset"]).await;
         let asset = context
@@ -205,6 +206,99 @@ pub(super) async fn run(kernel: &Arc<Kernel>) {
             "✔ payroll: attendance valuation, immutable calculation, approval and payment journals"
         );
     }
+}
+
+async fn company_group_consent(kernel: &Arc<Kernel>) {
+    let owner = Ctx::new(kernel, None, &["consolidation"]).await;
+    let member = Ctx::new(kernel, None, &["consolidation"]).await;
+    let currencies = owner.list("master-data.currency", &[]).await;
+    let usd = currencies
+        .iter()
+        .find(|currency| currency["code"] == "VND")
+        .unwrap_or_else(|| panic!("VND currency seed missing"));
+    let group = owner
+        .create(
+            "consolidation.company_group",
+            json!({ "name": "Test Group", "reporting_currency": usd["id"] }),
+        )
+        .await;
+    let invite = kernel
+        .invite_company_group_member(&owner.a, &owner.t, &id(&group), &member.t.id)
+        .await
+        .expect("create company group invite");
+    let member_id = invite["memberId"].as_str().unwrap();
+    let token = invite["inviteToken"].as_str().unwrap();
+
+    assert!(
+        kernel
+            .accept_company_group_invite(
+                &member.a,
+                &member.t,
+                &owner.t.id,
+                member_id,
+                "wrong-token",
+            )
+            .await
+            .is_err()
+    );
+    kernel
+        .accept_company_group_invite(&member.a, &member.t, &owner.t.id, member_id, token)
+        .await
+        .expect("member admin consents to invite");
+
+    let owner_record = owner.get("consolidation.member", member_id).await;
+    assert_eq!(owner_record["status"], "active");
+    let shares = member.list("consolidation.shared_company", &[]).await;
+    assert_eq!(shares.len(), 1);
+    assert_eq!(shares[0]["owner_tenant_id"], owner.t.id);
+
+    assert!(
+        kernel
+            .accept_company_group_invite(&member.a, &member.t, &owner.t.id, member_id, token,)
+            .await
+            .is_ok(),
+        "acceptance retry should be idempotent"
+    );
+    kernel
+        .revoke_shared_company(&member.a, &member.t, &owner.t.id, member_id)
+        .await
+        .expect("member admin revokes consent");
+    assert_eq!(
+        owner.get("consolidation.member", member_id).await["status"],
+        "revoked"
+    );
+    assert_eq!(
+        member
+            .get(
+                "consolidation.shared_company",
+                shares[0]["id"].as_str().unwrap()
+            )
+            .await["status"],
+        "revoked"
+    );
+
+    let second_invite = kernel
+        .invite_company_group_member(&owner.a, &owner.t, &id(&group), &member.t.id)
+        .await
+        .expect("create replacement invitation after revocation");
+    let second_member_id = second_invite["memberId"].as_str().unwrap();
+    kernel
+        .accept_company_group_invite(
+            &member.a,
+            &member.t,
+            &owner.t.id,
+            second_member_id,
+            second_invite["inviteToken"].as_str().unwrap(),
+        )
+        .await
+        .expect("member admin accepts replacement invite");
+    kernel
+        .revoke_company_group_member(&owner.a, &owner.t, second_member_id)
+        .await
+        .expect("owner admin revokes company membership");
+    let shares = member.list("consolidation.shared_company", &[]).await;
+    assert_eq!(shares.len(), 2);
+    assert!(shares.iter().all(|share| share["status"] == "revoked"));
 }
 
 async fn manual_journal_approvals(kernel: &Arc<Kernel>) {

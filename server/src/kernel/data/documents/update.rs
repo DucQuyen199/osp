@@ -13,6 +13,17 @@ impl Kernel {
         opts: &Opts,
     ) -> R<Value> {
         let qname = ent.qname();
+        if qname.starts_with("consolidation.")
+            && matches!(actor, Actor::User { .. })
+            && matches!(
+                qname.as_str(),
+                "consolidation.member" | "consolidation.shared_company"
+            )
+        {
+            return Err(ApiError::forbidden(
+                "Company membership records can only be changed through the consent endpoints",
+            ));
+        }
         if qname.starts_with("loyalty.") {
             crate::modules::loyalty::prepare_document(ent.def.name.as_str(), &mut patch);
         }

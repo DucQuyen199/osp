@@ -1,0 +1,66 @@
+{
+  "id": "consolidation",
+  "name": "Đa công ty",
+  "description": "Nhóm pháp nhân có sự đồng ý chia sẻ và cấu hình tiền tệ báo cáo hợp nhất.",
+  "category": "finance",
+  "version": "0.1.0",
+  "depends": ["accounting", "master-data"],
+  "core": false,
+  "entities": [
+    {
+      "name": "company_group",
+      "label": "Nhóm công ty",
+      "fields": [
+        { "name": "name", "type": "string", "required": true },
+        { "name": "reporting_currency", "type": "ref", "required": true, "ref": "master-data.currency" },
+        { "name": "description", "type": "text", "required": false }
+      ],
+      "states": null,
+      "computed": {},
+      "constraints": []
+    },
+    {
+      "name": "member",
+      "label": "Công ty thành viên",
+      "systemManaged": true,
+      "fields": [
+        { "name": "group", "type": "ref", "required": true, "ref": "consolidation.company_group" },
+        { "name": "member_tenant_id", "type": "string", "required": true },
+        { "name": "member_name", "type": "string", "required": true },
+        { "name": "status", "type": "enum", "required": false, "options": ["invited", "active", "revoked"] },
+        { "name": "consented_by", "type": "string", "required": false, "system": true },
+        { "name": "consented_at", "type": "string", "required": false, "system": true }
+      ],
+      "states": {
+        "field": "status",
+        "initial": "invited",
+        "actions": {
+          "accepted": { "from": ["invited"], "to": "active" },
+          "revoked": { "from": ["invited", "active"], "to": "revoked" }
+        }
+      },
+      "computed": {},
+      "constraints": []
+    },
+    {
+      "name": "shared_company",
+      "label": "Đơn vị đã chia sẻ",
+      "systemManaged": true,
+      "fields": [
+        { "name": "owner_tenant_id", "type": "string", "required": true },
+        { "name": "owner_member_id", "type": "string", "required": true },
+        { "name": "owner_name", "type": "string", "required": true },
+        { "name": "status", "type": "enum", "required": false, "options": ["active", "revoked"] }
+      ],
+      "states": {
+        "field": "status",
+        "initial": "active",
+        "actions": {
+          "revoked": { "from": ["active"], "to": "revoked" }
+        }
+      },
+      "computed": {},
+      "constraints": []
+    }
+  ]
+}
