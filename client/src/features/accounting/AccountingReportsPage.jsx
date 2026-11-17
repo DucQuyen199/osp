@@ -17,7 +17,7 @@ function ReportTable({ headers, rows }) {
   if (!rows.length) return <div className="empty"><h3>{uiText("Chưa có phát sinh")}</h3><p>{uiText("Không có dữ liệu trong khoảng ngày đã chọn.")}</p></div>;
   return <div className="table-wrap"><table className="table">
     <thead><tr>{headers.map((header) => <th key={header} scope="col">{uiText(header)}</th>)}</tr></thead>
-    <tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, index) => <td key={index} className={typeof cell === 'number' ? 'right money' : ''}>{typeof cell === 'number' ? fmtMoney(cell) : uiText(cell)}</td>)}</tr>)}</tbody>
+    <tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, index) => <td key={index} className={typeof cell === 'number' ? 'right money' : ''}>{typeof cell === 'number' ? fmtMoney(cell) : cell}</td>)}</tr>)}</tbody>
   </table></div>;
 }
 function Stat({ label, value }) {
@@ -44,7 +44,7 @@ function TaxDocumentTable({ rows }) {
           const tax = Number(line.base_tax_amount) || 0;
           const base = Number(line.base_net_amount) || 0;
           const name = line.product_name || line.name || line.description || line.product || uiText('Dòng chứng từ');
-          const rate = line.tax_rate == null ? uiText(line.tax_name || 'Chưa phân loại') : `${uiText(line.tax_name || 'Thuế')} · ${line.tax_rate}%`;
+          const rate = line.tax_rate == null ? (line.tax_name || uiText('Chưa phân loại')) : `${line.tax_name || uiText('Thuế')} · ${line.tax_rate}%`;
           return <tr key={`${document.id}:line:${index}`}><td>{name}</td><td>{rate}</td><td className="right money">{fmtMoney(base)}</td><td className="right money">{fmtMoney(tax)}</td></tr>;
         })}</tbody></table></div></details></td>
         <td className="right money">{fmtMoney(document.total)}</td>
@@ -154,7 +154,7 @@ export default function AccountingReportsPage() {
       {mode === 'trial' && <section className="card report-section"><div className="card-pad"><ReportTable headers={['Mã TK', 'Tài khoản', 'Dư Nợ đầu', 'Dư Có đầu', 'Phát sinh Nợ', 'Phát sinh Có', 'Dư Nợ cuối', 'Dư Có cuối']} rows={(report.accounts || []).map((row) => [row.code, row.name, num(row.openingDebit), num(row.openingCredit), num(row.periodDebit), num(row.periodCredit), num(row.closingDebit), num(row.closingCredit)])} /></div></section>}
       {mode === 'tax' && <>
         <div className="stats"><Stat label="Thuế đầu ra thuần" value={report.outputTax} /><Stat label="Thuế đầu vào thuần" value={report.inputTax} /><Stat label="Chênh lệch đầu ra - đầu vào" value={report.netTaxPosition} /></div>
-        <section className="card report-section"><div className="card-head"><h2>{uiText("Tổng hợp theo thuế suất")}</h2><span className="muted small">{uiText('{invoices} invoices · {credits} credit notes · {bills} bills · {debits} debit notes').replace('{invoices}', report.invoiceCount).replace('{credits}', report.creditNoteCount).replace('{bills}', report.billCount).replace('{debits}', report.debitNoteCount)}</span></div><div className="card-pad"><ReportTable headers={['Thuế', 'Thuế đầu ra', 'Cơ sở bán thuần', 'Thuế đầu vào', 'Cơ sở mua thuần', 'Thuế đầu ra thuần - đầu vào thuần']} rows={(report.byRate || []).map((row) => [row.taxRate == null ? `${uiText(row.taxName)} · ${uiText('chưa phân loại')}` : `${uiText(row.taxName)} · ${row.taxRate}%`, num(row.outputTax), num(row.taxableBase), num(row.inputTax), num(row.taxablePurchaseBase), num(row.netTaxPosition)])} /></div></section>
+        <section className="card report-section"><div className="card-head"><h2>{uiText("Tổng hợp theo thuế suất")}</h2><span className="muted small">{uiText('{invoices} invoices · {credits} credit notes · {bills} bills · {debits} debit notes').replace('{invoices}', report.invoiceCount).replace('{credits}', report.creditNoteCount).replace('{bills}', report.billCount).replace('{debits}', report.debitNoteCount)}</span></div><div className="card-pad"><ReportTable headers={['Thuế', 'Thuế đầu ra', 'Cơ sở bán thuần', 'Thuế đầu vào', 'Cơ sở mua thuần', 'Thuế đầu ra thuần - đầu vào thuần']} rows={(report.byRate || []).map((row) => [row.taxRate == null ? (row.taxName ? `${row.taxName} · ${uiText('chưa phân loại')}` : uiText('chưa phân loại')) : `${row.taxName || uiText('Thuế')} · ${row.taxRate}%`, num(row.outputTax), num(row.taxableBase), num(row.inputTax), num(row.taxablePurchaseBase), num(row.netTaxPosition)])} /></div></section>
         <section className="card report-section"><div className="card-head"><h2>{uiText("Chi tiết chứng từ thuế")}</h2><span className="muted small">{uiText("Mở rộng từng chứng từ để so sánh cơ sở tính thuế và tiền thuế.")}</span></div><div className="card-pad"><TaxDocumentTable rows={report.documents || []} /></div></section>
         <p className="muted small">{uiText("Sổ nội bộ tổng hợp theo ngày bút toán, gồm hóa đơn bán, credit note, bill mua và debit note đã ghi sổ. Đối chiếu thuế đầu vào với chứng từ và quy định trước khi kê khai.")}</p>
       </>}
