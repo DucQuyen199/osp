@@ -2,3 +2,4 @@
 mod application;
 mod domain;
 mod persistence;
+mod reports;

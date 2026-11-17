@@ -699,6 +699,16 @@ pub fn build(reg: &Registry) -> Value {
         } }),
     );
     paths.insert(
+        "/api/t/{tenantId}/consolidation/groups/{groupId}/trial-balance".into(),
+        json!({ "get": {
+            "tags": ["consolidation"], "summary": "Read a consent-verified, currency-converted group trial balance", "security": sec,
+            "parameters": [tid, { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+                { "name": "from", "in": "query", "schema": { "type": "string", "format": "date" } },
+                { "name": "to", "in": "query", "schema": { "type": "string", "format": "date" } }],
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Member trial balances and account-code totals in the group reporting currency; requires reciprocal consent and an available effective rate" })), ("409".to_string(), err("Member consent, currency rate, or accounting data is unavailable"))]))
+        } }),
+    );
+    paths.insert(
         "/api/t/{tenantId}/consolidation/groups/{groupId}/invites".into(),
         json!({ "post": {
             "tags": ["consolidation"], "summary": "Invite another tenant to a company group", "security": sec,

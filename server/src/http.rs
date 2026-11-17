@@ -857,6 +857,20 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
     };
 
     match (&method, rest.as_slice()) {
+        (&Method::GET, ["consolidation", "groups", group_id, "trial-balance"]) => {
+            let from = query
+                .iter()
+                .find(|(key, _)| key == "from")
+                .map(|(_, value)| value.as_str());
+            let to = query
+                .iter()
+                .find(|(key, _)| key == "to")
+                .map(|(_, value)| value.as_str());
+            return json_ok(
+                k.consolidated_trial_balance(&actor, &t, group_id, from, to)
+                    .await?,
+            );
+        }
         (&Method::POST, ["consolidation", "groups", group_id, "invites"]) => {
             let body = json_obj(&bytes)?;
             let result = k

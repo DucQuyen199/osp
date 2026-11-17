@@ -251,6 +251,13 @@ async fn company_group_consent(kernel: &Arc<Kernel>) {
     let shares = member.list("consolidation.shared_company", &[]).await;
     assert_eq!(shares.len(), 1);
     assert_eq!(shares[0]["owner_tenant_id"], owner.t.id);
+    let report = kernel
+        .consolidated_trial_balance(&owner.a, &owner.t, &id(&group), None, None)
+        .await
+        .expect("read reciprocal-consent group report");
+    assert_eq!(report["reportingCurrency"], "VND");
+    assert_eq!(report["companies"].as_array().unwrap().len(), 1);
+    assert_eq!(report["companies"][0]["tenantId"], member.t.id);
 
     assert!(
         kernel
@@ -299,6 +306,11 @@ async fn company_group_consent(kernel: &Arc<Kernel>) {
     let shares = member.list("consolidation.shared_company", &[]).await;
     assert_eq!(shares.len(), 2);
     assert!(shares.iter().all(|share| share["status"] == "revoked"));
+    let revoked_report = kernel
+        .consolidated_trial_balance(&owner.a, &owner.t, &id(&group), None, None)
+        .await
+        .expect("revoked members are excluded from the consolidated report");
+    assert!(revoked_report["companies"].as_array().unwrap().is_empty());
 }
 
 async fn manual_journal_approvals(kernel: &Arc<Kernel>) {
