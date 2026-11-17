@@ -8,6 +8,7 @@ import {
 } from '../../lib/state.js';
 import { listHref } from '../../lib/routes.js';
 import { AccountingJournalLines, FieldLines, InventoryLines } from './components/EntityLineEditors.jsx';
+import EntityFormView from './components/EntityFormView.jsx';
 
 const SYSTEM_MANAGED_FIELDS = {
   'events.event': ['ticket_tax_rate', 'ticket_tax_name'],
@@ -186,29 +187,20 @@ export default function EntityFormDialog({ qname, record, onClose, onSaved }) {
 
   const title = `${uiText(editing ? 'Sửa' : 'Tạo')} ${uiText(entityLabel(qname)).toLowerCase()}`;
   return <dialog ref={dialog} className="drawer" aria-labelledby="entity-form-title" onCancel={(event) => { event.preventDefault(); close(); }}>
-    <form className="drawer-form" noValidate onSubmit={save}>
-      <header className="drawer-head">
-        <div><h2 id="entity-form-title">{title}</h2><p className="faint">{uiText(definition.label)}</p></div>
-        <button className="btn btn-ghost btn-icon" type="button" aria-label={uiText('Đóng')} onClick={close}>×</button>
-      </header>
-      <div className="drawer-body stack">
-        {generalErrors.length > 0 && <div className="alert danger" role="alert"><strong>{uiText('Chưa lưu được')}</strong><ul>{generalErrors.map((message, index) => <li key={index}>{uiText(message)}</li>)}</ul></div>}
-        <div className="form-grid">
-          {fields.filter((field) => !SYSTEM_MANAGED_FIELDS[qname]?.includes(field.name)).map((field) => <div key={field.name} className={`field${['text', 'json'].includes(field.type) ? ' full' : ''}`}>
-            {field.type === 'bool' ? renderControl(field) : <>
-              <label htmlFor={`entity-field-${field.name}`}>{uiText(fieldLabelOf(qname, field.name))}{field.required && <><span className="req" aria-hidden="true">*</span><span className="sr-only"> ({uiText('bắt buộc')})</span></>}</label>
-              {renderControl(field)}
-            </>}
-            {errors[field.name] && <div className="error-text" id={`entity-field-${field.name}-error`}>{uiText(errors[field.name])}</div>}
-          </div>)}
-        </div>
-        {computed.length > 0 && <p className="hint">{uiText('Tự tính')}: {computed.map((field) => uiText(fieldLabelOf(qname, field.name))).join(', ')}.</p>}
-      </div>
-      <footer className="drawer-foot">
-        <button className="btn" type="button" disabled={saving} onClick={close}>{uiText('Hủy')}</button>
-        <button className="btn btn-primary" type="submit" disabled={saving}>{saving ? uiText('Đang lưu…') : editing ? uiText('Lưu thay đổi') : uiText('Tạo mới')}</button>
-      </footer>
-    </form>
+    <EntityFormView
+      qname={qname}
+      definition={definition}
+      fields={fields.filter((field) => !SYSTEM_MANAGED_FIELDS[qname]?.includes(field.name))}
+      computed={computed}
+      title={title}
+      editing={editing}
+      saving={saving}
+      errors={errors}
+      generalErrors={generalErrors}
+      renderControl={renderControl}
+      onSubmit={save}
+      onClose={close}
+    />
   </dialog>;
 }
 
