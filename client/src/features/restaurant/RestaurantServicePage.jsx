@@ -6,6 +6,7 @@ import { fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.j
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import restaurantEnglish from './restaurant.en.js';
+import RestaurantRecipesPanel from './components/RestaurantRecipesPanel.jsx';
 import RestaurantReservationsPanel from './components/RestaurantReservationsPanel.jsx';
 const t = (text) => uiTextWith(text, restaurantEnglish);
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -169,15 +170,19 @@ export default function RestaurantServicePage() {
   return <div className="page restaurant-service-page">
     <header className="page-head"><div><h1>{t('Phục vụ nhà hàng')}</h1><p className="muted">{t('Mở bàn, ghi món, gửi bếp, theo dõi món sẵn sàng và thanh toán.')}</p></div><button className="btn" onClick={() => load()} disabled={loading}>{t('Làm mới')}</button></header>
     {error && <div className="alert error" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
-    {can('restaurant.recipe.read') && <section className="card restaurant-recipes"><header className="restaurant-order-card-head"><div><h2>{t('Công thức món')}</h2><p className="small muted">{t('Định lượng nguyên liệu trên một lần nấu; kho trừ theo đơn vị gốc.')}</p></div>{can('restaurant.recipe.create') && <button className="btn" type="button" onClick={resetRecipe}>{t('Công thức mới')}</button>}</header>
-      {(can('restaurant.recipe.create') || can('restaurant.recipe.update')) && <form onSubmit={saveRecipe} className="restaurant-recipe-form">
-        <label className="field"><span>{t('Món trong thực đơn *')}</span><select className="select" required value={recipeProduct} disabled={Boolean(editingRecipe)} onChange={(event) => setRecipeProduct(event.target.value)}><option value="">{t('Chọn món')}</option>{recipeProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
-        <label className="field"><span>{t('Khẩu phần đầu ra *')}</span><input className="input num" type="number" min="0.000001" step="any" required value={recipeOutputQty} onChange={(event) => setRecipeOutputQty(event.target.value)} /></label>
-        <div className="restaurant-recipe-lines"><h3>{t('Nguyên liệu')}</h3>{recipeIngredients.map((line, index) => { const lineUnits = unitsFor(line.product); return <div className="row wrap" key={index}><select className="select" required aria-label={`${t('Nguyên liệu')} ${index + 1}`} value={line.product} onChange={(event) => setRecipeIngredients((current) => current.map((item, i) => i === index ? { ...item, product: event.target.value, uom: '' } : item))}><option value="">{t('Chọn nguyên liệu')}</option>{ingredientProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select><input className="input num" type="number" min="0.000001" step="any" required aria-label={`${t('Lượng nguyên liệu')} ${index + 1}`} value={line.qty} onChange={(event) => setRecipeIngredients((current) => current.map((item, i) => i === index ? { ...item, qty: event.target.value } : item))} />{lineUnits.length > 1 && <select className="select" aria-label={`${t('Đơn vị nguyên liệu')} ${index + 1}`} value={line.uom || products.get(line.product)?.uom || ''} onChange={(event) => setRecipeIngredients((current) => current.map((item, i) => i === index ? { ...item, uom: event.target.value } : item))}>{lineUnits.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` · ${unit.ratio} × ${t('đơn vị gốc')}` : ` · ${t('đơn vị gốc')}`}</option>)}</select>}{recipeIngredients.length > 1 && <button className="btn" type="button" aria-label={`${t('Xóa nguyên liệu')} ${index + 1}`} onClick={() => setRecipeIngredients((current) => current.filter((_, i) => i !== index))}>{t('Bỏ')}</button>}</div>; })}<button className="btn" type="button" onClick={() => setRecipeIngredients((current) => [...current, { product: '', qty: '1', uom: '' }])}>{t('Thêm nguyên liệu')}</button></div>
-        <div className="restaurant-actions"><button className="btn btn-primary" type="submit" disabled={busy === 'recipe' || !can(editingRecipe ? 'restaurant.recipe.update' : 'restaurant.recipe.create')}>{busy === 'recipe' ? t('Đang lưu…') : editingRecipe ? t('Lưu công thức') : t('Tạo công thức')}</button>{editingRecipe && <button className="btn" type="button" onClick={resetRecipe}>{t('Hủy sửa')}</button>}</div>
-      </form>}
-      <div className="restaurant-recipe-list">{recipes.map((recipe) => <article className="restaurant-recipe-card" key={recipe.id}><div><strong>{products.get(recipe.product)?.name || recipe.product}</strong><span className="small muted"> {recipe.output_qty || 1} {t('đơn vị đầu ra')} · {(recipe.ingredients || []).length} {t('nguyên liệu')}</span><div className="small muted">{(recipe.ingredients || []).map((ingredient) => `${products.get(ingredient.product)?.name || t('Nguyên liệu')} ${ingredient.qty} ${units.get(ingredient.uom)?.name || ''}`).join(' · ')}</div></div>{can('restaurant.recipe.update') && <button className="btn" type="button" onClick={() => editRecipe(recipe)}>{t('Sửa')}</button>}</article>)}{!recipes.length && <p className="small muted">{t('Chưa có công thức nào.')}</p>}</div>
-    </section>}
+    <RestaurantRecipesPanel
+      recipes={recipes} products={products} units={units} productOptions={recipeProducts}
+      ingredientProducts={ingredientProducts} unitsFor={unitsFor}
+      editingId={editingRecipe} productId={recipeProduct} outputQty={recipeOutputQty}
+      ingredients={recipeIngredients} busy={busy}
+      canRead={can('restaurant.recipe.read')} canCreate={can('restaurant.recipe.create')} canUpdate={can('restaurant.recipe.update')}
+      onSubmit={saveRecipe} onReset={resetRecipe} onProductChange={setRecipeProduct}
+      onOutputQtyChange={setRecipeOutputQty}
+      onIngredientChange={(index, field, value) => setRecipeIngredients((current) => current.map((item, rowIndex) => rowIndex === index ? { ...item, [field]: value, ...(field === 'product' ? { uom: '' } : {}) } : item))}
+      onAddIngredient={() => setRecipeIngredients((current) => [...current, { product: '', qty: '1', uom: '' }])}
+      onRemoveIngredient={(index) => setRecipeIngredients((current) => current.filter((_, rowIndex) => rowIndex !== index))}
+      onEdit={editRecipe} t={t}
+    />
     <RestaurantReservationsPanel
       reservations={reservations} tables={tables} form={reservationForm} busy={busy}
       permissions={{
