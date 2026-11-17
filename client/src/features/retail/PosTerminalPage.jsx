@@ -77,11 +77,17 @@ export default function PosTerminalPage() {
     try {
       const pharmacyEnabled = app.meta?.modules?.some((module) => module.id === 'pharmacy');
       const [warehouseMap, branchMap, productMap, unitMap, partyMap, taxMap, accountMap, sessionResponse, orderResponse, movementResponse, prescriptionResponse, returnResponse] = await Promise.all([
-        loadRefs('inventory.warehouse'), loadRefs('master-data.branch'),
-        loadRefs('master-data.product'), can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()), loadRefs('master-data.party'), loadRefs('master-data.tax'),
-        loadRefs('accounting.account'), loadAllResponse('pos.pos_session'),
-        loadAllResponse('pos.pos_order'), loadAllResponse('pos.cash_movement'),
-        pharmacyEnabled ? loadAllResponse('pharmacy.prescription') : Promise.resolve({ items: [] }),
+        can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
+        can('master-data.branch.read') ? loadRefs('master-data.branch') : Promise.resolve(new Map()),
+        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
+        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
+        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
+        can('master-data.tax.read') ? loadRefs('master-data.tax') : Promise.resolve(new Map()),
+        can('accounting.account.read') ? loadRefs('accounting.account') : Promise.resolve(new Map()),
+        can('pos.pos_session.read') ? loadAllResponse('pos.pos_session') : Promise.resolve({ items: [] }),
+        can('pos.pos_order.read') ? loadAllResponse('pos.pos_order') : Promise.resolve({ items: [] }),
+        can('pos.cash_movement.read') ? loadAllResponse('pos.cash_movement') : Promise.resolve({ items: [] }),
+        pharmacyEnabled && can('pharmacy.prescription.read') ? loadAllResponse('pharmacy.prescription') : Promise.resolve({ items: [] }),
         can('pos.pos_return.read') ? loadAllResponse('pos.pos_return') : Promise.resolve({ items: [] }),
       ]);
       setWarehouses(warehouseMap);
