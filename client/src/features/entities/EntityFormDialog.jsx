@@ -4,7 +4,7 @@ import { ApiError, api, dataPath } from '../../lib/api.js';
 import { toast } from '../../lib/feedback.js';
 import { uiText } from '../../lib/i18n.js';
 import {
-  entity, entityLabel, fieldLabelOf, invalidateRefs, loadRefs,
+  can, entity, entityLabel, fieldLabelOf, invalidateRefs, loadRefs,
 } from '../../lib/state.js';
 import EntityFieldControl from './components/EntityFieldControl.jsx';
 import EntityFormView from './components/EntityFormView.jsx';
@@ -45,7 +45,8 @@ export default function EntityFormDialog({ qname, record, onClose, onSaved }) {
   useEffect(() => {
     let active = true;
     Promise.all([...new Set(fields.filter((field) => field.type === 'ref').map((field) => field.ref))]
-      .map(async (ref) => [ref, await loadRefs(ref)]))
+      .filter((ref) => can(`${ref}.read`))
+      .map(async (ref) => [ref, await loadRefs(ref).catch(() => new Map())]))
       .then((entries) => { if (active) setReferences(Object.fromEntries(entries)); });
     return () => { active = false; };
   }, [fields]);

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, tenantPath } from '../../../lib/api.js';
 import { fmtMoney, statusLabel, uiText } from '../../../lib/i18n.js';
-import { fieldLabelOf, loadRefs, recordLabel } from '../../../lib/state.js';
+import { can, fieldLabelOf, loadRefs, recordLabel } from '../../../lib/state.js';
 
 export function FieldLines({ qname, value, onChange, priceList, salesOrder, purchaseOrder, inspection }) {
   const discountEnabled = qname.startsWith('sales.') || qname === 'crm.deal';
@@ -32,10 +32,12 @@ export function FieldLines({ qname, value, onChange, priceList, salesOrder, purc
 
   useEffect(() => {
     let active = true;
-    const requests = [loadRefs('master-data.product')];
-    if (discountEnabled) requests.push(loadRefs('master-data.tax'));
-    if (lotEnabled) requests.push(loadRefs('inventory.lot'));
-    Promise.all(requests).then((loaded) => {
+    const refs = ['master-data.product'];
+    if (discountEnabled) refs.push('master-data.tax');
+    if (lotEnabled) refs.push('inventory.lot');
+    Promise.all(refs.map(async (ref) => can(`${ref}.read`)
+      ? loadRefs(ref).catch(() => new Map())
+      : new Map())).then((loaded) => {
       if (!active) return;
       setProducts(loaded[0]);
       if (discountEnabled) setTaxes(loaded[1] || new Map());
@@ -104,7 +106,10 @@ export function InventoryLines({ value, countMode, onChange, fromWarehouse, toWa
 
   useEffect(() => {
     let active = true;
-    Promise.all([loadRefs('master-data.product'), loadRefs('inventory.lot'), loadRefs('inventory.warehouse_location')]).then(([productMap, lotMap, locationMap]) => {
+    const refs = ['master-data.product', 'inventory.lot', 'inventory.warehouse_location'];
+    Promise.all(refs.map(async (ref) => can(`${ref}.read`)
+      ? loadRefs(ref).catch(() => new Map())
+      : new Map())).then(([productMap, lotMap, locationMap]) => {
       if (active) { setProducts(productMap); setLots(lotMap); setLocations(locationMap); }
     });
     return () => { active = false; };
@@ -158,7 +163,10 @@ export function AccountingJournalLines({ value, onChange }) {
 
   useEffect(() => {
     let active = true;
-    Promise.all([loadRefs('accounting.account'), loadRefs('hrm.department')]).then(([accountMap, departmentMap]) => {
+    const refs = ['accounting.account', 'hrm.department'];
+    Promise.all(refs.map(async (ref) => can(`${ref}.read`)
+      ? loadRefs(ref).catch(() => new Map())
+      : new Map())).then(([accountMap, departmentMap]) => {
       if (active) { setAccounts(accountMap); setDepartments(departmentMap); }
     });
     return () => { active = false; };

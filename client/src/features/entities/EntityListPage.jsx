@@ -64,9 +64,10 @@ export default function EntityListPage({ qname }) {
     if (debouncedQuery) params.set('q', debouncedQuery);
     const refsToLoad = new Set(columns.filter((field) => field.type === 'ref').map((field) => field.ref));
     if (qname.startsWith('accounting.')) refsToLoad.add('master-data.currency');
+    for (const ref of refsToLoad) if (!can(`${ref}.read`)) refsToLoad.delete(ref);
     Promise.all([
       api(`${dataPath(qname)}?${params}`, { signal: controller.signal }),
-      Promise.all([...refsToLoad].map(async (ref) => [ref, await loadRefs(ref)])),
+      Promise.all([...refsToLoad].map(async (ref) => [ref, await loadRefs(ref).catch(() => new Map())])),
     ]).then(([result, loadedRefs]) => {
       if (!active) return;
       setRows(result.items);
