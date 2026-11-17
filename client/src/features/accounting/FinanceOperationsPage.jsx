@@ -12,7 +12,7 @@ const defaultFirstDueDate = () => addCalendarMonths(today(), 1);
 const money = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 2 });
 const actions = async (qname, row, action) => api(dataPath(qname, row.id, action), { method: 'POST' });
 export default function FinanceOperationsPage() {
-  useDocumentTitle(`${uiText(uiText("Điều hành cho vay và bảo hiểm"))} · OSP Suite`);
+  useDocumentTitle(`${uiText('Điều hành cho vay và bảo hiểm')} · OSP Suite`);
   const [parties, setParties] = useState(new Map());
   const [accounts, setAccounts] = useState([]);
   const [loans, setLoans] = useState([]);
