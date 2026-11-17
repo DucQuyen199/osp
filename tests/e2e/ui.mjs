@@ -147,6 +147,15 @@ await step('đăng nhập + tạo doanh nghiệp: accessibility', async () => {
   await axe('tạo doanh nghiệp');
 });
 
+await step('OIDC callback lỗi nhà cung cấp: thông báo và khả năng phục hồi', async () => {
+  await page.goto(`${BASE}/oidc-callback.html?error=access_denied`, { waitUntil: 'networkidle0' });
+  await page.waitForSelector('.alert[role="alert"]');
+  await axe('OIDC callback lỗi');
+  must(await page.$eval('.alert[role="alert"]', (alert) => alert.textContent.includes('access_denied')), 'provider error was not shown');
+  await page.click('a[href="/#/login"]');
+  await page.waitForFunction(() => location.hash === '#/login');
+});
+
 await step('dùng thử -> trang chủ có số liệu', async () => {
   await page.goto(`${BASE}/?demo=retail&go=/`, { waitUntil: 'networkidle0' });
   await page.waitForSelector('.stat');
