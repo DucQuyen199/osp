@@ -2,12 +2,11 @@
 import { localDateTime as businessDateTime, localDateTimeToIso } from '../../lib/dates.js';
 import { ApiError, api, dataPath } from '../../lib/api.js';
 import { toast } from '../../lib/feedback.js';
-import { statusLabel, uiText } from '../../lib/i18n.js';
+import { uiText } from '../../lib/i18n.js';
 import {
-  entity, entityLabel, fieldLabelOf, invalidateRefs, loadRefs, recordLabel,
+  entity, entityLabel, fieldLabelOf, invalidateRefs, loadRefs,
 } from '../../lib/state.js';
-import { listHref } from '../../lib/routes.js';
-import { AccountingJournalLines, FieldLines, InventoryLines } from './components/EntityLineEditors.jsx';
+import EntityFieldControl from './components/EntityFieldControl.jsx';
 import EntityFormView from './components/EntityFormView.jsx';
 
 const SYSTEM_MANAGED_FIELDS = {
@@ -144,47 +143,6 @@ export default function EntityFormDialog({ qname, record, onClose, onSaved }) {
     }
   };
 
-  const renderControl = (field) => {
-    const id = `entity-field-${field.name}`;
-    const common = {
-      id,
-      ref: (node) => { inputRefs.current[field.name] = node; },
-      'aria-invalid': errors[field.name] ? 'true' : undefined,
-      'aria-describedby': errors[field.name] ? `${id}-error` : undefined,
-    };
-    if (field.type === 'bool') return <label className="check" htmlFor={id}>
-      <input {...common} type="checkbox" checked={Boolean(values[field.name])} onChange={(event) => setValue(field.name, event.target.checked)} />
-      {fieldLabelOf(qname, field.name)}
-    </label>;
-    if (field.type === 'json' && (field.name === 'adjustment_lines' || (field.name === 'lines' && qname === 'inventory.stock_transfer')))
-      return <div {...common}><InventoryLines value={values[field.name]} countMode={field.name === 'adjustment_lines'} fromWarehouse={field.name === 'adjustment_lines' ? values.warehouse : values.from_warehouse} toWarehouse={values.to_warehouse} onChange={(value) => setValue(field.name, value.length ? value : undefined)} /></div>;
-    if (field.type === 'json' && field.name === 'lines' && qname === 'accounting.journal_entry')
-      return <div {...common}><AccountingJournalLines value={values[field.name]} onChange={(value) => setValue(field.name, value.length ? value : undefined)} /></div>;
-    if (field.type === 'json' && field.name === 'lines')
-      return <div {...common}><FieldLines qname={qname} value={values[field.name]} onChange={(value) => setValue(field.name, value.length ? value : undefined)}
-        priceList={values.price_list} salesOrder={values.sales_order} purchaseOrder={values.purchase_order} inspection={values.inspection} /></div>;
-    if (field.type === 'enum') return <select {...common} className="select" value={values[field.name] ?? ''} onChange={(event) => setValue(field.name, event.target.value || undefined)}>
-      <option value="">{field.required ? uiText('— Chọn —') : uiText('— Không chọn —')}</option>
-      {(field.options || []).map((option) => <option key={option} value={option}>{statusLabel(option)}</option>)}
-    </select>;
-    if (field.type === 'ref') return <>
-      <select {...common} className="select" value={values[field.name] ?? ''} onChange={(event) => setValue(field.name, event.target.value || undefined)}>
-        <option value="">{field.required ? uiText('— Chọn —') : uiText('— Không chọn —')}</option>
-        {[...(references[field.ref]?.values() || [])].map((item) => <option key={item.id} value={item.id}>{recordLabel(field.ref, item)}</option>)}
-      </select>
-      <div className="hint"><a href={listHref(field.ref)}>Quản lý {entityLabel(field.ref).toLowerCase()}</a></div>
-    </>;
-    if (field.type === 'json') return <textarea {...common} className="textarea mono" value={fieldValue(field)} placeholder={uiText('[] hoặc {}')} spellCheck="false" onChange={(event) => setValue(field.name, event.target.value)} />;
-    if (field.type === 'text') return <textarea {...common} className="textarea" value={values[field.name] ?? ''} onChange={(event) => setValue(field.name, event.target.value)} />;
-    const types = { date: 'date', datetime: 'datetime-local', number: 'number', money: 'number' };
-    return <input {...common} className={['number', 'money'].includes(field.type) ? 'input num' : 'input'}
-      type={field.name === 'email' ? 'email' : types[field.type] || 'text'}
-      step={['number', 'money'].includes(field.type) ? 'any' : undefined}
-      inputMode={['number', 'money'].includes(field.type) ? 'decimal' : undefined}
-      autoComplete={field.name === 'email' ? 'email' : 'off'}
-      value={fieldValue(field)} onChange={(event) => setValue(field.name, event.target.value)} />;
-  };
-
   const title = `${uiText(editing ? 'Sửa' : 'Tạo')} ${uiText(entityLabel(qname)).toLowerCase()}`;
   return <dialog ref={dialog} className="drawer" aria-labelledby="entity-form-title" onCancel={(event) => { event.preventDefault(); close(); }}>
     <EntityFormView
@@ -197,7 +155,16 @@ export default function EntityFormDialog({ qname, record, onClose, onSaved }) {
       saving={saving}
       errors={errors}
       generalErrors={generalErrors}
-      renderControl={renderControl}
+      renderControl={(field) => <EntityFieldControl
+        qname={qname}
+        field={field}
+        displayValue={fieldValue(field)}
+        references={references}
+        values={values}
+        error={errors[field.name]}
+        inputRef={(node) => { inputRefs.current[field.name] = node; }}
+        onChange={setValue}
+      />}
       onSubmit={save}
       onClose={close}
     />
