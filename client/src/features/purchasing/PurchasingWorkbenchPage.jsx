@@ -17,6 +17,7 @@ import PurchaseOrderSummary from './components/PurchaseOrderSummary.jsx';
 import {
   calculateInvoiceableLines,
   calculateReturnableLines,
+  calculateSupplierInvoiceDraftTotals,
   invoiceLineForReturn as findInvoiceLineForReturn,
   keyOf,
   lineValue,
@@ -130,17 +131,6 @@ export default function PurchasingWorkbenchPage() {
     () => calculateInvoiceableLines(selectedReceipts, selectedSupplierInvoices, invoiceableReturns),
     [selectedReceipts, selectedSupplierInvoices, invoiceableReturns],
   );
-  const invoiceAdjustmentTotals = invoiceAdjustments.reduce((totals, line) => {
-    const amount = Number(line.amount) || 0;
-    const rate = Number(taxById.get(line.tax)?.rate) || 0;
-    const sign = line.kind === 'discount' ? -1 : 1;
-    return { net: totals.net + amount * sign, tax: totals.tax + amount * rate / 100 * sign };
-  }, { net: 0, tax: 0 });
-  const invoiceAdjustmentsInvalid = invoiceAdjustments.some((line) => {
-    const hasAnyValue = line.description.trim() || line.amount !== '';
-    return Boolean(hasAnyValue) && (!line.description.trim() || Number(line.amount) <= 0
-      || (line.allocation === 'landed_cost' && (line.kind !== 'charge' || !(line.receipt_ids || []).length)));
-  });
   const baseCurrencyCode = String(app.meta?.settings?.baseCurrency || 'VND').toUpperCase();
   const baseCurrency = [...currencies.values()].find((currency) => String(currency.code || '').toUpperCase() === baseCurrencyCode);
   const supplierInvoiceCurrency = currencies.get(supplierInvoiceForm.currency);
@@ -148,17 +138,17 @@ export default function PurchasingWorkbenchPage() {
   const supplierInvoiceRate = supplierInvoiceIsBaseCurrency ? 1 : currencyRates
     .filter((rate) => rate.from_currency === supplierInvoiceForm.currency && rate.to_currency === baseCurrency?.id && String(rate.effective_date || '') <= supplierInvoiceForm.issue_date)
     .sort((left, right) => String(right.effective_date || '').localeCompare(String(left.effective_date || '')))[0]?.rate;
-  const invoiceForeignPriceMissing = !supplierInvoiceIsBaseCurrency && invoiceableLines.some((line) => Number(invoiceQuantities[keyOf(line)] ?? line.qty) > 0 && !String(invoicePrices[keyOf(line)] ?? '').trim());
-  const invoiceableTotal = invoiceableLines.reduce((sum, line) => {
-    const key = keyOf(line);
-    const price = invoicePrices[key] ?? (supplierInvoiceIsBaseCurrency ? line.price : 0);
-    return sum + lineValue({ ...line, qty: invoiceQuantities[key] ?? line.qty, price, tax: invoiceTaxes[key] ?? line.tax }, taxById);
-  }, 0) + invoiceAdjustmentTotals.net + invoiceAdjustmentTotals.tax;
-  const invoiceableVariance = (invoiceableLines.reduce((sum, line) => {
-    const key = keyOf(line);
-    const price = Number(invoicePrices[key] ?? (supplierInvoiceIsBaseCurrency ? line.price : 0));
-    return sum + (price - Number(line.price)) * Number(invoiceQuantities[key] ?? line.qty);
-  }, 0) + invoiceAdjustmentTotals.net) * Number(supplierInvoiceRate || 0);
+  const invoiceDraftTotals = useMemo(() => calculateSupplierInvoiceDraftTotals({
+    lines: invoiceableLines,
+    quantities: invoiceQuantities,
+    prices: invoicePrices,
+    taxesById: taxById,
+    taxChoices: invoiceTaxes,
+    adjustments: invoiceAdjustments,
+    isBaseCurrency: supplierInvoiceIsBaseCurrency,
+    exchangeRate: supplierInvoiceRate,
+  }), [invoiceableLines, invoiceQuantities, invoicePrices, taxById, invoiceTaxes, invoiceAdjustments, supplierInvoiceIsBaseCurrency, supplierInvoiceRate]);
+  const { adjustmentsInvalid: invoiceAdjustmentsInvalid, foreignPriceMissing: invoiceForeignPriceMissing, total: invoiceableTotal, variance: invoiceableVariance } = invoiceDraftTotals;
   const approvalByOrder = useMemo(() => new Map(approvalRequests.filter((row) => row.entity === 'purchasing.purchase_order').map((row) => [row.record_id, row])), [approvalRequests]);
   const approvalByRequisition = useMemo(() => new Map(approvalRequests.filter((row) => row.entity === 'purchasing.purchase_requisition').map((row) => [row.record_id, row])), [approvalRequests]);
   const orderByRequisition = useMemo(() => new Map(orders.filter((row) => row.source === 'purchase_requisition').map((row) => [row.source_id, row])), [orders]);

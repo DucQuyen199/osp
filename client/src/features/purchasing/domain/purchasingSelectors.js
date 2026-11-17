@@ -100,3 +100,54 @@ export function calculateInvoiceableLines(receipts, invoices, returns) {
     .map(([key, line]) => ({ ...line, qty: Math.max(0, line.qty - (reserved.get(key) || 0)) }))
     .filter((line) => line.qty > 0.000001);
 }
+
+export function calculateSupplierInvoiceDraftTotals({
+  lines,
+  quantities,
+  prices,
+  taxesById,
+  taxChoices,
+  adjustments,
+  isBaseCurrency,
+  exchangeRate,
+}) {
+  const adjustmentTotals = adjustments.reduce((totals, line) => {
+    const amount = Number(line.amount) || 0;
+    const rate = Number(taxesById.get(line.tax)?.rate) || 0;
+    const sign = line.kind === 'discount' ? -1 : 1;
+    return {
+      net: totals.net + amount * sign,
+      tax: totals.tax + amount * rate / 100 * sign,
+    };
+  }, { net: 0, tax: 0 });
+
+  const adjustmentsInvalid = adjustments.some((line) => {
+    const hasAnyValue = line.description.trim() || line.amount !== '';
+    return Boolean(hasAnyValue) && (!line.description.trim() || Number(line.amount) <= 0
+      || (line.allocation === 'landed_cost' && (line.kind !== 'charge' || !(line.receipt_ids || []).length)));
+  });
+
+  const foreignPriceMissing = !isBaseCurrency && lines.some((line) => {
+    const key = keyOf(line);
+    return Number(quantities[key] ?? line.qty) > 0 && !String(prices[key] ?? '').trim();
+  });
+
+  const total = lines.reduce((sum, line) => {
+    const key = keyOf(line);
+    const price = prices[key] ?? (isBaseCurrency ? line.price : 0);
+    return sum + lineValue({
+      ...line,
+      qty: quantities[key] ?? line.qty,
+      price,
+      tax: taxChoices[key] ?? line.tax,
+    }, taxesById);
+  }, 0) + adjustmentTotals.net + adjustmentTotals.tax;
+
+  const variance = (lines.reduce((sum, line) => {
+    const key = keyOf(line);
+    const price = Number(prices[key] ?? (isBaseCurrency ? line.price : 0));
+    return sum + (price - Number(line.price)) * Number(quantities[key] ?? line.qty);
+  }, 0) + adjustmentTotals.net) * Number(exchangeRate || 0);
+
+  return { adjustmentTotals, adjustmentsInvalid, foreignPriceMissing, total, variance };
+}

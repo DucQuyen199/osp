@@ -77,6 +77,7 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 - The pharmacy workbench owns prescription validation, status transitions and persistence; `PrescriptionForm` renders controlled prescription details and medicine lines for new records or editable drafts, and emits updates through callbacks.
 - The contract workbench owns contract and amendment permissions, API actions, and workflow state; `ContractDraftForm` renders controlled draft fields and emits field changes, while `ContractRegisterTable` renders the selectable register and emits selection changes.
 - The approval workbench owns rule persistence, request decisions, and authorization checks; `ApprovalApproverPicker` renders controlled role and user selections through callbacks.
+- The purchasing workbench owns invoice draft state and persistence; `purchasingSelectors.js` derives received, returnable and invoiceable quantities plus supplier-invoice totals, tax, foreign-price completeness, and purchase-price variance outside the React page.
 
 ## Styling layers
 
