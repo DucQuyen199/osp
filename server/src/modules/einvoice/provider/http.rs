@@ -76,13 +76,23 @@ impl HttpEInvoiceProvider {
         Ok(endpoint)
     }
 
-    async fn send_json(&self, url: Url, body: Value, idempotency_key: Option<&str>) -> R<Value> {
-        let mut request = self.client.post(url).json(&body);
+    async fn send_json(
+        &self,
+        url: Url,
+        tenant_id: &str,
+        body: Value,
+        idempotency_key: Option<&str>,
+    ) -> R<Value> {
+        let mut request = self
+            .client
+            .post(url)
+            .header("X-OSP-Tenant-ID", tenant_id)
+            .json(&body);
         if let Some(token) = &self.bearer_token {
             request = request.bearer_auth(token);
         }
         if let Some(key) = idempotency_key {
-            request = request.header("Idempotency-Key", key);
+            request = request.header("Idempotency-Key", format!("{tenant_id}:{key}"));
         }
         let response = request.send().await.map_err(|_| {
             ApiError::new(
@@ -148,13 +158,14 @@ impl EInvoiceProvider for HttpEInvoiceProvider {
 
     fn issue<'a>(
         &'a self,
-        _tenant_id: &'a str,
+        tenant_id: &'a str,
         request: &'a Value,
     ) -> BoxFuture<'a, R<IssueResult>> {
         Box::pin(async move {
             let response = self
                 .send_json(
                     self.endpoint.clone(),
+                    tenant_id,
                     request.clone(),
                     request.get("idempotency_key").and_then(Value::as_str),
                 )
@@ -191,7 +202,7 @@ impl EInvoiceProvider for HttpEInvoiceProvider {
 
     fn cancel<'a>(
         &'a self,
-        _tenant_id: &'a str,
+        tenant_id: &'a str,
         provider_reference: &'a str,
         reason: &'a str,
     ) -> BoxFuture<'a, R<CancellationResult>> {
@@ -207,6 +218,7 @@ impl EInvoiceProvider for HttpEInvoiceProvider {
             let response = self
                 .send_json(
                     self.cancellation_endpoint(provider_reference)?,
+                    tenant_id,
                     json!({ "reason": reason }),
                     Some(&idempotency_key),
                 )
