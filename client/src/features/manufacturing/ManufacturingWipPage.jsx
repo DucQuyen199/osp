@@ -11,6 +11,7 @@ import ProductionInspectionQueue from './components/ProductionInspectionQueue.js
 import ManufacturingWipReport from './components/ManufacturingWipReport.jsx';
 import ConditionalAcceptancePanel from './components/ConditionalAcceptancePanel.jsx';
 import ProductionDispositionPanel from './components/ProductionDispositionPanel.jsx';
+import BillOfMaterialsSection from './components/BillOfMaterialsSection.jsx';
 const t = (text) => uiTextWith(text, manufacturingEnglish);
 const today = localDate;
 const qty = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
@@ -277,16 +278,28 @@ export default function ManufacturingWipPage() {
     {notice && <div className="alert success" role="status">{t(notice)}</div>}
     <section className="card card-pad manufacturing-workbench">
       <header className="card-head"><div><h2>{t("BOM và lệnh sản xuất")}</h2><p className="small muted">{t("Lập định mức, giữ lịch sử BOM đã dùng, xuất vật tư khi bắt đầu và chuyển thành phẩm sang QC khi hoàn tất.")}</p></div></header>
-      {can('manufacturing.bom.read') && <div className="manufacturing-bom-area">
-        {(can('manufacturing.bom.create') || can('manufacturing.bom.update')) && <form className="manufacturing-form" onSubmit={saveBom}>
-          <h3>{editingBom ? t("Sửa BOM") : t("Tạo BOM")}</h3>
-          <label className="field"><span>{t("Thành phẩm *")}</span><select className="select" required value={bomProduct} disabled={Boolean(editingBom)} onChange={(event) => setBomProduct(event.target.value)}><option value="">{t("Chọn thành phẩm")}</option>{[...products.values()].filter((product) => product.active !== false && product.kind !== 'service').map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
-          <label className="field"><span>{t("Sản lượng định mức *")}</span><input className="input num" type="number" min="0.000001" step="any" required value={bomOutputQty} onChange={(event) => setBomOutputQty(event.target.value)} /></label>
-          <div className="manufacturing-lines"><h4>{t("Nguyên vật liệu")}</h4>{components.map((component, index) => { const options = unitsFor(component.product); return <div className="manufacturing-line" key={index}><select className="select" required aria-label={`Vật tư BOM ${index + 1}`} value={component.product} onChange={(event) => setComponents((rows) => rows.map((row, i) => i === index ? { ...row, product: event.target.value, uom: '' } : row))}><option value="">{t("Chọn vật tư")}</option>{[...products.values()].filter((product) => product.active !== false && product.kind !== 'service').map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select><input className="input num" type="number" min="0.000001" step="any" aria-label={`Số lượng vật tư ${index + 1}`} required value={component.qty} onChange={(event) => setComponents((rows) => rows.map((row, i) => i === index ? { ...row, qty: event.target.value } : row))} />{options.length > 1 && <select className="select" aria-label={`Đơn vị vật tư ${index + 1}`} value={component.uom || products.get(component.product)?.uom || ''} onChange={(event) => setComponents((rows) => rows.map((row, i) => i === index ? { ...row, uom: event.target.value } : row))}>{options.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` · ${unit.ratio} × ${t("đơn vị gốc")}` : ` · ${t("đơn vị gốc")}`}</option>)}</select>}{components.length > 1 && <button className="btn btn-ghost btn-sm" type="button" onClick={() => setComponents((rows) => rows.filter((_, i) => i !== index))}>{t("Bỏ")}</button>}</div>; })}<button className="btn btn-secondary btn-sm" type="button" onClick={() => setComponents((rows) => [...rows, { product: '', qty: '1', uom: '' }])}>{t("Thêm vật tư")}</button></div>
-          <div className="row wrap"><button className="btn btn-primary" type="submit" disabled={busy === 'bom' || !can(editingBom ? 'manufacturing.bom.update' : 'manufacturing.bom.create')}>{busy === 'bom' ? t("Đang lưu…") : editingBom ? t("Lưu BOM") : t("Tạo BOM")}</button>{editingBom && <button className="btn btn-ghost" type="button" onClick={resetBom}>{t("Hủy sửa")}</button>}</div>
-        </form>}
-        <div className="manufacturing-bom-list">{boms.map((bom) => <article className="manufacturing-bom-card" key={bom.id}><div><strong>{products.get(bom.product)?.name || bom.product}</strong><span className="small muted"> · {bom.output_qty || 1} thành phẩm / định mức</span><div className="small muted">{(bom.components || []).map((item) => `${products.get(item.product)?.name || t("Vật tư")} ${item.qty} ${units.get(item.uom)?.name || ''}`).join(' · ')}</div></div>{can('manufacturing.bom.update') && <button className="btn btn-ghost btn-sm" type="button" onClick={() => editBom(bom)}>{t("Sửa")}</button>}</article>)}{!boms.length && <div className="empty">{t("Chưa có BOM. Tạo định mức trước khi lập lệnh sản xuất.")}</div>}</div>
-      </div>}
+      {can('manufacturing.bom.read') && <BillOfMaterialsSection
+        boms={boms}
+        products={products}
+        units={units}
+        unitsFor={unitsFor}
+        editingBom={editingBom}
+        product={bomProduct}
+        outputQty={bomOutputQty}
+        components={components}
+        busy={busy}
+        canCreate={can('manufacturing.bom.create')}
+        canUpdate={can('manufacturing.bom.update')}
+        onSubmit={saveBom}
+        onProductChange={setBomProduct}
+        onOutputQtyChange={setBomOutputQty}
+        onComponentChange={(index, field, value) => setComponents((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: value, ...(field === 'product' ? { uom: '' } : {}) } : row))}
+        onAddComponent={() => setComponents((rows) => [...rows, { product: '', qty: '1', uom: '' }])}
+        onRemoveComponent={(index) => setComponents((rows) => rows.filter((_, rowIndex) => rowIndex !== index))}
+        onReset={resetBom}
+        onEdit={editBom}
+        t={t}
+      />}
       {can('manufacturing.production_order.create') && <ProductionOrderForm
         boms={boms}
         products={products}
