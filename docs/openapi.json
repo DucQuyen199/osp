@@ -18700,6 +18700,65 @@
         ]
       }
     },
+    "/api/t/{tenantId}/approvals/approvers": {
+      "get": {
+        "description": "Returns only user IDs, names, and disabled flags. Requires workflow-approval.approval_rule.read, create, or update; disabled users are included so existing rules can be edited and cleaned up.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tenant users with minimal approval-picker fields"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List tenant users available as approval-rule approvers",
+        "tags": [
+          "workflow-approval"
+        ]
+      }
+    },
     "/api/t/{tenantId}/auth/mfa/confirm": {
       "post": {
         "parameters": [

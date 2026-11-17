@@ -1600,6 +1600,27 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
             admin("tenant.admin")?;
             return json_ok(k.update_settings(&t, &parse_json(&bytes)?).await?);
         }
+        (&Method::GET, ["approvals", "approvers"]) => {
+            let can_manage_approvers = [
+                "workflow-approval.approval_rule.read",
+                "workflow-approval.approval_rule.create",
+                "workflow-approval.approval_rule.update",
+            ]
+            .iter()
+            .any(|permission| k.can(&t, &actor, permission));
+            if !can_manage_approvers {
+                return Err(ApiError::forbidden(
+                    "workflow-approval.approval_rule.read/create/update",
+                ));
+            }
+            let users = k
+                .list_users(&t)
+                .await?
+                .into_iter()
+                .map(|user| json!({ "id": user.id, "name": user.name, "disabled": user.disabled }))
+                .collect::<Vec<_>>();
+            return json_ok(json!(users));
+        }
         (&Method::GET, ["users"]) => {
             admin("tenant.admin")?;
             return json_ok(serde_json::to_value(k.list_users(&t).await?).unwrap_or_default());

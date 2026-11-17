@@ -14,6 +14,7 @@ const APPROVAL_TARGETS: &[&str] = &[
     "hrm.leave_request",
     "accounting.settlement_batch",
     "contract.amendment",
+    "manufacturing.conditional_acceptance",
 ];
 
 fn valid_approvers(value: &Value) -> bool {

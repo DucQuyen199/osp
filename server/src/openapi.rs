@@ -950,6 +950,18 @@ pub fn build(reg: &Registry) -> Value {
         } }),
     );
     paths.insert(
+        "/api/t/{tenantId}/approvals/approvers".into(),
+        json!({ "get": {
+            "tags": ["workflow-approval"], "summary": "List tenant users available as approval-rule approvers", "security": sec,
+            "parameters": [tid],
+            "description": "Returns only user IDs, names, and disabled flags. Requires workflow-approval.approval_rule.read, create, or update; disabled users are included so existing rules can be edited and cleaned up.",
+            "responses": with_common(Map::from_iter([
+                ("200".to_string(), json!({ "description": "Tenant users with minimal approval-picker fields" })),
+                ("403".to_string(), err("Requires workflow-approval.approval_rule.read, create, or update"))
+            ]))
+        } }),
+    );
+    paths.insert(
         "/api/t/{tenantId}/reports/agriculture/crop-cycles/{cycleId}/input-costs".into(),
         json!({ "get": {
             "tags": ["agriculture", "inventory"], "summary": "Crop-cycle inventory input costs", "security": sec,
