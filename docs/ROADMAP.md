@@ -81,7 +81,7 @@ Các module CRM/Marketing, bán hàng, mua hàng, loyalty, logistics, field serv
 
 ## Thứ tự đề xuất
 
-- Bản dịch giao diện tiếng Anh theo feature hiện bao phủ BI, CRM pipeline, integration hub, loyalty, payroll, construction, manufacturing, education, clinic, project management, real estate và utilities cùng các workbench liệt kê ở tài liệu kiến trúc frontend; dialog mẫu hệ thống tài khoản và nhập CSV dùng chung cũng đã được dịch. Chưa hoàn tất localization cho toàn bộ workbench ngành và một số màn hình dùng chung; cần rà soát tương tác thủ công bằng cả `vi-VN` và `en-US`.
+- Bản dịch giao diện tiếng Anh theo feature hiện bao phủ BI, CRM pipeline, integration hub, loyalty, payroll, construction, manufacturing, education, clinic, project management, real estate, utilities và đối soát ngân hàng cùng các workbench liệt kê ở tài liệu kiến trúc frontend; dialog mẫu hệ thống tài khoản và nhập CSV dùng chung cũng đã được dịch. Chưa hoàn tất localization cho toàn bộ workbench ngành và một số màn hình dùng chung; cần rà soát tương tác thủ công bằng cả `vi-VN` và `en-US`.
 
 1. Chọn một ngành theo nhu cầu khách hàng thật.
 2. Hoàn tất email, tích hợp, scheduler, quan sát và accessibility.
