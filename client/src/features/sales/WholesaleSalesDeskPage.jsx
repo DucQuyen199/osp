@@ -48,11 +48,16 @@ export default function WholesaleSalesDeskPage() {
       const accountingEnabled = app.meta?.modules?.some((module) => module.id === 'accounting') && can('accounting.invoice.read');
       const approvalEnabled = app.meta?.modules?.some((module) => module.id === 'workflow-approval') && can('workflow-approval.approval_request.read');
       const [partyMap, productMap, unitMap, warehouseMap, listResponse, quoteResponse, orderResponse, shipmentResponse, invoiceResponse, returnResponse, approvalResponse, creditResponse] = await Promise.all([
-        loadRefs('master-data.party'), loadRefs('master-data.product'), loadRefs('master-data.uom'), loadRefs('inventory.warehouse'),
-        loadAllResponse('sales.price_list'), loadAllResponse('sales.quotation'), loadAllResponse('sales.sales_order'),
+        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
+        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
+        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
+        can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
+        can('sales.price_list.read') ? loadAllResponse('sales.price_list') : Promise.resolve({ items: [] }),
+        can('sales.quotation.read') ? loadAllResponse('sales.quotation') : Promise.resolve({ items: [] }),
+        can('sales.sales_order.read') ? loadAllResponse('sales.sales_order') : Promise.resolve({ items: [] }),
         logisticsEnabled ? loadAllResponse('logistics.shipment') : Promise.resolve({ items: [] }),
         accountingEnabled ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
-        loadAllResponse('sales.sales_return'),
+        can('sales.sales_return.read') ? loadAllResponse('sales.sales_return') : Promise.resolve({ items: [] }),
         approvalEnabled ? loadAllResponse('workflow-approval.approval_request') : Promise.resolve({ items: [] }),
         can('accounting.credit_note.read') ? loadAllResponse('accounting.credit_note') : Promise.resolve({ items: [] }),
       ]);
