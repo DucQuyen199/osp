@@ -72,4 +72,4 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 
 ## Styling layers
 
-`client/public/app/styles/` loads in this order: design tokens, base/reset and utilities, reusable components, page layout, then shared workspace refinements. Components should use semantic variables (`--surface`, `--text-muted`, `--accent`) instead of hard-coded colors. Responsive behavior and reduced-motion preferences belong in shared styles unless a workflow needs a distinct interaction model.
+`client/public/app/styles/` loads in this order: design tokens, base/reset and utilities, reusable components, page layout, then shared workspace refinements. Components should use semantic variables (`--surface`, `--text-muted`, `--accent`) instead of hard-coded colors. The token layer also sets native control `color-scheme` for explicit light and dark themes. Responsive behavior and reduced-motion preferences belong in shared styles unless a workflow needs a distinct interaction model.
