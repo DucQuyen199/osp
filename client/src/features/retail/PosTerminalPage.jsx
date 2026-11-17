@@ -8,12 +8,12 @@ import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/stat
 import PosReceipt from './components/PosReceipt.jsx';
 import PosCheckoutPanel from './components/PosCheckoutPanel.jsx';
 import PosReturnDialog from './components/PosReturnDialog.jsx';
+import PosSessionPanel from './components/PosSessionPanel.jsx';
+import PosCashOperationsPanel from './components/PosCashOperationsPanel.jsx';
+import PosRecentTransactions from './components/PosRecentTransactions.jsx';
 
 const readItems = (response) => Array.isArray(response?.items) ? response.items : [];
 const displayPrice = (product) => Number(product?.price) || 0;
-const supportsPartialReturn = (order) => {
-  return Boolean(order);
-};
 const t = (text) => uiTextWith(text, {
   'Thuốc trả từ đơn thuốc được cách ly và phải hủy; không được bán lại.': 'Medicines returned from a prescription are quarantined for disposal and cannot be resold.',
   'Lý do hoàn đơn': 'Refund reason',
@@ -117,8 +117,6 @@ export default function PosTerminalPage() {
   const activeWarehouse = activeSession ? warehouses.get(activeSession.warehouse) : null;
   const sessionOrders = useMemo(() => orders.filter((item) => item.session === sessionId && item.status === 'open'), [orders, sessionId]);
   const recentTransactions = useMemo(() => orders.filter((item) => ['completed', 'refunded'].includes(item.status)).slice(0, 20), [orders]);
-  const partialReturnsFor = (orderId) => returns.filter((item) => item.pos_order === orderId && item.status === 'received');
-  const partialReturnTotal = (orderId) => partialReturnsFor(orderId).reduce((sum, item) => sum + (Number(item.total) || 0), 0);
   const cart = useMemo(() => Object.entries(quantities).map(([id, qty]) => ({ product: products.get(id), uom: selectedUnits[id] || products.get(id)?.uom || '', qty: Number(qty) })).filter((row) => row.product && row.qty > 0), [quantities, products, selectedUnits]);
   const unitsFor = (product) => product?.uom ? [...units.values()].filter((unit) => unit.id === product.uom || unit.base_uom === product.uom) : [];
   const priceFor = (product, uomId) => {
@@ -351,18 +349,14 @@ export default function PosTerminalPage() {
     <div className="page-head"><div><h1>{t('Quầy bán hàng POS')}</h1><p className="sub">{t('Mở ca theo kho, ghi nhận hàng bán và phương thức thanh toán; giá và thuế cuối cùng do máy chủ tính theo danh mục.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={() => load()}>{t('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     {loading ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <>
-      <section className="card pos-session-bar">
-        <div className="pos-session-select"><label className="field"><span className="label">{t('Ca đang mở')}</span><select className="select" value={sessionId} onChange={(event) => { setSessionId(event.target.value); setClosingCash(''); }}><option value="">{t('Chưa chọn ca')}</option>{sessions.map((item) => <option key={item.id} value={item.id}>{branches.get(item.branch)?.name || t('Không gán chi nhánh')} · {warehouses.get(item.warehouse)?.name || t('Ca cũ chưa có kho')} · {item.cashier || t('Thu ngân')}</option>)}</select></label>
-          {activeSession && <div className="small muted">{t('Kho:')} {activeWarehouse?.name || t('Ca cũ chưa khai báo kho')} · {t('Tiền đầu ca:')} {fmtMoney(activeSession.opening_cash || 0)}{activeSession.cashier ? ` · ${activeSession.cashier}` : ''}</div>}
-        </div>
-        {!sessions.length && <div className="small muted">{t('Chưa có ca mở. Tạo ca mới để bắt đầu bán.')}</div>}
-        <details className="pos-open-session"><summary>{t('Mở ca mới')}</summary><form className="pos-session-form" onSubmit={startSession}>
-          <label className="field"><span className="label">{t('Kho bán hàng *')}</span><select className="select" required value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)}><option value="">{t('Chọn kho')}</option>{[...warehouses.values()].filter((item) => item.active !== false).map((item) => <option key={item.id} value={item.id}>{recordLabel('inventory.warehouse', item)}</option>)}</select></label>
-          <label className="field"><span className="label">{t('Chi nhánh')}</span><select className="select" value={branchId} onChange={(event) => setBranchId(event.target.value)}><option value="">{t('Không gán chi nhánh')}</option>{[...branches.values()].filter((item) => item.active !== false).map((item) => <option key={item.id} value={item.id}>{recordLabel('master-data.branch', item)}</option>)}</select></label>
-          <label className="field"><span className="label">{t('Tiền đầu ca')}</span><input className="input num" type="number" min="0" step="any" value={openingCash} onChange={(event) => setOpeningCash(event.target.value)} /></label>
-          <button className="btn btn-primary" type="submit" disabled={busy || !can('pos.pos_session.create')}>{busy ? t('Đang mở…') : t('Mở ca')}</button>
-        </form></details>
-      </section>
+      <PosSessionPanel
+        sessions={sessions} sessionId={sessionId} activeSession={activeSession} activeWarehouse={activeWarehouse}
+        branches={branches} warehouses={warehouses} warehouseId={warehouseId} branchId={branchId}
+        openingCash={openingCash} busy={busy} canCreate={can('pos.pos_session.create')}
+        onSessionChange={(id) => { setSessionId(id); setClosingCash(''); }} onWarehouseChange={setWarehouseId}
+        onBranchChange={setBranchId} onOpeningCashChange={setOpeningCash} onSubmit={startSession}
+        formatMoney={fmtMoney} recordLabel={recordLabel} t={t}
+      />
       {!activeSession ? <div className="empty card-pad">{t('Chọn một ca đang mở hoặc mở ca mới để sử dụng quầy.')}</div> : !activeSession.warehouse ? <div className="alert warning">{t('Ca này được tạo trước khi bắt buộc chọn kho. Hãy chốt ca cũ và mở ca mới để tiếp tục bán.')}<form className="pos-close-form" onSubmit={closeSession}><label className="field"><span className="label">{t('Tiền mặt thực đếm để chốt ca')}</span><input className="input num" type="number" min="0" step="any" required value={closingCash} onChange={(event) => setClosingCash(event.target.value)} /></label><button className="btn btn-secondary" type="submit" disabled={busy || !can('pos.pos_session.update') || !can('pos.pos_session.closed')}>{t('Chốt ca cũ')}</button></form></div> : <div className="pos-layout">
         <section className="pos-products-panel"><div className="row wrap"><h2>{t('Sản phẩm')}</h2><span className="grow" /><input className="input pos-search" type="search" placeholder={t('Quét/nhập tên, SKU hoặc mã vạch')} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={scanProduct} aria-label={t('Quét barcode hoặc tìm sản phẩm')} /></div><p className="small muted">{t('Đặt con trỏ trong ô tìm kiếm rồi quét mã; máy quét gửi Enter để thêm đúng một sản phẩm vào giỏ.')}</p>
           <div className="pos-products">{filteredProducts.map((product) => { const uom = selectedUnits[product.id] || product.uom || ''; return <button className={`card pos-product${quantities[product.id] ? ' selected' : ''}`} key={product.id} type="button" disabled={!can('pos.pos_order.create')} onClick={() => setQty(product.id, (Number(quantities[product.id]) || 0) + 1)}><strong>{product.name}</strong><span className="small muted">{product.sku || t('Không mã')}</span><span className="num">{fmtMoney(priceFor(product, uom))}{units.get(uom)?.name ? ` / ${units.get(uom).name}` : ''}</span>{product.tracked !== false && <span className="small faint">{t('Quản lý tồn kho')}</span>}</button>; })}</div>
@@ -374,16 +368,23 @@ export default function PosTerminalPage() {
           {pharmacyEnabled && rxRequired && <label className="field"><span className="label">{t('Đơn thuốc *')}</span><select className="select" required={rxRequired} value={prescriptionId} onChange={(event) => { const id = event.target.value; setPrescriptionId(id); const rx = prescriptions.find((item) => item.id === id); if (rx?.party) setPartyId(rx.party); }}><option value="">{t('Chọn đơn còn thuốc được kê')}</option>{prescriptions.filter((item) => ['verified', 'partially_dispensed'].includes(item.status) && item.valid_until && item.valid_until >= localDate()).map((item) => <option key={item.id} value={item.id}>{item.prescription_no} · {t(item.status === 'partially_dispensed' ? 'cấp một phần' : 'đã xác minh')} · {t('hết hạn')} {item.valid_until}</option>)}</select>{rxRequired && <small className="muted">{t('Thuốc kê đơn chỉ được bán theo đơn còn hạn, đúng khách hàng; số lượng bán cộng dồn không vượt số lượng kê.')}</small>}</label>}
           <PosCheckoutPanel method={method} onMethodChange={setMethod} cashReceived={cashReceived} onCashReceived={setCashReceived} subtotal={subtotal} estimatedTax={estimatedTax} total={total} hasItems={cart.length > 0} busy={busy} canCreate={can('pos.pos_order.create')} onCheckout={checkout} formatMoney={fmtMoney} t={t} />
           {sessionOrders.length > 0 && <section className="pos-pending"><h3>{t('Đơn chờ xử lý')} ({sessionOrders.length})</h3>{sessionOrders.map((order) => <div className="pos-pending-item" key={order.id}><div><strong>{fmtMoney(order.total || 0)}</strong><div className="small muted">{fmtDateTime(order.created_at)} · {statusLabel(order.status)}</div>{order.method === 'cash' && <label className="field"><span className="label">{t('Khách đưa')}</span><input className="input num" type="number" min={Number(order.total || 0)} step="0.01" value={pendingCashReceived[order.id] ?? (order.cash_received ?? '')} onChange={(event) => setPendingCashReceived((current) => ({ ...current, [order.id]: event.target.value }))} aria-label={`${t('Tiền khách đưa cho đơn')} ${String(order.id).slice(0, 8)}`} /></label>}</div><button className="btn btn-primary btn-sm" type="button" disabled={busy || !can('pos.pos_order.completed')} onClick={() => completeOrder(order)}>{t('Hoàn tất')}</button><button className="btn btn-ghost btn-sm" type="button" disabled={busy || !can('pos.pos_order.delete')} onClick={() => removeOrder(order)}>{t('Hủy')}</button></div>)}</section>}
-          <section className="pos-pending"><h3>{t('Giao dịch gần đây')}</h3>{recentTransactions.length ? recentTransactions.map((order) => { const partialEligible = supportsPartialReturn(order); return <div className="pos-pending-item" key={order.id}><div className="grow"><strong>{fmtMoney(order.total || 0)} · {parties.get(order.party)?.name || t('Khách lẻ')}</strong><div className="small muted">{fmtDateTime(order.created_at)} · {t(order.method === 'cash' ? 'Tiền mặt' : order.method === 'card' ? 'Thẻ' : order.method === 'transfer' ? 'Chuyển khoản' : order.method === 'ewallet' ? 'Ví điện tử' : '—')} · {statusLabel(order.status)}</div><div className="small muted">{(order.lines || []).map((line, index) => `${line.product_name || products.get(line.product)?.name || t('Mặt hàng')} × ${line.qty}${line.uom_name ? ` ${line.uom_name}` : ''}`).join(' · ')}</div>{partialReturnsFor(order.id).length > 0 && <div className="small muted">{t('Đã trả một phần')}: {fmtMoney(partialReturnTotal(order.id))}</div>}{order.refund_reason && <div className="small muted">{t('Lý do hoàn:')} {order.refund_reason}</div>}{order.status === 'completed' && order.prescription && <div className="small muted">{t('Thuốc trả từ đơn thuốc được cách ly và phải hủy; không được bán lại.')}</div>}</div><button className="btn btn-ghost btn-sm" type="button" onClick={() => setPrintingOrderId(order.id)}>{t('In biên nhận')}</button>{order.status === 'completed' && partialEligible && can('pos.pos_return.read') && can('pos.pos_return.create') && can('pos.pos_return.received') && <button className="btn btn-secondary btn-sm" type="button" disabled={busy} onClick={() => beginPartialReturn(order)}>{t('Trả một phần')}</button>}{order.status === 'completed' && partialReturnsFor(order.id).length === 0 && can('pos.pos_order.refunded') && can('pos.pos_order.update') && <button className="btn btn-ghost btn-sm" type="button" disabled={busy} onClick={() => refundOrder(order)}>{t('Hoàn toàn bộ')}</button>}</div>; }) : <div className="empty">{t('Chưa có giao dịch hoàn tất trong danh sách gần đây.')}</div>}</section>
-          <details className="pos-cash-panel"><summary>{t('Thu / chi quỹ tiền mặt')}</summary><form className="pos-cash-form" onSubmit={createCashMovement}>
-            <label className="field"><span className="label">{t('Loại giao dịch')}</span><select className="select" value={cashDirection} onChange={(event) => setCashDirection(event.target.value)}><option value="cash_out">{t('Chi tiền')}</option><option value="cash_in">{t('Nộp tiền vào quỹ')}</option></select></label>
-            <label className="field"><span className="label">{t('Số tiền')}</span><input className="input num" required type="number" min="0.01" step="any" value={cashAmount} onChange={(event) => setCashAmount(event.target.value)} /></label>
-            <label className="field"><span className="label">{t('Tài khoản đối ứng')}</span><select className="select" required value={cashAccount} onChange={(event) => setCashAccount(event.target.value)}><option value="">{t('Chọn tài khoản')}</option>{[...accounts.values()].filter((item) => !['111', '112'].includes(String(item.code)) && item.active !== false).map((item) => <option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></label>
-            <label className="field"><span className="label">{t('Lý do')}</span><input className="input" required value={cashReason} onChange={(event) => setCashReason(event.target.value)} /></label>
-            <button className="btn btn-secondary" type="submit" disabled={busy || !can('pos.cash_movement.create') || !can('pos.cash_movement.posted')}>{t('Ghi nhận')}</button>
-          </form>
-            {cashMovements.filter((item) => item.session === sessionId).map((movement) => <div className="pos-pending-item" key={movement.id}><div><strong>{t(movement.direction === 'cash_in' ? 'Nộp quỹ' : 'Chi quỹ')} · {fmtMoney(movement.amount)}</strong><div className="small muted">{movement.reason}</div></div><button className="btn btn-primary btn-sm" type="button" disabled={busy || !can('pos.cash_movement.posted')} onClick={() => postCashMovement(movement)}>{t('Ghi sổ')}</button><button className="btn btn-ghost btn-sm" type="button" disabled={busy || !can('pos.cash_movement.delete')} onClick={() => removeCashMovement(movement)}>{t('Xóa')}</button></div>)}
-          </details>
+          <PosRecentTransactions
+            orders={recentTransactions} returns={returns} parties={parties} products={products} busy={busy}
+            canReadReturns={can('pos.pos_return.read')} canCreateReturns={can('pos.pos_return.create')}
+            canReceiveReturns={can('pos.pos_return.received')} canRefundOrders={can('pos.pos_order.refunded')}
+            canUpdateOrders={can('pos.pos_order.update')} onPrint={(order) => setPrintingOrderId(order.id)}
+            onPartialReturn={beginPartialReturn} onRefund={refundOrder} formatMoney={fmtMoney}
+            formatDateTime={fmtDateTime} statusLabel={statusLabel} t={t}
+          />
+          <PosCashOperationsPanel
+            movements={cashMovements.filter((item) => item.session === sessionId)} direction={cashDirection}
+            amount={cashAmount} accountId={cashAccount} reason={cashReason} accounts={accounts} busy={busy}
+            canCreate={can('pos.cash_movement.create')} canPost={can('pos.cash_movement.posted')}
+            canDelete={can('pos.cash_movement.delete')} onDirectionChange={setCashDirection}
+            onAmountChange={setCashAmount} onAccountChange={setCashAccount} onReasonChange={setCashReason}
+            onSubmit={createCashMovement} onPost={postCashMovement} onRemove={removeCashMovement}
+            formatMoney={fmtMoney} t={t}
+          />
           <form className="pos-close-form" onSubmit={closeSession}><label className="field"><span className="label">{t('Tiền mặt thực đếm khi chốt ca')}</span><input className="input num" type="number" min="0" step="any" required value={closingCash} onChange={(event) => setClosingCash(event.target.value)} /></label><button className="btn btn-secondary" type="submit" disabled={busy || cart.length > 0 || !can('pos.pos_session.update') || !can('pos.pos_session.closed')}>{t('Chốt ca')}</button></form>{cart.length > 0 && <p className="small muted">{t('Xóa các mặt hàng trong giỏ trước khi chốt ca.')}</p>}
         </aside>
       </div>}

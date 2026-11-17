@@ -49,6 +49,7 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 - The purchasing workbench owns invoice permissions, FX validation and persistence; `SupplierInvoiceDraftForm` renders controlled invoice quantities, tax, currency and reference fields.
 - The purchasing workbench owns supplier-invoice validation, permissions and state transitions; `SupplierInvoicesPanel` renders controlled dispute fields and emits dispute, resolution, submit and approval requests.
 - The POS terminal owns cart, tender, permissions and checkout; `PosCheckoutPanel` displays controlled payment fields and emits the checkout request.
+- The POS terminal owns session and cash-movement permissions, API calls and closing rules; `PosSessionPanel` displays controlled shift fields, `PosCashOperationsPanel` edits and lists controlled cash movements, and `PosRecentTransactions` renders receipt, refund and partial-return actions through callbacks.
 - The POS terminal owns return permissions, the draft retry flow and persistence; `PosReturnDialog` edits controlled return quantities and reason, previews the refund, and emits submit/close callbacks.
 - The HR workbench owns attendance-date rules and punch actions; `AttendanceEntriesTable` renders the controlled daily records and emits punch-out requests.
 - The HR workbench owns schedule-pattern permissions, template selection, date limits and persistence; `WorkSchedulePatternForm` renders the controlled rotation schedule and emits form edits through callbacks.
