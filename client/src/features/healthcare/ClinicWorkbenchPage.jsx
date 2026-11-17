@@ -39,10 +39,14 @@ export default function ClinicWorkbenchPage() {
     setLoading(true); setError(''); if (!preserveNotice) setNotice('');
     try {
       const [patientRows, partyMap, encounterRows, prescriptionRows, labRows, productMap, unitMap, warehouseMap] = await Promise.all([
-        loadAll('clinic.patient'), loadRefs('master-data.party'),
-        loadAll('clinic.encounter'), loadAll('clinic.prescription'),
-        loadAll('clinic.lab_order'), loadRefs('master-data.product'),
-        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()), loadRefs('inventory.warehouse'),
+        can('clinic.patient.read') ? loadAll('clinic.patient') : Promise.resolve([]),
+        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
+        can('clinic.encounter.read') ? loadAll('clinic.encounter') : Promise.resolve([]),
+        can('clinic.prescription.read') ? loadAll('clinic.prescription') : Promise.resolve([]),
+        can('clinic.lab_order.read') ? loadAll('clinic.lab_order') : Promise.resolve([]),
+        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
+        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
+        can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
       ]);
       const encounterItems = encounterRows.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
       setPatients(patientRows); setParties(partyMap); setEncounters(encounterItems);
