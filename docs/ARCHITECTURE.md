@@ -4,6 +4,10 @@
 
 OSP là modular monolith: một tiến trình Rust/Axum, một PostgreSQL, các bounded context triển khai qua catalog module. Tất cả nghiệp vụ ghi chạy trong transaction PostgreSQL có tenant scope và RLS. Tách dịch vụ chỉ khi có nhu cầu vận hành đo được.
 
+## Tenant and company boundaries
+
+Each tenant currently owns one organization's data and its users, roles, settings, audit, and row-level security context. A branch is an operational location within that tenant. Separate tenants cannot reference one another's records, and consolidated reporting across tenants is not implemented. The proposed consent and access design is recorded in [ADR-0010](adr/0010-multi-company-and-consolidation.md); it preserves tenant RLS and requires member-organization consent before any cross-tenant report access.
+
 ## Các lớp hệ thống
 
 ```text
