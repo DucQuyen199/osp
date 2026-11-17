@@ -7,6 +7,7 @@ import Icon from '../components/Icon.jsx';
 import Sidebar from '../components/Sidebar.jsx';
 import { api, onUnauthorized, session } from '../lib/api.js';
 import { setBusinessTimezone } from '../lib/dates.js';
+import { enhanceScrollableRegions } from '../lib/scrollableRegions.js';
 import { ensureUiTranslations, formatLocale, setFormatLocale, setUiLocale, uiLocale, uiText } from '../lib/i18n.js';
 import { app, getAppStateRevision, loadMeta, loadSummary, publishAppState, resetAppState, subscribeAppState } from '../lib/state.js';
 export default function App() {
@@ -38,6 +39,11 @@ export default function App() {
   useEffect(() => {
     document.documentElement.lang = interfaceLanguage === 'en-US' ? 'en' : 'vi';
   }, [interfaceLanguage]);
+
+  useEffect(() => {
+    if (!ready || !meta || !user) return undefined;
+    return enhanceScrollableRegions(document.getElementById('main'));
+  }, [ready, meta, user]);
 
   useEffect(() => {
     if (!mobileNav || !navOpen) return;

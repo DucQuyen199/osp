@@ -205,7 +205,7 @@ Thẻ gom nội dung liên quan; `.stat` là thẻ số liệu, **cả thẻ là
 
 ### 3.5 Table — `.table`
 **Dùng cho:** danh sách bản ghi. Đầu cột viết hoa nhỏ, `scope="col"`; cột tiền/số căn phải; hàng có thể bấm (`.clickable`) **và** ô đầu tiên là `<a>` thật để dùng được bằng bàn phím.
-- Cuộn ngang trong `.table-wrap` trên màn hình hẹp (không làm trang cuộn ngang).
+- Cuộn ngang trong `.table-wrap` trên màn hình hẹp (không làm trang cuộn ngang). Bảng chỉ cuộn được phải có thể nhận focus bằng bàn phím và được đặt tên theo caption, tiêu đề vùng hoặc tên cột.
 - Cột rỗng (nút thao tác) phải có `<span class="sr-only">Thao tác</span>` trong `<th>`.
 - Phân trang `.pager`: "N bản ghi · trang x/y" (`aria-live="polite"`), nút Trước/Sau.
 
