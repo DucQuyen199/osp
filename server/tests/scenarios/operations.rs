@@ -463,6 +463,62 @@ async fn restaurant(kernel: &Arc<Kernel>) {
     let table = t
         .create("restaurant.table", json!({ "name": "Table A", "seats": 4 }))
         .await;
+    let reservation_start = chrono::Utc::now() + chrono::Duration::hours(2);
+    let reservation_end = reservation_start + chrono::Duration::hours(1);
+    let reservation = t
+        .create(
+            "restaurant.reservation",
+            json!({
+                "guest_name": "Reservation guest",
+                "table": id(&table),
+                "guest_count": 4,
+                "starts_at": reservation_start.to_rfc3339(),
+                "ends_at": reservation_end.to_rfc3339()
+            }),
+        )
+        .await;
+    assert_eq!(reservation["status"], "requested");
+    t.act("restaurant.reservation", &id(&reservation), "confirmed")
+        .await;
+    let overlap_start = reservation_start + chrono::Duration::minutes(30);
+    let overlap = t
+        .create(
+            "restaurant.reservation",
+            json!({
+                "guest_name": "Overlapping guest",
+                "table": id(&table),
+                "guest_count": 2,
+                "starts_at": overlap_start.to_rfc3339(),
+                "ends_at": (overlap_start + chrono::Duration::hours(1)).to_rfc3339()
+            }),
+        )
+        .await;
+    assert!(
+        kernel
+            .act(
+                &t.a,
+                &t.t,
+                "restaurant.reservation",
+                &id(&overlap),
+                "confirmed"
+            )
+            .await
+            .is_err()
+    );
+    assert!(
+        t.try_create(
+            "restaurant.reservation",
+            json!({
+                "guest_name": "Oversized party",
+                "table": id(&table),
+                "guest_count": 5,
+                "starts_at": (reservation_end + chrono::Duration::hours(1)).to_rfc3339(),
+                "ends_at": (reservation_end + chrono::Duration::hours(2)).to_rfc3339()
+            }),
+        )
+        .await
+        .is_err()
+    );
     let ingredient = t
         .create(
             "master-data.product",
