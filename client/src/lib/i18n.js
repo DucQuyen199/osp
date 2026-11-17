@@ -227,6 +227,10 @@ function dynamicEnglishText(text) {
   if (onlyField) return `Send only the ${onlyField[1]} field.`;
   const finiteAmount = String(text).match(/^([\w.-]+) phải là số tiền hữu hạn$/);
   if (finiteAmount) return `${finiteAmount[1]} must be a finite amount.`;
+  const mixedTemplates = String(text).match(/^Doanh nghiệp đã chọn mẫu (.+); không thể trộn mẫu (.+)$/);
+  if (mixedTemplates) return `This business account already uses template ${mixedTemplates[1]}; it cannot be mixed with ${mixedTemplates[2]}.`;
+  const missingParent = String(text).match(/^Mẫu (.+) thiếu tài khoản cha (.+)$/);
+  if (missingParent) return `Template ${missingParent[1]} is missing parent account ${missingParent[2]}.`;
   return undefined;
 }
 
