@@ -84,7 +84,8 @@ export default function EntityDetailPage({ qname, id }) {
       const data = await api(dataPath(qname, id));
       setRecord(data);
       const targets = await Promise.all([...new Set(references.map((field) => field.ref))]
-        .map(async (ref) => [ref, await loadRefs(ref)]));
+        .filter((ref) => can(`${ref}.read`))
+        .map(async (ref) => [ref, await loadRefs(ref).catch(() => new Map())]));
       setRefs(Object.fromEntries(targets));
     } catch (reason) {
       setError(reason.message || 'Không mở được bản ghi.');
