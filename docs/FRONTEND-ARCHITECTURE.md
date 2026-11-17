@@ -35,6 +35,7 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 - Split a long workflow view into focused components under `features/<domain>/components/`. Pass controlled values and callbacks so child components render and edit the state owned by the workflow.
 - Keep business rules, API calls, and cross-module coordination out of presentational line editors and panels. Promote a component to `components/` only when more than one domain uses it.
 - The ecommerce order desk follows this boundary: `EcommerceOrderDeskPage` owns loading, permissions, API actions and cart state; `WebOrderCreateForm` edits controlled values through callbacks, and `WebOrderCard` renders an order and emits requested actions.
+- The wholesale sales desk owns quotation payload construction, price-list selection and persistence; `QuotationComposer` renders controlled customer, warehouse, price, delivery and product fields and emits changes and submit requests through callbacks.
 - The school workbench keeps attendance persistence and permission checks in `EducationWorkbenchPage`; `AttendanceRosterTable` renders the roster and requests marks through a callback.
 - The school workbench owns class and session permissions, validation, and persistence; `CourseClassForm` and `ClassSessionForm` render controlled schedule fields and submit through callbacks.
 - The school workbench owns the atomic contact-and-student creation flow and pending-contact recovery; `StudentIntakeForm` renders controlled learner fields and submits through a callback.

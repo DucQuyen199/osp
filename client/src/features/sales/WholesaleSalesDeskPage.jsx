@@ -5,6 +5,7 @@ import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
+import QuotationComposer from './components/QuotationComposer.jsx';
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const today = localDate;
 export default function WholesaleSalesDeskPage() {
@@ -214,23 +215,18 @@ export default function WholesaleSalesDeskPage() {
   return <div className="page-content wholesale-sales-page">
     <header className="page-header"><div><h1>{uiText('Bán hàng, báo giá và giao hàng')}</h1><p className="muted">{uiText('Lập báo giá theo khách hàng, chuyển báo giá được chấp nhận thành đơn, kiểm soát tín dụng và theo dõi giao hàng.')}</p></div><button className="button" onClick={() => load()} disabled={loading}>{uiText('Làm mới')}</button></header>
     {error && <div className="alert error" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
-    {can('sales.quotation.create') && <section className="wholesale-create card"><h2>{uiText('Lập báo giá')}</h2><form onSubmit={createQuote}>
-      <div className="wholesale-form">
-        <label className="field"><span>{uiText('Khách hàng / đại lý')}</span><select className="select" required value={party} onChange={(event) => setParty(event.target.value)}><option value="">{uiText('Chọn khách hàng')}</option>{[...parties.values()].map((item) => <option key={item.id} value={item.id}>{recordLabel('master-data.party', item)}</option>)}</select></label>
-        <label className="field"><span>{uiText('Kho xuất')}</span><select className="select" required value={warehouse} onChange={(event) => setWarehouse(event.target.value)}><option value="">{uiText('Chọn kho')}</option>{[...warehouses.values()].map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-        <label className="field"><span>{uiText('Bảng giá')}</span><select className="select" value={priceList} onChange={(event) => setPriceList(event.target.value)}><option value="">{uiText('Giá bán mặc định')}</option>{priceLists.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-        <label className="field"><span>{uiText('Ngày hết hạn')}</span><input className="input" type="date" min={today()} value={validUntil} onChange={(event) => setValidUntil(event.target.value)} /></label>
-        <label className="field wholesale-address"><span>{uiText('Địa chỉ giao hàng')}</span><input className="input" value={shippingAddress} onChange={(event) => setShippingAddress(event.target.value)} placeholder={uiText('Nhập để tạo chuyến giao khi xác nhận đơn')} /></label>
-        <label className="field wholesale-address"><span>{uiText('Ghi chú')}</span><input className="input" value={note} onChange={(event) => setNote(event.target.value)} /></label>
-      </div>
-      <div className="wholesale-product-grid">{activeProducts.map((product) => <article className="wholesale-product card" key={product.id}>
-        <strong>{recordLabel('master-data.product', product)}</strong><span className="num">{fmtMoney(getPrice(product, selectedUnits[product.id] || product.uom))} / {units.get(selectedUnits[product.id] || product.uom)?.name || uiText('đơn vị')}</span>
-        {unitsFor(product).length > 1 && <label className="field"><span>{uiText('Đơn vị bán')}</span><select className="select" value={selectedUnits[product.id] || product.uom} onChange={(event) => setSelectedUnits((current) => ({ ...current, [product.id]: event.target.value }))}>{unitsFor(product).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` · ${unit.ratio} × ${uiText('đơn vị gốc')}` : ` · ${uiText('đơn vị gốc')}`}</option>)}</select></label>}
-        <label className="field"><span>{uiText('Số lượng')}</span><input className="input" type="number" min="0" step="any" value={quantities[product.id] || ''} onChange={(event) => setQuantity(product.id, event.target.value)} /></label>
-      </article>)}</div>
-      <div className="wholesale-estimate"><span>{uiText('Tạm tính theo bảng giá, chưa gồm thuế')}</span><strong className="num">{fmtMoney(estimate)}</strong></div>
-      <button className="button primary" disabled={busy === 'create' || !party || !warehouse || !cart.length}>{busy === 'create' ? uiText('Đang tạo…') : uiText('Lưu báo giá nháp')}</button>
-    </form></section>}
+    {can('sales.quotation.create') && <QuotationComposer
+      parties={parties} warehouses={warehouses} priceLists={priceLists} activeProducts={activeProducts}
+      units={units} selectedUnits={selectedUnits} quantities={quantities} party={party}
+      warehouse={warehouse} priceList={priceList} validUntil={validUntil}
+      shippingAddress={shippingAddress} note={note} estimate={estimate} hasLines={cart.length > 0}
+      saving={busy === 'create'} currentDate={today()}
+      onPartyChange={setParty} onWarehouseChange={setWarehouse} onPriceListChange={setPriceList}
+      onValidUntilChange={setValidUntil} onShippingAddressChange={setShippingAddress} onNoteChange={setNote}
+      onUnitChange={(productId, unitId) => setSelectedUnits((current) => ({ ...current, [productId]: unitId }))}
+      onQuantityChange={setQuantity} onSubmit={createQuote} getUnitsFor={unitsFor} getPrice={getPrice}
+      recordLabel={recordLabel} formatMoney={fmtMoney} t={uiText}
+    />}
     <section className="wholesale-section"><header><h2>{uiText('Báo giá')}</h2><span className="badge plain">{quotations.length}</span></header>
       <div className="wholesale-documents">{quotations.map((quote) => {
         const customer = parties.get(quote.party); const order = orderForQuote(quote);
