@@ -4,46 +4,15 @@ import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { confirmDialog, toast } from '../../lib/feedback.js';
 import EntityFormDialog from './EntityFormDialog.jsx';
 import EntityImportDialog from './EntityImportDialog.jsx';
+import EntityRecordsTable from './components/EntityRecordsTable.jsx';
 import {
-  can, entity, entityLabel, fieldLabelOf, invalidateRefs, listColumns, loadRefs, moduleOf, recordLabel,
+  can, entity, entityLabel, invalidateRefs, listColumns, loadRefs, moduleOf,
 } from '../../lib/state.js';
 import {
-  actionLabel, fmtDate, fmtDateTime, fmtMoney, fmtNumber, statusLabel, tone, uiText,
+  actionLabel, fmtNumber, statusLabel, tone, uiText,
 } from '../../lib/i18n.js';
 import { recordHref } from '../../lib/routes.js';
 const PAGE_SIZE = 25;
-function FieldValue({ qname, field, record, definition, refs }) {
-  const value = record[field.name];
-  if (value == null || value === '') return <span className="faint">—</span>;
-  if (field.type === 'money') {
-    const currencyId = record.currency;
-    const currency = refs['master-data.currency']?.get(currencyId);
-    return <span className="num">{fmtMoney(value, currency?.code)}</span>;
-  }
-  if (field.type === 'number') return <span className="num">{fmtNumber(value)}</span>;
-  if (field.type === 'date') return fmtDate(value);
-  if (field.type === 'datetime') return fmtDateTime(value);
-  if (field.type === 'bool') return <span className={`badge plain ${value ? 'success' : ''}`}>{uiText(value ? 'Có' : 'Không')}</span>;
-  if (field.type === 'enum') {
-    const label = definition.states?.field === field.name || field.name === 'status'
-      ? statusLabel(value)
-      : statusLabel(value);
-    return field.name === 'status' || definition.states?.field === field.name
-      ? <span className={`badge ${tone(value)}`}>{label}</span>
-      : label;
-  }
-  if (field.type === 'ref') {
-    const target = refs[field.ref]?.get(value);
-    const targetName = target ? recordLabel(field.ref, target) : `#${String(value).slice(0, 8)}`;
-    return <a href={recordHref(field.ref, value)} onClick={(event) => event.stopPropagation()}>{targetName}</a>;
-  }
-  if (field.type === 'json') return Array.isArray(value) ? `${value.length} dòng` : '{…}';
-  if (field.type === 'text') {
-    const text = String(value);
-    return text.length > 80 ? `${text.slice(0, 80)}…` : text;
-  }
-  return String(value);
-}
 export default function EntityListPage({ qname }) {
   useDocumentTitle(`${uiText(entityLabel(qname))} · OSP Suite`);
   const definition = entity(qname);
@@ -228,21 +197,12 @@ export default function EntityListPage({ qname }) {
           <h3>{uiText(total ? 'Không có kết quả khớp' : 'Chưa có dữ liệu')}</h3>
           <p>{uiText(total ? 'Thử từ khóa khác hoặc bỏ bộ lọc.' : 'Chưa có bản ghi nào trong trang này.')}</p>
           {!total && canCreate && <button className="btn btn-primary" type="button" onClick={create}>＋ {uiText('Tạo bản ghi')}</button>}
-        </div> : <div className="table-wrap">
-          <table className="table">
-            <caption className="sr-only">{uiText('Danh sách')} {uiText(entityLabel(qname)).toLowerCase()}</caption>
-            <thead><tr>{selectable && <th scope="col"><input className="bulk-select" type="checkbox" aria-label={uiText('Chọn tất cả bản ghi trên trang')} checked={allRowsSelected} disabled={Boolean(bulkAction)} onChange={togglePage} /></th>}{columns.map((field) => <th key={field.name} scope="col" className={['money', 'number'].includes(field.type) ? 'right' : ''}>{uiText(fieldLabelOf(qname, field.name))}</th>)}{columns.length === 0 && <th scope="col">{uiText('Mở bản ghi')}</th>}</tr></thead>
-            <tbody>{rows.map((record) => <tr key={record.id} className="clickable" onClick={() => { location.hash = recordHref(qname, record.id); }}>
-              {selectable && <td><input className="bulk-select" type="checkbox" aria-label={`${uiText('Chọn')} ${uiText(recordLabel(qname, record))}`} checked={selectedIds.has(record.id)} disabled={Boolean(bulkAction)} onClick={(event) => event.stopPropagation()} onChange={() => toggleRow(record.id)} /></td>}
-              {columns.length === 0 && <td><a href={recordHref(qname, record.id)} aria-label={`${uiText('Mở bản ghi')} ${record.id}`} onClick={(event) => event.stopPropagation()}>{String(record.id).slice(0, 8)}</a></td>}
-              {columns.map((field, index) => <td key={field.name} className={['money', 'number'].includes(field.type) ? 'right' : ''}>
-                {index === 0 && field.type !== 'ref'
-                  ? <a href={recordHref(qname, record.id)} onClick={(event) => event.stopPropagation()}><FieldValue qname={qname} field={field} record={record} definition={definition} refs={refs} /></a>
-                  : <FieldValue qname={qname} field={field} record={record} definition={definition} refs={refs} />}
-              </td>)}
-            </tr>)}</tbody>
-          </table>
-        </div>}
+        </div> : <EntityRecordsTable
+          qname={qname} definition={definition} columns={columns} rows={rows} refs={refs}
+          selectable={selectable} selectedIds={selectedIds} allRowsSelected={allRowsSelected} busy={Boolean(bulkAction)}
+          onTogglePage={togglePage} onToggleRow={toggleRow}
+          onOpenRecord={(record) => { location.hash = recordHref(qname, record.id); }}
+        />}
       <div className="pager">
         <span aria-live="polite">{fmtNumber(total)} {uiText('bản ghi')} · {uiText('trang')} {page + 1}/{pages}</span>
         <div className="row">
