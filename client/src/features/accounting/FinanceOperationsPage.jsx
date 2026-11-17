@@ -36,7 +36,7 @@ export default function FinanceOperationsPage() {
     setLoading(true); setError('');
     try {
       const [partyMap, accountRes, loanRes, repaymentRes, policyRes, claimRes, invoiceRes] = await Promise.all([
-        loadRefs('master-data.party'),
+        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
         can('accounting.account.read') ? loadAllResponse('accounting.account') : Promise.resolve({ items: [] }),
         can('lending.loan.read') ? loadAllResponse('lending.loan') : Promise.resolve({ items: [] }),
         can('lending.repayment.read') ? loadAllResponse('lending.repayment') : Promise.resolve({ items: [] }),

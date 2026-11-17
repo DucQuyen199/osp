@@ -41,7 +41,7 @@ export default function AccountingSettlementWorkbenchPage() {
         can('accounting.invoice.read') ? listAll('accounting.invoice') : Promise.resolve([]),
         can('accounting.bill.read') ? listAll('accounting.bill') : Promise.resolve([]),
         can('accounting.payment.read') ? listAll('accounting.payment') : Promise.resolve([]),
-        loadRefs('master-data.party'),
+        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
         can('master-data.currency.read') ? listAll('master-data.currency') : Promise.resolve([]),
         workflowApproval && can('workflow-approval.approval_request.read') ? listAll('workflow-approval.approval_request') : Promise.resolve([]),
       ]);
