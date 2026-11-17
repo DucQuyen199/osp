@@ -8,6 +8,7 @@ const t = (text) => uiTextWith(text, authEnglish);
 export default function AuthPage({ route, onSignedIn }) {
   const [catalog, setCatalog] = useState(null);
   const [catalogError, setCatalogError] = useState('');
+  const [loginTenantId, setLoginTenantId] = useState(() => new URLSearchParams(location.search).get('tenant') || '');
   const [mode, setMode] = useState(route.name === 'signup' ? 'signup' : route.name === 'forgot-password' ? 'forgot' : route.name === 'reset-password' ? 'reset' : route.name === 'verify-email' ? 'verify' : 'login');
   const [vertical, setVertical] = useState('');
   const [busy, setBusy] = useState('');
@@ -117,7 +118,7 @@ export default function AuthPage({ route, onSignedIn }) {
   };
 
   const startOidc = async () => {
-    const tenantId = String(document.getElementById('auth-tenant')?.value || '').trim();
+    const tenantId = loginTenantId.trim();
     if (!tenantId) { setError('Nhập mã doanh nghiệp trước khi đăng nhập bằng tài khoản doanh nghiệp.'); return; }
     setBusy('oidc'); setError('');
     try {
@@ -195,7 +196,7 @@ export default function AuthPage({ route, onSignedIn }) {
         <button className="btn btn-primary" type="submit" disabled={Boolean(busy)}>{t(busy === 'mfa' ? 'Đang xác minh…' : 'Xác minh và đăng nhập')}</button>
         <button className="btn btn-ghost" type="button" disabled={Boolean(busy)} onClick={() => { setMfaChallenge(''); setMode('login'); }}>{t('Quay lại đăng nhập')}</button>
       </form> : mode === 'login' ? <form className="stack" onSubmit={login}>
-        <div className="field"><label htmlFor="auth-tenant">{t('Mã doanh nghiệp')}</label><input className="input mono" id="auth-tenant" name="tenantId" autoComplete="organization" required placeholder="t_xxxxxxxx" defaultValue={new URLSearchParams(location.search).get('tenant') || ''} /><p className="hint">{t('Mã bắt đầu bằng t_, được cấp khi tạo doanh nghiệp.')}</p></div>
+        <div className="field"><label htmlFor="auth-tenant">{t('Mã doanh nghiệp')}</label><input className="input mono" id="auth-tenant" name="tenantId" autoComplete="organization" required placeholder="t_xxxxxxxx" value={loginTenantId} onChange={(event) => setLoginTenantId(event.target.value)} /><p className="hint">{t('Mã bắt đầu bằng t_, được cấp khi tạo doanh nghiệp.')}</p></div>
         <div className="field"><label htmlFor="auth-email">{t('Email')}</label><input className="input" id="auth-email" name="email" type="email" autoComplete="username" required /></div>
         <div className="field"><label htmlFor="auth-password">{t('Mật khẩu')}</label><input className="input" id="auth-password" name="password" type="password" autoComplete="current-password" required /></div>
         <label className="check"><input type="checkbox" name="remember" />{t('Ghi nhớ đăng nhập trên máy này')}</label>
