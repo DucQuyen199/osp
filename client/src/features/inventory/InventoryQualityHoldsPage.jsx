@@ -18,7 +18,17 @@ export default function InventoryQualityHoldsPage() {
   const [busy, setBusy] = useState('');
   const [notes, setNotes] = useState({});
   const [releaseDrafts, setReleaseDrafts] = useState({});
-  useEffect(() => { loadRefs('inventory.warehouse').then(setWarehouses); }, []);
+  useEffect(() => {
+    let active = true;
+    if (!can('inventory.warehouse.read')) {
+      setWarehouses(new Map());
+      return () => { active = false; };
+    }
+    loadRefs('inventory.warehouse')
+      .then((rows) => { if (active) setWarehouses(rows); })
+      .catch(() => { if (active) setWarehouses(new Map()); });
+    return () => { active = false; };
+  }, []);
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
