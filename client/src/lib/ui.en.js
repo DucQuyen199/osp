@@ -50,6 +50,7 @@ const uiTextEnglish = {
   'Hộp thư hỗ trợ': 'Support inbox', 'Dữ liệu gốc': 'Master data', 'Quản trị': 'Administration', 'Cài đặt': 'Settings',
   'Tổng quan': 'Overview', 'Tìm module hoặc dữ liệu…': 'Search modules or records…',
   'Tìm module hoặc dữ liệu': 'Search modules or records', 'Kết quả tìm kiếm': 'Search results', 'Kết quả: {count}': 'Results: {count}',
+  'Chứng từ thuế theo ngày hạch toán': 'Tax documents by posting date',
   'loại dữ liệu': 'data types', 'Không tìm thấy module hoặc dữ liệu phù hợp.': 'No matching modules or records found.',
   'Định dạng ngày và số': 'Date and number format', 'Ngôn ngữ giao diện': 'Interface language',
   'Tiếng Việt': 'Vietnamese', 'Tiếng Anh': 'English', 'Bảo mật tài khoản': 'Account security',

@@ -5,6 +5,7 @@ const num = (value) => Number(value) || 0;
 function ReportTable({ headers, rows }) {
   if (!rows.length) return <div className="empty"><h3>{uiText("Chưa có phát sinh")}</h3><p>{uiText("Không có dữ liệu trong khoảng ngày đã chọn.")}</p></div>;
   return <div className="table-wrap"><table className="table">
+    <caption className="sr-only">{headers.map((header) => uiText(header)).join(' · ')}</caption>
     <thead><tr>{headers.map((header) => <th key={header} scope="col">{uiText(header)}</th>)}</tr></thead>
     <tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, index) => <td key={index} className={typeof cell === 'number' ? 'right money' : ''}>{typeof cell === 'number' ? fmtMoney(cell) : cell}</td>)}</tr>)}</tbody>
   </table></div>;
@@ -21,6 +22,7 @@ const TAX_DOCUMENT_KIND = {
 function TaxDocumentTable({ rows }) {
   if (!rows?.length) return <div className="empty"><h3>{uiText("Chưa có chứng từ")}</h3><p>{uiText("Không có chứng từ thuế trong khoảng ngày đã chọn.")}</p></div>;
   return <div className="table-wrap"><table className="table">
+    <caption className="sr-only">{uiText('Chứng từ thuế theo ngày hạch toán')}</caption>
     <thead><tr><th scope="col">{uiText("Ngày hạch toán")}</th><th scope="col">{uiText("Loại")}</th><th scope="col">{uiText("Đối tác")}</th><th scope="col">{uiText("Mã số thuế")}</th><th scope="col">{uiText("Dòng thuế")}</th><th scope="col" className="right">{uiText("Tổng tiền")}</th><th scope="col" className="right">{uiText("Tiền thuế")}</th></tr></thead>
     <tbody>{rows.map((document) => {
       const lines = Array.isArray(document.lines) ? document.lines : [];
@@ -29,7 +31,7 @@ function TaxDocumentTable({ rows }) {
         <td>{uiText(TAX_DOCUMENT_KIND[document.kind] || document.kind)}</td>
         <td>{document.counterparty || '—'}</td>
         <td className="mono">{document.taxCode || '—'}</td>
-        <td><details><summary>{lines.length} dòng</summary><div className="table-wrap"><table className="table"><thead><tr><th scope="col">{uiText("Hàng hóa / dịch vụ")}</th><th scope="col">{uiText("Thuế")}</th><th scope="col" className="right">{uiText("Cơ sở tính thuế")}</th><th scope="col" className="right">{uiText("Tiền thuế")}</th></tr></thead><tbody>{lines.map((line, index) => {
+        <td><details><summary>{lines.length} dòng</summary><div className="table-wrap"><table className="table"><caption className="sr-only">{["Hàng hóa / dịch vụ", "Thuế", "Cơ sở tính thuế", "Tiền thuế"].map(uiText).join(' · ')}</caption><thead><tr><th scope="col">{uiText("Hàng hóa / dịch vụ")}</th><th scope="col">{uiText("Thuế")}</th><th scope="col" className="right">{uiText("Cơ sở tính thuế")}</th><th scope="col" className="right">{uiText("Tiền thuế")}</th></tr></thead><tbody>{lines.map((line, index) => {
           const tax = Number(line.base_tax_amount) || 0;
           const base = Number(line.base_net_amount) || 0;
           const name = line.product_name || line.name || line.description || line.product || uiText('Dòng chứng từ');
