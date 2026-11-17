@@ -59,6 +59,7 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 - The BI workbench owns safe query construction, source permissions, scheduling, and persistence; `BiReportBuilderForm` renders controlled report criteria and emits field changes and submit requests through callbacks.
 - The POS terminal owns return permissions, the draft retry flow and persistence; `PosReturnDialog` edits controlled return quantities and reason, previews the refund, and emits submit/close callbacks.
 - The HR workbench owns attendance-date rules and punch actions; `AttendanceEntriesTable` renders the controlled daily records and emits punch-out requests.
+- The HR workbench owns leave and salary-revision decisions, employee permissions, and resubmission actions; `LeaveRequestsTable`, `EmployeeDirectoryTable`, and `SalaryRevisionsTable` render controlled records and emit the requested decisions through callbacks.
 - The HR workbench owns salary-revision permissions, submission and approval; `SalaryRevisionForm` renders controlled employee, effective-date, salary and reason fields and emits changes and submit requests.
 - The HR workbench owns schedule-pattern permissions, template selection, date limits and persistence; `WorkSchedulePatternForm` renders the controlled rotation schedule and emits form edits through callbacks.
 - The performance workbench owns key-result permissions and updates; `KeyResultProgressCard` renders a controlled progress meter and value field and emits edits and submit requests.
