@@ -4,6 +4,7 @@ import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
 import biEnglish from './bi.en.js';
+import BiReportBuilderForm from './components/BiReportBuilderForm.jsx';
 const t = (text) => uiTextWith(text, biEnglish);
 const asItems = (value) => Array.isArray(value?.items) ? value.items : [];
 const label = (value) => String(value ?? '—');
@@ -278,21 +279,19 @@ export default function BiReportsPage({ route }) {
       {can('bi.dashboard.create') && can('bi.report.read') && !creatingDashboard && <button className="btn" type="button" onClick={() => setCreatingDashboard(true)}>{t("Tạo dashboard")}</button>}
       {can('bi.kpi.create') && can('bi.report.read') && !creatingKpi && <button className="btn" type="button" onClick={() => setCreatingKpi(true)}>{t("Tạo KPI")}</button>}
     </div>
-    {creating && <section className="card report-section"><div className="card-head"><h2>{t("Thiết kế báo cáo")}</h2><button className="btn btn-ghost" type="button" onClick={() => setCreating(false)}>{t("Đóng")}</button></div><form className="card-pad stack" onSubmit={createReport}>
-      <div className="form-grid"><label className="field"><span>{t("Tên báo cáo")}</span><input className="input" required maxLength={160} value={draftName} onChange={(event) => setDraftName(event.target.value)} /></label>
-        <label className="field"><span>{t("Nguồn dữ liệu")}</span><select className="input" required value={selectedSource?.qname || ''} onChange={(event) => { setDraftSource(event.target.value); setDraftField(''); setDraftGroup(''); setDraftFilter(''); }}><option value="">{t("Chọn module và dữ liệu")}</option>{sources.map((source) => <option key={source.qname} value={source.qname}>{source.label}</option>)}</select></label>
-        <label className="field"><span>{t("Kiểu kết quả")}</span><select className="input" value={draftOperation} onChange={(event) => { setDraftOperation(event.target.value); setDraftField(''); setDraftGroup(''); }}><option value="rows">{t("Danh sách bản ghi")}</option><option value="count">{t("Đếm bản ghi")}</option><option value="sum">{t("Tổng")}</option><option value="avg">{t("Trung bình")}</option><option value="min">{t("Nhỏ nhất")}</option><option value="max">{t("Lớn nhất")}</option></select></label>
-        {draftOperation !== 'rows' && draftOperation !== 'count' && <label className="field"><span>{t("Trường số cần tính")}</span><select className="input" required value={draftField} onChange={(event) => setDraftField(event.target.value)}><option value="">{t("Chọn trường")}</option>{numericFields.map((field) => <option key={field.name} value={field.name}>{field.label || field.name}</option>)}</select></label>}
-        {draftOperation !== 'rows' && <label className="field"><span>{t("Nhóm theo (không bắt buộc)")}</span><select className="input" value={draftGroup} onChange={(event) => setDraftGroup(event.target.value)}><option value="">{t("Không nhóm")}</option>{groupFields.map((field) => <option key={field.name} value={field.name}>{field.label || field.name}</option>)}</select></label>}
-        <label className="field"><span>{t("Tìm kiếm văn bản (không bắt buộc)")}</span><input className="input" value={draftSearch} onChange={(event) => setDraftSearch(event.target.value)} /></label>
-        <label className="field"><span>{t("Lịch chạy snapshot")}</span><select className="input" value={draftSchedule} onChange={(event) => setDraftSchedule(event.target.value)}><option value="">{t("Chạy thủ công")}</option><option value="daily">{t("Hằng ngày")}</option><option value="weekly">{t("Hằng tuần")}</option></select><span className="small muted">{t("Lịch dùng UTC; snapshot tiếp theo chạy sau một chu kỳ.")}</span></label>
-        <label className="field"><span>{t("Email nhận báo cáo (không bắt buộc)")}</span><textarea className="input" rows="3" value={draftRecipients} onChange={(event) => setDraftRecipients(event.target.value)} placeholder="name@example.com, team@example.com" disabled={!draftSchedule} /><span className="small muted">{t("Đính kèm CSV sau mỗi lần chạy theo lịch; cần cấu hình SMTP hoặc email provider.")}</span></label>
-        <label className="field"><span>{t("Lọc theo trường (không bắt buộc)")}</span><select className="input" value={draftFilter} onChange={(event) => setDraftFilter(event.target.value)}><option value="">{t("Không lọc")}</option>{sourceFields.filter((field) => field.type !== 'json').map((field) => <option key={field.name} value={field.name}>{field.label || field.name}</option>)}</select></label>
-        {draftFilter && <label className="field"><span>{t("Giá trị lọc chính xác")}</span><input className="input" value={draftFilterValue} onChange={(event) => setDraftFilterValue(event.target.value)} /></label>}
-      </div>
-      {!sources.length && <p className="small muted">{t("Bạn chưa có quyền đọc nguồn dữ liệu nào để thiết kế báo cáo.")}</p>}
-      <div className="row"><button className="btn btn-primary" type="submit" disabled={savingReport || !selectedSource}>{savingReport ? t('Đang lưu…') : t('Lưu và chạy báo cáo')}</button></div>
-    </form></section>}
+    {creating && <BiReportBuilderForm
+      sources={sources} selectedSource={selectedSource} sourceFields={sourceFields}
+      numericFields={numericFields} groupFields={groupFields} name={draftName}
+      operation={draftOperation} field={draftField} group={draftGroup} search={draftSearch}
+      filter={draftFilter} filterValue={draftFilterValue} schedule={draftSchedule}
+      recipients={draftRecipients} saving={savingReport} onNameChange={setDraftName}
+      onSourceChange={(value) => { setDraftSource(value); setDraftField(''); setDraftGroup(''); setDraftFilter(''); }}
+      onOperationChange={(value) => { setDraftOperation(value); setDraftField(''); setDraftGroup(''); }}
+      onFieldChange={setDraftField} onGroupChange={setDraftGroup} onSearchChange={setDraftSearch}
+      onFilterChange={setDraftFilter} onFilterValueChange={setDraftFilterValue}
+      onScheduleChange={setDraftSchedule} onRecipientsChange={setDraftRecipients}
+      onSubmit={createReport} onClose={() => setCreating(false)} t={t}
+    />}
     {creatingDashboard && <section className="card report-section"><div className="card-head"><h2>{t("Tạo dashboard")}</h2><button className="btn btn-ghost" type="button" onClick={() => setCreatingDashboard(false)}>{t("Đóng")}</button></div><form className="card-pad stack" onSubmit={createDashboard}>
       <label className="field"><span>{t("Tên dashboard")}</span><input className="input" required maxLength={160} value={dashboardName} onChange={(event) => setDashboardName(event.target.value)} /></label>
       <div className="form-grid"><label className="field"><span>{t("Báo cáo")}</span><select className="input" value={widgetReportId} onChange={(event) => { const next = reports.find((item) => item.id === event.target.value); setWidgetReportId(event.target.value); setWidgetType(reportWidgetTypes(next)[0]); }}><option value="">{t("Chọn báo cáo đã lưu")}</option>{reports.filter((item) => item.query).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
