@@ -8,7 +8,7 @@ Chọn theo việc bạn cần làm.
 | Hiểu các module nối với nhau thế nào, vì sao thiết kế vậy | [ARCHITECTURE.md](ARCHITECTURE.md) → [adr/](adr) |
 | Kiến trúc Rust theo bounded context và lộ trình port | [RUST-MODULAR-ARCHITECTURE.md](RUST-MODULAR-ARCHITECTURE.md) · [ADR-0007](adr/0007-rust-bounded-contexts.md) |
 | Viết module mới / thêm ngành mới | [MODULE-AUTHORING.md](MODULE-AUTHORING.md) |
-| Làm giao diện nhất quán, đạt chuẩn truy cập | [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md) |
+| Phát triển giao diện React nhất quán, đạt chuẩn truy cập | [FRONTEND-ARCHITECTURE.md](FRONTEND-ARCHITECTURE.md) · [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md) · [ADR-0009](adr/0009-react-vite-frontend.md) |
 | Tích hợp qua API | [API.md](API.md) · [openapi.json](openapi.json) |
 | Triển khai, sao lưu, vận hành | [DEPLOYMENT.md](DEPLOYMENT.md) |
 | Đánh giá bảo mật, tuân thủ | [SECURITY.md](SECURITY.md) |
