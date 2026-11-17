@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
-import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { confirmDialog, toast } from '../../lib/feedback.js';
 import EntityFormDialog from './EntityFormDialog.jsx';
@@ -231,9 +230,11 @@ export default function EntityListPage({ qname }) {
           {!total && canCreate && <button className="btn btn-primary" type="button" onClick={create}>＋ {uiText('Tạo bản ghi')}</button>}
         </div> : <div className="table-wrap">
           <table className="table">
-            <thead><tr>{selectable && <th scope="col"><input className="bulk-select" type="checkbox" aria-label={uiText('Chọn tất cả bản ghi trên trang')} checked={allRowsSelected} disabled={Boolean(bulkAction)} onChange={togglePage} /></th>}{columns.map((field) => <th key={field.name} scope="col" className={['money', 'number'].includes(field.type) ? 'right' : ''}>{uiText(fieldLabelOf(qname, field.name))}</th>)}</tr></thead>
-            <tbody>{rows.map((record) => <tr {...selectableTableRowProps} key={record.id} className="clickable" onClick={() => { location.hash = recordHref(qname, record.id); }}>
+            <caption className="sr-only">{uiText('Danh sách')} {uiText(entityLabel(qname)).toLowerCase()}</caption>
+            <thead><tr>{selectable && <th scope="col"><input className="bulk-select" type="checkbox" aria-label={uiText('Chọn tất cả bản ghi trên trang')} checked={allRowsSelected} disabled={Boolean(bulkAction)} onChange={togglePage} /></th>}{columns.map((field) => <th key={field.name} scope="col" className={['money', 'number'].includes(field.type) ? 'right' : ''}>{uiText(fieldLabelOf(qname, field.name))}</th>)}{columns.length === 0 && <th scope="col">{uiText('Mở bản ghi')}</th>}</tr></thead>
+            <tbody>{rows.map((record) => <tr key={record.id} className="clickable" onClick={() => { location.hash = recordHref(qname, record.id); }}>
               {selectable && <td><input className="bulk-select" type="checkbox" aria-label={`${uiText('Chọn')} ${uiText(recordLabel(qname, record))}`} checked={selectedIds.has(record.id)} disabled={Boolean(bulkAction)} onClick={(event) => event.stopPropagation()} onChange={() => toggleRow(record.id)} /></td>}
+              {columns.length === 0 && <td><a href={recordHref(qname, record.id)} aria-label={`${uiText('Mở bản ghi')} ${record.id}`} onClick={(event) => event.stopPropagation()}>{String(record.id).slice(0, 8)}</a></td>}
               {columns.map((field, index) => <td key={field.name} className={['money', 'number'].includes(field.type) ? 'right' : ''}>
                 {index === 0 && field.type !== 'ref'
                   ? <a href={recordHref(qname, record.id)} onClick={(event) => event.stopPropagation()}><FieldValue qname={qname} field={field} record={record} definition={definition} refs={refs} /></a>
