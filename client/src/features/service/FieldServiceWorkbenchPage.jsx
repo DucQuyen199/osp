@@ -36,9 +36,11 @@ export default function FieldServiceWorkbenchPage() {
       const showInvoices = can('accounting.invoice.read');
       const showTickets = can('helpdesk.ticket.read');
       const [orderResponse, partyMap, productMap, unitMap, warehouseMap, invoiceResponse, ticketResponse, employeeMap] = await Promise.all([
-        loadAllResponse('field-service.work_order'), loadRefs('master-data.party'), loadRefs('master-data.product'),
+        can('field-service.work_order.read') ? loadAllResponse('field-service.work_order') : Promise.resolve({ items: [] }),
+        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
+        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
         can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
-        loadRefs('inventory.warehouse'),
+        can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
         showInvoices ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
         showTickets ? loadAllResponse('helpdesk.ticket') : Promise.resolve({ items: [] }),
         can('hrm.employee.read') ? loadRefs('hrm.employee') : Promise.resolve(new Map()),
