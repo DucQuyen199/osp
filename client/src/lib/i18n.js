@@ -225,6 +225,8 @@ function dynamicEnglishText(text) {
   if (rowObject) return `Row ${rowObject[1]} must be a JSON object.`;
   const onlyField = String(text).match(/^Cần gửi duy nhất trường ([\w.-]+)$/);
   if (onlyField) return `Send only the ${onlyField[1]} field.`;
+  const finiteAmount = String(text).match(/^([\w.-]+) phải là số tiền hữu hạn$/);
+  if (finiteAmount) return `${finiteAmount[1]} must be a finite amount.`;
   return undefined;
 }
 
