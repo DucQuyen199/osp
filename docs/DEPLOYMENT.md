@@ -49,6 +49,10 @@ Before users enable TOTP, configure `OSP_TOTP_ENCRYPTION_KEY` with the Base64 en
 
 Set `OSP_METRICS_TOKEN` to a random secret of at least 32 characters to enable `GET /metrics`. Without it, the endpoint returns 404. Scrapes require `Authorization: Bearer <token>`. The endpoint exposes aggregate HTTP request counts by status class and response-time histogram only; it does not label or reveal tenant data. Keep the scrape on a private network or use HTTPS through the reverse proxy, and store the token in the secret manager.
 
+### Optional distributed tracing
+
+Run an OpenTelemetry Collector or another OTLP/HTTP receiver, then set `OTEL_EXPORTER_OTLP_ENDPOINT` to its base URL (for example `http://otel-collector:4318`) or set `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` to the complete trace URL (for example `http://otel-collector:4318/v1/traces`). Tracing stays disabled when neither endpoint is set. This build exports HTTP/protobuf batches over HTTP; the exporter also accepts the standard OTLP headers and timeout variables. Incoming W3C `traceparent` is continued. Only HTTP request spans are exported, with method and request ID; URL paths and worker events are excluded to avoid tenant or record identifiers. Keep collector access private or use HTTPS, and put credentials in the secret manager. The provider flushes its batch during graceful shutdown.
+
 ### E-invoice provider (optional)
 
 The Rust worker issues posted accounting invoices and processes cancellation requests through the configured HTTPS REST contract. Set `OSP_EINVOICE_ENDPOINT`, `OSP_EINVOICE_PROVIDER`, and `OSP_EINVOICE_TOKEN` in `.env`; `OSP_EINVOICE_TIMEOUT_SEC` accepts 1–120 seconds, `OSP_EINVOICE_CONCURRENCY` accepts 1–16 (default 2) to control simultaneous requests per worker, and `OSP_EINVOICE_INTERVAL_SEC=0` disables the worker. Transient network, HTTP 408/425/429, and 5xx errors retry automatically up to eight attempts with a one-minute to 64-minute exponential delay; permanent provider rejections remain failed for operator review. Manual retry resets the attempt counter. Without an endpoint, requests remain pending. Every issue and cancellation request includes `X-OSP-Tenant-ID`; the provider must route it to the matching tenant account. It must honor the tenant-scoped `Idempotency-Key` header for safe recovery after a worker restart. The generic adapter is not certified for a vendor API; map the payload and response to the actual provider contract before enabling production issuance.
@@ -82,8 +86,11 @@ Doanh nghiệp tạo ra chỉ chọn được trong số module đã cài; modul
 | `OSP_SIGNUP` | `0` trong Compose; script khởi tạo đặt `1` | Tắt sau khi tạo tenant/quản trị viên đầu tiên |
 | `OSP_TOTP_ENCRYPTION_KEY` | rỗng | Khóa Base64 32 byte để mã hóa bí mật TOTP; bắt buộc trước khi bất kỳ người dùng nào bật MFA |
 | `OSP_METRICS_TOKEN` | rỗng | Bật `/metrics` khi là bí mật ngẫu nhiên từ 32 ký tự; giữ endpoint trong mạng giám sát riêng |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | rỗng | Bật trace OTLP/HTTP khi cấu hình URL gốc; exporter tự thêm `/v1/traces` |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | rỗng | Bật trace OTLP/HTTP với URL đầy đủ; ưu tiên hơn endpoint chung |
+| `OTEL_EXPORTER_OTLP_TRACES_HEADERS` | rỗng | Header xác thực/định tuyến của exporter; lưu token trong secret manager |
 | `OSP_OUTBOX_INTERVAL_SEC` | `2` | Chu kỳ worker webhook outbox; đặt `0` để tạm dừng worker |
-| `NODE_ENV=production` | — | Tắt demo mặc định, bật log truy cập JSON (mỗi dòng: thời gian, request id, IP, phương thức, đường dẫn, trạng thái, ms) |
+| `NODE_ENV=production` | — | Tắt demo mặc định, bật log truy cập JSON (thời gian, request ID, phương thức, trạng thái, thời gian xử lý) |
 
 Máy chủ tắt êm khi nhận `SIGINT`/`SIGTERM` (đóng DB).
 

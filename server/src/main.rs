@@ -12,6 +12,9 @@
 //!   OSP_JOBS_INTERVAL_SEC   chu kỳ tác vụ theo lịch (mặc định 60; 0 = tắt)
 //!   OSP_PG_DIR          (PostgreSQL nhúng) thư mục dữ liệu, mặc định ./data/pg
 //!   NODE_ENV=production hoặc OSP_ENV=production   tắt demo mặc định, bật log JSON
+use opentelemetry::trace::TracerProvider as _;
+use opentelemetry_otlp::{Protocol, SpanExporter, WithExportConfig};
+use opentelemetry_sdk::{Resource, propagation::TraceContextPropagator, trace::SdkTracerProvider};
 use osp_server::{
     app_state, build_kernel, default_public_dir, http::AppConfig, router,
     spawn_communication_worker, spawn_einvoice_worker, spawn_outbox_worker, spawn_scheduler,
@@ -19,6 +22,7 @@ use osp_server::{
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
 fn flag(name: &str, default: bool) -> bool {
     match std::env::var(name) {
@@ -42,14 +46,7 @@ async fn run() {
         .is_ok_and(|v| v == "production");
     let filter =
         tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into());
-    if production {
-        tracing_subscriber::fmt()
-            .json()
-            .with_env_filter(filter)
-            .init();
-    } else {
-        tracing_subscriber::fmt().with_env_filter(filter).init();
-    }
+    let tracer_provider = init_observability(production, filter);
 
     let process_role = std::env::var("OSP_PROCESS_ROLE").unwrap_or_else(|_| "all".into());
     if !matches!(process_role.as_str(), "api" | "worker" | "all") {
@@ -137,6 +134,7 @@ async fn run() {
         if let Some(pg) = embedded {
             let _ = pg.stop().await;
         }
+        shutdown_tracing(tracer_provider);
         return;
     }
 
@@ -176,9 +174,94 @@ async fn run() {
     .await
     .unwrap_or_else(|e| fatal(&e.to_string()));
 
+    shutdown_tracing(tracer_provider);
+
     #[cfg(feature = "embedded-pg")]
     if let Some(pg) = embedded {
         let _ = pg.stop().await;
+    }
+}
+
+fn init_observability(
+    production: bool,
+    filter: tracing_subscriber::EnvFilter,
+) -> Option<SdkTracerProvider> {
+    let endpoint_configured = [
+        "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+    ]
+    .iter()
+    .any(|name| std::env::var(name).is_ok_and(|value| !value.trim().is_empty()));
+
+    let provider = if endpoint_configured {
+        match SpanExporter::builder()
+            .with_http()
+            .with_protocol(Protocol::HttpBinary)
+            .build()
+        {
+            Ok(exporter) => Some(
+                SdkTracerProvider::builder()
+                    .with_batch_exporter(exporter)
+                    .with_resource(Resource::builder().with_service_name("osp-server").build())
+                    .build(),
+            ),
+            Err(error) => {
+                eprintln!("Không khởi tạo được OTLP trace exporter: {error}");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
+    if production {
+        let subscriber = tracing_subscriber::registry()
+            .with(filter)
+            .with(tracing_subscriber::fmt::layer().json());
+        if let Some(provider) = &provider {
+            subscriber
+                .with(
+                    tracing_opentelemetry::layer()
+                        .with_tracer(provider.tracer("osp-server"))
+                        .with_filter(tracing_subscriber::filter::filter_fn(|metadata| {
+                            metadata.is_span() && metadata.name() == "http"
+                        })),
+                )
+                .init();
+        } else {
+            subscriber.init();
+        }
+    } else {
+        let subscriber = tracing_subscriber::registry()
+            .with(filter)
+            .with(tracing_subscriber::fmt::layer());
+        if let Some(provider) = &provider {
+            subscriber
+                .with(
+                    tracing_opentelemetry::layer()
+                        .with_tracer(provider.tracer("osp-server"))
+                        .with_filter(tracing_subscriber::filter::filter_fn(|metadata| {
+                            metadata.is_span() && metadata.name() == "http"
+                        })),
+                )
+                .init();
+        } else {
+            subscriber.init();
+        }
+    }
+
+    if provider.is_some() {
+        tracing::info!("OTLP HTTP/protobuf distributed tracing enabled");
+    }
+    provider
+}
+
+fn shutdown_tracing(provider: Option<SdkTracerProvider>) {
+    if let Some(provider) = provider {
+        if let Err(error) = provider.shutdown() {
+            eprintln!("Không flush được OpenTelemetry trace provider: {error}");
+        }
     }
 }
 

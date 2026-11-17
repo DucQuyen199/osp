@@ -7,11 +7,12 @@ use crate::{
 use axum::{
     Router,
     extract::{Request, State},
-    http::{HeaderName, HeaderValue, header},
+    http::{HeaderMap, HeaderName, HeaderValue, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{any, get, post},
 };
+use opentelemetry::{global, propagation::Extractor};
 use std::{path::PathBuf, sync::Arc};
 use tower::{ServiceBuilder, ServiceExt};
 use tower_http::{
@@ -22,6 +23,7 @@ use tower_http::{
     set_header::SetResponseHeaderLayer,
     trace::{DefaultOnResponse, TraceLayer},
 };
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 pub const CSP: &str = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 
@@ -62,11 +64,18 @@ pub fn router(state: Arc<AppState>) -> Router {
                 .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
                 .layer(PropagateRequestIdLayer::x_request_id())
                 .layer(TraceLayer::new_for_http().make_span_with(move |request: &Request| {
-                    if request_log {
-                        tracing::info_span!("http", method = %request.method(), path = %request.uri().path(), request_id = ?request.headers().get("x-request-id"))
+                    let parent = global::get_text_map_propagator(|propagator| {
+                        propagator.extract(&HeaderExtractor(request.headers()))
+                    });
+                    let span = if request_log {
+                        // Do not attach URL paths here: tenant and record IDs are
+                        // present in API paths and must not reach trace backends.
+                        tracing::info_span!("http", method = %request.method(), request_id = ?request.headers().get("x-request-id"))
                     } else {
-                        tracing::debug_span!("http", method = %request.method(), path = %request.uri().path(), request_id = ?request.headers().get("x-request-id"))
-                    }
+                        tracing::debug_span!("http", method = %request.method(), request_id = ?request.headers().get("x-request-id"))
+                    };
+                    let _ = span.set_parent(parent);
+                    span
                 }).on_response(DefaultOnResponse::new().level(if request_log { tracing::Level::INFO } else { tracing::Level::DEBUG })))
                 .layer(SetResponseHeaderLayer::if_not_present(header::CACHE_CONTROL, HeaderValue::from_static("no-store")))
                 .layer(SetResponseHeaderLayer::overriding(HeaderName::from_static("content-security-policy"), HeaderValue::from_static(CSP)))
@@ -78,6 +87,21 @@ pub fn router(state: Arc<AppState>) -> Router {
                     ApiError::internal("HTTP handler panicked").into_response()
                 })),
         )
+}
+
+struct HeaderExtractor<'a>(&'a HeaderMap);
+
+impl Extractor for HeaderExtractor<'_> {
+    fn get(&self, key: &str) -> Option<&str> {
+        self.0.get(key).and_then(|value| value.to_str().ok())
+    }
+
+    fn keys(&self) -> Vec<&str> {
+        self.0
+            .keys()
+            .filter_map(|key| key.as_str().into())
+            .collect()
+    }
 }
 
 async fn normalize_request_id(mut request: Request, next: Next) -> Response {
