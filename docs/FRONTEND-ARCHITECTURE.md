@@ -41,6 +41,7 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 - The school workbench owns the atomic contact-and-student creation flow and pending-contact recovery; `StudentIntakeForm` renders controlled learner fields and submits through a callback.
 - The school workbench owns tuition issuance permissions and invoice actions; `TuitionLedgerTable` renders controlled fee and invoice records and emits issuance requests through a callback.
 - The school workbench owns grade filters, permissions and persistence; `GradebookSection` renders controlled class, term and subject filters with editable grade rows.
+- The HRM workbench owns shift schedule validation, time-zone conversion and persistence; `WorkScheduleEntriesPanel` renders the controlled day override form and schedule exception list.
 - The manufacturing workbench keeps production commands and output drafts in `ManufacturingWipPage`; `ProductionOrderCard` renders the controlled output fields and emits requested transitions.
 - The manufacturing workbench owns production-order permissions and creation; `ProductionOrderForm` renders the controlled BOM, warehouse, work-center, lot and scrap-account fields and emits changes through a callback.
 - The manufacturing workbench owns BOM permissions and persistence; `BillOfMaterialsSection` renders controlled BOM and component fields and emits edits through callbacks.
