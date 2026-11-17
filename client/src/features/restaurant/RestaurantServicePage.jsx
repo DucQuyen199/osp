@@ -48,10 +48,13 @@ export default function RestaurantServicePage() {
       const canReadInvoices = app.meta?.modules?.some((module) => module.id === 'accounting') && can('accounting.payment.read');
       const canReadReservations = can('restaurant.reservation.read');
       const [tableResponse, menuResponse, recipeResponse, orderResponse, productMap, unitMap, warehouseMap, ticketResponse, invoiceResponse, reservationResponse] = await Promise.all([
-        loadAllResponse('restaurant.table'), loadAllResponse('restaurant.menu_item'),
+        can('restaurant.table.read') ? loadAllResponse('restaurant.table') : Promise.resolve({ items: [] }),
+        can('restaurant.menu_item.read') ? loadAllResponse('restaurant.menu_item') : Promise.resolve({ items: [] }),
         can('restaurant.recipe.read') ? loadAllResponse('restaurant.recipe') : Promise.resolve({ items: [] }),
-        loadAllResponse('restaurant.table_order'), loadRefs('master-data.product'),
-        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()), loadRefs('inventory.warehouse'),
+        can('restaurant.table_order.read') ? loadAllResponse('restaurant.table_order') : Promise.resolve({ items: [] }),
+        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
+        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
+        can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
         canReadTickets ? loadAllResponse('restaurant.kitchen_ticket') : Promise.resolve({ items: [] }),
         canReadInvoices ? loadAllResponse('accounting.payment') : Promise.resolve({ items: [] }),
         canReadReservations ? loadAllResponse('restaurant.reservation') : Promise.resolve({ items: [] }),
