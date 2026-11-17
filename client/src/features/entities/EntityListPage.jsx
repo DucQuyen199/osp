@@ -4,6 +4,8 @@ import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { confirmDialog, toast } from '../../lib/feedback.js';
 import EntityFormDialog from './EntityFormDialog.jsx';
 import EntityImportDialog from './EntityImportDialog.jsx';
+import EntityListPager from './components/EntityListPager.jsx';
+import EntityListToolbar from './components/EntityListToolbar.jsx';
 import EntityRecordsTable from './components/EntityRecordsTable.jsx';
 import {
   can, entity, entityLabel, invalidateRefs, listColumns, loadRefs, moduleOf,
@@ -172,25 +174,13 @@ export default function EntityListPage({ qname }) {
       </div>
     </div>
     <section className="card" aria-label={`${uiText('Danh sách')} ${uiText(entityLabel(qname)).toLowerCase()}`}>
-      <div className="toolbar">
-        <label className="search">
-          <span className="sr-only">{uiText('Tìm')} {uiText(entityLabel(qname)).toLowerCase()}</span>
-          <input className="input" type="search" value={query} onChange={(event) => { setQuery(event.target.value); setPage(0); }} placeholder={`${uiText('Tìm')} ${uiText(entityLabel(qname)).toLowerCase()}…`} />
-        </label>
-        {definition.states && <label>
-          <span className="sr-only">{uiText('Lọc theo trạng thái')}</span>
-          <select className="select" value={status} onChange={(event) => { setStatus(event.target.value); setPage(0); }}>
-            <option value="">{uiText('Mọi trạng thái')}</option>
-            {states.map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}
-          </select>
-        </label>}
-      </div>
-      {selectable && selectedRows.length > 0 && <div className="toolbar" aria-label={uiText('Thao tác hàng loạt')}>
-        <span className="muted">{uiText('Đã chọn')} {fmtNumber(selectedRows.length)} {uiText('bản ghi')}</span>
-        {bulkActions.map(([action, transition]) => <button key={action} className="btn btn-sm" type="button" disabled={Boolean(bulkAction)} onClick={() => runBulkAction(action, transition)}>
-          {bulkAction === action ? uiText('Đang xử lý…') : actionLabel(action)}
-        </button>)}
-      </div>}
+      <EntityListToolbar
+        entityName={uiText(entityLabel(qname)).toLowerCase()} hasStates={Boolean(definition.states)} states={states}
+        query={query} status={status} selectable={selectable} selectedCount={selectedRows.length}
+        bulkActions={bulkActions} busy={bulkAction}
+        onQueryChange={(value) => { setQuery(value); setPage(0); }}
+        onStatusChange={(value) => { setStatus(value); setPage(0); }} onBulkAction={runBulkAction}
+      />
       {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
       {loading ? <div className="skeleton" data-h="row" aria-label={uiText('Đang tải danh sách')} />
         : rows.length === 0 ? <div className="empty">
@@ -203,13 +193,7 @@ export default function EntityListPage({ qname }) {
           onTogglePage={togglePage} onToggleRow={toggleRow}
           onOpenRecord={(record) => { location.hash = recordHref(qname, record.id); }}
         />}
-      <div className="pager">
-        <span aria-live="polite">{fmtNumber(total)} {uiText('bản ghi')} · {uiText('trang')} {page + 1}/{pages}</span>
-        <div className="row">
-          <button className="btn btn-sm" type="button" disabled={loading || page === 0} onClick={() => setPage((value) => Math.max(0, value - 1))}>{uiText('Trước')}</button>
-          <button className="btn btn-sm" type="button" disabled={loading || page >= pages - 1} onClick={() => setPage((value) => value + 1)}>{uiText('Sau')}</button>
-        </div>
-      </div>
+      <EntityListPager total={total} page={page} pages={pages} loading={loading} onPageChange={setPage} />
     </section>
   </div>
   {formOpen && <EntityFormDialog qname={qname} onClose={() => setFormOpen(false)} onSaved={created} />}
