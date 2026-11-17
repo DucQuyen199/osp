@@ -221,6 +221,10 @@ function dynamicEnglishText(text) {
   if (bodySize) return `Request body is too large (>${bodySize[1]} KB)`;
   const httpStatus = String(text).match(/^Lỗi (\d{3})$/);
   if (httpStatus) return `Request failed (HTTP ${httpStatus[1]})`;
+  const rowObject = String(text).match(/^Dòng (\d+) phải là một đối tượng JSON$/);
+  if (rowObject) return `Row ${rowObject[1]} must be a JSON object.`;
+  const onlyField = String(text).match(/^Cần gửi duy nhất trường ([\w.-]+)$/);
+  if (onlyField) return `Send only the ${onlyField[1]} field.`;
   return undefined;
 }
 
