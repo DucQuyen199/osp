@@ -546,6 +546,10 @@ for (const [vertical, hash, label, summaryEntity, setupEntity] of verticalScreen
     must(setupEntities.includes(setupEntity), `${label} onboarding is missing ${setupEntity}`);
   });
   if (process.env.E2E_ALL_NAV === '1') {
+    await page.evaluate(() => localStorage.setItem('osp.uiLocale', 'en-US'));
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.goto(`${BASE}/#/`, { waitUntil: 'networkidle0' });
+    await page.waitForSelector('.sidebar');
     const navigationRoutes = await page.$$eval('.sidebar a.nav-link', (links) => [...new Set(links
       .map((link) => link.getAttribute('href'))
       .filter((href) => href?.startsWith('#/') && href !== '#/' && !href.startsWith('#/m/') && !href.startsWith('#/e/')))]);
@@ -555,9 +559,14 @@ for (const [vertical, hash, label, summaryEntity, setupEntity] of verticalScreen
         await page.waitForSelector('h1');
         must(!(await page.$('.route-error')), `${navHash} route failed to render`);
         must(!(await page.$('.not-found-page')), `${navHash} route resolved to not found`);
+        const heading = await page.$eval('#main h1', (node) => node.textContent);
+        must(!/[\u00C0-\u01FF\u1E00-\u1EFF]/u.test(heading), `${navHash} heading is not translated to English: ${heading}`);
         await axe(`${label} ${navHash}`);
       });
     }
+    await page.evaluate(() => localStorage.setItem('osp.uiLocale', 'vi-VN'));
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.goto(`${BASE}/#/`, { waitUntil: 'networkidle0' });
   }
 }
 
