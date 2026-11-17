@@ -53,9 +53,15 @@ export default function AgricultureOperationsPage() {
     setLoading(true); setError(''); if (!preserveNotice) setNotice('');
     try {
       const [farmResponse, cycleResponse, harvestResponse, inputResponse, productMap, unitMap, warehouseMap, partyMap, lotMap] = await Promise.all([
-        loadAllResponse('agriculture.farm'), loadAllResponse('agriculture.crop_cycle'),
-        loadAllResponse('agriculture.harvest'), loadAllResponse('agriculture.input_application'),
-        loadRefs('master-data.product'), can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()), loadRefs('inventory.warehouse'), loadRefs('master-data.party'), loadRefs('inventory.lot'),
+        can('agriculture.farm.read') ? loadAllResponse('agriculture.farm') : Promise.resolve({ items: [] }),
+        can('agriculture.crop_cycle.read') ? loadAllResponse('agriculture.crop_cycle') : Promise.resolve({ items: [] }),
+        can('agriculture.harvest.read') ? loadAllResponse('agriculture.harvest') : Promise.resolve({ items: [] }),
+        can('agriculture.input_application.read') ? loadAllResponse('agriculture.input_application') : Promise.resolve({ items: [] }),
+        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
+        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
+        can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
+        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
+        can('inventory.lot.read') ? loadRefs('inventory.lot') : Promise.resolve(new Map()),
       ]);
       const farmItems = listItems(farmResponse);
       const cycleItems = listItems(cycleResponse).sort((a, b) => String(a.expected_harvest || '9999').localeCompare(String(b.expected_harvest || '9999')));
