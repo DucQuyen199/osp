@@ -18,7 +18,7 @@ Tài liệu mô tả những gì hệ thống **đã làm**, những gì **chưa
 - **Token:** tiền tố `osp_` và hai UUID v4 ngẫu nhiên ở dạng hex. Chỉ lưu **SHA-256** của token; DB bị lộ không đủ để dùng lại token. Danh sách token chỉ trả 12 ký tự đầu của băm làm mã định danh.
 - **Phiên** hết hạn sau 12 giờ; bị thu hồi khi đăng xuất, đổi mật khẩu, khóa tài khoản. **API token** có thể đặt hạn.
 - Người dùng có thể xem thời gian bắt đầu/hết hạn và tự thu hồi mọi phiên trình duyệt khác trong **Bảo mật tài khoản**; thao tác này chỉ tác động các phiên của chính họ.
-- Endpoint Prometheus `/metrics` tắt mặc định; khi bật cần bearer token ngẫu nhiên ≥32 ký tự và chỉ nên được scrape qua mạng riêng/HTTPS. Metrics chỉ dùng nhãn status class, không có tenant hoặc user labels.
+- Endpoint Prometheus `/metrics` tắt mặc định; khi bật cần bearer token ngẫu nhiên ≥32 ký tự và chỉ nên được scrape qua mạng riêng/HTTPS. Các bộ đếm lỗi nghiệp vụ và integration outbox dead-letter là số tổng hợp toàn hệ thống, không có tenant hoặc user labels.
 - Trace OTLP tắt mặc định; chỉ bật khi cấu hình endpoint collector. Lớp xuất trace chỉ nhận span HTTP có method/request ID, bỏ URL path và sự kiện worker để tránh gửi tenant/record ID từ nghiệp vụ. Giữ collector riêng tư hoặc dùng HTTPS; xem cấu hình trong [DEPLOYMENT.md](DEPLOYMENT.md#optional-distributed-tracing).
 - **Chống dò mật khẩu:** 5 lần sai / 15 phút cho mỗi (doanh nghiệp, email), thêm 30 lần đăng nhập/phút/IP.
 - Luôn còn ít nhất một quản trị viên hoạt động (không thể tự khóa mình ra khỏi hệ thống).

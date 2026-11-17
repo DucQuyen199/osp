@@ -209,6 +209,7 @@ CREATE TABLE IF NOT EXISTS osp_failures (
 );
 CREATE INDEX IF NOT EXISTS osp_failures_tenant ON osp_failures (tenant_id, status, created_at DESC);
 CREATE INDEX IF NOT EXISTS osp_failures_scheduled_retry ON osp_failures (tenant_id, module, event_type, updated_at DESC) WHERE rule_index = -1 AND status = 'open';
+CREATE INDEX IF NOT EXISTS osp_failures_open_count ON osp_failures (id) WHERE status = 'open';
 
 CREATE TABLE IF NOT EXISTS osp_outbox (
   id uuid PRIMARY KEY,
@@ -227,6 +228,7 @@ CREATE TABLE IF NOT EXISTS osp_outbox (
 );
 CREATE INDEX IF NOT EXISTS osp_outbox_ready ON osp_outbox (available_at, created_at) WHERE status IN ('pending', 'retry');
 CREATE INDEX IF NOT EXISTS osp_outbox_tenant_status ON osp_outbox (tenant_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS osp_outbox_dead_count ON osp_outbox (id) WHERE status = 'dead';
 ALTER TABLE osp_outbox ADD COLUMN IF NOT EXISTS destination_kind text NOT NULL DEFAULT 'webhook' CHECK (destination_kind IN ('webhook', 'connector'));
 ALTER TABLE osp_outbox ADD COLUMN IF NOT EXISTS destination_id uuid;
 UPDATE osp_outbox SET destination_id = webhook_id WHERE destination_id IS NULL;

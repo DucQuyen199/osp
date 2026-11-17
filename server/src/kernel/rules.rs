@@ -407,6 +407,20 @@ impl Kernel {
             .get(0))
     }
 
+    /// Aggregate operational alert counts for the protected Prometheus endpoint.
+    /// The result intentionally contains no tenant identifiers or labels.
+    pub async fn operational_alert_counts(&self) -> R<(i64, i64)> {
+        let conn = self.pool.get().await?;
+        let row = conn
+            .query_one(
+                "SELECT (SELECT count(*) FROM osp_failures WHERE status = 'open'), \
+                        (SELECT count(*) FROM osp_outbox WHERE status = 'dead')",
+                &[],
+            )
+            .await?;
+        Ok((row.get(0), row.get(1)))
+    }
+
     pub async fn dismiss_failure(&self, actor: &Actor, t: &Tenant, id: &str) -> R<()> {
         self.authorize(t, actor, "tenant.admin")?;
         let uid =

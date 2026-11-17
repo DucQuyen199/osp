@@ -53,7 +53,7 @@ impl HttpMetrics {
         self.duration_buckets[HTTP_DURATION_BUCKETS_MS.len()].fetch_add(1, Ordering::Relaxed);
     }
 
-    fn prometheus_text(&self) -> String {
+    fn prometheus_text(&self, open_failures: i64, dead_outbox: i64) -> String {
         let mut output = String::from(
             "# HELP osp_http_requests_total Total HTTP requests handled by OSP.\n# TYPE osp_http_requests_total counter\n",
         );
@@ -61,6 +61,10 @@ impl HttpMetrics {
             "osp_http_requests_total {}\n",
             self.requests.load(Ordering::Relaxed)
         ));
+        output.push_str("# HELP osp_open_failures Current count of unresolved workflow and scheduled-job failures across tenants.\n# TYPE osp_open_failures gauge\n");
+        output.push_str(&format!("osp_open_failures {open_failures}\n"));
+        output.push_str("# HELP osp_dead_outbox_deliveries Current count of dead-letter integration deliveries across tenants.\n# TYPE osp_dead_outbox_deliveries gauge\n");
+        output.push_str(&format!("osp_dead_outbox_deliveries {dead_outbox}\n"));
         output.push_str("# HELP osp_http_responses_total HTTP responses grouped by status class.\n# TYPE osp_http_responses_total counter\n");
         for (index, class) in ["1xx", "2xx", "3xx", "4xx", "5xx"].iter().enumerate() {
             output.push_str(&format!(
@@ -495,10 +499,14 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
         if !constant_time_token_eq(supplied_token.as_bytes(), expected_token.as_bytes()) {
             return Err(ApiError::new(404, "NOT_FOUND", "Không tìm thấy"));
         }
+        let (open_failures, dead_outbox) = k.operational_alert_counts().await?;
         return Ok(Reply::Raw {
             status: 200,
             content_type: "text/plain; version=0.0.4; charset=utf-8",
-            body: st.metrics.prometheus_text().into_bytes(),
+            body: st
+                .metrics
+                .prometheus_text(open_failures, dead_outbox)
+                .into_bytes(),
             extra: vec![],
         });
     }

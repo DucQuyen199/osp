@@ -47,7 +47,7 @@ Before users enable TOTP, configure `OSP_TOTP_ENCRYPTION_KEY` with the Base64 en
 
 ### Optional Prometheus metrics
 
-Set `OSP_METRICS_TOKEN` to a random secret of at least 32 characters to enable `GET /metrics`. Without it, the endpoint returns 404. Scrapes require `Authorization: Bearer <token>`. The endpoint exposes aggregate HTTP request counts by status class and response-time histogram only; it does not label or reveal tenant data. Keep the scrape on a private network or use HTTPS through the reverse proxy, and store the token in the secret manager.
+Set `OSP_METRICS_TOKEN` to a random secret of at least 32 characters to enable `GET /metrics`. Without it, the endpoint returns 404. Scrapes require `Authorization: Bearer <token>`. In addition to aggregate HTTP request counts by status class and response-time histogram, it exposes total counts of open workflow/job failures and dead-letter integration deliveries. These gauges contain no tenant labels or identifiers. Use [`prometheus-alerts.yml`](prometheus-alerts.yml) as a starting point for Prometheus rules, change its `job="osp"` selector to match the scrape job name you configure, then configure an Alertmanager receiver for email/chat/on-call delivery and adjust the `for` interval or threshold to your service objectives. Keep the scrape on a private network or use HTTPS through the reverse proxy, and store the token in the secret manager.
 
 ### Optional distributed tracing
 

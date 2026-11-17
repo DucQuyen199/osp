@@ -1,0 +1,29 @@
+groups:
+  - name: osp-suite-operational
+    rules:
+      - alert: OspMetricsTargetUnavailable
+        expr: up{job="osp"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Prometheus cannot scrape OSP
+          description: Check the OSP process, database connectivity, scrape URL, and bearer token.
+
+      - alert: OspOpenWorkflowFailures
+        expr: osp_open_failures > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: OSP has unresolved workflow or scheduled-job failures
+          description: '{{ $value }} unresolved failure(s) are waiting for review in the OSP admin workbench.'
+
+      - alert: OspDeadOutboxDeliveries
+        expr: osp_dead_outbox_deliveries > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: OSP has integration deliveries in the dead-letter queue
+          description: '{{ $value }} integration delivery/deliveries need review in the OSP outbox.'
