@@ -231,6 +231,20 @@ function dynamicEnglishText(text) {
   if (mixedTemplates) return `This business account already uses template ${mixedTemplates[1]}; it cannot be mixed with ${mixedTemplates[2]}.`;
   const missingParent = String(text).match(/^Mẫu (.+) thiếu tài khoản cha (.+)$/);
   if (missingParent) return `Template ${missingParent[1]} is missing parent account ${missingParent[2]}.`;
+  const repairLine = String(text).match(/^Dòng sửa chữa (\d+): (.+)$/);
+  if (repairLine) {
+    const detail = {
+      'dữ liệu dòng không hợp lệ': 'line data is invalid',
+      'số lượng phải lớn hơn 0': 'quantity must be greater than zero',
+      'đơn giá không thể âm': 'unit price cannot be negative',
+      'phải chọn phụ tùng hoặc dịch vụ hợp lệ': 'select a valid part or service',
+      'sản phẩm không tồn tại trong doanh nghiệp': 'product does not exist in this business',
+      'sản phẩm đã ngừng kinh doanh': 'product is discontinued',
+      'sản phẩm chưa có đơn giá hợp lệ': 'product has no valid unit price',
+      'phụ tùng theo dõi tồn kho phải chọn sản phẩm': 'a stock-tracked part requires a product',
+    }[repairLine[2]];
+    if (detail) return `Repair line ${repairLine[1]}: ${detail}.`;
+  }
   return undefined;
 }
 
