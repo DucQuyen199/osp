@@ -232,6 +232,7 @@ await step('ngôn ngữ giao diện: chuyển đổi và lưu lựa chọn', asy
   must((await page.$eval('#main h1', (heading) => heading.textContent)) === 'Approval center', 'approval workbench is not translated');
   must(await clickText('Approval rules', '[role="tab"]'), 'approval rules tab is not translated');
   must((await page.$eval('#main h2', (heading) => heading.textContent)) === 'Rules by amount and role', 'approval rule setup is not translated');
+  must(await page.$$eval('#main select', (selects) => selects.some((select) => [...select.options].some((option) => option.value === 'accounting.journal_entry'))), 'manual journal approval target is missing');
   await axe('approval workbench tiếng Anh');
   const hrmModule = await page.evaluate(async () => {
     const session = JSON.parse(sessionStorage.getItem('osp.session') || localStorage.getItem('osp.session') || 'null');
