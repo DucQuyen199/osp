@@ -41,8 +41,12 @@ export default function AutoServiceWorkshopPage() {
     try {
       const showInvoices = app.meta?.modules?.some((module) => module.id === 'accounting') && can('accounting.invoice.read');
       const [vehicleResponse, orderResponse, partyMap, productMap, unitMap, warehouseMap, invoiceResponse] = await Promise.all([
-        loadAllResponse('auto-service.vehicle'), loadAllResponse('auto-service.repair_order'),
-        loadRefs('master-data.party'), loadRefs('master-data.product'), can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()), loadRefs('inventory.warehouse'),
+        can('auto-service.vehicle.read') ? loadAllResponse('auto-service.vehicle') : Promise.resolve({ items: [] }),
+        can('auto-service.repair_order.read') ? loadAllResponse('auto-service.repair_order') : Promise.resolve({ items: [] }),
+        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
+        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
+        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
+        can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
         showInvoices ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
       ]);
       const nextVehicles = itemsOf(vehicleResponse).sort((a, b) => String(a.plate || '').localeCompare(String(b.plate || '')));
