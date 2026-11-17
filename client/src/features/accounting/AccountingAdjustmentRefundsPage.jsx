@@ -43,7 +43,7 @@ export default function AccountingAdjustmentRefundsPage() {
         can('accounting.invoice.read') ? listAll('accounting.invoice') : Promise.resolve([]),
         can('accounting.bill.read') ? listAll('accounting.bill') : Promise.resolve([]),
         can('accounting.payment.read') ? listAll('accounting.payment') : Promise.resolve([]),
-        loadRefs('master-data.party'),
+        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
       ]);
       setNotes({ credit: creditRows.filter((row) => row.status === 'posted'), debit: debitRows.filter((row) => row.status === 'posted') });
       setInvoices(invoiceRows); setBills(billRows); setPayments(paymentRows); setParties(partyMap || new Map());
