@@ -47,6 +47,7 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 - The manufacturing workbench keeps QC permissions and inspection actions in `ManufacturingWipPage`; `ProductionInspectionQueue` renders pending production inspections and emits pass/fail decisions through callbacks.
 - The manufacturing workbench owns failed-quantity accounting, rework permissions and API actions; `ReworkOrdersPanel` renders controlled failed inspection selection, repair quantity and reason fields, plus rework orders and their available actions.
 - The manufacturing workbench owns WIP report filters and reconciliation actions; `ManufacturingWipReport` renders the order level WIP table and its reconciliation context.
+- `AccountingReportsPage` owns report filters, permissions, API requests and FX journal creation; `AccountingReportResults` renders each selected report with controlled memo and draft-action callbacks.
 - The purchasing workbench owns supplier-invoice state and validation; `SupplierInvoiceAdjustmentsEditor` edits controlled charge and landed-cost allocations through a callback.
 - The purchasing workbench owns invoice permissions, FX validation and persistence; `SupplierInvoiceDraftForm` renders controlled invoice quantities, tax, currency and reference fields.
 - The purchasing workbench owns supplier-invoice validation, permissions and state transitions; `SupplierInvoicesPanel` renders controlled dispute fields and emits dispute, resolution, submit and approval requests.
