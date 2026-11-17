@@ -90,7 +90,7 @@ export default function QuotationComposer({
         })}
       </div>
       <div className="wholesale-estimate"><span>{t('Tạm tính theo bảng giá, chưa gồm thuế')}</span><strong className="num">{formatMoney(estimate)}</strong></div>
-      <button className="button primary" type="submit" disabled={saving || !party || !warehouse || !hasLines}>{saving ? t('Đang tạo…') : t('Lưu báo giá nháp')}</button>
+      <button className="btn btn-primary" type="submit" disabled={saving || !party || !warehouse || !hasLines}>{saving ? t('Đang tạo…') : t('Lưu báo giá nháp')}</button>
     </form>
   </section>;
 }
