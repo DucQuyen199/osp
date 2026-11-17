@@ -32,12 +32,12 @@ export default function RealEstateWorkbenchPage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [propertyRes, reservationRes, viewingRes, leaseRes, cycleRes, partyMap, invoiceRes] = await Promise.all([
-        loadAllResponse('real-estate.property'),
+        can('real-estate.property.read') ? loadAllResponse('real-estate.property') : Promise.resolve({ items: [] }),
         can('real-estate.reservation.read') ? loadAllResponse('real-estate.reservation') : Promise.resolve({ items: [] }),
         can('real-estate.viewing.read') ? loadAllResponse('real-estate.viewing') : Promise.resolve({ items: [] }),
         can('real-estate.lease.read') ? loadAllResponse('real-estate.lease') : Promise.resolve({ items: [] }),
         can('real-estate.rent_cycle.read') ? loadAllResponse('real-estate.rent_cycle') : Promise.resolve({ items: [] }),
-        loadRefs('master-data.party'),
+        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
         can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
       ]);
       const propertyRows = itemsOf(propertyRes);
