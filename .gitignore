@@ -11,3 +11,4 @@ node_modules/
 server/.git/
 server/.git-internal-backup/
 server/target/
+/client-dist/

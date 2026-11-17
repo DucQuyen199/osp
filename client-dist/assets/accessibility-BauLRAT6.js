@@ -1,1 +1,0 @@
-var e={tabIndex:0,"data-selectable-row":``,onKeyDown(e){e.target===e.currentTarget&&(e.key===`Enter`||e.key===` `)&&(e.preventDefault(),e.currentTarget.click())}};export{e as t};
