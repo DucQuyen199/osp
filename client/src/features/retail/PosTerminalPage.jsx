@@ -11,13 +11,11 @@ import PosReturnDialog from './components/PosReturnDialog.jsx';
 import PosSessionPanel from './components/PosSessionPanel.jsx';
 import PosCashOperationsPanel from './components/PosCashOperationsPanel.jsx';
 import PosRecentTransactions from './components/PosRecentTransactions.jsx';
+import retailEnglish from './retail.en.js';
 
 const readItems = (response) => Array.isArray(response?.items) ? response.items : [];
 const displayPrice = (product) => Number(product?.price) || 0;
-const t = (text) => uiTextWith(text, {
-  'Thuốc trả từ đơn thuốc được cách ly và phải hủy; không được bán lại.': 'Medicines returned from a prescription are quarantined for disposal and cannot be resold.',
-  'Lý do hoàn đơn': 'Refund reason',
-});
+const t = (text) => uiTextWith(text, retailEnglish);
 
 export default function PosTerminalPage() {
   useDocumentTitle(`${t('Quầy bán hàng POS')} · OSP Suite`);
