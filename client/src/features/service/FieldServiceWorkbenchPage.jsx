@@ -1,7 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
-import { localDateTime as businessDateTime, localDateTimeToIso } from '../../lib/dates.js';
-import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { can, recordLabel } from '../../lib/state.js';
 import { compareDecimals } from '../../lib/decimal.js';
@@ -9,24 +7,19 @@ import fieldServiceEnglish from './field-service.en.js';
 import FieldServiceWorkOrderQueue from './components/FieldServiceWorkOrderQueue.jsx';
 import { fieldServiceLineTotal, fieldServiceStoredLineTotal, fieldServiceTotal } from './domain/fieldServiceTotals.js';
 import { useFieldServiceData } from './hooks/useFieldServiceData.js';
+import { useFieldServiceWorkflow } from './hooks/useFieldServiceWorkflow.js';
 const t = (text) => uiTextWith(text, fieldServiceEnglish);
-const localDateTime = (value) => value ? businessDateTime(new Date(value)) : '';
-const futureSlot = (hours) => businessDateTime(new Date(Date.now() + hours * 3600000));
 const lineTotal = fieldServiceLineTotal;
 export default function FieldServiceWorkbenchPage() {
   useDocumentTitle(`${t('Điều phối dịch vụ hiện trường')} · OSP Suite`);
   const { orders, parties, products, units, warehouses, employees, invoices, tickets, loading, error, setError, load } = useFieldServiceData();
-  const [selectedId, setSelectedId] = useState('');
-  const [form, setForm] = useState({ party: '', title: '', address: '', technician: '', technician_employee: '', scheduled_at: futureSlot(2), scheduled_end: futureSlot(3), warehouse: '' });
-  const [editForm, setEditForm] = useState({ party: '', title: '', address: '', technician: '', technician_employee: '', scheduled_at: '', scheduled_end: '', warehouse: '' });
-  const [newLines, setNewLines] = useState([]);
-  const [editLines, setEditLines] = useState([]);
-  const [busy, setBusy] = useState('');
-  const [notice, setNotice] = useState('');
-  useEffect(() => { setSelectedId((current) => orders.some((item) => item.id === current) ? current : orders[0]?.id || ''); }, [orders]);
-  useEffect(() => { setForm((current) => ({ ...current, party: current.party || [...parties.keys()][0] || '' })); }, [parties]);
-  const selected = orders.find((order) => order.id === selectedId);
   const productChoices = [...products.values()].filter((item) => item.active !== false && ['goods', 'service', undefined].includes(item.kind)).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
+  const workflow = useFieldServiceWorkflow({ orders, parties, productChoices, load, setError, t });
+  const {
+    selectedId, setSelectedId, selected, form, setForm, editForm, setEditForm, newLines, editLines,
+    busy, notice, updateForm, updateEditForm, updateNewLine, updateEditLine, removeNewLine, removeEditLine,
+    addNewLine, addEditLine, createOrder, saveOpenOrder, transition,
+  } = workflow;
   const unitsFor = (productId) => {
     const baseUnit = products.get(productId)?.uom;
     return baseUnit ? [...units.values()].filter((unit) => unit.id === baseUnit || unit.base_uom === baseUnit) : [];
@@ -43,71 +36,6 @@ export default function FieldServiceWorkbenchPage() {
     return product && (product.tracked ?? product.kind === 'goods');
   });
   const openCount = orders.filter((order) => ['open', 'dispatched'].includes(order.status)).length;
-  useEffect(() => {
-    if (!selected) return;
-    setEditLines((selected.lines || []).map((line) => ({ rowId: crypto.randomUUID(), product: line.product || '', uom: line.uom || '', qty: String(line.qty || 1), price: line.price })));
-    setEditForm((current) => ({
-      ...current,
-      party: selected.party || '', title: selected.title || '', address: selected.address || '', technician: selected.technician || '', technician_employee: selected.technician_employee || '',
-      scheduled_at: localDateTime(selected.scheduled_at), scheduled_end: localDateTime(selected.scheduled_end), warehouse: selected.warehouse || '',
-    }));
-  }, [selectedId]);
-  function updateForm(field, value) { setForm((current) => ({ ...current, [field]: value })); }
-  function updateEditForm(field, value) { setEditForm((current) => ({ ...current, [field]: value })); }
-  function updateNewLine(index, field, value) { setNewLines((current) => current.map((line, i) => i === index ? { ...line, [field]: value, ...(field === 'product' ? { uom: '' } : {}) } : line)); }
-  function updateEditLine(index, field, value) { setEditLines((current) => current.map((line, i) => i === index ? { ...line, [field]: value, ...(field === 'product' ? { uom: '' } : {}) } : line)); }
-  async function createOrder(event) {
-    event.preventDefault(); setBusy('create'); setError(''); setNotice('');
-    try {
-      const scheduledAt = form.scheduled_at ? localDateTimeToIso(form.scheduled_at) : undefined;
-      const scheduledEnd = form.scheduled_end ? localDateTimeToIso(form.scheduled_end) : undefined;
-      if ((form.scheduled_at && !scheduledAt) || (form.scheduled_end && !scheduledEnd)) throw new Error(t('Giờ hẹn không hợp lệ trong múi giờ kinh doanh.'));
-      const created = await api(dataPath('field-service.work_order'), { method: 'POST', body: {
-        party: form.party, title: form.title.trim(), address: form.address.trim() || undefined,
-        technician: form.technician_employee ? undefined : form.technician.trim() || undefined,
-        technician_employee: form.technician_employee || undefined,
-        scheduled_at: scheduledAt,
-        scheduled_end: scheduledEnd,
-        warehouse: form.warehouse || undefined,
-        lines: newLines.map((line) => ({ product: line.product, qty: String(line.qty), ...(line.uom ? { uom: line.uom } : {}) })),
-      } });
-      setNotice(`${t('Đã tạo lệnh')} ${String(created.id).slice(0, 8)}${t('. Giá và trạng thái tồn được chụp từ danh mục.')}`);
-      setForm((current) => ({ ...current, title: '', address: '', technician: '', technician_employee: '', warehouse: '' })); setNewLines([]); await load(true); setSelectedId(created.id);
-    } catch (reason) { setError(reason.message || t('Không thể tạo lệnh công việc.')); }
-    finally { setBusy(''); }
-  }
-  async function saveOpenOrder(order) {
-    setBusy(`${order.id}:save`); setError(''); setNotice('');
-    try {
-      const scheduledAt = editForm.scheduled_at ? localDateTimeToIso(editForm.scheduled_at) : null;
-      const scheduledEnd = editForm.scheduled_end ? localDateTimeToIso(editForm.scheduled_end) : null;
-      if ((editForm.scheduled_at && !scheduledAt) || (editForm.scheduled_end && !scheduledEnd)) throw new Error(t('Giờ hẹn không hợp lệ trong múi giờ kinh doanh.'));
-      const body = {
-        title: editForm.title.trim(), address: editForm.address.trim() || null,
-        technician: editForm.technician_employee ? null : editForm.technician.trim() || null,
-        technician_employee: editForm.technician_employee || null,
-        scheduled_at: scheduledAt,
-        scheduled_end: scheduledEnd,
-        warehouse: editForm.warehouse || null,
-        lines: editLines.map((line) => ({ product: line.product, qty: String(line.qty), ...(line.uom ? { uom: line.uom } : {}) })),
-      };
-      await api(dataPath('field-service.work_order', order.id), { method: 'PATCH', body });
-      setNotice(t('Đã lưu phân công, lịch hẹn và báo giá theo danh mục.')); await load(true);
-    } catch (reason) { setError(reason.message || t('Không thể cập nhật lệnh.')); }
-    finally { setBusy(''); }
-  }
-  async function transition(order, action) {
-    setBusy(`${order.id}:${action}`); setError(''); setNotice('');
-    try {
-      await api(dataPath('field-service.work_order', order.id, action), { method: 'POST' });
-      await load(true);
-      const messages = { dispatched: 'Đã điều phối lệnh; lịch và người phụ trách đã được khóa.', done: 'Đã hoàn tất; hệ thống xuất vật tư và tạo hóa đơn.', cancelled: 'Đã hủy lệnh công việc.' };
-      setNotice(t(messages[action]));
-    } catch (reason) { setError(reason.message || t('Không thể cập nhật lệnh. Kiểm tra lịch, kho và tồn vật tư.')); await load(true); }
-    finally { setBusy(''); }
-  }
-  const addNewLine = () => setNewLines((current) => [...current, { rowId: crypto.randomUUID(), product: productChoices[0]?.id || '', qty: '1', uom: '' }]);
-  const addEditLine = () => setEditLines((current) => [...current, { rowId: crypto.randomUUID(), product: productChoices[0]?.id || '', qty: '1', uom: '' }]);
   const selectedTicket = selected?.source_ticket && tickets.get(selected.source_ticket);
   const canManage = can('field-service.work_order.update');
   const assignedTechnician = (order) => {
@@ -136,7 +64,7 @@ export default function FieldServiceWorkbenchPage() {
       <label className="field"><span className="label">{t('Kết thúc dự kiến *')}</span><input className="input" required type="datetime-local" min={form.scheduled_at} value={form.scheduled_end} onChange={(e) => updateForm('scheduled_end', e.target.value)} /></label>
       <label className="field"><span className="label">{t('Kho vật tư')}</span><select className="select" value={form.warehouse} onChange={(e) => updateForm('warehouse', e.target.value)}><option value="">{t('Chọn kho nếu có vật tư theo dõi tồn')}</option>{[...warehouses.values()].filter((item) => item.active !== false).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
       <div className="field full"><div className="row wrap"><strong>{t('Vật tư và dịch vụ')}</strong><span className="grow" /><button className="btn btn-secondary btn-sm" type="button" disabled={!productChoices.length} onClick={addNewLine}>{t('Thêm dòng')}</button></div>
-        {newLines.map((line, index) => <div className="row wrap u-mt-8" key={line.rowId} ><select className="select" required value={line.product} onChange={(e) => updateNewLine(index, 'product', e.target.value)}><option value="">{t('Chọn vật tư / dịch vụ')}</option>{productChoices.map((item) => <option key={item.id} value={item.id}>{item.name} · {fmtMoney(item.price || 0)}</option>)}</select>{unitsFor(line.product).length > 0 && <select className="select" aria-label={t('Unit')} value={line.uom || products.get(line.product)?.uom || ''} onChange={(event) => updateNewLine(index, 'uom', event.target.value)}>{unitsFor(line.product).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` (${unit.ratio} × ${t('base')})` : ` (${t('base')})`}</option>)}</select>}<input className="input num u-max-w-140" aria-label={t('Số lượng')} type="number" min="0.001" step="any" required value={line.qty} onChange={(e) => updateNewLine(index, 'qty', e.target.value)}  /><strong>{fmtMoney(lineTotal(line, products, units))}</strong><button className="btn btn-ghost btn-sm" type="button" aria-label={t('Xóa dòng')} onClick={() => setNewLines((current) => current.filter((_, i) => i !== index))}>{t('Bỏ')}</button></div>)}
+        {newLines.map((line, index) => <div className="row wrap u-mt-8" key={line.rowId} ><select className="select" required value={line.product} onChange={(e) => updateNewLine(index, 'product', e.target.value)}><option value="">{t('Chọn vật tư / dịch vụ')}</option>{productChoices.map((item) => <option key={item.id} value={item.id}>{item.name} · {fmtMoney(item.price || 0)}</option>)}</select>{unitsFor(line.product).length > 0 && <select className="select" aria-label={t('Unit')} value={line.uom || products.get(line.product)?.uom || ''} onChange={(event) => updateNewLine(index, 'uom', event.target.value)}>{unitsFor(line.product).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` (${unit.ratio} × ${t('base')})` : ` (${t('base')})`}</option>)}</select>}<input className="input num u-max-w-140" aria-label={t('Số lượng')} type="number" min="0.001" step="any" required value={line.qty} onChange={(e) => updateNewLine(index, 'qty', e.target.value)}  /><strong>{fmtMoney(lineTotal(line, products, units))}</strong><button className="btn btn-ghost btn-sm" type="button" aria-label={t('Xóa dòng')} onClick={() => removeNewLine(index)}>{t('Bỏ')}</button></div>)}
         <div className="row u-mt-10" ><span className="grow" /><strong>{t('Tổng dự kiến:')} {fmtMoney(newTotal)}</strong></div>
         {hasTrackedNewLine && !form.warehouse && <p className="small muted">{t('Cần chọn kho trước khi lưu lệnh có vật tư theo dõi tồn.')}</p>}
       </div>
@@ -158,7 +86,7 @@ export default function FieldServiceWorkbenchPage() {
             <label className="field"><span className="label">{t('Kết thúc *')}</span><input className="input" type="datetime-local" min={editForm.scheduled_at} value={editForm.scheduled_end} onChange={(e) => updateEditForm('scheduled_end', e.target.value)} /></label>
           </div>
           <div className="row wrap u-mt-14" ><h3>{t('Vật tư / dịch vụ')}</h3><span className="grow" /><button className="btn btn-secondary btn-sm" type="button" disabled={!productChoices.length} onClick={addEditLine}>{t('Thêm dòng')}</button></div>
-          {editLines.map((line, index) => <div className="row wrap u-mt-8" key={line.rowId} ><select className="select" value={line.product} onChange={(e) => updateEditLine(index, 'product', e.target.value)}><option value="">{t('Chọn vật tư / dịch vụ')}</option>{productChoices.map((item) => <option key={item.id} value={item.id}>{item.name} · {fmtMoney(item.price || 0)}</option>)}</select>{unitsFor(line.product).length > 0 && <select className="select" aria-label={t('Unit')} value={line.uom || products.get(line.product)?.uom || ''} onChange={(event) => updateEditLine(index, 'uom', event.target.value)}>{unitsFor(line.product).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` (${unit.ratio} × ${t('base')})` : ` (${t('base')})`}</option>)}</select>}<input className="input num u-max-w-140" aria-label={t('Số lượng')} type="number" min="0.001" step="any" value={line.qty} onChange={(e) => updateEditLine(index, 'qty', e.target.value)}  /><strong>{fmtMoney(lineTotal(line, products, units))}</strong><button className="btn btn-ghost btn-sm" type="button" aria-label={t('Xóa dòng')} onClick={() => setEditLines((current) => current.filter((_, i) => i !== index))}>{t('Bỏ')}</button></div>)}
+          {editLines.map((line, index) => <div className="row wrap u-mt-8" key={line.rowId} ><select className="select" value={line.product} onChange={(e) => updateEditLine(index, 'product', e.target.value)}><option value="">{t('Chọn vật tư / dịch vụ')}</option>{productChoices.map((item) => <option key={item.id} value={item.id}>{item.name} · {fmtMoney(item.price || 0)}</option>)}</select>{unitsFor(line.product).length > 0 && <select className="select" aria-label={t('Unit')} value={line.uom || products.get(line.product)?.uom || ''} onChange={(event) => updateEditLine(index, 'uom', event.target.value)}>{unitsFor(line.product).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` (${unit.ratio} × ${t('base')})` : ` (${t('base')})`}</option>)}</select>}<input className="input num u-max-w-140" aria-label={t('Số lượng')} type="number" min="0.001" step="any" value={line.qty} onChange={(e) => updateEditLine(index, 'qty', e.target.value)}  /><strong>{fmtMoney(lineTotal(line, products, units))}</strong><button className="btn btn-ghost btn-sm" type="button" aria-label={t('Xóa dòng')} onClick={() => removeEditLine(index)}>{t('Bỏ')}</button></div>)}
           <div className="row wrap u-mt-10" ><span className="grow" /><strong>{t('Tổng theo danh mục:')} {fmtMoney(editTotal)}</strong><button className="btn btn-secondary" type="button" disabled={Boolean(busy) || (hasTrackedEditLine && !editForm.warehouse)} onClick={() => saveOpenOrder(selected)}>{t('Lưu thay đổi')}</button></div>
         </> : <><p className="small muted">{assignedTechnician(selected)} · {selected.scheduled_at ? `${fmtDateTime(selected.scheduled_at)} – ${fmtDateTime(selected.scheduled_end)}` : t('Chưa có lịch')} · {t('Kho')} {warehouses.get(selected.warehouse)?.name || '—'}</p><div className="table-wrap"><table className="table"><thead><tr><th>{t('Vật tư / dịch vụ')}</th><th>{t('Số lượng')}</th><th>{t('Đơn giá đã chụp')}</th><th>{t('Thành tiền')}</th></tr></thead><tbody>{(selected.lines || []).map((line, index) => <tr key={`${line.product}-${index}`}><td>{line.product_name || products.get(line.product)?.name || t('Mục dịch vụ')}</td><td>{line.qty} {line.uom_name || units.get(line.uom)?.name || ''}</td><td>{fmtMoney(line.price || 0)}</td><td>{fmtMoney(fieldServiceStoredLineTotal(line))}</td></tr>)}</tbody><tfoot><tr><th colSpan="3">{t('Tổng cộng')}</th><th>{fmtMoney(selected.total || 0)}</th></tr></tfoot></table></div></>}
         {selectedInvoice && <p className="u-mt-12"><a className="btn btn-secondary btn-sm" href={`#/e/accounting/invoice/${selectedInvoice.id}`}>{t('Mở hóa đơn')} {statusLabel(selectedInvoice.status)}</a></p>}
