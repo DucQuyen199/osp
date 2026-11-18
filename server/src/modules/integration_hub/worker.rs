@@ -206,19 +206,21 @@ pub async fn list_deliveries(
             "Unsupported outbox status",
         ));
     }
-    let conn = kernel.pool.get().await?;
-    let total: i64 = conn
-        .query_one(
+    let mut conn = kernel.pool.get().await?;
+    let tx = Tx::begin_snapshot(&mut conn, &tenant.id).await?;
+    let status_value = status.to_string();
+    let total: i64 = tx
+        .query_one_row(
             "SELECT count(*) FROM osp_outbox WHERE tenant_id = $1 AND status = $2",
-            &[&tenant.id, &status],
+            &[&tenant.id, &status_value],
         )
         .await?
         .get(0);
     let page_size = limit.clamp(1, 100);
     let offset = offset.max(0).min(i64::MAX - page_size);
-    let rows = conn.query(
+    let rows = tx.query(
         "SELECT jsonb_build_object('id', id, 'webhookId', webhook_id, 'destinationKind', destination_kind, 'destinationId', destination_id, 'eventId', event_id, 'eventType', event_type, 'status', status, 'attempts', attempts, 'error', last_error, 'createdAt', created_at, 'deliveredAt', delivered_at) FROM osp_outbox WHERE tenant_id = $1 AND status = $2 ORDER BY created_at DESC, id DESC LIMIT $3 OFFSET $4",
-        &[&tenant.id, &status, &page_size, &offset],
+        &[&tenant.id, &status_value, &page_size, &offset],
     ).await?;
     let items = rows
         .into_iter()
