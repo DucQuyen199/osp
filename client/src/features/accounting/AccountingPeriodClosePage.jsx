@@ -1,52 +1,24 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate } from '../../lib/dates.js';
-import { api, dataPath } from '../../lib/api.js';
-import { confirmDialog } from '../../lib/feedback.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
-import { app, can } from '../../lib/state.js';
+import { can } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import { useAccountingPeriodCloseData } from './hooks/useAccountingPeriodCloseData.js';
+import { useAccountingPeriodCloseWorkflow } from './hooks/useAccountingPeriodCloseWorkflow.js';
 const today = localDate;
-const monthStart = () => `${today().slice(0, 7)}-01`;
-const monthEnd = () => new Date(Date.UTC(Number(today().slice(0, 4)), Number(today().slice(5, 7)), 0)).toISOString().slice(0, 10);
 const dateForJournal = (row) => row.posting_date || String(row.createdAt || '').slice(0, 10);
 const inPeriod = (date, period) => Boolean(date && period && date >= period.start_date && date <= period.end_date);
 export default function AccountingPeriodClosePage() {
   useDocumentTitle(`${uiText('Khóa sổ kế toán')} · OSP Suite`);
   const { periods, draftStatements, draftJournals, loading, error, setError, load } = useAccountingPeriodCloseData();
-  const [periodId, setPeriodId] = useState('');
-  const [form, setForm] = useState({ name: `${today().slice(0, 7)}`, start_date: monthStart(), end_date: monthEnd() });
-  const [busy, setBusy] = useState('');
-  const [notice, setNotice] = useState('');
-  useEffect(() => { setPeriodId((id) => id && periods.some((row) => row.id === id) ? id : periods.find((row) => row.status === 'open')?.id || periods[0]?.id || ''); }, [periods]);
+  const { periodId, setPeriodId, form, setForm, busy, notice, createPeriod, closePeriod, reopenPeriod } = useAccountingPeriodCloseWorkflow({ periods, load, setError });
   const selected = periods.find((row) => row.id === periodId);
   const blockingStatements = useMemo(() => selected ? draftStatements.filter((row) => row.start_date <= selected.end_date && row.end_date >= selected.start_date) : [], [draftStatements, selected]);
   const blockingJournals = useMemo(() => selected ? draftJournals.filter((row) => inPeriod(dateForJournal(row), selected)) : [], [draftJournals, selected]);
   const periodEnded = Boolean(selected && selected.end_date <= today());
   const closeReady = Boolean(selected && selected.status === 'open' && periodEnded && !blockingStatements.length && !blockingJournals.length);
-  async function run(key, operation, success) {
-    setBusy(key); setError(''); setNotice('');
-    try { await operation(); setNotice(success); await load(true); }
-    catch (reason) { setError(reason.message || uiText('Không cập nhật được kỳ kế toán.')); await load(true); }
-    finally { setBusy(''); }
-  }
-  async function createPeriod(event) {
-    event.preventDefault();
-    await run('period:create', async () => {
-      await api(dataPath('accounting.period'), { method: 'POST', body: form });
-      setForm((current) => ({ ...current, name: `${today().slice(0, 7)}`, start_date: monthStart(), end_date: monthEnd() }));
-    }, uiText('Đã tạo kỳ kế toán. Hệ thống sẽ chặn kỳ bị chồng và bảo vệ ngày sau khi có bút toán.'));
-  }
-  async function closePeriod() {
-    if (!selected) return;
-    await run(`${selected.id}:closed`, () => api(dataPath('accounting.period', selected.id, 'closed'), { method: 'POST' }), uiText('Đã khóa kỳ. Hệ thống không cho ghi sổ hoặc sửa bút toán trong khoảng ngày này.'));
-  }
-  async function reopenPeriod() {
-    if (!selected || !await confirmDialog({ title: uiText('Mở lại kỳ'), message: `${selected.name}? ${uiText('Việc này cho phép ghi nhận lại bút toán trong kỳ.')}`, danger: true, confirmLabel: uiText('Mở lại kỳ') })) return;
-    await run(`${selected.id}:reopened`, () => api(dataPath('accounting.period', selected.id, 'reopened'), { method: 'POST' }), uiText('Đã mở lại kỳ kế toán.'));
-  }
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Khóa sổ kế toán')}</h1><p className="sub">{uiText('Rà soát chứng từ nháp, xác nhận ngày kết thúc và khóa kỳ bằng quy tắc kiểm tra của hệ thống.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{uiText('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
@@ -63,9 +35,9 @@ export default function AccountingPeriodClosePage() {
         {selected.status === 'open' && <section className="stack u-mt-14" ><div className={`alert ${closeReady ? 'success' : 'warning'}`} role="status">{uiText(!periodEnded ? 'Chưa thể khóa kỳ: ngày kết thúc phải là hôm nay hoặc trước đó.' : blockingStatements.length || blockingJournals.length ? 'Chưa thể khóa kỳ: hoàn tất hoặc hủy các chứng từ nháp đang hiển thị bên dưới.' : 'Đủ điều kiện theo checklist; máy chủ sẽ kiểm tra lại trong giao dịch khóa sổ.')}</div>
           {blockingStatements.length > 0 && <div><h3>{uiText('Sao kê ngân hàng nháp giao với kỳ')}</h3><div className="table-wrap"><table className="table"><thead><tr><th>{uiText('Số sao kê')}</th><th>{uiText('Khoảng ngày')}</th><th>{uiText('Hành động')}</th></tr></thead><tbody>{blockingStatements.map((row) => <tr key={row.id}><td>{row.statement_number}</td><td>{fmtDate(row.start_date)} – {fmtDate(row.end_date)}</td><td><a href={recordHref('accounting.bank_statement', row.id)}>{uiText('Mở sao kê')}</a></td></tr>)}</tbody></table></div></div>}
           {blockingJournals.length > 0 && <div><h3>{uiText('Bút toán nháp trong kỳ')}</h3><div className="table-wrap"><table className="table"><thead><tr><th>{uiText('Ngày ghi sổ')}</th><th>{uiText('Diễn giải')}</th><th>{uiText('Số tiền')}</th><th>{uiText('Hành động')}</th></tr></thead><tbody>{blockingJournals.map((row) => <tr key={row.id}><td>{fmtDate(dateForJournal(row))}</td><td>{row.memo || row.source || uiText('Bút toán nháp')}</td><td className="num">{fmtMoney(row.amount)}</td><td><a href={recordHref('accounting.journal_entry', row.id)}>{uiText('Mở bút toán')}</a></td></tr>)}</tbody></table></div></div>}
-          <div className="row wrap"><span className="small muted">{uiText('Chỉ khóa kỳ đã kết thúc và không còn sao kê hoặc bút toán nháp liên quan.')}</span><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !closeReady || !can('accounting.period.closed')} onClick={closePeriod}>{uiText('Khóa kỳ')}</button></div>
+          <div className="row wrap"><span className="small muted">{uiText('Chỉ khóa kỳ đã kết thúc và không còn sao kê hoặc bút toán nháp liên quan.')}</span><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !closeReady || !can('accounting.period.closed')} onClick={() => closePeriod(selected)}>{uiText('Khóa kỳ')}</button></div>
         </section>}
-        {selected.status === 'period_closed' && <div className="row wrap u-mt-14" ><span className="small muted">{uiText('Kỳ đã khóa sẽ chặn ghi sổ trong khoảng ngày này. Mở lại chỉ khi có quyền và đã xác nhận với người phụ trách kế toán.')}</span><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy) || !can('accounting.period.reopened')} onClick={reopenPeriod}>{uiText('Mở lại kỳ')}</button></div>}
+        {selected.status === 'period_closed' && <div className="row wrap u-mt-14" ><span className="small muted">{uiText('Kỳ đã khóa sẽ chặn ghi sổ trong khoảng ngày này. Mở lại chỉ khi có quyền và đã xác nhận với người phụ trách kế toán.')}</span><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy) || !can('accounting.period.reopened')} onClick={() => reopenPeriod(selected)}>{uiText('Mở lại kỳ')}</button></div>}
       </section>}
     </div>
     <p className="small muted u-mt-12" >{uiText('Kỳ không được chồng lấn. Không thể đổi ngày kỳ sau khi kỳ đã có bút toán hoặc sao kê; kỳ đã khóa không thể xóa.')}</p>

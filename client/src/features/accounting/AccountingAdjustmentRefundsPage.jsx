@@ -1,24 +1,15 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
-import { localDate } from '../../lib/dates.js';
-import { api, dataPath, session, tenantPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { compareDecimals } from '../../lib/decimal.js';
 import { calculateAdjustmentRefundable } from './domain/adjustmentRefunds.js';
 import { can, recordLabel } from '../../lib/state.js';
 import { listHref, recordHref } from '../../lib/routes.js';
 import { useAdjustmentRefundData } from './hooks/useAdjustmentRefundData.js';
-const today = localDate;
-const storageKey = `osp.adjustment-refund-requests:${session.current()?.tenantId || 'tenant'}`;
-const readRequests = () => { try { return JSON.parse(sessionStorage.getItem(storageKey) || '{}'); } catch { return {}; } };
+import { useAdjustmentRefundWorkflow } from './hooks/useAdjustmentRefundWorkflow.js';
 export default function AccountingAdjustmentRefundsPage() {
   useDocumentTitle(`${uiText('Hoàn tiền và thu tiền hoàn')} · OSP Suite`);
   const { notes, invoices, bills, payments, parties, loading, error, setError, load } = useAdjustmentRefundData();
-  const [selected, setSelected] = useState('');
-  const [form, setForm] = useState({ amount: '', method: 'bank', paymentDate: today() });
-  const [requestIds, setRequestIds] = useState(readRequests);
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState('');
   const docs = useMemo(() => ({ invoice: new Map(invoices.map((row) => [row.id, row])), bill: new Map(bills.map((row) => [row.id, row])) }), [invoices, bills]);
   const rows = useMemo(() => [
     ...notes.credit.map((note) => ({ ...note, kind: 'credit_note', title: 'Hoàn tiền khách hàng', sourceDoc: docs.invoice.get(note.invoice), docKind: 'invoice', party: docs.invoice.get(note.invoice)?.party, refundRef: 'refund_credit_note', docRef: 'invoice' })),
@@ -35,30 +26,14 @@ export default function AccountingAdjustmentRefundsPage() {
     });
     return { ...note, ...allowance };
   }), [notes, payments, docs]);
-  const active = rows.find((row) => row.id === selected);
-  const submit = async (event) => {
-    event.preventDefault();
-    if (!active || compareDecimals(form.amount || 0, 0) <= 0 || compareDecimals(form.amount, active.refundable) > 0) return;
-    setBusy(true); setError(''); setNotice('');
-    const requestId = requestIds[active.id] || crypto.randomUUID();
-    const pendingRequests = { ...requestIds, [active.id]: requestId };
-    setRequestIds(pendingRequests);
-    try { sessionStorage.setItem(storageKey, JSON.stringify(pendingRequests)); } catch { /* still safe for retries within this session */ }
-    try {
-      const payment = await api(tenantPath('/accounting/adjustment-refunds'), { method: 'POST', body: { kind: active.kind, adjustmentId: active.id, amount: String(form.amount), method: form.method, paymentDate: form.paymentDate, requestId } });
-      setNotice(uiText('Đã ghi nhận payment hoàn tiền{payment} và tạo bút toán kế toán.').replace('{payment}', payment?.id ? ` ${String(payment.id).slice(0, 8)}` : ''));
-      setRequestIds((current) => { const next = { ...current }; delete next[active.id]; try { sessionStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* optional retry storage */ } return next; });
-      setForm((current) => ({ ...current, amount: '' }));
-      await load();
-    } catch (e) { setError(e.message || uiText('Không tạo được payment hoàn tiền. Có thể gửi lại an toàn.')); }
-    finally { setBusy(false); }
-  };
+  const { selected, setSelected, active, form, setForm, busy, notice, selectForRefund, submit }
+    = useAdjustmentRefundWorkflow({ rows, load, setError });
   return <div className="page">
     <div className="page-head"><div><h1>{uiText("Hoàn tiền và thu tiền hoàn")}</h1><p className="sub">{uiText("Thực hiện chi tiền cho khách theo credit note hoặc nhận tiền nhà cung cấp theo debit note; hệ thống giới hạn số dư, ghi payment âm và tự tạo bút toán tiền mặt/ngân hàng.")}</p></div><button className="btn btn-secondary" onClick={load} disabled={loading || busy}>{uiText("Làm mới")}</button></div>
     {error && <div className="alert error">{uiText(error)}</div>}{notice && <div className="alert success">{uiText(notice)}</div>}
     <div className="card card-pad"><div className="row wrap"><div><strong>{uiText('{count} phiếu điều chỉnh đã ghi sổ').replace('{count}', rows.length)}</strong><div className="small muted">{uiText("Số tiền có thể hoàn được tính từ tổng thanh toán thực tế và các điều chỉnh đã ghi sổ.")}</div></div><span className="grow"/><a className="small" href={listHref('accounting.payment')}>{uiText("Danh sách payment")}</a></div>
       {loading ? <p className="muted">{uiText("Đang tải công nợ và payment…")}</p> : <div className="table-wrap u-mt-12" ><table className="table"><thead><tr><th>{uiText("Nghiệp vụ")}</th><th>{uiText("Đối tác")}</th><th>{uiText("Chứng từ gốc")}</th><th>{uiText("Giá trị phiếu")}</th><th>{uiText("Đã hoàn")}</th><th>{uiText("Còn được hoàn")}</th><th>{uiText("Thao tác")}</th></tr></thead><tbody>
-        {rows.map((row) => <tr key={row.id} className={selected === row.id ? 'selected' : ''}><td><strong>{uiText(row.title)}</strong><div className="small muted"><a href={recordHref(`accounting.${row.kind}`, row.id)}>{row.number || String(row.id).slice(0, 8)}</a> · {statusLabel(row.status)}</div></td><td>{parties.get(row.party) ? recordLabel('master-data.party', parties.get(row.party)) : '—'}</td><td>{row.sourceDoc ? <a href={recordHref(`accounting.${row.docKind}`, row.sourceDoc.id)}>{row.sourceDoc.number || String(row.sourceDoc.id).slice(0, 8)}</a> : uiText('Không tìm thấy hóa đơn gốc')}<div className="small muted">{fmtDate(row.sourceDoc?.issue_date)}</div></td><td>{fmtMoney(row.total)}</td><td>{fmtMoney(row.alreadyRefunded)}</td><td><strong>{fmtMoney(row.refundable)}</strong></td><td><button className="btn btn-secondary btn-sm" disabled={compareDecimals(row.refundable, '0.005') <= 0 || !can('accounting.payment.create')} onClick={() => { setSelected(row.id); setForm((current) => ({ ...current, amount: row.refundable })); setNotice(''); }}>{uiText("Lập payment")}</button></td></tr>)}
+      {rows.map((row) => <tr key={row.id} className={selected === row.id ? 'selected' : ''}><td><strong>{uiText(row.title)}</strong><div className="small muted"><a href={recordHref(`accounting.${row.kind}`, row.id)}>{row.number || String(row.id).slice(0, 8)}</a> · {statusLabel(row.status)}</div></td><td>{parties.get(row.party) ? recordLabel('master-data.party', parties.get(row.party)) : '—'}</td><td>{row.sourceDoc ? <a href={recordHref(`accounting.${row.docKind}`, row.sourceDoc.id)}>{row.sourceDoc.number || String(row.sourceDoc.id).slice(0, 8)}</a> : uiText('Không tìm thấy hóa đơn gốc')}<div className="small muted">{fmtDate(row.sourceDoc?.issue_date)}</div></td><td>{fmtMoney(row.total)}</td><td>{fmtMoney(row.alreadyRefunded)}</td><td><strong>{fmtMoney(row.refundable)}</strong></td><td><button className="btn btn-secondary btn-sm" disabled={compareDecimals(row.refundable, '0.005') <= 0 || !can('accounting.payment.create')} onClick={() => selectForRefund(row)}>{uiText("Lập payment")}</button></td></tr>)}
         {!rows.length && <tr><td colSpan="7" className="muted">{uiText("Chưa có credit note hoặc debit note đã ghi sổ.")}</td></tr>}
       </tbody></table></div>}
     </div>
