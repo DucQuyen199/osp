@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { confirmDialog, textDialog } from '../../lib/feedback.js';
 import { fmtMoney, fmtDateTime, statusLabel, uiTextWith } from '../../lib/i18n.js';
-import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { app, can, recordLabel } from '../../lib/state.js';
 import PosReceipt from './components/PosReceipt.jsx';
 import PosCheckoutPanel from './components/PosCheckoutPanel.jsx';
 import PosReturnDialog from './components/PosReturnDialog.jsx';
@@ -13,30 +13,19 @@ import PosCashOperationsPanel from './components/PosCashOperationsPanel.jsx';
 import PosRecentTransactions from './components/PosRecentTransactions.jsx';
 import { calculatePosTotals } from './domain/posTotals.js';
 import retailEnglish from './retail.en.js';
+import { usePosWorkbenchData } from './hooks/usePosWorkbenchData.js';
 
-const readItems = (response) => Array.isArray(response?.items) ? response.items : [];
 const displayPrice = (product) => Number(product?.price) || 0;
 const t = (text) => uiTextWith(text, retailEnglish);
 
 export default function PosTerminalPage() {
   useDocumentTitle(`${t('Quầy bán hàng POS')} · OSP Suite`);
-  const [warehouses, setWarehouses] = useState(new Map());
-  const [branches, setBranches] = useState(new Map());
-  const [products, setProducts] = useState(new Map());
-  const [units, setUnits] = useState(new Map());
-  const [taxes, setTaxes] = useState(new Map());
-  const [parties, setParties] = useState(new Map());
-  const [accounts, setAccounts] = useState(new Map());
-  const [sessions, setSessions] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [returns, setReturns] = useState([]);
+  const { warehouses, branches, products, units, taxes, parties, accounts, sessions, orders, returns, prescriptions, cashMovements, loading, error: dataError, load: loadData } = usePosWorkbenchData(t);
   const [returningOrder, setReturningOrder] = useState(null);
   const [returnQuantities, setReturnQuantities] = useState({});
   const [returnReason, setReturnReason] = useState('');
   const [returnDraftId, setReturnDraftId] = useState('');
-  const [prescriptions, setPrescriptions] = useState([]);
   const [prescriptionId, setPrescriptionId] = useState('');
-  const [cashMovements, setCashMovements] = useState([]);
   const [sessionId, setSessionId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
   const [branchId, setBranchId] = useState('');
@@ -57,8 +46,17 @@ export default function PosTerminalPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [loading, setLoading] = useState(true);
   const [printingOrderId, setPrintingOrderId] = useState('');
+
+  const load = async (keepNotice = false) => {
+    if (!keepNotice) setNotice('');
+    setError('');
+    await loadData();
+  };
+
+  useEffect(() => {
+    setSessionId((current) => sessions.some((item) => item.id === current) ? current : sessions[0]?.id || '');
+  }, [sessions]);
 
   useEffect(() => {
     if (!printingOrderId) return undefined;
@@ -70,51 +68,6 @@ export default function PosTerminalPage() {
       window.removeEventListener('afterprint', finish);
     };
   }, [printingOrderId]);
-
-  const load = useCallback(async (keepNotice = false) => {
-    setLoading(true);
-    setError('');
-    if (!keepNotice) setNotice('');
-    try {
-      const pharmacyEnabled = app.meta?.modules?.some((module) => module.id === 'pharmacy');
-      const [warehouseMap, branchMap, productMap, unitMap, partyMap, taxMap, accountMap, sessionResponse, orderResponse, movementResponse, prescriptionResponse, returnResponse] = await Promise.all([
-        can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
-        can('master-data.branch.read') ? loadRefs('master-data.branch') : Promise.resolve(new Map()),
-        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
-        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('master-data.tax.read') ? loadRefs('master-data.tax') : Promise.resolve(new Map()),
-        can('accounting.account.read') ? loadRefs('accounting.account') : Promise.resolve(new Map()),
-        can('pos.pos_session.read') ? loadAllResponse('pos.pos_session') : Promise.resolve({ items: [] }),
-        can('pos.pos_order.read') ? loadAllResponse('pos.pos_order') : Promise.resolve({ items: [] }),
-        can('pos.cash_movement.read') ? loadAllResponse('pos.cash_movement') : Promise.resolve({ items: [] }),
-        pharmacyEnabled && can('pharmacy.prescription.read') ? loadAllResponse('pharmacy.prescription') : Promise.resolve({ items: [] }),
-        can('pos.pos_return.read') ? loadAllResponse('pos.pos_return') : Promise.resolve({ items: [] }),
-      ]);
-      setWarehouses(warehouseMap);
-      setBranches(branchMap);
-      setProducts(productMap);
-      setUnits(unitMap);
-      setParties(partyMap);
-      setTaxes(taxMap);
-      setAccounts(accountMap);
-      const nextSessions = readItems(sessionResponse).filter((item) => item.status === 'open').sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
-      const nextOrders = readItems(orderResponse).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
-      setSessions(nextSessions);
-      setOrders(nextOrders);
-      setReturns(readItems(returnResponse));
-      setCashMovements(readItems(movementResponse).filter((item) => item.status === 'draft').sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))));
-      setPrescriptions(readItems(prescriptionResponse).filter((item) => ['verified', 'partially_dispensed'].includes(item.status)).sort((a, b) => String(a.valid_until || '').localeCompare(String(b.valid_until || ''))));
-      setSessionId((current) => nextSessions.some((item) => item.id === current) ? current : nextSessions[0]?.id || '');
-    } catch (reason) {
-      setError(t(reason.message || 'Không tải được dữ liệu quầy POS.'));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { load();
-  }, [load]);
 
   const activeSession = sessions.find((item) => item.id === sessionId) || null;
   const pharmacyEnabled = app.meta?.modules?.some((module) => module.id === 'pharmacy');
@@ -350,7 +303,7 @@ export default function PosTerminalPage() {
 
   return <div className="page pos-page">
     <div className="page-head"><div><h1>{t('Quầy bán hàng POS')}</h1><p className="sub">{t('Mở ca theo kho, ghi nhận hàng bán và phương thức thanh toán; giá và thuế cuối cùng do máy chủ tính theo danh mục.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={() => load()}>{t('Làm mới')}</button></div>
-    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
+    {(error || dataError) && <div className="alert danger" role="alert">{t(error || dataError)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     {loading ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <>
       <PosSessionPanel
         sessions={sessions} sessionId={sessionId} activeSession={activeSession} activeWarehouse={activeWarehouse}
