@@ -67,6 +67,11 @@ fn delivery_concurrency() -> R<usize> {
         })
 }
 
+fn delivery_lease_seconds(concurrency: usize) -> i64 {
+    let waves = (BATCH_SIZE as usize).div_ceil(concurrency.max(1));
+    (waves as i64 * 20) + 60
+}
+
 async fn process_batch(
     kernel: &Kernel,
     messages: Vec<Message>,
@@ -165,7 +170,7 @@ pub async fn run_once(kernel: &Kernel) -> R<u32> {
         if let Some(smtp) = &smtp {
             processed += process_batch(
                 kernel,
-                claim_auth_mail(kernel, &tenant_id).await?,
+                claim_auth_mail(kernel, &tenant_id, concurrency).await?,
                 DeliveryTarget::Smtp(smtp),
                 true,
                 concurrency,
@@ -178,7 +183,7 @@ pub async fn run_once(kernel: &Kernel) -> R<u32> {
             {
                 processed += process_batch(
                     kernel,
-                    claim_auth_mail(kernel, &tenant_id).await?,
+                    claim_auth_mail(kernel, &tenant_id, concurrency).await?,
                     DeliveryTarget::Provider(provider),
                     true,
                     concurrency,
@@ -192,7 +197,7 @@ pub async fn run_once(kernel: &Kernel) -> R<u32> {
         if let Some(smtp) = &smtp {
             processed += process_batch(
                 kernel,
-                claim(kernel, &tenant_id, "email").await?,
+                claim(kernel, &tenant_id, "email", concurrency).await?,
                 DeliveryTarget::Smtp(smtp),
                 false,
                 concurrency,
@@ -205,7 +210,7 @@ pub async fn run_once(kernel: &Kernel) -> R<u32> {
         {
             processed += process_batch(
                 kernel,
-                claim(kernel, &tenant_id, provider.channel).await?,
+                claim(kernel, &tenant_id, provider.channel, concurrency).await?,
                 DeliveryTarget::Provider(provider),
                 false,
                 concurrency,
@@ -216,7 +221,7 @@ pub async fn run_once(kernel: &Kernel) -> R<u32> {
     Ok(processed)
 }
 
-async fn claim_auth_mail(kernel: &Kernel, tenant_id: &str) -> R<Vec<Message>> {
+async fn claim_auth_mail(kernel: &Kernel, tenant_id: &str, concurrency: usize) -> R<Vec<Message>> {
     let mut conn = kernel.pool.get().await?;
     let tx = Tx::begin(&mut conn, tenant_id, true).await?;
     tx.execute(
@@ -226,8 +231,8 @@ async fn claim_auth_mail(kernel: &Kernel, tenant_id: &str) -> R<Vec<Message>> {
     .await?;
     let rows = tx
         .query(
-            "WITH ready AS (SELECT id FROM osp_auth_mail_outbox WHERE tenant_id = $1 AND ((status IN ('queued', 'retry') AND available_at <= now()) OR (status = 'processing' AND available_at <= now())) ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT $2) UPDATE osp_auth_mail_outbox m SET status = 'processing', attempts = m.attempts + 1, available_at = now() + interval '2 minutes', last_error = NULL, updated_at = now() FROM ready WHERE m.tenant_id = $1 AND m.id = ready.id RETURNING m.id, m.recipient, m.subject, m.body, m.attempts::bigint",
-            &[&tenant_id, &BATCH_SIZE],
+            "WITH ready AS (SELECT id FROM osp_auth_mail_outbox WHERE tenant_id = $1 AND ((status IN ('queued', 'retry') AND available_at <= now()) OR (status = 'processing' AND available_at <= now())) ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT $2) UPDATE osp_auth_mail_outbox m SET status = 'processing', attempts = m.attempts + 1, available_at = now() + ($3 * interval '1 second'), last_error = NULL, updated_at = now() FROM ready WHERE m.tenant_id = $1 AND m.id = ready.id RETURNING m.id, m.recipient, m.subject, m.body, m.attempts::bigint",
+            &[&tenant_id, &BATCH_SIZE, &delivery_lease_seconds(concurrency)],
         )
         .await?;
     tx.commit().await?;
@@ -272,13 +277,23 @@ fn retry_delay(attempts: i64) -> u64 {
     (15_u64.saturating_mul(2_u64.pow(exponent))).min(3600)
 }
 
-async fn claim(kernel: &Kernel, tenant_id: &str, channel: &str) -> R<Vec<Message>> {
+async fn claim(
+    kernel: &Kernel,
+    tenant_id: &str,
+    channel: &str,
+    concurrency: usize,
+) -> R<Vec<Message>> {
     let mut conn = kernel.pool.get().await?;
     let tx = Tx::begin(&mut conn, tenant_id, true).await?;
     let rows = tx
         .query(
-            "WITH ready AS (SELECT id FROM communication__message_log WHERE tenant_id = $1 AND channel = $2 AND ((status IN ('queued', 'retry') AND (available_at IS NULL OR available_at <= now())) OR (status = 'processing' AND (available_at IS NULL OR available_at <= now()))) ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT $3) UPDATE communication__message_log m SET status = 'processing', attempts = COALESCE(m.attempts, 0) + 1, available_at = now() + interval '2 minutes', last_error = NULL, updated_at = now() FROM ready WHERE m.tenant_id = $1 AND m.id = ready.id RETURNING m.id, m.channel, m.recipient, m.recipient_email, m.subject, m.body, m.attachment_name, m.attachment_content_type, m.attachment_content, COALESCE(m.attempts, 1)::bigint",
-            &[&tenant_id, &channel, &BATCH_SIZE],
+            "WITH ready AS (SELECT id FROM communication__message_log WHERE tenant_id = $1 AND channel = $2 AND ((status IN ('queued', 'retry') AND (available_at IS NULL OR available_at <= now())) OR (status = 'processing' AND (available_at IS NULL OR available_at <= now()))) ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT $3) UPDATE communication__message_log m SET status = 'processing', attempts = COALESCE(m.attempts, 0) + 1, available_at = now() + ($4 * interval '1 second'), last_error = NULL, updated_at = now() FROM ready WHERE m.tenant_id = $1 AND m.id = ready.id RETURNING m.id, m.channel, m.recipient, m.recipient_email, m.subject, m.body, m.attachment_name, m.attachment_content_type, m.attachment_content, COALESCE(m.attempts, 1)::bigint",
+            &[
+                &tenant_id,
+                &channel,
+                &BATCH_SIZE,
+                &delivery_lease_seconds(concurrency),
+            ],
         )
         .await?;
     tx.commit().await?;

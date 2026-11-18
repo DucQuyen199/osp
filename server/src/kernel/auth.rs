@@ -307,7 +307,33 @@ impl Kernel {
     }
 
     pub async fn update_user(&self, t: &Tenant, id: &str, patch: &Value) -> R<PublicUser> {
-        let users = self.list_users(t).await?;
+        let mut conn = self.pool.get().await?;
+        let tx = Tx::begin(&mut conn, &t.id, true).await?;
+        let admin_lock = format!("auth-admin-roster:{}", t.id);
+        tx.query_one_row(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            &[&admin_lock],
+        )
+        .await?;
+        let rows = tx
+            .query(
+                "SELECT id, name, email, roles, disabled, password_hash IS NOT NULL, totp_enabled, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') FROM osp_users WHERE tenant_id = $1 ORDER BY created_at, id",
+                &[&t.id],
+            )
+            .await?;
+        let users = rows
+            .into_iter()
+            .map(|r| PublicUser {
+                id: r.get(0),
+                name: r.get(1),
+                email: r.get(2),
+                roles: r.get(3),
+                disabled: r.get(4),
+                has_password: r.get(5),
+                mfa_enabled: r.get(6),
+                created_at: r.get(7),
+            })
+            .collect::<Vec<_>>();
         let cur = users.iter().find(|u| u.id == id).ok_or_else(|| {
             ApiError::new(404, "USER_NOT_FOUND", format!("Không có người dùng {id}"))
         })?;
@@ -361,8 +387,6 @@ impl Kernel {
             }
             None => None,
         };
-        let mut conn = self.pool.get().await?;
-        let tx = Tx::begin(&mut conn, &t.id, true).await?;
         tx.execute("UPDATE osp_users SET name = $3, roles = $4, disabled = $5, password_hash = COALESCE($6, password_hash) WHERE tenant_id = $1 AND id = $2", &[&t.id, &id, &name, &roles, &disabled, &new_hash]).await?;
         if new_hash.is_some() {
             tx.execute("DELETE FROM osp_sessions WHERE tenant_id = $1 AND user_id = $2 AND kind = 'session'", &[&t.id, &id]).await?; // đổi mật khẩu => đăng xuất mọi phiên
