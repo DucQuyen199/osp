@@ -22,7 +22,16 @@ const integrationEnglish = {
   'Đang gửi': 'Sending', 'Thiếu adapter': 'Adapter missing', 'Đã tắt': 'Disabled', 'Gửi thử': 'Send test', 'Tạm ngưng': 'Pause', 'Bật lại': 'Enable',
   'Webhook gửi sự kiện': 'Event webhooks', 'Chưa đăng ký webhook.': 'No webhooks registered.', 'Endpoint': 'Endpoint', 'Sự kiện': 'Events',
   'Chưa chọn sự kiện': 'No events selected', 'Ví dụ sự kiện:': 'Example events:', 'Theo dõi và thử lại lần gửi tới webhook hoặc connector trong': 'Monitor and retry webhook or connector deliveries in', 'Cài đặt API token': 'API token settings',
-  'Outbox tích hợp': 'Integration Outbox', 'Tạo token tích hợp giới hạn quyền tại': 'Create a scoped integration token in', 'Thao tác': 'Actions',
+  'Outbox tích hợp': 'Integration Outbox', 'Tạo token tích hợp giới hạn quyền tại': 'Create a scoped integration token in', 'Thao tác': 'Actions',  'Adapter': 'Adapter',
+  'HTTP event sink': 'HTTP event sink',
+  'Casso bank feed': 'Casso bank feed',
+  'Thêm connector': 'Add connector',
+  'Chọn adapter HTTP gửi sự kiện ra ngoài hoặc Casso để đồng bộ giao dịch ngân hàng vào sao kê.': 'Choose an HTTP event sink for outbound events or Casso to sync bank transactions into statements.',
+  'Cấu hình JSON': 'JSON configuration',
+  'Nhập app_id và app_secret từ Casso Open Platform; app_secret được che khi đọc lại. Cần scope flow:transaction:read.': 'Enter app_id and app_secret from Casso Open Platform; app_secret is masked when read back. The app needs the flow:transaction:read scope.',
+  'Cần URL HTTPS công khai, events và header xác thực. Secret được che khi đọc lại.': 'Requires a public HTTPS URL, events, and authentication headers. Secrets are masked when read back.',
+  'Adapter trong cấu hình phải khớp loại connector đã chọn.': 'The configured adapter must match the selected connector type.',
+  'Đã cấu hình': 'Configured',
 };
 
 export default integrationEnglish;

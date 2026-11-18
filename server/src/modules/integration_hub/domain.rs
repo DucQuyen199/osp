@@ -94,19 +94,31 @@ fn validate_connector(document: &Value) -> Vec<String> {
         if !config.is_object() {
             errors.push("Connector configuration must be an object".into());
         } else if enabled {
-            if config.get("adapter").and_then(Value::as_str) == Some("http_event_sink") {
-                validate_http_event_sink(config, &mut errors);
-            } else {
-                errors.push(
-                    "Enabled connectors must use the supported http_event_sink adapter".into(),
-                );
+            match config.get("adapter").and_then(Value::as_str) {
+                Some("http_event_sink") => validate_http_event_sink(config, &mut errors),
+                Some("casso_bank_feed") => validate_casso_bank_feed(config, &mut errors),
+                _ => errors.push("Enabled connector must use a supported adapter".into()),
             }
         }
     } else if enabled {
-        errors
-            .push("An enabled connector requires the http_event_sink adapter configuration".into());
+        errors.push("An enabled connector requires a supported adapter configuration".into());
     }
     errors
+}
+
+fn validate_casso_bank_feed(config: &Value, errors: &mut Vec<String>) {
+    match config.get("app_id").and_then(Value::as_str) {
+        Some(value)
+            if !value.trim().is_empty()
+                && value.len() <= 256
+                && !value.chars().any(char::is_control) => {}
+        _ => errors.push("Casso bank feed requires a valid app_id".into()),
+    }
+    match config.get("app_secret").and_then(Value::as_str) {
+        Some(value)
+            if (16..=512).contains(&value.len()) && !value.chars().any(char::is_control) => {}
+        _ => errors.push("Casso bank feed requires an app_secret of 16 to 512 characters".into()),
+    }
 }
 
 fn validate_http_event_sink(config: &Value, errors: &mut Vec<String>) {

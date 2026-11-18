@@ -9,6 +9,7 @@ export function useBankReconciliationData(statementId, translate) {
   const [accounts, setAccounts] = useState(new Map());
   const [currencies, setCurrencies] = useState(new Map());
   const [parties, setParties] = useState(new Map());
+  const [connectors, setConnectors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const beginRequest = useLatestRequest();
@@ -25,7 +26,8 @@ export function useBankReconciliationData(statementId, translate) {
         accountMap: can('accounting.account.read') ? loadRefs('accounting.account') : Promise.resolve(emptyMap()),
         currencyMap: can('master-data.currency.read') ? loadRefs('master-data.currency') : Promise.resolve(emptyMap()),
         partyMap: can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(emptyMap()),
-      }, { statementRows: emptyRows(), accountMap: emptyMap(), currencyMap: emptyMap(), partyMap: emptyMap() });
+        connectors: can('integration-hub.connector.read') ? loadAll('integration-hub.connector') : Promise.resolve(emptyRows()),
+      }, { statementRows: emptyRows(), accountMap: emptyMap(), currencyMap: emptyMap(), partyMap: emptyMap(), connectors: emptyRows() });
       if (!isCurrent()) return;
       const { statementRows, accountMap, currencyMap, partyMap } = data;
       statementRows.sort((a, b) => String(b.start_date || '').localeCompare(String(a.start_date || '')));
@@ -33,6 +35,7 @@ export function useBankReconciliationData(statementId, translate) {
       setAccounts(accountMap);
       setCurrencies(currencyMap);
       setParties(partyMap);
+      setConnectors(data.connectors);
       setError(errors[0]?.message || (errors.length ? translate('Một số dữ liệu đối soát ngân hàng không tải được.') : ''));
     } catch (reason) {
       if (isCurrent()) setError(reason.message || translate('Không tải được dữ liệu đối soát ngân hàng.'));
@@ -63,5 +66,5 @@ export function useBankReconciliationData(statementId, translate) {
   useEffect(() => { loadLines(statementId); }, [statementId, loadLines]);
 
   const baseCurrency = [...currencies.values()].find((currency) => String(currency.code).toUpperCase() === String(app.meta?.settings?.baseCurrency || 'VND').toUpperCase());
-  return { statements, allLines, linesLoading, accounts, currencies, parties, baseCurrency, loading, error, setError, load, loadLines };
+  return { statements, allLines, linesLoading, accounts, currencies, parties, connectors, baseCurrency, loading, error, setError, load, loadLines };
 }

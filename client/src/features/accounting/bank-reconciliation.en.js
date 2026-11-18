@@ -93,5 +93,9 @@ export default {
   'Với CAMT.053 và Casso, hãy cấu hình IBAN, mã tài khoản hoặc mã tài khoản Casso trên tài khoản kế toán đã chọn trước khi nhập.': 'For CAMT.053 and Casso, configure the IBAN, account ID, or Casso account ID on the selected ledger account before importing.',
   'Xóa dòng': 'Delete line',
   'Xóa dòng chưa đối chiếu này khỏi sao kê?': 'Delete this unreconciled line from the statement?',
-  'Xóa dòng sao kê': 'Delete statement line',
+  'Xóa dòng sao kê': 'Delete statement line',  'Casso connector': 'Casso connector',
+  'Từ ngày đồng bộ': 'Sync from date',
+  'Đến ngày đồng bộ': 'Sync through date',
+  'Đồng bộ từ Casso API': 'Sync from Casso API',
+  'Đã đồng bộ {imported} giao dịch từ Casso; bỏ qua {skipped} dòng trùng.': 'Synced {imported} transactions from Casso; skipped {skipped} duplicate rows.',
 };

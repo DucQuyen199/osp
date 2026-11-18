@@ -1255,6 +1255,32 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                 .await?,
             );
         }
+        (&Method::POST, ["accounting", "bank-statements", statement_id, "sync-casso"]) => {
+            let payload = parse_json(&bytes)?;
+            let connector_id = payload
+                .get("connectorId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    ApiError::validation(
+                        "accounting.bank_statement",
+                        vec!["connectorId is required".into()],
+                    )
+                })?;
+            let from_date = payload.get("fromDate").and_then(Value::as_str);
+            let to_date = payload.get("toDate").and_then(Value::as_str);
+            return json_ok(
+                crate::modules::accounting::sync_statement_casso(
+                    k,
+                    &actor,
+                    &t,
+                    statement_id,
+                    connector_id,
+                    from_date,
+                    to_date,
+                )
+                .await?,
+            );
+        }
         (
             &Method::POST,
             [

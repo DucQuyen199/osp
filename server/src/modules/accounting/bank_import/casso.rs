@@ -44,6 +44,7 @@ pub(super) fn parse(payload: &Value) -> R<ParsedBankStatement> {
                     })
             };
             let account = value("bank_sub_acc_id")
+                .or_else(|| value("bankSubAccId"))
                 .or_else(|| value("subAccId"))
                 .filter(|account| !account.trim().is_empty())
                 .ok_or_else(|| {
