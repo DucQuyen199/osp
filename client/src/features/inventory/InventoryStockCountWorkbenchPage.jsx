@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, statusLabel, uiText } from '../../lib/i18n.js';
+import { compareDecimals } from '../../lib/decimal.js';
 import { app, can, loadAll, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import StockCountLinesEditor from './components/StockCountLinesEditor.jsx';
@@ -9,7 +10,7 @@ async function listMap(qname) { return new Map((await loadAll(qname)).map((row) 
 const blankLine = () => ({ rowId: crypto.randomUUID(), product: '', lot: '', location: '', counted_qty: '' });
 const cleanLines = (lines) => lines.map(({ product, lot, location, counted_qty }) => ({
   product,
-  counted_qty: Number(counted_qty),
+  counted_qty: String(counted_qty),
   ...(lot ? { lot } : {}),
   ...(location ? { location } : {}),
 }));
@@ -95,7 +96,9 @@ export default function InventoryStockCountWorkbenchPage() {
     if (!lines.length) return uiText('Thêm ít nhất một dòng kiểm kê.');
     for (const [index, line] of lines.entries()) {
       if (!line.product) return `${uiText('Dòng')} ${index + 1}: ${uiText('chọn sản phẩm.')}`;
-      if (line.counted_qty === '' || !Number.isFinite(Number(line.counted_qty)) || Number(line.counted_qty) < 0) return `${uiText('Dòng')} ${index + 1}: ${uiText('số lượng thực tế phải là số không âm.')}`;
+      let validCount = false;
+      try { validCount = line.counted_qty !== '' && compareDecimals(line.counted_qty, 0) >= 0; } catch { validCount = false; }
+      if (!validCount) return `${uiText('Dòng')} ${index + 1}: ${uiText('số lượng thực tế phải là số không âm.')}`;
       const product = products.get(line.product);
       if (product?.lot_tracked && !line.lot) return `${uiText('Dòng')} ${index + 1}: ${uiText('sản phẩm quản lý theo lô, cần chọn lô.')}`;
       const duplicate = lines.slice(0, index).some((other) => other.product === line.product && (other.lot || '') === (line.lot || '') && (other.location || '') === (line.location || ''));
