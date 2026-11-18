@@ -1,24 +1,18 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtMoney, uiTextWith } from '../../lib/i18n.js';
 import { addDecimals, compareDecimals } from '../../lib/decimal.js';
-import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { app, can, recordLabel } from '../../lib/state.js';
 import ecommerceEnglish from './ecommerce.en.js';
 import WebOrderCard from './components/WebOrderCard.jsx';
 import WebOrderCreateForm from './components/WebOrderCreateForm.jsx';
+import { useEcommerceOrderData } from './hooks/useEcommerceOrderData.js';
 const t = (text) => uiTextWith(text, ecommerceEnglish);
-const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 export default function EcommerceOrderDeskPage() {
   useDocumentTitle(`${t('Điều phối đơn online')} · OSP Suite`);
-  const [storefronts, setStorefronts] = useState(new Map());
-  const [parties, setParties] = useState(new Map());
-  const [products, setProducts] = useState(new Map());
-  const [currencies, setCurrencies] = useState(new Map());
-  const [orders, setOrders] = useState([]);
-  const [salesOrders, setSalesOrders] = useState([]);
-  const [shipments, setShipments] = useState([]);
-  const [invoices, setInvoices] = useState([]);
+  const logisticsEnabled = app.meta?.modules?.some((module) => module.id === 'logistics') || false;
+  const { storefronts, parties, products, currencies, orders, salesOrders, shipments, invoices, loading, error, setError, load } = useEcommerceOrderData(logisticsEnabled);
   const [party, setParty] = useState('');
   const [storefront, setStorefront] = useState('');
   const [channel, setChannel] = useState('web');
@@ -26,30 +20,8 @@ export default function EcommerceOrderDeskPage() {
   const [query, setQuery] = useState('');
   const [quantities, setQuantities] = useState({});
   const [busy, setBusy] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const logisticsEnabled = app.meta?.modules?.some((module) => module.id === 'logistics') && can('logistics.shipment.read');
-      const [storefrontMap, partyMap, productMap, currencyMap, orderResponse, salesResponse, shipmentResponse, invoiceResponse] = await Promise.all([
-        can('ecommerce.storefront.read') ? loadRefs('ecommerce.storefront') : Promise.resolve(new Map()),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
-        can('master-data.currency.read') ? loadRefs('master-data.currency') : Promise.resolve(new Map()),
-        can('ecommerce.web_order.read') ? loadAllResponse('ecommerce.web_order') : Promise.resolve({ items: [] }),
-        can('sales.sales_order.read') ? loadAllResponse('sales.sales_order') : Promise.resolve({ items: [] }),
-        logisticsEnabled ? loadAllResponse('logistics.shipment') : Promise.resolve({ items: [] }),
-        can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
-      ]);
-      setStorefronts(storefrontMap); setParties(partyMap); setProducts(productMap); setCurrencies(currencyMap);
-      setOrders(itemsOf(orderResponse).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))));
-      setSalesOrders(itemsOf(salesResponse)); setShipments(itemsOf(shipmentResponse)); setInvoices(itemsOf(invoiceResponse));
-    } catch (reason) { setError(t(reason.message || 'Không tải được danh sách đơn online.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
-  useEffect(() => { load();
+  useEffect(() => {
     const timer = window.setInterval(() => load(true), 20000);
     return () => window.clearInterval(timer);
   }, [load]);
