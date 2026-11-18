@@ -1,51 +1,28 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { addDecimals } from '../../lib/decimal.js';
-import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { can, recordLabel } from '../../lib/state.js';
 import servicesEnglish from './professional-services.en.js';
 import { estimateTimeEntryAmount } from './domain/timeEntryTotals.js';
+import { useProfessionalServicesData } from './hooks/useProfessionalServicesData.js';
 const t = (text) => uiTextWith(text, servicesEnglish);
 const today = localDate;
-const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
 export default function ProfessionalServicesWorkbenchPage() {
   useDocumentTitle(`${t('Hồ sơ và giờ dịch vụ')} · OSP Suite`);
-  const [cases, setCases] = useState([]);
-  const [notes, setNotes] = useState([]);
-  const [timeEntries, setTimeEntries] = useState([]);
-  const [invoices, setInvoices] = useState([]);
-  const [parties, setParties] = useState(new Map());
+  const { cases, notes, timeEntries, invoices, parties, loading, error, setError, load } = useProfessionalServicesData();
   const [caseId, setCaseId] = useState('');
   const [caseForm, setCaseForm] = useState({ title: '', party: '', kind: '', owner: '', opened_on: today() });
   const [noteBody, setNoteBody] = useState('');
   const [timeForm, setTimeForm] = useState({ who: '', date: today(), hours: '', rate: '' });
   const [busy, setBusy] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const [caseRes, noteRes, timeRes, invoiceRes, partyMap] = await Promise.all([
-        can('case-management.case.read') ? loadAllResponse('case-management.case') : Promise.resolve({ items: [] }),
-        can('case-management.case_note.read') ? loadAllResponse('case-management.case_note') : Promise.resolve({ items: [] }),
-        can('case-management.time_entry.read') ? loadAllResponse('case-management.time_entry') : Promise.resolve({ items: [] }),
-        can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-      ]);
-      const caseRows = itemsOf(caseRes);
-      setCases(caseRows.sort((a, b) => String(b.opened_on || '').localeCompare(String(a.opened_on || ''))));
-      setNotes(itemsOf(noteRes)); setTimeEntries(itemsOf(timeRes)); setInvoices(itemsOf(invoiceRes)); setParties(partyMap);
-      setCaseId((current) => caseRows.some((row) => row.id === current) ? current : caseRows[0]?.id || '');
-      setCaseForm((current) => ({ ...current, party: current.party || [...partyMap.keys()][0] || '' }));
-    } catch (reason) { setError(t(reason.message || 'Không tải được hồ sơ vụ việc.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { setCaseId((current) => current && cases.some((row) => row.id === current) ? current : cases[0]?.id || ''); }, [cases]);
+  useEffect(() => { setCaseForm((current) => ({ ...current, party: current.party || [...parties.keys()][0] || '' })); }, [parties]);
   const selectedCase = cases.find((row) => row.id === caseId);
   const caseEntries = useMemo(() => timeEntries.filter((row) => row.case === caseId).sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))), [timeEntries, caseId]);
   const caseNotes = useMemo(() => notes.filter((row) => row.case === caseId).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))), [notes, caseId]);
