@@ -342,7 +342,7 @@ async fn company_group_consent(kernel: &Arc<Kernel>) {
     assert_eq!(report["companies"].as_array().unwrap().len(), 1);
     assert_eq!(report["companies"][0]["tenantId"], member.t.id);
     assert_eq!(report["companies"][0]["localCurrency"], "USD");
-    assert_eq!(report["companies"][0]["conversionRate"], 25000.0);
+    assert_eq!(report["companies"][0]["conversionRate"], "25000");
     assert_eq!(
         report["companies"][0]["rateEffectiveDate"],
         rate_date.to_string()
@@ -355,9 +355,9 @@ async fn company_group_consent(kernel: &Arc<Kernel>) {
         .iter()
         .find(|account| account["code"] == "642")
         .unwrap();
-    assert_eq!(source_expense["closingDebit"], 10.0);
-    assert_eq!(source_expense["reportingClosingDebit"], 250000.0);
-    assert_eq!(report["reconciliation"]["difference"], 0.0);
+    assert_eq!(source_expense["closingDebit"], "10");
+    assert_eq!(source_expense["reportingClosingDebit"], "250000");
+    assert_eq!(report["reconciliation"]["difference"], "0");
     assert_eq!(report["reconciliation"]["withinCentTolerance"], true);
     let (snapshot_status, snapshot) = owner
         .api(

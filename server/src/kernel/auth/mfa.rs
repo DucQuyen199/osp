@@ -527,7 +527,7 @@ pub async fn setup_confirm(
     .await?;
     let current_hash = hash_token(current_token);
     tx.execute(
-        "DELETE FROM osp_sessions WHERE tenant_id=$1 AND user_id=$2 AND kind IN ('session','api','mfa') AND NOT (hash=$3 AND kind='session')",
+        "DELETE FROM osp_sessions WHERE tenant_id=$1 AND user_id=$2 AND kind IN ('session','api','scoped_api','mfa') AND NOT (hash=$3 AND kind='session')",
         &[&tenant.id, &user_id, &current_hash],
     )
     .await?;
@@ -648,7 +648,7 @@ pub async fn disable(
     .await?;
     let current_hash = hash_token(current_token);
     tx.execute(
-        "DELETE FROM osp_sessions WHERE tenant_id=$1 AND user_id=$2 AND kind IN ('session','api','mfa') AND NOT (hash=$3 AND kind='session')",
+        "DELETE FROM osp_sessions WHERE tenant_id=$1 AND user_id=$2 AND kind IN ('session','api','scoped_api','mfa') AND NOT (hash=$3 AND kind='session')",
         &[&tenant.id, &user_id, &current_hash],
     )
     .await?;

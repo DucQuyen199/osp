@@ -143,6 +143,13 @@ fn converted(value: &Value, field: &str, rate: Decimal) -> R<Decimal> {
 }
 
 fn json_amount(value: Decimal) -> R<Value> {
+    Ok(Value::String(value.normalize().to_string()))
+}
+
+fn json_rate_age(value: Decimal) -> R<Value> {
+    if value.fract() != Decimal::ZERO {
+        return Err(amount_error());
+    }
     crate::money::json_number(value).ok_or_else(amount_error)
 }
 
@@ -344,7 +351,7 @@ impl Kernel {
                 "conversionRate": json_amount(rate)?,
                 "rateEffectiveDate": rate_effective_date,
                 "rateAgeDays": rate_age_days,
-                "maxRateAgeDays": max_rate_age_days.map(json_amount).transpose()?,
+                "maxRateAgeDays": max_rate_age_days.map(json_rate_age).transpose()?,
                 "accounts": accounts,
             }));
         }
@@ -481,7 +488,7 @@ impl Kernel {
             "from": from_text,
             "to": to_text,
             "reportingCurrency": reporting_currency,
-            "maxRateAgeDays": max_rate_age_days.map(json_amount).transpose()?,
+            "maxRateAgeDays": max_rate_age_days.map(json_rate_age).transpose()?,
             "rateBasis": "latest direct or inverse currency rate effective on or before the report end date; same rate applied to all balance columns",
             "consolidationMethod": "account-code roll-up with separately approved group-owned management elimination journals",
             "reconciliation": {

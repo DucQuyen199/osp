@@ -4,8 +4,8 @@ import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { localDate } from '../../lib/dates.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { fmtMoney, fmtNumber, uiText } from '../../lib/i18n.js';
+import { compareDecimals } from '../../lib/decimal.js';
 const year = () => localDate().slice(0, 4);
-const amount = (value) => Number(value || 0);
 function VarianceStats({ summary }) {
   return <div className="stats">
     <div className="card stat"><span className="stat-label">{uiText('Chi phí dự toán')}</span><strong className="stat-value num">{fmtMoney(summary.expensePlannedTotal)}</strong></div>
@@ -62,7 +62,7 @@ export default function BudgetVariancePage() {
         <tbody>{report.lines.map((line) => <tr key={line.lineId}>
           <td>{line.period}</td><td>{line.budget}</td><td>{line.accountCode} · {line.account}</td><td>{line.accountKind === 'revenue' ? uiText('Doanh thu') : uiText('Chi phí')}</td><td>{uiText(line.budgetStatus)}</td>
           <td className="right money">{fmtMoney(line.planned)}</td><td className="right money">{fmtMoney(line.actual)}</td>
-          <td className="right money" data-over={amount(line.variance) < 0 || undefined}>{fmtMoney(line.variance)}</td><td className="right">{fmtNumber(amount(line.utilization), { maximumFractionDigits: 1 })}%</td>
+          <td className="right money" data-over={compareDecimals(line.variance || 0, '0') < 0 || undefined}>{fmtMoney(line.variance)}</td><td className="right">{fmtNumber(String(line.utilization ?? 0), { maximumFractionDigits: 1 })}%</td>
         </tr>)}</tbody>
       </table></div>}
       <p className="faint">{uiText('Thực tế doanh thu/chi phí dùng số dư tự nhiên của tài khoản và cập nhật cùng transaction kế toán.')}</p>

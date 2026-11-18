@@ -4,7 +4,7 @@ import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
-import { compareDecimals } from '../../lib/decimal.js';
+import { compareDecimals, multiplyDecimals } from '../../lib/decimal.js';
 import { app, can, recordLabel } from '../../lib/state.js';
 import MaintenancePartsEditor from './components/MaintenancePartsEditor.jsx';
 import maintenanceEnglish from './maintenance.en.js';
@@ -91,8 +91,8 @@ export default function MaintenanceWorkbenchPage() {
     }
     await run(`${row.id}:done`, async () => {
       await api(dataPath('maintenance.maintenance_request', row.id, 'done'), { method: 'POST', body: {
-        resolution: resolution.trim(), labor_hours: laborHours === '' ? undefined : Number(laborHours),
-        labor_rate: laborRate === '' ? undefined : Number(laborRate),
+        resolution: resolution.trim(), labor_hours: laborHours === '' ? undefined : String(laborHours).trim(),
+        labor_rate: laborRate === '' ? undefined : String(laborRate).trim(),
       } });
       setResolution(''); setLaborHours(''); setLaborRate('');
     }, 'Đã hoàn tất lệnh. Vật tư được xuất khỏi kho đã chọn và kế hoạch định kỳ được cập nhật.');
@@ -122,7 +122,7 @@ export default function MaintenanceWorkbenchPage() {
       {!!selected.parts?.length && <div className="table-wrap"><table className="table"><thead><tr><th>{t('Vật tư')}</th><th>{t('Số lượng dự kiến')}</th></tr></thead><tbody>{selected.parts.map((line, index) => <tr key={`${line.product}-${index}`}><td>{products.get(line.product)?.name || t('Vật tư')}</td><td>{line.qty} {line.uom_name || units.get(line.uom)?.name || ''}</td></tr>)}</tbody></table></div>}
       {selected.status === 'open' && can('maintenance.maintenance_request.started') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => startRequest(selected)}>{t('Bắt đầu xử lý')}</button>}
       {selected.status === 'in_progress' && can('maintenance.maintenance_request.update') && can('maintenance.maintenance_request.done') && <form className="card card-pad u-mt-12"  onSubmit={(event) => completeRequest(event, selected)}><h3>{t('Ghi nhận hoàn tất')}</h3><label className="field"><span className="label">{t('Kết quả xử lý *')}</span><textarea className="input" required rows="3" value={resolution} onChange={(event) => setResolution(event.target.value)} placeholder={t("Nguyên nhân, công việc đã làm, tình trạng sau sửa chữa…")}/></label><div className="form-grid u-mt-10" ><label className="field"><span className="label">{t('Giờ công (nhập cùng đơn giá)')}</span><input className="input num" type="number" min="0" step="0.25" value={laborHours} onChange={(event) => setLaborHours(event.target.value)}/></label><label className="field"><span className="label">{t('Đơn giá giờ công')}</span><input className="input num" type="number" min="0" step="any" value={laborRate} onChange={(event) => setLaborRate(event.target.value)}/></label></div><div className="row u-mt-10" ><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy)}>{t('Hoàn tất lệnh')}</button></div></form>}
-      {selected.resolution && <div className="alert success u-mt-12" ><strong>{t('Kết quả:')}</strong> {selected.resolution}{selected.labor_hours != null && <span> · {selected.labor_hours} {t("giờ công")} · {fmtMoney((Number(selected.labor_hours) || 0) * (Number(selected.labor_rate) || 0))}</span>}</div>}
+      {selected.resolution && <div className="alert success u-mt-12" ><strong>{t('Kết quả:')}</strong> {selected.resolution}{selected.labor_hours != null && <span> · {selected.labor_hours} {t("giờ công")} · {fmtMoney(multiplyDecimals([selected.labor_hours, selected.labor_rate || 0]))}</span>}</div>}
     </section>}
     <p className="small muted u-mt-12" >{t('Kế hoạch đến hạn chỉ phát sinh một lệnh đang mở cho mỗi kỳ; nếu lệnh bị hủy, có thể tạo lại. Khi hoàn tất lệnh, hệ thống kiểm tra tồn kho, ghi xuất vật tư, lưu ngày bảo trì và tính kỳ kế tiếp từ ngày hoàn tất.')}</p>
   </div>;

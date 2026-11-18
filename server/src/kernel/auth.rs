@@ -451,7 +451,7 @@ impl Kernel {
         let tx = Tx::begin(&mut conn, &t.id, true).await?;
         if tx
             .query_opt(
-                "SELECT 1 FROM osp_users WHERE tenant_id = $1 AND id = $2",
+                "SELECT 1 FROM osp_users WHERE tenant_id = $1 AND id = $2 AND disabled = false FOR SHARE",
                 &[&t.id, &user_id],
             )
             .await?
@@ -1021,7 +1021,7 @@ impl Kernel {
         )
         .await?;
         tx.execute(
-            "DELETE FROM osp_sessions WHERE tenant_id = $1 AND user_id = $2 AND kind IN ('reset', 'session', 'api')",
+            "DELETE FROM osp_sessions WHERE tenant_id = $1 AND user_id = $2 AND kind IN ('reset', 'session', 'api', 'scoped_api')",
             &[&tenant_id, &user_id],
         )
         .await?;
