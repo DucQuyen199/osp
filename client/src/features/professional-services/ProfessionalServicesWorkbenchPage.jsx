@@ -1,30 +1,26 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate } from '../../lib/dates.js';
-import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { addDecimals } from '../../lib/decimal.js';
 import { can, recordLabel } from '../../lib/state.js';
 import servicesEnglish from './professional-services.en.js';
 import { estimateTimeEntryAmount } from './domain/timeEntryTotals.js';
 import { useProfessionalServicesData } from './hooks/useProfessionalServicesData.js';
+import { useProfessionalServicesWorkflow } from './hooks/useProfessionalServicesWorkflow.js';
 import ProfessionalServicesTimeEntriesTable from './components/ProfessionalServicesTimeEntriesTable.jsx';
 import TimeEntryRegisterForm from './components/TimeEntryRegisterForm.jsx';
 const t = (text) => uiTextWith(text, servicesEnglish);
 const today = localDate;
-const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
 export default function ProfessionalServicesWorkbenchPage() {
   useDocumentTitle(`${t('Hồ sơ và giờ dịch vụ')} · OSP Suite`);
   const { cases, notes, timeEntries, invoices, parties, loading, error, setError, load } = useProfessionalServicesData();
-  const [caseId, setCaseId] = useState('');
-  const [caseForm, setCaseForm] = useState({ title: '', party: '', kind: '', owner: '', opened_on: today() });
-  const [noteBody, setNoteBody] = useState('');
-  const [timeForm, setTimeForm] = useState({ who: '', date: today(), hours: '', rate: '' });
-  const [busy, setBusy] = useState('');
-  const [notice, setNotice] = useState('');
-  useEffect(() => { setCaseId((current) => current && cases.some((row) => row.id === current) ? current : cases[0]?.id || ''); }, [cases]);
-  useEffect(() => { setCaseForm((current) => ({ ...current, party: current.party || [...parties.keys()][0] || '' })); }, [parties]);
+  const {
+    caseId, setCaseId, caseForm, setCaseForm, noteBody, setNoteBody,
+    timeForm, setTimeForm, busy, notice, createCase, createNote, createTime,
+    changeCase, billTime,
+  } = useProfessionalServicesWorkflow({ cases, parties, load, setError, t, todayDate: today() });
   const selectedCase = cases.find((row) => row.id === caseId);
   const caseEntries = useMemo(() => timeEntries.filter((row) => row.case === caseId).sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))), [timeEntries, caseId]);
   const caseNotes = useMemo(() => notes.filter((row) => row.case === caseId).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))), [notes, caseId]);
@@ -34,34 +30,6 @@ export default function ProfessionalServicesWorkbenchPage() {
   const billedAmount = addDecimals(caseEntries.filter((row) => row.status === 'billed').map((row) => row.amount));
   const allWip = addDecimals(timeEntries.filter((row) => row.status === 'recorded').map((row) => row.amount));
   const allBilled = addDecimals(timeEntries.filter((row) => row.status === 'billed').map((row) => row.amount));
-  async function run(key, operation, success) {
-    setBusy(key); setError(''); setNotice('');
-    try { await operation(); setNotice(t(success)); await load(true); }
-    catch (reason) { setError(t(reason.message || 'Thao tác không thành công.')); await load(true); }
-    finally { setBusy(''); }
-  }
-  async function createCase(event) {
-    event.preventDefault();
-    await run('case', () => api(dataPath('case-management.case'), { method: 'POST', body: { ...caseForm, title: caseForm.title.trim(), kind: caseForm.kind.trim() || undefined, owner: caseForm.owner.trim() || undefined, status: 'open' } }), 'Đã mở hồ sơ vụ việc.');
-    setCaseForm((current) => ({ ...current, title: '', kind: '', owner: '' }));
-  }
-  async function createNote(event) {
-    event.preventDefault();
-    await run('note', () => api(dataPath('case-management.case_note'), { method: 'POST', body: { case: caseId, body: noteBody.trim() } }), 'Đã lưu ghi chú hồ sơ vào lịch sử bất biến.');
-    setNoteBody('');
-  }
-  async function createTime(event) {
-    event.preventDefault();
-    await run('time', () => api(dataPath('case-management.time_entry'), { method: 'POST', body: { case: caseId, who: timeForm.who.trim(), date: timeForm.date, hours: String(timeForm.hours), rate: String(timeForm.rate), status: 'recorded' } }), 'Đã ghi giờ công. Khách hàng và phí được chụp từ hồ sơ và đơn giá giờ.');
-    setTimeForm((current) => ({ ...current, hours: '' }));
-  }
-  async function changeCase(row, verb) {
-    const messages = { on_hold: 'Đã tạm dừng hồ sơ.', resumed: 'Đã tiếp tục xử lý hồ sơ.', closed: 'Đã đóng hồ sơ sau khi xuất hóa đơn toàn bộ giờ công.' };
-    await run(`${row.id}:${verb}`, () => action('case-management.case', row, verb), messages[verb]);
-  }
-  async function billTime(row) {
-    await run(`${row.id}:billed`, () => action('case-management.time_entry', row, 'billed'), 'Đã xuất hóa đơn dịch vụ cho khoản giờ công. Giờ công đã khóa khỏi chỉnh sửa.');
-  }
   return <div className="page">
     <div className="page-head"><div><h1>{t('Hồ sơ vụ việc và giờ dịch vụ')}</h1><p className="sub">{t('Tiếp nhận thân chủ, lưu diễn biến, ghi giờ tính phí và xuất hóa đơn theo từng hồ sơ.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
