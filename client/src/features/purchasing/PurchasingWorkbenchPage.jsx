@@ -11,6 +11,8 @@ import PurchaseOrdersList from './components/PurchaseOrdersList.jsx';
 import PurchaseRequisitionsTable from './components/PurchaseRequisitionsTable.jsx';
 import SupplierInvoiceAdjustmentsEditor from './components/SupplierInvoiceAdjustmentsEditor.jsx';
 import PurchaseOrderDetailPanel from './components/PurchaseOrderDetailPanel.jsx';
+import PurchasingWorkbenchHeader from './components/PurchasingWorkbenchHeader.jsx';
+import PurchasingOverviewStats from './components/PurchasingOverviewStats.jsx';
 import { usePurchasingData } from './hooks/usePurchasingData.js';
 import {
   calculateInvoiceableLines,
@@ -286,10 +288,9 @@ export default function PurchasingWorkbenchPage() {
   const canReceive = (row) => ['approved','partially_received'].includes(row.status) && can('purchasing.purchase_receipt.create');
   const orderLinesTotal = addDecimals(lines.map((line) => lineValue(line, taxById)));
   return <div className="page">
-    <div className="page-head"><div><h1>{uiText('Mua hàng và nhận hàng')}</h1><p className="sub">{uiText('Lập đơn mua, gửi duyệt, nhận đủ hoặc từng phần vào kho và theo dõi hóa đơn nhà cung cấp.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{uiText('Làm mới')}</button></div>
-    {can('purchasing.rfq.read') && <div className="row u-actions-end-mb-10" ><a className="btn btn-secondary btn-sm" href="#/sourcing">{uiText('RFQ và so sánh báo giá')}</a></div>}
+    <PurchasingWorkbenchHeader loading={loading} busy={busy} onRefresh={() => load()} canReadSourcing={can('purchasing.rfq.read')} />
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
-    <div className="stats u-mb-16" ><div className="card stat"><span className="stat-label">{uiText('Nháp / bị trả')}</span><strong className="stat-value">{totals.draft}</strong></div><div className="card stat"><span className="stat-label">{uiText('Chờ duyệt')}</span><strong className="stat-value">{totals.awaitingApproval}</strong></div><div className="card stat"><span className="stat-label">{uiText('Đang nhận hàng')}</span><strong className="stat-value">{totals.receiving}</strong></div><div className="card stat"><span className="stat-label">{uiText('Đã nhận đủ')}</span><strong className="stat-value">{totals.received}</strong></div></div>
+    <PurchasingOverviewStats totals={totals} />
     {can('purchasing.purchase_requisition.read') && <>
       {!can('purchasing.purchase_requisition.create') && <section className="card card-pad"><h2>{uiText('Đề nghị mua nội bộ')}</h2><p className="small muted">{uiText('Ghi nhu cầu hàng hóa và kho nhận. Sau khi phê duyệt, hệ thống sinh đơn mua nháp có liên kết nguồn; đơn mua vẫn cần giá và phê duyệt riêng trước khi đặt hàng.')}</p></section>}
       {can('purchasing.purchase_requisition.create') && <PurchaseRequisitionForm
