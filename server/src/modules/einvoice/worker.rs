@@ -145,7 +145,7 @@ async fn claim(kernel: &Kernel, tenant: &Tenant, limit: i64) -> R<Vec<Job>> {
                ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT $2 \
              ) \
              UPDATE einvoice__einvoice e \
-             SET attempts = COALESCE(e.attempts, 0) + 1, lease_until = now() + ($3 * interval '1 second'), lease_token = $4, updated_at = now() \
+             SET attempts = COALESCE(e.attempts, 0) + 1, lease_until = now() + ($3::bigint * interval '1 second'), lease_token = $4, updated_at = now() \
              FROM ready WHERE e.tenant_id = $1 AND e.id = ready.id \
              RETURNING e.id, e.operation, e.request_payload, e.provider_reference, e.cancellation_reason, e.attempts::bigint",
             &[&tenant.id, &limit, &LEASE_SECONDS, &lease_token],

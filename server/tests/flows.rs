@@ -1,14 +1,71 @@
 //! Test tích hợp trên PostgreSQL thật (bản nhúng, vai trò không phải superuser nên RLS có hiệu lực).
 //! Một hàm test duy nhất chạy tuần tự các kịch bản để dùng chung một tiến trình PostgreSQL và tắt nó gọn gàng.
 #![cfg(feature = "embedded-pg")]
+use futures::future::BoxFuture;
+use osp_server::error::{ApiError, R};
 use osp_server::kernel::data::ListQuery;
 use osp_server::kernel::io::ImportInput;
 use osp_server::kernel::tenants::{AdminInput, CreateTenant};
 use osp_server::kernel::{Actor, Kernel, Obj, Tenant};
+use osp_server::modules::einvoice::{
+    CancellationResult, EInvoiceProvider, IssueResult, run_once_with_provider,
+};
 use serde_json::{Value, json};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tower::ServiceExt;
+
+#[derive(Default)]
+struct RecordingEInvoiceProvider {
+    issues: Mutex<Vec<(String, Value)>>,
+}
+
+impl EInvoiceProvider for RecordingEInvoiceProvider {
+    fn code(&self) -> &str {
+        "test-provider"
+    }
+
+    fn issue<'a>(
+        &'a self,
+        tenant_id: &'a str,
+        request: &'a Value,
+    ) -> BoxFuture<'a, R<IssueResult>> {
+        Box::pin(async move {
+            let key = request
+                .get("idempotency_key")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    ApiError::validation("einvoice", vec!["Missing idempotency key".into()])
+                })?
+                .to_owned();
+            self.issues
+                .lock()
+                .expect("provider issue log lock")
+                .push((tenant_id.to_owned(), request.clone()));
+            Ok(IssueResult {
+                provider_reference: Some(key.clone()),
+                serial: Some("TEST".into()),
+                number: format!("TEST-{key}"),
+                lookup_code: Some(format!("LOOKUP-{key}")),
+                response: json!({ "accepted": true }),
+            })
+        })
+    }
+
+    fn cancel<'a>(
+        &'a self,
+        tenant_id: &'a str,
+        provider_reference: &'a str,
+        _reason: &'a str,
+    ) -> BoxFuture<'a, R<CancellationResult>> {
+        Box::pin(async move {
+            Ok(CancellationResult {
+                provider_reference: Some(provider_reference.to_owned()),
+                response: json!({ "accepted": true, "tenantId": tenant_id }),
+            })
+        })
+    }
+}
 
 #[path = "scenarios/commerce.rs"]
 mod commerce;
@@ -505,9 +562,26 @@ async fn run(k: Arc<Kernel>, url: String, defs: PathBuf) {
             .list("accounting.invoice", &[("source_id", &id(order))])
             .await[0];
         assert_eq!(inv["status"], "posted");
-        assert_eq!(
-            t.list("einvoice.einvoice", &[("invoice", &id(inv))]).await[0]["status"],
-            "pending"
+        let e_invoice = t
+            .list("einvoice.einvoice", &[("invoice", &id(inv))])
+            .await
+            .remove(0);
+        assert_eq!(e_invoice["status"], "pending");
+        let provider = RecordingEInvoiceProvider::default();
+        assert!(run_once_with_provider(&k, &provider).await.unwrap() >= 1);
+        let issued = t.get("einvoice.einvoice", &id(&e_invoice)).await;
+        assert_eq!(issued["status"], "issued");
+        assert_eq!(issued["provider"], "test-provider");
+        assert_eq!(issued["number"], format!("TEST-{}", id(&e_invoice)));
+        assert_eq!(issued["lookup_code"], format!("LOOKUP-{}", id(&e_invoice)));
+        assert!(
+            provider
+                .issues
+                .lock()
+                .expect("provider issue log lock")
+                .iter()
+                .any(|(tenant_id, request)| tenant_id == &t.t.id
+                    && request["idempotency_key"] == id(&e_invoice))
         );
         t.create(
             "accounting.payment",
