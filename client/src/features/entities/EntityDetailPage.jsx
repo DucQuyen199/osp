@@ -210,6 +210,7 @@ export default function EntityDetailPage({ qname, id }) {
     }
   };
   const state = definition?.states && record?.[definition.states.field];
+  const canEditRecord = can(`${qname}.update`) && !(qname === 'crm.deal' && ['won', 'lost'].includes(state));
   const actions = definition?.states
     ? Object.entries(definition.states.actions).filter(([action, transition]) => transition.from.includes(state) && can(`${qname}.${action}`) && !(qname === 'helpdesk.ticket' && action === 'responded') && !(qname === 'accounting.journal_entry' && ['posted', 'rejected'].includes(action)) && !(qname === 'accounting.journal_entry' && action === 'submitted' && record?.source) && (qname !== 'crm.deal' || action !== 'lost' || can(`${qname}.update`)))
     : [];
@@ -238,7 +239,7 @@ export default function EntityDetailPage({ qname, id }) {
               </button>)}
               {qname === 'inventory.lot' && can('inventory.lot.read') && can('inventory.stock_move.read') && <a className="btn btn-sm" href={`#/reports/inventory/lots/${encodeURIComponent(id)}/traceability`}>{uiText('Truy xuất lô')}</a>}
               <span className="grow" />
-              {can(`${qname}.update`) && <button className="btn btn-sm" type="button" disabled={Boolean(working)} onClick={edit}>{uiText('Sửa')}</button>}
+              {canEditRecord && <button className="btn btn-sm" type="button" disabled={Boolean(working)} onClick={edit}>{uiText('Sửa')}</button>}
               {qname === 'accounting.bank_statement' && record?.status === 'draft' && can('accounting.bank_statement_line.create') && <>
                 <input className="input" type="file" accept=".csv,.xml,.camt,text/csv,application/xml,text/xml" aria-label={uiText('Tệp sao kê CSV hoặc CAMT.053')} disabled={Boolean(working)} onChange={(event) => setStatementFile(event.target.files?.[0] || null)} />
                 <button className="btn btn-sm" type="button" disabled={!statementFile || Boolean(working)} onClick={importStatementFile}>{working === 'import' ? uiText('Đang nhập…') : `${uiText('Nhập')} ${statementFile && /\.(xml|camt)$/i.test(statementFile.name) ? 'CAMT.053' : 'CSV'}`}</button>

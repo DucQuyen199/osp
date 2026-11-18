@@ -122,8 +122,8 @@ async fn validate_claim(
             errors.push("Claim payout requires an expense account in this tenant".into());
         }
     }
-    if action == "created" && policy_status != "active" {
-        errors.push("Chỉ hợp đồng đang có hiệu lực mới tiếp nhận bồi thường".into());
+    if action == "created" && !matches!(policy_status.as_str(), "active" | "lapsed") {
+        errors.push("Chỉ tiếp nhận bồi thường từ hợp đồng đã kích hoạt hoặc hết hạn, với ngày sự cố trong thời hạn bảo hiểm".into());
     }
     if start_date
         .as_deref()

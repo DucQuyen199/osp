@@ -120,7 +120,9 @@ export default function App() {
     target.focus();
   }, [route, ready, meta, user]);
 
-  if (!ready) return <div className="landing-panel"><div className="skeleton" data-h="row" /></div>;
+  if (!ready) return <div className="landing-panel" role="status" aria-busy="true" aria-label={uiText('Đang tải…')}>
+    <div className="skeleton" data-h="row" aria-hidden="true" />
+  </div>;
   if (!session.current()) return <>
     {error && <div className="toast toast-danger" role="alert">{uiText(error)}</div>}
     <AuthPage route={route} onSignedIn={signedIn} />

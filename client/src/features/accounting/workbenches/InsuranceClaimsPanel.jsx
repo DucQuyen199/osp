@@ -2,17 +2,17 @@ import React from 'react';
 import { fmtDate, statusLabel, uiText } from '../../../lib/i18n.js';
 
 export default function InsuranceClaimsPanel(props) {
-  const { can, claims, loading, uiText, claimForm, setClaimForm, activePolicies, today, createClaim, policies, parties, money, claimPay, claimApprovalAmounts, setClaimApprovalAmounts, claimAction, claimRejectionReasons, setClaimRejectionReasons, busy, payClaim, accounts, fmtDate } = props;
+  const { can, claims, loading, uiText, claimForm, setClaimForm, eligiblePolicies, today, createClaim, policies, parties, money, claimPay, claimApprovalAmounts, setClaimApprovalAmounts, claimAction, claimRejectionReasons, setClaimRejectionReasons, busy, payClaim, accounts, fmtDate } = props;
   return (
     <>
     {can('insurance.claim.read') && <section className="card card-pad u-legacy-eee3f850c9" ><h2>{uiText("Hồ sơ bồi thường")}</h2>
       {can('insurance.claim.create') && <form className="form-grid" onSubmit={createClaim}>
         <label className="field"><span className="label">{uiText("Mã hồ sơ *")}</span><input className="input" required value={claimForm.number} onChange={(e) => setClaimForm((x) => ({ ...x, number: e.target.value }))} /></label>
-        <label className="field"><span className="label">{uiText("Hợp đồng còn hiệu lực *")}</span><select className="select" required value={claimForm.policy} onChange={(e) => setClaimForm((x) => ({ ...x, policy: e.target.value }))}><option value="">{uiText("Chọn hợp đồng")}</option>{activePolicies.map((policy) => <option key={policy.id} value={policy.id}>{policy.number} · {parties.get(policy.party)?.name || policy.product}</option>)}</select></label>
+        <label className="field"><span className="label">{uiText("Hợp đồng áp dụng cho sự cố *")}</span><select className="select" required value={claimForm.policy} onChange={(e) => setClaimForm((x) => ({ ...x, policy: e.target.value }))}><option value="">{uiText("Chọn hợp đồng")}</option>{eligiblePolicies.map((policy) => <option key={policy.id} value={policy.id}>{policy.number} · {parties.get(policy.party)?.name || policy.product}</option>)}</select></label>
         <label className="field"><span className="label">{uiText("Số tiền yêu cầu *")}</span><input className="input num" required type="number" min="0.01" step="any" value={claimForm.amount} onChange={(e) => setClaimForm((x) => ({ ...x, amount: e.target.value }))} /></label>
         <label className="field"><span className="label">{uiText("Ngày sự cố *")}</span><input className="input" required type="date" max={today()} value={claimForm.incident_date} onChange={(e) => setClaimForm((x) => ({ ...x, incident_date: e.target.value }))} /></label>
         <label className="field full"><span className="label">{uiText("Mô tả sự cố")}</span><textarea className="textarea" value={claimForm.description} onChange={(e) => setClaimForm((x) => ({ ...x, description: e.target.value }))} /></label>
-        <div className="row full"><span className="grow" /><button className="btn btn-primary" disabled={busy || loading || !activePolicies.length}>{uiText("Tiếp nhận hồ sơ")}</button></div>
+        <div className="row full"><span className="grow" /><button className="btn btn-primary" disabled={busy || loading || !eligiblePolicies.length}>{uiText("Tiếp nhận hồ sơ")}</button></div>
       </form>}
       {!claims.length && !loading ? <div className="empty">{uiText("Chưa có hồ sơ bồi thường.")}</div> : <div className="table-wrap u-legacy-0ee7f66ad9" ><table className="table"><thead><tr><th>{uiText("Mã hồ sơ")}</th><th>{uiText("Hợp đồng")}</th><th>{uiText('Sự cố')}</th><th>{uiText("Yêu cầu / duyệt")}</th><th>{uiText("Trạng thái")}</th><th>{uiText("Thẩm định / chi trả")}</th></tr></thead><tbody>{claims.map((claim) => {
         const policy = policies.find((item) => item.id === claim.policy); const pay = claimPay[claim.id] || {};

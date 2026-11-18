@@ -27,6 +27,11 @@ export default function FinanceOperationsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const eligiblePolicies = useMemo(() => policies.filter((policy) =>
+    ['active', 'lapsed'].includes(policy.status)
+      && claimForm.incident_date >= (policy.start_date || '')
+      && claimForm.incident_date <= (policy.end_date || '9999-12-31')),
+  [claimForm.incident_date, policies]);
   useEffect(() => {
     setClaimApprovalAmounts((current) => {
       const next = { ...current };
@@ -35,13 +40,13 @@ export default function FinanceOperationsPage() {
     });
     setLoanForm((x) => ({ ...x, party: x.party || [...parties.keys()][0] || '' }));
     setPolicyForm((x) => ({ ...x, party: x.party || [...parties.keys()][0] || '' }));
-    setClaimForm((x) => ({ ...x, policy: x.policy || policies.find((p) => p.status === 'active')?.id || '' }));
+    setClaimForm((x) => ({ ...x, policy: eligiblePolicies.some((policy) => policy.id === x.policy) ? x.policy : eligiblePolicies[0]?.id || '' }));
     setClaimPay((current) => {
       const next = { ...current };
       for (const claim of claims) if (!next[claim.id]) next[claim.id] = { method: 'bank', expense_account: accounts.find((a) => a.kind === 'expense')?.id || '' };
       return next;
     });
-  }, [accounts, claims, parties, policies]);
+  }, [accounts, claims, eligiblePolicies, parties]);
   const invoiceByPolicy = useMemo(() => new Map(invoices.filter((item) => item.source === 'policy').map((item) => [item.source_id, item])), [invoices]);
   const repaymentsByLoan = useMemo(() => {
     const map = new Map();
@@ -49,7 +54,6 @@ export default function FinanceOperationsPage() {
     for (const rows of map.values()) rows.sort((a, b) => Number(a.installment_no) - Number(b.installment_no));
     return map;
   }, [repayments]);
-  const activePolicies = policies.filter((policy) => policy.status === 'active');
   const refresh = () => { setError(''); load(); };
   async function createLoan(event) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
@@ -145,6 +149,6 @@ export default function FinanceOperationsPage() {
     {(error || loadError) && <div className="alert danger" role="alert">{uiText(error || loadError)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
     <LoanRepaymentPanel {...{ can, loans, loading, uiText, loanForm, setLoanForm, parties, recordLabel, createLoan, busy, repaymentsByLoan, statusLabel, today, loanAction, repaymentMethods, setRepaymentMethods, repaymentAction, money }} />
     <InsurancePolicyPanel {...{ can, policies, loading, uiText, policyForm, setPolicyForm, parties, createPolicy, busy, recordLabel, invoiceByPolicy, fmtDate, statusLabel, policyCancellationReasons, setPolicyCancellationReasons, policyAction }} />
-    <InsuranceClaimsPanel {...{ can, claims, loading, uiText, claimForm, setClaimForm, activePolicies, today, createClaim, policies, parties, money, claimPay, claimApprovalAmounts, setClaimApprovalAmounts, claimAction, claimRejectionReasons, setClaimRejectionReasons, busy, payClaim, accounts, fmtDate }} />
+    <InsuranceClaimsPanel {...{ can, claims, loading, uiText, claimForm, setClaimForm, eligiblePolicies, today, createClaim, policies, parties, money, claimPay, claimApprovalAmounts, setClaimApprovalAmounts, claimAction, claimRejectionReasons, setClaimRejectionReasons, busy, payClaim, accounts, fmtDate }} />
   </div>;
 }

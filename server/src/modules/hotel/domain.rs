@@ -73,6 +73,16 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
             }
         }
         "folio_charge" => {
+            let description = document
+                .get("description")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .unwrap_or_default();
+            if description.is_empty() {
+                errors.push("Folio charge description is required".into());
+            } else if description.chars().count() > 500 {
+                errors.push("Folio charge description cannot exceed 500 characters".into());
+            }
             if !document
                 .get("amount")
                 .and_then(money::decimal)

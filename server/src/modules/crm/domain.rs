@@ -219,6 +219,10 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
         ("deal", Some("won" | "lost")) => [
             "title",
             "party",
+            "warehouse",
+            "price_list",
+            "shipping_address",
+            "lines",
             "amount",
             "stage",
             "pipeline_stage",
