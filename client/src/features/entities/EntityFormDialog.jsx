@@ -81,7 +81,8 @@ export default function EntityFormDialog({ qname, record, onClose, onSaved }) {
 
   const readField = (field) => {
     const value = values[field.name];
-    if (field.type === 'number' || field.type === 'money') return value === '' || value == null ? undefined : Number(value);
+    if (field.type === 'money') return value === '' || value == null ? undefined : String(value);
+    if (field.type === 'number') return value === '' || value == null ? undefined : Number(value);
     if (field.type === 'datetime') {
       if (!value) return undefined;
       const instant = localDateTimeToIso(value);
