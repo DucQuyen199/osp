@@ -35,6 +35,14 @@ function combine(left, right, subtract = false) {
   return decimalText(leftValue + (subtract ? -rightValue : rightValue), scale);
 }
 
+export function multiplyDecimals(values) {
+  return values.reduce((product, value) => {
+    const left = decimalParts(product);
+    const right = decimalParts(value);
+    return decimalText(left.coefficient * right.coefficient, left.scale + right.scale);
+  }, '1');
+}
+
 export function addDecimals(values) {
   return values.reduce((total, value) => combine(total, value), '0');
 }

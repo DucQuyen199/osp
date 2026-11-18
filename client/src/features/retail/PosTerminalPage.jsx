@@ -11,6 +11,7 @@ import PosReturnDialog from './components/PosReturnDialog.jsx';
 import PosSessionPanel from './components/PosSessionPanel.jsx';
 import PosCashOperationsPanel from './components/PosCashOperationsPanel.jsx';
 import PosRecentTransactions from './components/PosRecentTransactions.jsx';
+import { calculatePosTotals } from './domain/posTotals.js';
 import retailEnglish from './retail.en.js';
 
 const readItems = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -129,9 +130,7 @@ export default function PosTerminalPage() {
   };
   const rxRequired = cart.some(({ product }) => product.requires_prescription === true);
   useEffect(() => { if (!rxRequired && prescriptionId) setPrescriptionId(''); }, [rxRequired, prescriptionId]);
-  const subtotal = cart.reduce((sum, row) => sum + priceFor(row.product, row.uom) * row.qty, 0);
-  const estimatedTax = cart.reduce((sum, row) => sum + priceFor(row.product, row.uom) * row.qty * ((Number(taxes.get(row.product.tax)?.rate) || 0) / 100), 0);
-  const total = Math.round((subtotal + estimatedTax + Number.EPSILON) * 100) / 100;
+  const { subtotal, tax: estimatedTax, total } = calculatePosTotals(cart, units, taxes);
   const filteredProducts = [...products.values()].filter((product) => product.active !== false && (!query || `${product.name} ${product.sku || ''} ${product.barcode || ''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()))).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
 
   const startSession = async (event) => {
