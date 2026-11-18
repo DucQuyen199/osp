@@ -4,6 +4,7 @@ import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
+import { absDecimal, compareDecimals } from '../../lib/decimal.js';
 import { app, can, loadAllResponse } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import approvalEnglish from './approvals.en.js';
@@ -17,6 +18,7 @@ const targets = [
 ];
 const requestRows = (response) => Array.isArray(response?.items) ? response.items : [];
 const blankRule = { name: '', entity: targets[0], min_amount: '', variance_tolerance: '', roles: [], users: [] };
+const decimalInput = (value) => String(value ?? '').trim().replace(/^([+-]?)\./, (_, sign) => `${sign}0.`);
 function ruleApprovers(value) {
   if (Array.isArray(value)) return {
     roles: value.filter((entry) => typeof entry === 'string' && app.meta?.roles?.[entry]),
@@ -71,8 +73,8 @@ export default function ApprovalWorkbenchPage() {
   const selected = visibleRequests.find((row) => row.id === selectedId) || requests.find((row) => row.id === selectedId);
   const pendingCount = requests.filter((row) => row.status === 'pending').length;
   const applicableRule = selected ? rules
-    .filter((rule) => rule.entity === selected.entity && (rule.min_amount == null || Number(rule.min_amount) <= Math.abs(Number(selected.amount || 0))))
-    .sort((a, b) => Number(b.min_amount ?? -1) - Number(a.min_amount ?? -1))[0] : null;
+    .filter((rule) => rule.entity === selected.entity && (rule.min_amount == null || compareDecimals(rule.min_amount, absDecimal(selected.amount || 0)) <= 0))
+    .sort((a, b) => compareDecimals(b.min_amount ?? '-1', a.min_amount ?? '-1'))[0] : null;
   const selectedApprovers = applicableRule ? ruleApprovers(applicableRule.approvers) : { roles: [], users: [] };
   const usersById = useMemo(() => new Map(approverUsers.map((user) => [user.id, user])), [approverUsers]);
   const approverName = (id) => usersById.get(id)?.name || `${t('Tài khoản')} ${String(id).slice(0, 8)}`;
@@ -102,8 +104,8 @@ export default function ApprovalWorkbenchPage() {
     event.preventDefault();
     const payload = {
       name: ruleForm.name.trim(), entity: ruleForm.entity,
-      min_amount: ruleForm.min_amount === '' ? null : Number(ruleForm.min_amount),
-      ...(ruleForm.entity === 'purchasing.supplier_invoice' && ruleForm.variance_tolerance !== '' ? { variance_tolerance: Number(ruleForm.variance_tolerance) } : {}),
+      min_amount: ruleForm.min_amount.trim() === '' ? null : decimalInput(ruleForm.min_amount),
+      ...(ruleForm.entity === 'purchasing.supplier_invoice' && ruleForm.variance_tolerance.trim() !== '' ? { variance_tolerance: decimalInput(ruleForm.variance_tolerance) } : {}),
       approvers: { roles: ruleForm.roles, ...(ruleForm.users.length ? { users: ruleForm.users } : {}) },
     };
     const qname = 'workflow-approval.approval_rule';

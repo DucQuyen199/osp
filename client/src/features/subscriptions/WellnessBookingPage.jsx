@@ -88,7 +88,7 @@ export default function WellnessBookingPage({ healthcare = false }) {
       if (!startsAt || (form.ends_at && !endsAt)) throw new Error(t('Giờ hẹn không hợp lệ trong múi giờ kinh doanh.'));
       const body = { resource: form.resource, service: form.service || undefined, party: form.party || undefined, starts_at: startsAt, note: form.note.trim() || undefined };
       if (endsAt) body.ends_at = endsAt;
-      if (form.price !== '') body.price = Number(form.price);
+      if (form.price !== '') body.price = String(form.price).trim();
       await api(dataPath('booking.booking'), { method: 'POST', body });
     }, 'Đã tiếp nhận lịch hẹn. Tài nguyên và khung giờ sẽ được kiểm tra trùng lịch ở máy chủ.');
     setForm((current) => ({ ...current, note: '', price: '', ends_at: '' }));
@@ -137,7 +137,7 @@ export default function WellnessBookingPage({ healthcare = false }) {
       const editService = services.find((row) => row.id === editForm.service);
       const serviceHasDuration = Number(editService?.duration_min) > 0;
       if (editForm.ends_at !== originalEnd || !serviceHasDuration) body.ends_at = endsAt;
-      if (editForm.price !== '') body.price = Number(editForm.price);
+      if (editForm.price !== '') body.price = String(editForm.price).trim();
       await api(dataPath('booking.booking', selected.id), { method: 'PATCH', body });
     }, 'Đã cập nhật lịch chờ; máy chủ đã tính lại thời lượng dịch vụ và kiểm tra xung đột tài nguyên.');
     setEditingBooking(false);

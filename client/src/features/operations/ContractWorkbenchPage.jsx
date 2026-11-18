@@ -95,7 +95,7 @@ export default function ContractWorkbenchPage() {
     await run(`${selected.id}:save`, () => api(dataPath('contract.contract', selected.id), { method: 'PATCH', body: {
       title: draftEdit.title.trim(), party: draftEdit.party,
       start_date: draftEdit.start_date || null, end_date: draftEdit.end_date || null,
-      value: draftEdit.value === '' ? null : Number(draftEdit.value), terms: draftEdit.terms.trim() || null,
+      value: draftEdit.value === '' ? null : String(draftEdit.value).trim(), terms: draftEdit.terms.trim() || null,
     } }), t("Đã lưu thông tin hợp đồng nháp."));
   }
   useEffect(() => {
@@ -115,7 +115,7 @@ export default function ContractWorkbenchPage() {
     if (amendmentForm.title.trim()) changes.title = amendmentForm.title.trim();
     if (amendmentForm.terms.trim()) changes.terms = amendmentForm.terms.trim();
     if (amendmentForm.end_date) changes.end_date = amendmentForm.end_date;
-    if (amendmentForm.value !== '') changes.value = Number(amendmentForm.value);
+    if (amendmentForm.value !== '') changes.value = String(amendmentForm.value).trim();
     if (!Object.keys(changes).length) { setError(t("Hãy nhập ít nhất một nội dung thay đổi trong phụ lục.")); return; }
     await run(`${selected.id}:amendment`, async () => {
       const amendment = await api(dataPath('contract.amendment'), { method: 'POST', body: {
