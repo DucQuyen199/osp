@@ -1,47 +1,21 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { addDecimals, compareDecimals, roundDecimal } from '../../lib/decimal.js';
-import { app, can, loadAll, loadRefs, recordLabel } from '../../lib/state.js';
+import { app, can, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
+import { useAccountingSettlementData } from './hooks/useAccountingSettlementData.js';
 const today = localDate;
 export default function AccountingSettlementWorkbenchPage() {
   useDocumentTitle(`${uiText('Thu/chi phân bổ công nợ')} · OSP Suite`);
-  const [batches, setBatches] = useState([]);
-  const [invoices, setInvoices] = useState([]);
-  const [bills, setBills] = useState([]);
-  const [payments, setPayments] = useState([]);
-  const [parties, setParties] = useState(new Map());
-  const [currencies, setCurrencies] = useState(new Map());
-  const [approvals, setApprovals] = useState([]);
   const [form, setForm] = useState({ direction: 'receipt', party: '', currency: '', method: 'bank', payment_date: today(), reference: '' });
   const [allocations, setAllocations] = useState({});
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const workflowApproval = app.meta?.modules?.some((module) => module.id === 'workflow-approval');
-  const load = useCallback(async () => {
-    setLoading(true); setError('');
-    try {
-      const [batchRows, invoiceRows, billRows, paymentRows, partyMap, currencyRows, approvalRows] = await Promise.all([
-        can('accounting.settlement_batch.read') ? loadAll('accounting.settlement_batch') : Promise.resolve([]),
-        can('accounting.invoice.read') ? loadAll('accounting.invoice') : Promise.resolve([]),
-        can('accounting.bill.read') ? loadAll('accounting.bill') : Promise.resolve([]),
-        can('accounting.payment.read') ? loadAll('accounting.payment') : Promise.resolve([]),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('master-data.currency.read') ? loadAll('master-data.currency') : Promise.resolve([]),
-        workflowApproval && can('workflow-approval.approval_request.read') ? loadAll('workflow-approval.approval_request') : Promise.resolve([]),
-      ]);
-      batchRows.sort((a, b) => String(b.payment_date || '').localeCompare(String(a.payment_date || '')) || String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
-      setBatches(batchRows); setInvoices(invoiceRows); setBills(billRows); setPayments(paymentRows); setParties(partyMap || new Map());
-      setCurrencies(new Map(currencyRows.map((currency) => [currency.id, currency]))); setApprovals(approvalRows);
-    } catch (reason) { setError(reason.message || uiText('Không tải được phiếu thu/chi công nợ.')); }
-    finally { setLoading(false); }
-  }, [workflowApproval]);
-  useEffect(() => { load(); }, [load]);
+  const { batches, invoices, bills, payments, parties, currencies, approvals, loading, error, setError, load } = useAccountingSettlementData(workflowApproval);
   const docs = form.direction === 'receipt' ? invoices : bills;
   const partyField = form.direction === 'receipt' ? 'party' : 'supplier';
   const available = useMemo(() => docs.filter((doc) => doc[partyField] === form.party && ['posted', 'partially_paid', 'partially_settled'].includes(doc.status) && compareDecimals(doc.balance_due || 0, '0.005') > 0), [docs, partyField, form.party]);
