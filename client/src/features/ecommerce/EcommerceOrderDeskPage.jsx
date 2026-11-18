@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtMoney, uiTextWith } from '../../lib/i18n.js';
+import { addDecimals, compareDecimals } from '../../lib/decimal.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import ecommerceEnglish from './ecommerce.en.js';
 import WebOrderCard from './components/WebOrderCard.jsx';
@@ -52,14 +53,21 @@ export default function EcommerceOrderDeskPage() {
     const timer = window.setInterval(() => load(true), 20000);
     return () => window.clearInterval(timer);
   }, [load]);
-  const cartLines = useMemo(() => Object.entries(quantities).map(([id, qty]) => ({ product: products.get(id), qty: Number(qty) })).filter((line) => line.product && line.qty > 0), [quantities, products]);
+  const cartDrafts = useMemo(() => Object.entries(quantities).map(([id, qty]) => ({ product: products.get(id), qty: String(qty ?? '') })).filter((line) => line.product), [quantities, products]);
+  const cartLines = useMemo(() => cartDrafts.filter((line) => {
+    try { return compareDecimals(line.qty || 0, 0) > 0; } catch { return false; }
+  }), [cartDrafts]);
   const filteredProducts = [...products.values()].filter((item) => item.active !== false && (!query || `${item.name} ${item.sku || ''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()))).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
   const relatedSalesOrder = (webOrderId) => salesOrders.find((item) => item.source === 'ecommerce' && item.source_id === webOrderId);
   const relatedShipments = (salesOrderId) => shipments.filter((item) => item.source === 'sales_order' && item.source_id === salesOrderId);
   const relatedInvoice = (salesOrderId) => invoices.find((item) => item.source === 'sales_order' && item.source_id === salesOrderId);
   const setQty = (id, value) => setQuantities((current) => {
-    const next = { ...current }; const qty = Math.max(0, Number(value) || 0);
-    if (qty > 0) next[id] = qty; else delete next[id];
+    const next = { ...current };
+    if (value === '' || value == null) next[id] = '';
+    else {
+      try { if (compareDecimals(value, 0) > 0) next[id] = String(value); else delete next[id]; }
+      catch { next[id] = String(value); }
+    }
     return next;
   });
   const createCart = async (event) => {
@@ -137,6 +145,7 @@ export default function EcommerceOrderDeskPage() {
         parties={parties}
         filteredProducts={filteredProducts}
         quantities={quantities}
+        cartDrafts={cartDrafts}
         cartLines={cartLines}
         storefront={storefront}
         party={party}

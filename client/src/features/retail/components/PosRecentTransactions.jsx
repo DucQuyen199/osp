@@ -1,3 +1,5 @@
+import { addDecimals } from '../../../lib/decimal.js';
+
 function returnsForOrder(returns, orderId) {
   return returns.filter((item) => item.pos_order === orderId && item.status === 'received');
 }
@@ -25,7 +27,7 @@ export default function PosRecentTransactions({
     <h3>{t('Giao dịch gần đây')}</h3>
     {orders.length ? orders.map((order) => {
       const orderReturns = returnsForOrder(returns, order.id);
-      const returnedTotal = orderReturns.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+      const returnedTotal = addDecimals(orderReturns.map((item) => item.total || 0));
       const paymentMethod = order.method === 'cash' ? 'Tiền mặt'
         : order.method === 'card' ? 'Thẻ'
           : order.method === 'transfer' ? 'Chuyển khoản'
