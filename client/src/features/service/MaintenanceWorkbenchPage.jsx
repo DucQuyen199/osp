@@ -1,39 +1,28 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
-import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
-import { compareDecimals, multiplyDecimals } from '../../lib/decimal.js';
-import { app, can, recordLabel } from '../../lib/state.js';
+import { multiplyDecimals } from '../../lib/decimal.js';
+import { can, recordLabel } from '../../lib/state.js';
 import MaintenancePartsEditor from './components/MaintenancePartsEditor.jsx';
 import MaintenanceRequestQueue from './components/MaintenanceRequestQueue.jsx';
 import maintenanceEnglish from './maintenance.en.js';
 import { useMaintenanceWorkbenchData } from './hooks/useMaintenanceWorkbenchData.js';
+import { useMaintenanceWorkbenchWorkflow } from './hooks/useMaintenanceWorkbenchWorkflow.js';
 const t = (text) => uiTextWith(text, maintenanceEnglish);
-const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
 const today = localDate;
 export default function MaintenanceWorkbenchPage() {
   useDocumentTitle(`${t('Bảo trì tài sản')} · OSP Suite`);
   const { plans, requests, assets, products, units, warehouses, technicians, loading, error, setError, load } = useMaintenanceWorkbenchData();
-  const [selectedId, setSelectedId] = useState('');
-  const [assetId, setAssetId] = useState('');
-  const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState('normal');
-  const [warehouse, setWarehouse] = useState('');
-  const [technician, setTechnician] = useState('');
-  const [assignedTechnician, setAssignedTechnician] = useState('');
-  const [technicianForm, setTechnicianForm] = useState({ name: '', kind: 'internal', specialty: '', phone: '' });
-  const [parts, setParts] = useState([]);
-  const [resolution, setResolution] = useState('');
-  const [laborHours, setLaborHours] = useState('');
-  const [laborRate, setLaborRate] = useState('');
-  const [busy, setBusy] = useState('');
-  const [notice, setNotice] = useState('');
-  useEffect(() => { setSelectedId((id) => id && requests.some((row) => row.id === id) ? id : requests[0]?.id || ''); }, [requests]);
-  useEffect(() => { setAssetId((id) => id || [...assets.keys()][0] || ''); }, [assets]);
-  useEffect(() => { setWarehouse((id) => id || [...warehouses.keys()][0] || ''); }, [warehouses]);
-  const selected = requests.find((row) => row.id === selectedId);
-  useEffect(() => { setAssignedTechnician(selected?.technician || ''); }, [selectedId, selected?.technician]);
+  const workflow = useMaintenanceWorkbenchWorkflow({ requests, assets, products, warehouses, load, setError, t });
+  const {
+    selectedId, setSelectedId, selected, assetId, setAssetId, description, setDescription, priority, setPriority,
+    warehouse, setWarehouse, technician, setTechnician, assignedTechnician, setAssignedTechnician,
+    technicianForm, setTechnicianForm, parts, resolution, setResolution, laborHours, setLaborHours,
+    laborRate, setLaborRate, busy, notice,
+    createRequest, createTechnician, saveAssignment, runPlan, startRequest, completeRequest,
+    addPart, updatePart, removePart,
+  } = workflow;
   const openRequests = requests.filter((row) => ['open', 'in_progress'].includes(row.status));
   const requestForPlan = (plan) => requests.find((request) => request.source_plan === plan.id
     && request.scheduled_for === plan.next_due
@@ -52,74 +41,18 @@ export default function MaintenanceWorkbenchPage() {
     const baseUnit = products.get(productId)?.uom;
     return baseUnit ? [...units.values()].filter((unit) => unit.id === baseUnit || unit.base_uom === baseUnit) : [];
   };
-  async function run(key, operation, success) {
-    setBusy(key); setError(''); setNotice('');
-    try { await operation(); setNotice(t(success)); await load(true); }
-    catch (reason) { setError(t(reason.message || 'Thao tác không thành công.')); await load(true); }
-    finally { setBusy(''); }
-  }
-  async function createRequest(event) {
-    event.preventDefault();
-    const materialLines = parts.filter((line) => line.product && compareDecimals(line.qty || 0, 0) > 0).map((line) => ({ product: line.product, qty: String(line.qty), ...(line.uom ? { uom: line.uom } : {}) }));
-    await run('create', async () => {
-      const row = await api(dataPath('maintenance.maintenance_request'), { method: 'POST', body: {
-        asset: assetId, description: description.trim() || undefined, priority,
-        technician: technician || undefined,
-        warehouse: materialLines.length ? warehouse : undefined, parts: materialLines.length ? materialLines : undefined,
-        requested_by: app.user?.name || app.user?.email || undefined,
-      } });
-      setSelectedId(row.id); setDescription(''); setPriority('normal'); setParts([]);
-    }, 'Đã ghi nhận yêu cầu bảo trì. Lệnh được đưa vào hàng đợi để kỹ thuật viên tiếp nhận.');
-  }
-  async function createTechnician(event) {
-    event.preventDefault();
-    await run('technician', async () => {
-      await api(dataPath('maintenance.maintenance_technician'), { method: 'POST', body: {
-        ...technicianForm, name: technicianForm.name.trim(), specialty: technicianForm.specialty.trim() || undefined,
-        phone: technicianForm.phone.trim() || undefined, active: true,
-      } });
-      setTechnicianForm({ name: '', kind: 'internal', specialty: '', phone: '' });
-    }, 'Đã thêm kỹ thuật viên vào danh mục phân công.');
-  }
-  async function saveAssignment(row) {
-    await run(`${row.id}:assignment`, () => api(dataPath('maintenance.maintenance_request', row.id), {
-      method: 'PATCH', body: { technician: assignedTechnician || null },
-    }), 'Đã cập nhật người phụ trách lệnh bảo trì.');
-  }
-  async function runPlan(plan) {
-    await run(`${plan.id}:due`, () => action('maintenance.maintenance_plan', plan, 'due'), 'Đã đưa lệnh bảo trì định kỳ vào hàng đợi. Kỳ kế tiếp sẽ tính sau khi lệnh được hoàn tất.');
-  }
-  async function startRequest(row) {
-    await run(`${row.id}:started`, () => action('maintenance.maintenance_request', row, 'started'), 'Kỹ thuật viên đã bắt đầu xử lý lệnh.');
-  }
-  async function completeRequest(event, row) {
-    event.preventDefault();
-    if ((laborHours === '') !== (laborRate === '')) {
-      setError(t('Nhập đồng thời giờ công và đơn giá, hoặc để trống cả hai.'));
-      return;
-    }
-    await run(`${row.id}:done`, async () => {
-      await api(dataPath('maintenance.maintenance_request', row.id, 'done'), { method: 'POST', body: {
-        resolution: resolution.trim(), labor_hours: laborHours === '' ? undefined : String(laborHours).trim(),
-        labor_rate: laborRate === '' ? undefined : String(laborRate).trim(),
-      } });
-      setResolution(''); setLaborHours(''); setLaborRate('');
-    }, 'Đã hoàn tất lệnh. Vật tư được xuất khỏi kho đã chọn và kế hoạch định kỳ được cập nhật.');
-  }
-  const addPart = () => setParts((current) => [...current, { rowId: crypto.randomUUID(), product: [...products.keys()][0] || '', qty: '1', uom: '' }]);
-  const updatePart = (index, field, value) => setParts((current) => current.map((row, i) => i === index ? { ...row, [field]: value, ...(field === 'product' ? { uom: '' } : {}) } : row));
   return <div className="page">
     <div className="page-head"><div><h1>{t('Bảo trì tài sản và thiết bị')}</h1><p className="sub">{t('Theo dõi lịch bảo trì định kỳ, tiếp nhận sự cố, phân công kỹ thuật, xuất vật tư và lưu kết quả sửa chữa.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     <div className="stats u-mb-16" ><div className="card stat"><span className="stat-label">{t('Lịch đã đến hạn')}</span><strong className="stat-value">{overduePlans.length}</strong></div><div className="card stat"><span className="stat-label">{t('Lệnh đang mở')}</span><strong className="stat-value">{openRequests.length}</strong></div><div className="card stat"><span className="stat-label">{t('Đang xử lý')}</span><strong className="stat-value">{requests.filter((row) => row.status === 'in_progress').length}</strong></div><div className="card stat"><span className="stat-label">{t('Đã hoàn tất')}</span><strong className="stat-value">{requests.filter((row) => row.status === 'done').length}</strong></div></div>
     {can('maintenance.maintenance_technician.create') && <section className="card card-pad u-mb-16" ><h2>{t('Danh mục kỹ thuật viên')}</h2><form className="form-grid" onSubmit={createTechnician}><label className="field"><span className="label">{t('Tên *')}</span><input className="input" required maxLength="200" value={technicianForm.name} onChange={(event) => setTechnicianForm((form) => ({ ...form, name: event.target.value }))}/></label><label className="field"><span className="label">{t('Loại')}</span><select className="select" value={technicianForm.kind} onChange={(event) => setTechnicianForm((form) => ({ ...form, kind: event.target.value }))}><option value="internal">{t('Nội bộ')}</option><option value="contractor">{t('Nhà thầu')}</option></select></label><label className="field"><span className="label">{t('Chuyên môn')}</span><input className="input" maxLength="200" value={technicianForm.specialty} onChange={(event) => setTechnicianForm((form) => ({ ...form, specialty: event.target.value }))}/></label><label className="field"><span className="label">{t('Điện thoại')}</span><input className="input" maxLength="50" value={technicianForm.phone} onChange={(event) => setTechnicianForm((form) => ({ ...form, phone: event.target.value }))}/></label><div className="row"><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy)}>{t('Thêm kỹ thuật viên')}</button></div></form></section>}
     {can('maintenance.maintenance_request.create') && <section className="card card-pad"><h2>{t('Tiếp nhận yêu cầu bảo trì')}</h2><form onSubmit={createRequest}><div className="form-grid">
-      <label className="field"><span className="label">{t('Tài sản / thiết bị *')}</span><select className="select" required value={assetId} onChange={(event) => setAssetId(event.target.value)}><option value="">{t('Chọn tài sản')}</option>{[...assets.values()].filter((row) => row.active !== false).map((row) => <option key={row.id} value={row.id}>{recordLabel('asset.asset', row)}</option>)}</select></label>
+      <label className="field"><span className="label">{t('Tài sản / thiết bị *')}</span><select className="select" required value={assetId} onChange={(event) => setAssetId(event.target.value)}><option value="">{t('Chọn tài sản')}</option>{[...assets.values()].filter((row) => row.status === 'active').map((row) => <option key={row.id} value={row.id}>{recordLabel('asset.asset', row)}</option>)}</select></label>
       <label className="field"><span className="label">{t('Mức ưu tiên')}</span><select className="select" value={priority} onChange={(event) => setPriority(event.target.value)}><option value="low">{t('Thấp')}</option><option value="normal">{t('Bình thường')}</option><option value="high">{t('Cao')}</option></select></label>
       <label className="field"><span className="label">{t('Kho xuất vật tư')}</span><select className="select" value={warehouse} onChange={(event) => setWarehouse(event.target.value)}><option value="">{t('Chọn kho khi có vật tư')}</option>{[...warehouses.values()].map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
       {can('maintenance.maintenance_technician.read') && <label className="field"><span className="label">{t('Kỹ thuật viên phụ trách')}</span><select className="select" value={technician} onChange={(event) => setTechnician(event.target.value)}><option value="">{t('Chưa phân công')}</option>{[...technicians.values()].filter((row) => row.active !== false).map((row) => <option key={row.id} value={row.id}>{row.name}{row.specialty ? ` · ${row.specialty}` : ''}</option>)}</select></label>}
       </div><label className="field u-mt-10" ><span className="label">{t('Mô tả sự cố / công việc')}</span><textarea className="input" rows="2" value={description} onChange={(event) => setDescription(event.target.value)} placeholder={t("Triệu chứng, vị trí, điều kiện vận hành…")}/></label>
-      <MaintenancePartsEditor parts={parts} products={products} unitsFor={unitsFor} onAdd={addPart} onUpdate={updatePart} onRemove={(index) => setParts((current) => current.filter((_, i) => i !== index))} t={t} />
+      <MaintenancePartsEditor parts={parts} products={products} unitsFor={unitsFor} onAdd={addPart} onUpdate={updatePart} onRemove={removePart} t={t} />
       <div className="row u-mt-12" ><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !assetId}>{t('Ghi nhận yêu cầu')}</button></div>
     </form></section>}
     <div className="layout-split u-mt-16" >

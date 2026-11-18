@@ -7,7 +7,7 @@ function WebOrderListSection({ title, orders, emptyMessage, renderOrder }) {
   </section>;
 }
 
-export default function WebOrderRegisters({ draftOrders, placedOrders, renderOrder, draftTitle, draftEmptyMessage, placedTitle, placedEmptyMessage }) {
+export default function WebOrderRegisters({ draftOrders, placedOrders, cancelledOrders = [], renderOrder, draftTitle, draftEmptyMessage, placedTitle, placedEmptyMessage, cancelledTitle, cancelledEmptyMessage }) {
   return <>
     <WebOrderListSection
       title={draftTitle}
@@ -21,5 +21,11 @@ export default function WebOrderRegisters({ draftOrders, placedOrders, renderOrd
       emptyMessage={placedEmptyMessage}
       renderOrder={renderOrder}
     />
+    {cancelledTitle && <WebOrderListSection
+      title={cancelledTitle}
+      orders={cancelledOrders}
+      emptyMessage={cancelledEmptyMessage}
+      renderOrder={renderOrder}
+    />}
   </>;
 }

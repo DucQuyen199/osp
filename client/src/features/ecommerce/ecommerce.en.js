@@ -22,6 +22,7 @@ const ecommerceEnglish = {
   'Giá đơn được lấy từ gian hàng và bảng giá. Đơn có vận đơn ghi nhận tồn kho theo từng lần giao và lập hóa đơn sau khi giao đủ; đơn bán trực tiếp tuân theo luồng bán hàng chuẩn.': 'Order prices come from the storefront and price list. Orders with shipments record inventory per delivery and create an invoice after full delivery; direct sales follow the standard sales flow.',
   'Đang tải…': 'Loading…', 'Đang tạo…': 'Creating…', 'Làm mới': 'Refresh', 'Giỏ chờ đặt:': 'Carts awaiting placement:',
   'Đã đặt:': 'Placed:', 'Đã hủy:': 'Cancelled:', 'Tạo giỏ hàng / nhận đơn': 'Create cart / take order',
+  'Đơn đã hủy': 'Cancelled orders', 'Chưa có giỏ hoặc đơn online bị hủy.': 'No online carts or orders have been cancelled.',
   'Tạo giỏ để máy chủ áp dụng đúng giá và thuế; sau đó kiểm tra tổng tiền trước khi xác nhận đặt.': 'Create a cart so the server applies the correct prices and taxes, then review the total before placing it.',
   'Gian hàng *': 'Storefront *', 'Chọn gian hàng': 'Select a storefront', 'Khách hàng *': 'Customer *',
   'Chọn khách hàng': 'Select a customer', 'Kênh': 'Channel', 'Ứng dụng': 'App', 'Sàn thương mại': 'Marketplace',
