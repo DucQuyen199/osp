@@ -1,35 +1,17 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, statusLabel, uiText } from '../../lib/i18n.js';
-import { can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
-const rows = (response) => Array.isArray(response?.items) ? response.items : [];
+import { can, recordLabel } from '../../lib/state.js';
+import { useQualityWorkbenchData } from './hooks/useQualityWorkbenchData.js';
 export default function QualityWorkbenchPage() {
   useDocumentTitle(`${uiText('Sổ sự không phù hợp')} · OSP Suite`);
   const severityLabels = { minor: uiText('Nhẹ'), major: uiText('Nghiêm trọng'), critical: uiText('Tới hạn') };
-  const [records, setRecords] = useState([]);
-  const [inspections, setInspections] = useState(new Map());
-  const [products, setProducts] = useState(new Map());
+  const { records, inspections, products, loading, error, setError, load } = useQualityWorkbenchData();
   const [filter, setFilter] = useState('open');
   const [form, setForm] = useState({ title: '', severity: 'major', description: '', inspection: '' });
   const [busy, setBusy] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const [recordRes, inspectionMap, productMap] = await Promise.all([
-        can('quality.nonconformance.read') ? loadAllResponse('quality.nonconformance') : Promise.resolve({ items: [] }),
-        can('quality.inspection.read') ? loadRefs('quality.inspection') : Promise.resolve(new Map()),
-        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
-      ]);
-      setRecords(rows(recordRes).sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))));
-      setInspections(inspectionMap); setProducts(productMap);
-    } catch (reason) { setError(reason.message || uiText('Không tải được sổ sự không phù hợp.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
   const visible = useMemo(() => records.filter((record) => filter === 'all' || record.status === filter), [records, filter]);
   const openCount = records.filter((record) => record.status === 'open').length;
   const criticalCount = records.filter((record) => record.status === 'open' && record.severity === 'critical').length;
