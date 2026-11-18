@@ -10,6 +10,7 @@ import servicesEnglish from './professional-services.en.js';
 import { estimateTimeEntryAmount } from './domain/timeEntryTotals.js';
 import { useProfessionalServicesData } from './hooks/useProfessionalServicesData.js';
 import ProfessionalServicesTimeEntriesTable from './components/ProfessionalServicesTimeEntriesTable.jsx';
+import TimeEntryRegisterForm from './components/TimeEntryRegisterForm.jsx';
 const t = (text) => uiTextWith(text, servicesEnglish);
 const today = localDate;
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
@@ -73,7 +74,16 @@ export default function ProfessionalServicesWorkbenchPage() {
         <div className="stats u-mt-16" ><div className="card stat"><span className="stat-label">{t('WIP chưa lập hóa đơn')}</span><strong className="stat-value">{fmtMoney(wip)}</strong></div><div className="card stat"><span className="stat-label">{t('Giờ đã lập hóa đơn')}</span><strong className="stat-value">{fmtMoney(billedAmount)}</strong></div></div>
         {selectedCase.status !== 'closed' && can('case-management.case_note.create') && <form onSubmit={createNote} className="u-mt-16"><label className="field"><span className="label">{t('Thêm ghi chú hồ sơ')}</span><textarea className="input" required rows="3" value={noteBody} onChange={(e) => setNoteBody(e.target.value)}/></label><div className="row u-mt-8" ><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy)}>{t('Lưu ghi chú')}</button></div></form>}
         {caseNotes.length > 0 && <div className="table-wrap u-mt-12" ><table className="table"><thead><tr><th>{t('Ghi chú')}</th><th>{t('Thời điểm')}</th></tr></thead><tbody>{caseNotes.map((row) => <tr key={row.id}><td className="u-pre-wrap">{row.body}</td><td>{row.created_at ? fmtDateTime(row.created_at) : '—'}</td></tr>)}</tbody></table></div>}
-         {selectedCase.status === 'open' && can('case-management.time_entry.create') && <form className="form-grid u-mt-20"  onSubmit={createTime}><h3 className="full">{t('Ghi giờ tính phí')}</h3><label className="field"><span className="label">{t('Chuyên viên *')}</span><input className="input" required value={timeForm.who} onChange={(e) => setTimeForm({ ...timeForm, who: e.target.value })}/></label><label className="field"><span className="label">{t('Ngày làm việc *')}</span><input className="input" required type="date" max={today()} value={timeForm.date} onChange={(e) => setTimeForm({ ...timeForm, date: e.target.value })}/></label><label className="field"><span className="label">{t('Số giờ *')}</span><input className="input" required type="number" min="0.01" max="24" step="0.01" value={timeForm.hours} onChange={(e) => setTimeForm({ ...timeForm, hours: e.target.value })}/></label><label className="field"><span className="label">{t('Đơn giá / giờ *')}</span><input className="input" required type="number" min="0" step="any" value={timeForm.rate} onChange={(e) => setTimeForm({ ...timeForm, rate: e.target.value })}/></label><div className="row full"><span className="grow"/><strong>{t('Phí dự kiến:')} {fmtMoney(estimateTimeEntryAmount(timeForm.hours, timeForm.rate))}</strong><button className="btn btn-primary" disabled={Boolean(busy)}>{t('Ghi giờ công')}</button></div></form>}
+         {selectedCase.status === 'open' && can('case-management.time_entry.create') && <TimeEntryRegisterForm
+          timeForm={timeForm}
+          onFieldChange={(field, value) => setTimeForm((current) => ({ ...current, [field]: value }))}
+          onSubmit={createTime}
+          busy={busy}
+          today={today()}
+          estimatedAmount={estimateTimeEntryAmount(timeForm.hours, timeForm.rate)}
+          fmtMoney={fmtMoney}
+          t={t}
+        />}
         <ProfessionalServicesTimeEntriesTable entries={caseEntries} invoiceByTime={invoiceByTime} busy={busy} canBill={can('case-management.time_entry.billed')} fmtDate={fmtDate} fmtMoney={fmtMoney} statusLabel={statusLabel} onBill={billTime} t={t} />
       </section>}
     </div>}
