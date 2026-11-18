@@ -33,8 +33,13 @@ export function returnSourceLineFor(inspection, receipts, order) {
 
 export function returnUnitRatioFor(inspection, receipts, order, units) {
   const unitId = returnSourceLineFor(inspection, receipts, order)?.uom;
-  const ratio = Number(units.get(unitId)?.ratio || 1);
-  return Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+  const value = String(units.get(unitId)?.ratio ?? '1').trim();
+  const ratio = value.startsWith('.') ? `0${value}` : value;
+  try {
+    return compareDecimals(ratio, '0') > 0 ? ratio : '1';
+  } catch {
+    return '1';
+  }
 }
 
 export function remainingInspectionBaseQuantity(inspection, returns) {
@@ -48,7 +53,7 @@ export function calculateUnreceivedPurchaseLines(order, receipts) {
   const ordered = new Map();
   for (const line of order?.lines || []) {
     const key = keyOf(line);
-    const entry = ordered.get(key) || { product: line.product, uom: line.uom, price: Number(line.price), qty: '0' };
+    const entry = ordered.get(key) || { product: line.product, uom: line.uom, price: String(line.price ?? 0), qty: '0' };
     entry.qty = addDecimals([entry.qty, line.qty || 0]);
     ordered.set(key, entry);
   }

@@ -2,19 +2,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
-import { fmtDate, fmtMoney, statusLabel, fmtNumber, uiText } from '../../lib/i18n.js';
-import { addDecimals, compareDecimals, multiplyDecimals } from '../../lib/decimal.js';
+import { fmtMoney, uiText } from '../../lib/i18n.js';
+import { addDecimals, compareDecimals, divideDecimals, multiplyDecimals } from '../../lib/decimal.js';
 import { app, can, recordLabel } from '../../lib/state.js';
 import PurchaseOrderDraftForm from './components/PurchaseOrderDraftForm.jsx';
 import PurchaseRequisitionForm from './components/PurchaseRequisitionForm.jsx';
 import PurchaseOrdersList from './components/PurchaseOrdersList.jsx';
 import PurchaseRequisitionsTable from './components/PurchaseRequisitionsTable.jsx';
-import PurchaseReceiptForm from './components/PurchaseReceiptForm.jsx';
-import PurchaseReturnsPanel from './components/PurchaseReturnsPanel.jsx';
 import SupplierInvoiceAdjustmentsEditor from './components/SupplierInvoiceAdjustmentsEditor.jsx';
-import SupplierInvoiceDraftForm from './components/SupplierInvoiceDraftForm.jsx';
-import SupplierInvoicesPanel from './components/SupplierInvoicesPanel.jsx';
-import PurchaseOrderSummary from './components/PurchaseOrderSummary.jsx';
+import PurchaseOrderDetailPanel from './components/PurchaseOrderDetailPanel.jsx';
 import { usePurchasingData } from './hooks/usePurchasingData.js';
 import {
   calculateInvoiceableLines,
@@ -236,7 +232,7 @@ export default function PurchasingWorkbenchPage() {
   }
   const returnInspection = qualityInspections.find((row) => row.id === returnForm.inspection);
   const returnAvailableBaseQuantity = remainingInspectionBaseQuantity(returnInspection, selectedReturns);
-  const returnAvailableQuantity = Number(returnAvailableBaseQuantity) / returnUnitRatioFor(returnInspection);
+  const returnAvailableQuantity = divideDecimals(returnAvailableBaseQuantity, returnUnitRatioFor(returnInspection), 28);
   async function createQualityReturn(event) {
     event.preventDefault();
     if (!selected || !returnInspection) return;
@@ -342,69 +338,137 @@ export default function PurchasingWorkbenchPage() {
     />}
     {loading ? <div className="skeleton" data-h="row"/> : !orders.length ? <div className="card card-pad empty u-mt-16" >{uiText('Chưa có đơn mua. Tạo đơn mua nháp, gửi duyệt rồi nhận hàng theo số lượng thực tế.')}</div> : <div className="layout-split u-mt-16" >
       <PurchaseOrdersList orders={orders} suppliers={suppliers} selectedId={selectedId} onSelect={setSelectedId} />
-      {selected && <section className="card card-pad"><PurchaseOrderSummary
-        order={selected}
+      {selected && <PurchaseOrderDetailPanel
+        summaryProps={{
+          order: selected,
+          receipts: selectedReceipts,
+          supplier: suppliers.get(selected.supplier),
+          warehouse: warehouses.get(selected.warehouse),
+          products,
+          units,
+          approvalRequest: approvalByOrder.get(selected.id),
+          workflowApproval,
+          bill: billByOrder.get(selected.id),
+          busy,
+          canEdit: ['draft', 'rejected'].includes(selected.status) && can('purchasing.purchase_order.update'),
+          canSubmit: ['draft', 'rejected'].includes(selected.status) && can('purchasing.purchase_order.submitted'),
+          canApprove: selected.status === 'submitted' && !workflowApproval && can('purchasing.purchase_order.approved'),
+          canCancel: ['draft', 'submitted', 'approved', 'rejected'].includes(selected.status) && approvalByOrder.get(selected.id)?.status !== 'pending' && can('purchasing.purchase_order.cancelled'),
+          canReceive: canReceive(selected),
+          onEdit: () => editOrder(selected),
+          onSubmit: () => submitOrder(selected),
+          onApprove: () => approveOrder(selected),
+          onCancel: () => orderAction(selected, 'cancelled'),
+          onReceive: () => prepareReceipt(selected),
+        }}
+        invoiceDraftProps={
+          ['partially_received', 'received'].includes(selected.status)
+            && selectedReceipts.some((receipt) => receipt.status === 'received')
+            && can('purchasing.supplier_invoice.create')
+            ? {
+                onSubmit: createSupplierInvoice,
+                lines: invoiceableLines,
+                products,
+                currencies,
+                taxes,
+                taxById,
+                selectedReceipts,
+                invoiceQuantities,
+                invoicePrices,
+                invoiceTaxes,
+                invoiceAdjustments,
+                supplierInvoiceForm,
+                supplierInvoiceCurrency,
+                supplierInvoiceIsBaseCurrency,
+                supplierInvoiceRate,
+                baseCurrencyCode,
+                invoiceableVariance,
+                invoiceableTotal,
+                invoiceAdjustmentsInvalid,
+                invoiceForeignPriceMissing,
+                busy,
+                lineKey: keyOf,
+                fmtMoney,
+                t: uiText,
+                onQuantityChange: (key, value) => setInvoiceQuantities((current) => ({ ...current, [key]: value })),
+                onPriceChange: (key, value) => setInvoicePrices((current) => ({ ...current, [key]: value })),
+                onCurrencyChange: (value) => {
+                  setSupplierInvoiceForm((current) => ({ ...current, currency: value }));
+                  setInvoicePrices({});
+                },
+                onTaxChange: (key, value) => setInvoiceTaxes((current) => ({ ...current, [key]: value })),
+                onAdjustmentsChange: (lines) => setInvoiceAdjustments(lines.map((line) => ({ ...line, rowId: line.rowId || crypto.randomUUID() }))),
+                onFormChange: (field, value) => setSupplierInvoiceForm((current) => ({ ...current, [field]: value })),
+              }
+            : null
+        }
+        supplierInvoicesProps={{
+          invoices: selectedSupplierInvoices,
+          bills,
+          approvalByInvoice,
+          currencies,
+          baseCurrencyCode,
+          workflowApproval,
+          busy,
+          disputeReasons: invoiceDisputeReasons,
+          resolutionNotes: invoiceResolutionNotes,
+          canDispute: can('purchasing.supplier_invoice.update') && can('purchasing.supplier_invoice.disputed'),
+          canResolve: can('purchasing.supplier_invoice.update') && can('purchasing.supplier_invoice.submitted'),
+          canSubmit: can('purchasing.supplier_invoice.submitted'),
+          canApprove: can('purchasing.supplier_invoice.approved'),
+          onDisputeReasonChange: (id, value) => setInvoiceDisputeReasons((current) => ({ ...current, [id]: value })),
+          onResolutionNoteChange: (id, value) => setInvoiceResolutionNotes((current) => ({ ...current, [id]: value })),
+          onDispute: openSupplierInvoiceDispute,
+          onResolve: resolveSupplierInvoiceDisputeAndSubmit,
+          onSubmit: submitSupplierInvoice,
+          onApprove: approveSupplierInvoice,
+        }}
+        receiptFormProps={receiptOrderId === selected.id ? {
+          lines: receiptLines,
+          products,
+          note: receiptNote,
+          busy,
+          onClose: () => setReceiptOrderId(''),
+          onLineChange: (index, field, value) => setReceiptLines((current) => current.map((item, rowIndex) => rowIndex === index ? { ...item, [field]: value } : item)),
+          onNoteChange: setReceiptNote,
+          onSubmit: receiveGoods,
+        } : null}
         receipts={selectedReceipts}
-        supplier={suppliers.get(selected.supplier)}
-        warehouse={warehouses.get(selected.warehouse)}
-        products={products}
-        units={units}
-        approvalRequest={approvalByOrder.get(selected.id)}
-        workflowApproval={workflowApproval}
-        bill={billByOrder.get(selected.id)}
-        busy={busy}
-        canEdit={['draft','rejected'].includes(selected.status) && can('purchasing.purchase_order.update')}
-        canSubmit={['draft','rejected'].includes(selected.status) && can('purchasing.purchase_order.submitted')}
-        canApprove={selected.status === 'submitted' && !workflowApproval && can('purchasing.purchase_order.approved')}
-        canCancel={['draft','submitted','approved','rejected'].includes(selected.status) && approvalByOrder.get(selected.id)?.status !== 'pending' && can('purchasing.purchase_order.cancelled')}
-        canReceive={canReceive(selected)}
-        onEdit={() => editOrder(selected)}
-        onSubmit={() => submitOrder(selected)}
-        onApprove={() => approveOrder(selected)}
-        onCancel={() => orderAction(selected, 'cancelled')}
-        onReceive={() => prepareReceipt(selected)}
-      />
-    {['partially_received','received'].includes(selected.status) && selectedReceipts.some((receipt) => receipt.status === 'received') && can('purchasing.supplier_invoice.create') && <SupplierInvoiceDraftForm onSubmit={createSupplierInvoice} lines={invoiceableLines} products={products} currencies={currencies} taxes={taxes} taxById={taxById} selectedReceipts={selectedReceipts} invoiceQuantities={invoiceQuantities} invoicePrices={invoicePrices} invoiceTaxes={invoiceTaxes} invoiceAdjustments={invoiceAdjustments} supplierInvoiceForm={supplierInvoiceForm} supplierInvoiceCurrency={supplierInvoiceCurrency} supplierInvoiceIsBaseCurrency={supplierInvoiceIsBaseCurrency} supplierInvoiceRate={supplierInvoiceRate} baseCurrencyCode={baseCurrencyCode} invoiceableVariance={invoiceableVariance} invoiceableTotal={invoiceableTotal} invoiceAdjustmentsInvalid={invoiceAdjustmentsInvalid} invoiceForeignPriceMissing={invoiceForeignPriceMissing} busy={busy} lineKey={keyOf} fmtMoney={fmtMoney} t={uiText} onQuantityChange={(key, value) => setInvoiceQuantities((current) => ({ ...current, [key]: value }))} onPriceChange={(key, value) => setInvoicePrices((current) => ({ ...current, [key]: value }))} onCurrencyChange={(value) => { setSupplierInvoiceForm((current) => ({ ...current, currency: value })); setInvoicePrices({}); }} onTaxChange={(key, value) => setInvoiceTaxes((current) => ({ ...current, [key]: value }))} onAdjustmentsChange={(lines) => setInvoiceAdjustments(lines.map((line) => ({ ...line, rowId: line.rowId || crypto.randomUUID() })))} onFormChange={(field, value) => setSupplierInvoiceForm((current) => ({ ...current, [field]: value }))} />}
-        <SupplierInvoicesPanel invoices={selectedSupplierInvoices} bills={bills} approvalByInvoice={approvalByInvoice} currencies={currencies} baseCurrencyCode={baseCurrencyCode} workflowApproval={workflowApproval} busy={busy} disputeReasons={invoiceDisputeReasons} resolutionNotes={invoiceResolutionNotes} canDispute={can('purchasing.supplier_invoice.update') && can('purchasing.supplier_invoice.disputed')} canResolve={can('purchasing.supplier_invoice.update') && can('purchasing.supplier_invoice.submitted')} canSubmit={can('purchasing.supplier_invoice.submitted')} canApprove={can('purchasing.supplier_invoice.approved')} onDisputeReasonChange={(id, value) => setInvoiceDisputeReasons((current) => ({ ...current, [id]: value }))} onResolutionNoteChange={(id, value) => setInvoiceResolutionNotes((current) => ({ ...current, [id]: value }))} onDispute={openSupplierInvoiceDispute} onResolve={resolveSupplierInvoiceDisputeAndSubmit} onSubmit={submitSupplierInvoice} onApprove={approveSupplierInvoice} />
-
-        {receiptOrderId === selected.id && <PurchaseReceiptForm lines={receiptLines} products={products} note={receiptNote} busy={busy} onClose={() => setReceiptOrderId('')} onLineChange={(index, field, value) => setReceiptLines((current) => current.map((item, rowIndex) => rowIndex === index ? { ...item, [field]: value } : item))} onNoteChange={setReceiptNote} onSubmit={receiveGoods} />}
-        {selectedReceipts.length > 0 && <div className="table-wrap u-mt-14" ><h3>{uiText("Lịch sử nhận hàng")}</h3><table className="table"><thead><tr><th>{uiText("Ngày")}</th><th>{uiText("Tổng phiếu")}</th><th>{uiText("Trạng thái")}</th></tr></thead><tbody>{selectedReceipts.map((row) => <tr key={row.id}><td>{fmtDate(row.created_at)}</td><td>{fmtMoney(row.total || 0)}</td><td>{statusLabel(row.status)}</td></tr>)}</tbody></table></div>}
-        {can('purchasing.purchase_return.read') && <PurchaseReturnsPanel
-          selected={selected}
-          returns={selectedReturns}
-          returnForm={returnForm}
-          generalReturnForm={generalReturnForm}
-          returnInspection={returnInspection}
-          returnAvailableQuantity={returnAvailableQuantity}
-          returnSourceUnit={units.get(returnSourceLineFor(returnInspection)?.uom || products.get(returnInspection?.product)?.uom)?.name}
-          returnableLines={returnableLines}
-          generalReturnLine={generalReturnLine}
-          returnableInspections={selectedReturnInspections}
-          supplierInvoices={selectedSupplierInvoices}
-          products={products}
-          units={units}
-          approvalByReturn={approvalByReturn}
-          workflowApproval={workflowApproval}
-          busy={busy}
-          canCreateQualityReturn={can('purchasing.purchase_return.create') && can('quality.inspection.read')}
-          canCreateGeneralReturn={can('purchasing.purchase_return.create')}
-          canSubmit={can('purchasing.purchase_return.submitted')}
-          canApprove={can('purchasing.purchase_return.approved')}
-          canDispatch={can('purchasing.purchase_return.dispatched')}
-          canCancel={can('purchasing.purchase_return.cancelled')}
-          onInspectionChange={(id) => {
+        returnsProps={can('purchasing.purchase_return.read') ? {
+          selected,
+          returns: selectedReturns,
+          returnForm,
+          generalReturnForm,
+          returnInspection,
+          returnAvailableQuantity,
+          returnSourceUnit: units.get(returnSourceLineFor(returnInspection)?.uom || products.get(returnInspection?.product)?.uom)?.name,
+          returnableLines,
+          generalReturnLine,
+          returnableInspections: selectedReturnInspections,
+          supplierInvoices: selectedSupplierInvoices,
+          products,
+          units,
+          approvalByReturn,
+          workflowApproval,
+          busy,
+          canCreateQualityReturn: can('purchasing.purchase_return.create') && can('quality.inspection.read'),
+          canCreateGeneralReturn: can('purchasing.purchase_return.create'),
+          canSubmit: can('purchasing.purchase_return.submitted'),
+          canApprove: can('purchasing.purchase_return.approved'),
+          canDispatch: can('purchasing.purchase_return.dispatched'),
+          canCancel: can('purchasing.purchase_return.cancelled'),
+          onInspectionChange: (id) => {
             const inspection = qualityInspections.find((row) => row.id === id);
             const availableBase = remainingInspectionBaseQuantity(inspection, selectedReturns);
-            setReturnForm((current) => ({ ...current, inspection: id, qty: inspection ? String(Number(availableBase) / returnUnitRatioFor(inspection)) : '' }));
-          }}
-          onReturnFormChange={(field, value) => setReturnForm((current) => ({ ...current, [field]: value }))}
-          onGeneralReturnFormChange={(field, value) => setGeneralReturnForm((current) => ({ ...current, [field]: value, ...(field === 'lineKey' ? { qty: '' } : {}) }))}
-          onCreateQualityReturn={createQualityReturn}
-          onCreateGeneralReturn={createGeneralReturn}
-          onAction={purchaseReturnAction}
-        />}
-        <p className="small muted">{uiText('Phiếu nhận cộng tồn kho theo số lượng thực nhận. Có thể nhập nhiều hóa đơn theo các đợt giao; mỗi hóa đơn chỉ được duyệt trong giới hạn số lượng đã nhận và chưa lập hóa đơn.')}</p>
-      </section>}
+            setReturnForm((current) => ({ ...current, inspection: id, qty: inspection ? divideDecimals(availableBase, returnUnitRatioFor(inspection), 28) : '' }));
+          },
+          onReturnFormChange: (field, value) => setReturnForm((current) => ({ ...current, [field]: value })),
+          onGeneralReturnFormChange: (field, value) => setGeneralReturnForm((current) => ({ ...current, [field]: value, ...(field === 'lineKey' ? { qty: '' } : {}) })),
+          onCreateQualityReturn: createQualityReturn,
+          onCreateGeneralReturn: createGeneralReturn,
+          onAction: purchaseReturnAction,
+        } : null}
+      />}
     </div>}
   </div>;
 }
