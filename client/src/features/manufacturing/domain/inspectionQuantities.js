@@ -4,6 +4,10 @@ const maxZero = (value) => compareDecimals(value, '0') < 0 ? '0' : value;
 const FAILED_QTY_TOLERANCE = '0.000001';
 const OUTPUT_QTY_TOLERANCE = '0.0001';
 
+export function isPositiveQuantity(value) {
+  try { return compareDecimals(value || 0, '0') > 0; } catch { return false; }
+}
+
 export function alreadyAccountedFailedQty(inspectionId, reworkOrders, dispositions, acceptances) {
   return addDecimals([
     ...reworkOrders

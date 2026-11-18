@@ -1,3 +1,5 @@
+import { isPositiveQuantity } from '../domain/inspectionQuantities.js';
+
 export default function ReworkOrdersPanel({
   candidates,
   inspections,
@@ -48,7 +50,7 @@ export default function ReworkOrdersPanel({
         <span>{t('Lý do sửa *')}</span>
         <input className="input" minLength={5} maxLength={500} required value={reason} onChange={(event) => onReasonChange(event.target.value)} />
       </label>
-      <button className="btn btn-primary btn-sm" type="submit" disabled={busy === 'rework' || !inspectionId || !Number(quantity) || reason.trim().length < 5}>
+      <button className="btn btn-primary btn-sm" type="submit" disabled={busy === 'rework' || !inspectionId || !isPositiveQuantity(quantity) || reason.trim().length < 5}>
         {busy === 'rework' ? t('Đang tạo…') : t('Tạo lệnh sửa')}
       </button>
     </form>}

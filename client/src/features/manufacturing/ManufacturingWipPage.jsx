@@ -125,7 +125,7 @@ export default function ManufacturingWipPage() {
   const saveBom = async (event) => {
     event.preventDefault(); setBusy('bom'); setError('');
     try {
-      const body = { product: bomProduct, output_qty: Number(bomOutputQty), components: components.map((row) => ({ product: row.product, qty: Number(row.qty), ...(row.uom ? { uom: row.uom } : {}) })) };
+      const body = { product: bomProduct, output_qty: String(bomOutputQty), components: components.map((row) => ({ product: row.product, qty: String(row.qty), ...(row.uom ? { uom: row.uom } : {}) })) };
       await api(editingBom ? dataPath('manufacturing.bom', editingBom) : dataPath('manufacturing.bom'), { method: editingBom ? 'PATCH' : 'POST', body });
       resetBom(); await load();
     } catch (reason) { setError(reason.message || t("Không lưu được BOM.")); }
@@ -137,7 +137,7 @@ export default function ManufacturingWipPage() {
     setBusy('order'); setError('');
     try {
       await api(dataPath('manufacturing.production_order'), { method: 'POST', body: {
-        product: selectedBom.product, bom: selectedBom.id, qty: Number(orderQty), warehouse: orderWarehouse,
+        product: selectedBom.product, bom: selectedBom.id, qty: String(orderQty), warehouse: orderWarehouse,
         ...(orderCenter ? { work_center: orderCenter, planned_start: orderDate } : {}),
         ...(outputLot ? { output_lot_code: outputLot } : {}), ...(outputExpiry ? { output_expiry: outputExpiry } : {}),
         scrap_cost_method: scrapMethod, ...(scrapMethod === 'expense' && scrapAccount ? { scrap_expense_account: scrapAccount } : {}),
@@ -159,7 +159,7 @@ export default function ManufacturingWipPage() {
           throw new Error('Tổng số lượng đạt và phế phẩm phải bằng số lượng kế hoạch (sai số tối đa 0,0001).');
         }
         await api(dataPath('manufacturing.production_order', order.id), { method: 'PATCH', body: {
-          good_qty: Number(goodQty), scrap_qty: Number(scrapQty), ...(draft.scrap_reason ? { scrap_reason: draft.scrap_reason } : {}),
+          good_qty: goodQty, scrap_qty: scrapQty, ...(draft.scrap_reason ? { scrap_reason: draft.scrap_reason } : {}),
         } });
       }
       await api(dataPath('manufacturing.production_order', order.id, action), { method: 'POST' });
@@ -189,7 +189,7 @@ export default function ManufacturingWipPage() {
       if (!isWithinFailedQty(reworkQty, remainingFailedQty(inspection))) throw new Error('Số lượng sửa vượt lượng QC lỗi còn lại.');
       await api(dataPath('manufacturing.rework_order'), { method: 'POST', body: {
         production_order: inspection.source_id, inspection: inspection.id,
-        qty: Number(reworkQty), reason: reworkReason.trim(),
+        qty: String(reworkQty), reason: reworkReason.trim(),
       } });
       setReworkInspection(''); setReworkQty(''); setReworkReason(''); await load();
     } catch (reason) { setError(reason.message || t("Không tạo được lệnh sửa.")); }
@@ -211,7 +211,7 @@ export default function ManufacturingWipPage() {
       const inspection = inspections.find((row) => row.id === dispositionInspection);
       if (!isWithinFailedQty(dispositionQty, remainingFailedQty(inspection))) throw new Error('Số lượng loại bỏ vượt lượng QC lỗi còn lại.');
       const created = await api(dataPath('manufacturing.production_disposition'), { method: 'POST', body: {
-        inspection: dispositionInspection, qty: Number(dispositionQty), note: dispositionNote.trim(), expense_account: dispositionAccount,
+        inspection: dispositionInspection, qty: String(dispositionQty), note: dispositionNote.trim(), expense_account: dispositionAccount,
       } });
       if (can('manufacturing.production_disposition.posted')) {
         await api(dataPath('manufacturing.production_disposition', created.id, 'posted'), { method: 'POST' });
@@ -232,7 +232,7 @@ export default function ManufacturingWipPage() {
       if (!isWithinFailedQty(acceptanceQty, remainingFailedQty(inspection))) throw new Error('Số lượng đề nghị vượt lượng QC lỗi còn lại.');
       const created = await api(dataPath('manufacturing.conditional_acceptance'), { method: 'POST', body: {
         inspection: inspection.id,
-        qty: Number(acceptanceQty),
+        qty: String(acceptanceQty),
         condition: acceptanceCondition.trim(),
         justification: acceptanceJustification.trim(),
       } });

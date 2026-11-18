@@ -1,4 +1,5 @@
 import React from 'react';
+import { isPositiveQuantity } from '../domain/inspectionQuantities.js';
 
 export default function ConditionalAcceptancePanel({
   inspections,
@@ -33,7 +34,7 @@ export default function ConditionalAcceptancePanel({
       {inspectionId && <label className="field"><span>{t('Số lượng đề nghị *')}</span><input className="input num" type="number" min="0.000001" max={remainingQuantity(inspections.find((row) => row.id === inspectionId))} step="any" required value={quantity} onChange={(event) => onQuantityChange(event.target.value)} /></label>}
       <label className="field"><span>{t('Điều kiện sử dụng / kiểm soát sau chấp nhận *')}</span><textarea className="input" rows="2" minLength="5" maxLength="2000" required value={condition} onChange={(event) => onConditionChange(event.target.value)} placeholder={t('Ví dụ: giới hạn sử dụng, kiểm tra bổ sung hoặc thông báo cho khách hàng')} /></label>
       <label className="field"><span>{t('Căn cứ đề nghị *')}</span><textarea className="input" rows="2" minLength="5" maxLength="2000" required value={justification} onChange={(event) => onJustificationChange(event.target.value)} placeholder={t('Ghi kết quả đánh giá rủi ro và căn cứ kỹ thuật')} /></label>
-      <button className="btn btn-primary btn-sm" type="submit" disabled={Boolean(busy) || !inspectionId || !(Number(quantity) > 0) || condition.trim().length < 5 || justification.trim().length < 5}>{busy === 'conditional-acceptance' ? t('Đang gửi…') : t('Gửi phê duyệt')}</button>
+      <button className="btn btn-primary btn-sm" type="submit" disabled={Boolean(busy) || !inspectionId || !isPositiveQuantity(quantity) || condition.trim().length < 5 || justification.trim().length < 5}>{busy === 'conditional-acceptance' ? t('Đang gửi…') : t('Gửi phê duyệt')}</button>
     </form>}
     <div className="stack-sm u-legacy-92c18f6bda">{acceptances.map((row) => {
       const inspection = inspections.find((item) => item.id === row.inspection);
