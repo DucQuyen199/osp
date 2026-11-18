@@ -2,7 +2,7 @@ import { absDecimal, addDecimals, compareDecimals, minDecimal, multiplyDecimals,
 
 const linesOf = (document) => Array.isArray(document?.lines) ? document.lines : [];
 const quantitySum = (lines) => lines.reduce((sum, line) => addDecimals([sum, line.qty || 0]), '0');
-const priceKey = (price) => Number(price || 0).toFixed(2);
+const priceKey = (price) => roundDecimal(price || 0, 2);
 const samePrice = (left, right) => compareDecimals(absDecimal(subtractDecimals(left || 0, right || 0)), '0.005') <= 0;
 const discountOf = (line) => line.effective_discount_pct ?? line.discount_pct ?? 0;
 const taxRateOf = (line) => line.tax_rate ?? 0;
@@ -16,7 +16,7 @@ export function wholesalePrice(product, uomId, selectedList, units) {
   const basePrice = selectedList?.items?.find((item) => item.product === product.id)?.price ?? product.price ?? 0;
   const unit = units.get(uomId);
   const ratio = unit?.base_uom ? unit.ratio || 0 : 1;
-  return Number(multiplyDecimals([basePrice, ratio]));
+  return multiplyDecimals([basePrice, ratio]);
 }
 
 export function estimateWholesaleSubtotal(cart, selectedList, units) {
@@ -26,7 +26,7 @@ export function estimateWholesaleSubtotal(cart, selectedList, units) {
     const ratio = unit?.base_uom ? unit.ratio || 0 : 1;
     return roundDecimal(multiplyDecimals([basePrice, ratio, qty]), 4);
   });
-  return Number(addDecimals(amounts));
+  return addDecimals(amounts);
 }
 
 export function eligibleWholesaleReturnLines(order, shipments, returns, products, requiresDelivery) {

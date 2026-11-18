@@ -2,7 +2,7 @@ import { addDecimals, multiplyDecimals, roundDecimal } from '../../../lib/decima
 
 export function estimateRestaurantSubtotal(cart) {
   const lineTotals = cart.map(({ product, qty }) => roundDecimal(multiplyDecimals([product.price || 0, qty]), 4));
-  return Number(addDecimals(lineTotals));
+  return addDecimals(lineTotals);
 }
 
 export function restaurantLineTotal(line) {

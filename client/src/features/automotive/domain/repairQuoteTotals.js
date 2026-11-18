@@ -1,7 +1,7 @@
 import { multiplyDecimals, roundDecimal } from '../../../lib/decimal.js';
 
 export function repairQuoteLineTotal(price, unitRatio, qty) {
-  return Number(roundDecimal(multiplyDecimals([price || 0, unitRatio || 1, qty || 0]), 4));
+  return roundDecimal(multiplyDecimals([price || 0, unitRatio || 1, qty || 0]), 4);
 }
 
 export function storedRepairLineTotal(line) {
