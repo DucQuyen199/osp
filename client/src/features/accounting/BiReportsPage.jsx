@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtNumber, uiTextWith } from '../../lib/i18n.js';
-import { app, can } from '../../lib/state.js';
+import { app, can, loadAllResponse } from '../../lib/state.js';
 import biEnglish from './bi.en.js';
 import BiReportBuilderForm from './components/BiReportBuilderForm.jsx';
 import { BiDataTable, BiKpiCard, BiReportWidget } from './components/BiReportVisualizations.jsx';
@@ -58,9 +58,9 @@ export default function BiReportsPage({ route }) {
     setError('');
     try {
       const [dashboardList, reportList, kpiList] = await Promise.all([
-        can('bi.dashboard.read') ? api(`${dataPath('bi.dashboard')}?limit=100`) : Promise.resolve({ items: [] }),
-        can('bi.report.read') ? api(`${dataPath('bi.report')}?limit=100`) : Promise.resolve({ items: [] }),
-        can('bi.kpi.read') ? api(`${dataPath('bi.kpi')}?limit=100`) : Promise.resolve({ items: [] }),
+        can('bi.dashboard.read') ? loadAllResponse('bi.dashboard') : Promise.resolve({ items: [] }),
+        can('bi.report.read') ? loadAllResponse('bi.report') : Promise.resolve({ items: [] }),
+        can('bi.kpi.read') ? loadAllResponse('bi.kpi') : Promise.resolve({ items: [] }),
       ]);
       setDashboards(asItems(dashboardList));
       setReports(asItems(reportList));

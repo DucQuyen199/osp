@@ -106,3 +106,4 @@ Các module CRM/Marketing, bán hàng, mua hàng, loyalty, logistics, field serv
 
 - HRM phân trang các bảng đơn nghỉ, hồ sơ nhân viên và điều chỉnh lương; dữ liệu nhân viên, nghỉ phép, chấm công và hạn mức nghỉ được tải qua nhiều trang API thay vì dừng ở một giới hạn cố định.
 - Bàn trả hàng bán và hoàn ứng nhân viên nạp hết các trang đơn bán, phiếu trả, vận đơn, hóa đơn, phiếu tín dụng, đề nghị chi và payment để đối chiếu không bị thiếu chứng từ cũ khi tenant vượt 1.000 bản ghi.
+- Bàn BI và hợp nhất tập đoàn cũng nạp danh mục qua các trang API; báo cáo, KPI, tài khoản và các hồ sơ nhóm không bị dừng ở trang đầu khi danh mục tăng.

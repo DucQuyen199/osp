@@ -10,8 +10,16 @@ import EliminationJournalsTable from './components/EliminationJournalsTable.jsx'
 const t = (text) => uiTextWith(text, consolidationEnglish);
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 async function listAll(qname) {
-  const response = await api(`${dataPath(qname)}?limit=1000&offset=0`);
-  return itemsOf(response);
+  const rows = [];
+  let total = Number.POSITIVE_INFINITY;
+  for (let offset = 0; offset < total; offset += 1000) {
+    const response = await api(`${dataPath(qname)}?limit=1000&offset=${offset}`);
+    const page = itemsOf(response);
+    rows.push(...page);
+    total = Number(response?.total ?? rows.length);
+    if (!page.length) break;
+  }
+  return rows;
 }
 
 export default function ConsolidationWorkbenchPage() {
