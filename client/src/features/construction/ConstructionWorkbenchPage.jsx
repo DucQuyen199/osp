@@ -4,7 +4,7 @@ import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { addDecimals } from '../../lib/decimal.js';
-import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { can, loadRefs, loadIndependentData, recordLabel, loadAllResponse } from '../../lib/state.js';
 import { boqLineValue, boqTotal } from './domain/boqTotals.js';
 import constructionEnglish from './construction.en.js';
 const t = (text) => uiTextWith(text, constructionEnglish);
@@ -35,16 +35,21 @@ export default function ConstructionWorkbenchPage() {
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
-      const [projectRes, siteRes, diaryRes, boqRes, subcontractRes, claimRes, billRes, partyMap] = await Promise.all([
-        can('project.project.read') ? loadAllResponse('project.project') : Promise.resolve({ items: [] }),
-        can('construction.site.read') ? loadAllResponse('construction.site') : Promise.resolve({ items: [] }),
-        can('construction.site_diary.read') ? loadAllResponse('construction.site_diary') : Promise.resolve({ items: [] }),
-        can('construction.boq.read') ? loadAllResponse('construction.boq') : Promise.resolve({ items: [] }),
-        can('construction.subcontract.read') ? loadAllResponse('construction.subcontract') : Promise.resolve({ items: [] }),
-        can('construction.progress_claim.read') ? loadAllResponse('construction.progress_claim') : Promise.resolve({ items: [] }),
-        can('accounting.bill.read') ? loadAllResponse('accounting.bill') : Promise.resolve({ items: [] }),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-      ]);
+      const emptyResponse = () => ({ items: [] });
+      const emptyMap = () => new Map();
+      const { data, errors } = await loadIndependentData({
+        projectRes: can('project.project.read') ? loadAllResponse('project.project') : Promise.resolve(emptyResponse()),
+        siteRes: can('construction.site.read') ? loadAllResponse('construction.site') : Promise.resolve(emptyResponse()),
+        diaryRes: can('construction.site_diary.read') ? loadAllResponse('construction.site_diary') : Promise.resolve(emptyResponse()),
+        boqRes: can('construction.boq.read') ? loadAllResponse('construction.boq') : Promise.resolve(emptyResponse()),
+        subcontractRes: can('construction.subcontract.read') ? loadAllResponse('construction.subcontract') : Promise.resolve(emptyResponse()),
+        claimRes: can('construction.progress_claim.read') ? loadAllResponse('construction.progress_claim') : Promise.resolve(emptyResponse()),
+        billRes: can('accounting.bill.read') ? loadAllResponse('accounting.bill') : Promise.resolve(emptyResponse()),
+        partyMap: can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(emptyMap()),
+      }, {
+        projectRes: emptyResponse(), siteRes: emptyResponse(), diaryRes: emptyResponse(), boqRes: emptyResponse(), subcontractRes: emptyResponse(), claimRes: emptyResponse(), billRes: emptyResponse(), partyMap: emptyMap(),
+      });
+      const { projectRes, siteRes, diaryRes, boqRes, subcontractRes, claimRes, billRes, partyMap } = data;
       const projectRows = itemsOf(projectRes);
       const siteRows = itemsOf(siteRes);
       const boqRows = itemsOf(boqRes);
@@ -56,6 +61,7 @@ export default function ConstructionWorkbenchPage() {
       setBoqForm((current) => ({ ...current, project: current.project || projectRows.find((row) => ['planned', 'active'].includes(row.status))?.id || '' }));
       setSubcontractForm((current) => ({ ...current, project: current.project || projectRows.find((row) => row.status === 'active')?.id || '', vendor: current.vendor || [...partyMap.keys()][0] || '' }));
       setClaimForm((current) => ({ ...current, subcontract: current.subcontract || itemsOf(subcontractRes).find((row) => row.status === 'signed')?.id || '' }));
+      if (errors.length) setError(errors[0]?.message || t('Một số dữ liệu công trường không tải được.'));
     } catch (reason) { setError(t(reason.message || 'Không tải được dữ liệu công trường.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
