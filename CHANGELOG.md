@@ -6,6 +6,7 @@
 ### Added
 - Bank reconciliation can now sync Casso Flow v3 transactions directly into a draft statement using a tenant-scoped, redacted connector; account mapping is checked against the selected ledger account and retries remain idempotent.
 - Bank reconciliation also supports SePay API v2, including its isolated sandbox, paginated transaction history, account identity checks, and idempotent draft-statement imports.
+- International bank connections can use Plaid Link for supported North American and European markets; access tokens stay server-side and linked account IDs map to ledger bank accounts for statement-period imports.
 - Unmatched bank credits can suggest open invoices and prefill a reviewable receipt draft; the statement line remains unmatched until its posted payment or journal is selected.
 - CAMT.053 and Casso imports now verify file account identity against identifiers configured on the ledger account linked to the statement; uploads no longer trust user-entered identity claims.
 - Clinic encounters may now complete with a zero patient fee only when a documented no-charge reason is supplied; these visits remain in the clinical record without creating a receivable.

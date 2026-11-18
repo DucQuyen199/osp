@@ -12,8 +12,9 @@ pub use application::{
     prepare_payment_currency,
 };
 pub use bank_import::{
-    import_statement_camt053, import_statement_casso, import_statement_csv, sync_statement_casso,
-    sync_statement_sepay,
+    complete_plaid_link, create_plaid_link_token, disconnect_plaid, import_statement_camt053,
+    import_statement_casso, import_statement_csv, list_plaid_accounts, sync_statement_casso,
+    sync_statement_plaid, sync_statement_sepay,
 };
 pub use domain::{validate, validate_action, validate_action_at, validate_remove, validate_update};
 pub use persistence::{post_stock_movement, validate_persistence};

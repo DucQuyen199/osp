@@ -222,3 +222,13 @@ Mẫu: `*` mọi quyền · `crm.*` mọi quyền của module · `*.*.read` m�
 | 508 | `EVENT_LOOP` | Chuỗi sự kiện sâu quá 12 bước (nghi vòng lặp luật) |
 
 Giới hạn tốc độ: `/api` 600 yêu cầu/phút/IP (cấu hình được). Giới hạn này tính theo địa chỉ socket; **nếu đặt sau reverse proxy, cần cấu hình proxy giới hạn thay hoặc bổ sung đọc `X-Forwarded-For` có kiểm soát** (xem [SECURITY.md](SECURITY.md)).
+
+### Plaid bank connector endpoints
+
+| Endpoint | Permission | Behavior |
+|---|---|---|
+| `POST /api/t/:tid/accounting/bank-statements/:id/sync-plaid` | `accounting.bank_statement_line.create`, `integration-hub.connector.read` | Calls Plaid `/transactions/get` for the selected statement dates and the account ID mapped in ledger `bank_account_id`. Imports posted transactions idempotently, skips pending rows, and limits a sync to 15,000 rows with request pacing for Plaid's per-Item rate limit. |
+| `POST /api/t/:tid/connectors/:id/plaid/link-token` | `integration-hub.connector.read`, `integration-hub.connector.update` | Creates a short-lived Plaid Link token for the configured environment and country codes. |
+| `POST /api/t/:tid/connectors/:id/plaid/exchange` | `integration-hub.connector.read`, `integration-hub.connector.update` | Exchanges the one-time `{ "publicToken": "..." }`; the returned access token is stored only on the server and redacted from connector reads. |
+| `GET /api/t/:tid/connectors/:id/plaid/accounts` | `integration-hub.connector.read` | Lists account names, masks, types, currencies, and Plaid account IDs. Map the ID to `bank_account_id` on the corresponding ledger account. |
+| `POST /api/t/:tid/connectors/:id/plaid/disconnect` | `integration-hub.connector.read`, `integration-hub.connector.update` | Revokes the Plaid Item and removes its server-side access token, including for a disabled connector. |

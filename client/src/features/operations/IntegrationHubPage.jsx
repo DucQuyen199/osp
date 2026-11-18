@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
+import { confirmDialog } from '../../lib/feedback.js';
 import { fmtDateTime, uiTextWith } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
 import integrationEnglish from './integration.en.js';
@@ -11,12 +12,29 @@ const connectorConfigs = {
   http_event_sink: '{\n  "adapter": "http_event_sink",\n  "url": "https://api.example.com/osp/events",\n  "events": ["sales.*"],\n  "headers": {},\n  "secret": ""\n}',
   casso_bank_feed: '{\n  "adapter": "casso_bank_feed",\n  "app_id": "",\n  "app_secret": ""\n}',
   sepay_bank_feed: '{\n  "adapter": "sepay_bank_feed",\n  "environment": "sandbox",\n  "api_token": "",\n  "bank_account_id": ""\n}',
+  plaid_bank_feed: '{\n  "adapter": "plaid_bank_feed",\n  "environment": "sandbox",\n  "client_id": "",\n  "secret": "",\n  "country_codes": ["US"]\n}',
 };
+function ensurePlaidLinkSdk() {
+  if (window.Plaid?.create) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    let script = document.querySelector('script[data-plaid-link-sdk]');
+    if (!script) {
+      script = document.createElement('script');
+      script.src = 'https://cdn.plaid.com/link/v2/stable/link-initialize.js';
+      script.async = true;
+      script.dataset.plaidLinkSdk = 'true';
+      document.head.appendChild(script);
+    }
+    script.addEventListener('load', () => window.Plaid?.create ? resolve() : reject(new Error('Plaid Link could not be initialized.')), { once: true });
+    script.addEventListener('error', () => reject(new Error('Could not load Plaid Link.')), { once: true });
+  });
+}
 export default function IntegrationHubPage() {
   useDocumentTitle(`${t('Cổng tích hợp')} · OSP Suite`);
   const { connectors, webhooks, loading, error, setError, load } = useIntegrationHubData();
   const [connectorForm, setConnectorForm] = useState({ name: '', kind: '', config: connectorConfigs.http_event_sink });
   const [connectorAdapter, setConnectorAdapter] = useState('http_event_sink');
+  const [plaidAccounts, setPlaidAccounts] = useState({});
   const [webhookForm, setWebhookForm] = useState({ url: '', events: '', secret: '' });
   const [eventSearch, setEventSearch] = useState('');
   const [busy, setBusy] = useState('');
@@ -40,6 +58,60 @@ export default function IntegrationHubPage() {
       setConnectorForm({ name: '', kind: '', config: connectorConfigs.http_event_sink });
       setConnectorAdapter('http_event_sink');
     }, 'Đã thêm connector.');
+  }
+  async function connectPlaid(row) {
+    setBusy(`${row.id}:plaid`); setError(''); setNotice('');
+    try {
+      const { linkToken } = await api(tenantPath(`/connectors/${row.id}/plaid/link-token`), { method: 'POST', body: {} });
+      await ensurePlaidLinkSdk();
+      await new Promise((resolve, reject) => {
+        let finished = false;
+        const finish = () => { if (!finished) { finished = true; resolve(); } };
+        const handler = window.Plaid.create({
+          token: linkToken,
+          onSuccess: async (publicToken, metadata) => {
+            try {
+              await api(tenantPath(`/connectors/${row.id}/plaid/exchange`), { method: 'POST', body: { publicToken } });
+              await load();
+              try {
+                const result = await api(tenantPath(`/connectors/${row.id}/plaid/accounts`));
+                setPlaidAccounts((current) => ({ ...current, [row.id]: result.accounts || [] }));
+              } catch {
+                const accounts = (metadata?.accounts || []).map((account) => ({ accountId: account.id, name: account.name, mask: account.mask, type: account.type, subtype: account.subtype }));
+                setPlaidAccounts((current) => ({ ...current, [row.id]: accounts }));
+              }
+              setNotice(t('Đã liên kết ngân hàng Plaid. Dùng account ID bên dưới làm bank_account_id trên tài khoản sổ cái.'));
+              finish();
+            } catch (reason) { reject(reason); }
+          },
+          onExit: (linkError) => {
+            if (linkError) setError(linkError.display_message || linkError.error_message || t('Không thể hoàn tất kết nối Plaid.'));
+            finish();
+          },
+        });
+        handler.open();
+      });
+    } catch (reason) { setError(reason.message || t('Không thể hoàn tất kết nối Plaid.')); }
+    finally { setBusy(''); }
+  }
+  async function loadPlaidAccounts(row) {
+    setBusy(`${row.id}:plaid-accounts`); setError('');
+    try {
+      const result = await api(tenantPath(`/connectors/${row.id}/plaid/accounts`));
+      setPlaidAccounts((current) => ({ ...current, [row.id]: result.accounts || [] }));
+    } catch (reason) { setError(reason.message || t('Không thể tải tài khoản Plaid.')); }
+    finally { setBusy(''); }
+  }
+  async function disconnectPlaid(row) {
+    if (!await confirmDialog({ title: t('Disconnect Plaid'), message: t('Revoke Plaid access and remove this linked bank Item?'), danger: true, confirmLabel: t('Disconnect bank') })) return;
+    setBusy(`${row.id}:plaid-disconnect`); setError(''); setNotice('');
+    try {
+      await api(tenantPath(`/connectors/${row.id}/plaid/disconnect`), { method: 'POST', body: {} });
+      setPlaidAccounts((current) => { const next = { ...current }; delete next[row.id]; return next; });
+      setNotice(t('Plaid bank disconnected.'));
+      await load();
+    } catch (reason) { setError(reason.message || t('Could not disconnect Plaid.')); }
+    finally { setBusy(''); }
   }
   async function createWebhook(event) {
     event.preventDefault();
@@ -70,10 +142,10 @@ export default function IntegrationHubPage() {
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     {(can('integration-hub.connector.create') || can('integration-hub.webhook.create')) && <div className="two-col">
       {can('integration-hub.connector.create') && <section className="card card-pad"><h2>{t("Thêm connector")}</h2><p className="small muted">{t("Chọn adapter HTTP gửi sự kiện ra ngoài hoặc một nhà cung cấp để đồng bộ giao dịch ngân hàng vào sao kê.")}</p><form className="form-grid" onSubmit={createConnector}>
-        <label className="field full"><span className="label">{t("Adapter")}</span><select className="select" value={connectorAdapter} onChange={(event) => { const adapter = event.target.value; setConnectorAdapter(adapter); setConnectorForm((form) => ({ ...form, config: connectorConfigs[adapter] })); }}><option value="http_event_sink">{t("HTTP event sink")}</option><option value="casso_bank_feed">{t("Casso Flow v3 bank feed")}</option><option value="sepay_bank_feed">{t("SePay API v2 bank feed")}</option></select></label>
+        <label className="field full"><span className="label">{t("Adapter")}</span><select className="select" value={connectorAdapter} onChange={(event) => { const adapter = event.target.value; setConnectorAdapter(adapter); setConnectorForm((form) => ({ ...form, config: connectorConfigs[adapter] })); }}><option value="http_event_sink">{t("HTTP event sink")}</option><option value="casso_bank_feed">{t("Casso Flow v3 bank feed")}</option><option value="sepay_bank_feed">{t("SePay API v2 bank feed")}</option><option value="plaid_bank_feed">{t("Plaid international bank feed")}</option></select></label>
         <label className="field"><span className="label">{t('Tên hiển thị *')}</span><input className="input" required maxLength="120" value={connectorForm.name} onChange={(event) => setConnectorForm({ ...connectorForm, name: event.target.value })}/></label>
         <label className="field"><span className="label">{t('Nhà cung cấp / mục đích *')}</span><input className="input" required maxLength="64" placeholder="bank, carrier, einvoice, crm" value={connectorForm.kind} onChange={(event) => setConnectorForm({ ...connectorForm, kind: event.target.value })}/></label>
-        <label className="field full"><span className="label">{t("Cấu hình JSON")}</span><textarea className="input mono" rows="8" spellCheck="false" value={connectorForm.config} onChange={(event) => setConnectorForm({ ...connectorForm, config: event.target.value })}/><p className="hint">{connectorAdapter === "casso_bank_feed" ? t("Nhập app_id và app_secret từ Casso Open Platform; app_secret được che khi đọc lại. Cần scope flow:transaction:read.") : connectorAdapter === "sepay_bank_feed" ? t("SePay API v2: chọn sandbox để thử hoặc production để chạy thật; nhập API token 64 ký tự và bank account UUID trong SePay. Token được che khi đọc lại. Trên tài khoản kế toán, cấu hình bank_account_id bằng số tài khoản ngân hàng.") : t("Cần URL HTTPS công khai, events và header xác thực. Secret được che khi đọc lại.")}</p></label>
+        <label className="field full"><span className="label">{t("Cấu hình JSON")}</span><textarea className="input mono" rows="8" spellCheck="false" value={connectorForm.config} onChange={(event) => setConnectorForm({ ...connectorForm, config: event.target.value })}/><p className="hint">{connectorAdapter === "casso_bank_feed" ? t("Nhập app_id và app_secret từ Casso Open Platform; app_secret được che khi đọc lại. Cần scope flow:transaction:read.") : connectorAdapter === "sepay_bank_feed" ? t("SePay API v2: chọn sandbox để thử hoặc production để chạy thật; nhập API token 64 ký tự và bank account UUID trong SePay. Token được che khi đọc lại. Trên tài khoản kế toán, cấu hình bank_account_id bằng số tài khoản ngân hàng.") : connectorAdapter === "plaid_bank_feed" ? t("Plaid kết nối qua Plaid Link; nhập client_id, secret, môi trường và country_codes được tài khoản Plaid cho phép. Kết nối một ngân hàng bằng nút Connect, rồi chọn account ID trả về để điền bank_account_id trên tài khoản sổ cái. Plaid không hỗ trợ ngân hàng Việt Nam.") : t("Cần URL HTTPS công khai, events và header xác thực. Secret được che khi đọc lại.")}</p></label>
         <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy)}>{t('Thêm connector')}</button></div>
       </form></section>}
       {can('integration-hub.webhook.create') && <section className="card card-pad"><h2>{t('Đăng ký webhook')}</h2><p className="small muted">{t('OSP sẽ gửi payload sự kiện đã đăng ký qua HTTPS và ký payload bằng HMAC SHA-256 nếu có bí mật.')}</p><form className="form-grid" onSubmit={createWebhook}>
@@ -84,7 +156,8 @@ export default function IntegrationHubPage() {
         <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy)}>{t('Tạo webhook')}</button></div>
       </form></section>}
     </div>}
-    {can('integration-hub.connector.read') && <section className="card card-pad"><h2>{t('Connectors')}</h2>{loading ? <div className="skeleton" data-h="row"/> : !connectors.length ? <div className="empty">{t('Chưa có connector.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Tên')}</th><th>{t('Loại')}</th><th>{t('Trạng thái')}</th><th>{t('Cập nhật')}</th><th><span className="sr-only">{t('Thao tác')}</span></th></tr></thead><tbody>{connectors.map((row) => { const adapter = row.config?.adapter; const runnable = ['http_event_sink', 'casso_bank_feed', 'sepay_bank_feed'].includes(adapter); const testable = adapter === 'http_event_sink'; const enabled = row.enabled && runnable; return <tr key={row.id}><td><strong>{row.name}</strong></td><td><span className="chip neutral">{row.kind}</span></td><td><span className={`badge ${enabled ? 'success' : row.enabled ? 'warning' : 'plain'}`}>{t(enabled ? (adapter === 'http_event_sink' ? 'Đang gửi' : 'Đã cấu hình') : row.enabled ? 'Thiếu adapter' : 'Đã tắt')}</span></td><td>{fmtDateTime(row.updatedAt || row.createdAt)}</td><td className="right">{can('tenant.admin') && testable && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => run(`${row.id}:test`, () => api(tenantPath(`/connectors/${row.id}/test`), { method: 'POST', body: {} }), 'Đã kết nối thử thành công.')}>{t('Gửi thử')}</button>} {can('integration-hub.connector.update') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => toggle('integration-hub.connector', row, 'enabled')}>{t(row.enabled ? 'Tạm ngưng' : 'Bật lại')}</button>}</td></tr>; })}</tbody></table></div>}</section>}
+    {can('integration-hub.connector.read') && <section className="card card-pad"><h2>{t('Connectors')}</h2>{loading ? <div className="skeleton" data-h="row"/> : !connectors.length ? <div className="empty">{t('Chưa có connector.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Tên')}</th><th>{t('Loại')}</th><th>{t('Trạng thái')}</th><th>{t('Cập nhật')}</th><th><span className="sr-only">{t('Thao tác')}</span></th></tr></thead><tbody>{connectors.map((row) => { const adapter = row.config?.adapter; const runnable = ['http_event_sink', 'casso_bank_feed', 'sepay_bank_feed', 'plaid_bank_feed'].includes(adapter); const testable = adapter === 'http_event_sink'; const enabled = row.enabled && runnable; return <tr key={row.id}><td><strong>{row.name}</strong></td><td><span className="chip neutral">{row.kind}</span></td><td><span className={`badge ${enabled ? 'success' : row.enabled ? 'warning' : 'plain'}`}>{t(enabled ? (adapter === 'http_event_sink' ? 'Đang gửi' : adapter === 'plaid_bank_feed' ? (row.config?.item_id ? 'Linked' : 'Connect required') : 'Đã cấu hình') : row.enabled ? 'Thiếu adapter' : 'Đã tắt')}</span></td><td>{fmtDateTime(row.updatedAt || row.createdAt)}</td><td className="right">{can('tenant.admin') && testable && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => run(`${row.id}:test`, () => api(tenantPath(`/connectors/${row.id}/test`), { method: 'POST', body: {} }), 'Đã kết nối thử thành công.')}>{t('Gửi thử')}</button>} {can('integration-hub.connector.update') && row.enabled && adapter === 'plaid_bank_feed' && !row.config?.item_id && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => connectPlaid(row)}>{t('Connect bank')}</button>} {can('integration-hub.connector.read') && adapter === 'plaid_bank_feed' && row.config?.item_id && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => loadPlaidAccounts(row)}>{t('Plaid accounts')}</button>} {can('integration-hub.connector.update') && adapter === 'plaid_bank_feed' && row.config?.item_id && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => disconnectPlaid(row)}>{t('Disconnect bank')}</button>} {can('integration-hub.connector.update') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => toggle('integration-hub.connector', row, 'enabled')}>{t(row.enabled ? 'Tạm ngưng' : 'Bật lại')}</button>}</td></tr>; })}</tbody></table></div>}</section>}
+    {Object.entries(plaidAccounts).map(([connectorId, accounts]) => <section className="card card-pad" key={connectorId}><h2>{t('Plaid accounts')}</h2><p className="small muted">{t('Set the account ID as bank_account_id on the matching ledger bank account.')}</p>{accounts.length === 0 ? <div className="empty">{t('Plaid returned no transaction accounts.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Account name')}</th><th>{t('Type')}</th><th>{t('Mask')}</th><th>{t('Account ID')}</th></tr></thead><tbody>{accounts.map((account) => <tr key={account.accountId}><td>{account.officialName || account.name}</td><td>{[account.type, account.subtype].filter(Boolean).join(' · ')}</td><td>{account.mask || '—'}</td><td className="mono small">{account.accountId}</td></tr>)}</tbody></table></div>}</section>)}
     {can('integration-hub.webhook.read') && <section className="card card-pad"><h2>{t('Webhook gửi sự kiện')}</h2>{loading ? <div className="skeleton" data-h="row"/> : !webhooks.length ? <div className="empty">{t('Chưa đăng ký webhook.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Endpoint')}</th><th>{t('Sự kiện')}</th><th>{t('Trạng thái')}</th><th>{t('Cập nhật')}</th><th><span className="sr-only">{t('Thao tác')}</span></th></tr></thead><tbody>{webhooks.map((row) => <tr key={row.id}><td className="mono small">{row.url}</td><td>{Array.isArray(row.events) ? row.events.join(', ') : t('Chưa chọn sự kiện')}</td><td><span className={`badge ${row.active ? 'success' : 'plain'}`}>{t(row.active ? 'Đang gửi' : 'Đã tắt')}</span></td><td>{fmtDateTime(row.updatedAt || row.createdAt)}</td><td className="right">{can('tenant.admin') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => run(`${row.id}:test`, () => api(tenantPath(`/webhooks/${row.id}/test`), { method: 'POST', body: {} }), 'Đã gửi thử thành công.')}>{t('Gửi thử')}</button>} {can('integration-hub.webhook.update') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => toggle('integration-hub.webhook', row, 'active')}>{t(row.active ? 'Tạm ngưng' : 'Bật lại')}</button>}</td></tr>)}</tbody></table></div>}</section>}
     <p className="small muted">{t('Ví dụ sự kiện:')} {eventExamples.join(' · ')}. {t('Theo dõi và thử lại lần gửi tới webhook hoặc connector trong')} <a href="#/settings/outbox">{t('Outbox tích hợp')}</a>. {can('tenant.admin') && <>{t('Tạo token tích hợp giới hạn quyền tại')} <a href="#/settings/tokens">{t('Cài đặt API token')}</a>.</>}</p>
   </div>;

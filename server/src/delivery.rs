@@ -25,7 +25,7 @@ use tower_http::{
 };
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-pub const CSP: &str = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+pub const CSP: &str = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.plaid.com/link/v2/stable/link-initialize.js; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://cdn.plaid.com; font-src 'self'; connect-src 'self' https://sandbox.plaid.com https://development.plaid.com https://production.plaid.com; frame-src https://cdn.plaid.com; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 
 pub fn router(state: Arc<AppState>) -> Router {
     let request_log = state.cfg.log;

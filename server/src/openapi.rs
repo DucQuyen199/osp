@@ -1084,6 +1084,78 @@ pub fn build(reg: &Registry) -> Value {
         } }),
     );
     paths.insert(
+        "/api/t/{tenantId}/accounting/bank-statements/{statementId}/sync-plaid".into(),
+        json!({ "post": {
+            "tags": ["accounting", "integration-hub"], "summary": "Sync Plaid transactions into a bank statement", "security": sec,
+            "parameters": [tid, { "name": "statementId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                "type": "object", "required": ["connectorId"], "properties": {
+                    "connectorId": { "type": "string", "format": "uuid", "description": "Enabled tenant-scoped Plaid Item connector" },
+                    "fromDate": { "type": "string", "format": "date", "description": "Optional date within the statement period; defaults to statement start date" },
+                    "toDate": { "type": "string", "format": "date", "description": "Optional date within the statement period; defaults to statement end date" }
+                }
+            } } } },
+            "responses": with_common(Map::from_iter([
+                ("200".to_string(), json!({ "description": "Posted transactions imported idempotently after matching the Plaid account_id to the ledger account" })),
+                ("409".to_string(), err("Only draft statements accept imported rows; Plaid transaction data may also be preparing")),
+                ("422".to_string(), err("Invalid connector, date range, account mapping, or provider response")),
+                ("429".to_string(), err("Plaid API rate limit reached")),
+                ("502".to_string(), err("Plaid transaction API is unavailable"))
+            ]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/connectors/{connectorId}/plaid/link-token".into(),
+        json!({ "post": {
+            "tags": ["integration-hub"], "summary": "Create a Plaid Link token", "security": sec,
+            "parameters": [tid, { "name": "connectorId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "responses": with_common(Map::from_iter([
+                ("200".to_string(), json!({ "description": "Short-lived Link token; requires integration-hub.connector.read and integration-hub.connector.update" })),
+                ("409".to_string(), err("Connector already has a linked Item")),
+                ("422".to_string(), err("Invalid Plaid credentials, environment, or country codes")),
+                ("502".to_string(), err("Plaid Link API is unavailable"))
+            ]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/connectors/{connectorId}/plaid/exchange".into(),
+        json!({ "post": {
+            "tags": ["integration-hub"], "summary": "Exchange a one-time Plaid public token", "security": sec,
+            "parameters": [tid, { "name": "connectorId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["publicToken"], "properties": { "publicToken": { "type": "string", "maxLength": 2048 } } } } } },
+            "responses": with_common(Map::from_iter([
+                ("200".to_string(), json!({ "description": "Plaid access token stored server-side and redacted from connector reads" })),
+                ("409".to_string(), err("Connector is already linked or changed while linking")),
+                ("422".to_string(), err("Invalid Plaid public token")),
+                ("502".to_string(), err("Plaid token exchange failed"))
+            ]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/connectors/{connectorId}/plaid/accounts".into(),
+        json!({ "get": {
+            "tags": ["integration-hub"], "summary": "List Plaid account IDs for ledger mapping", "security": sec,
+            "parameters": [tid, { "name": "connectorId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "responses": with_common(Map::from_iter([
+                ("200".to_string(), json!({ "description": "Names, masks, types, currencies, and Plaid account IDs; does not expose account numbers" })),
+                ("422".to_string(), err("Connector is not linked to Plaid")),
+                ("502".to_string(), err("Plaid account API is unavailable"))
+            ]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/connectors/{connectorId}/plaid/disconnect".into(),
+        json!({ "post": {
+            "tags": ["integration-hub"], "summary": "Revoke Plaid access and clear stored item tokens", "security": sec,
+            "parameters": [tid, { "name": "connectorId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "responses": with_common(Map::from_iter([
+                ("200".to_string(), json!({ "description": "Plaid Item revoked and server-side access token removed; requires integration-hub.connector.update" })),
+                ("422".to_string(), err("Connector is not linked to Plaid")),
+                ("502".to_string(), err("Plaid item removal failed"))
+            ]))
+        } }),
+    );
+    paths.insert(
         "/api/t/{tenantId}/accounting/bank-statements/{statementId}/import".into(),
         json!({ "post": {
             "tags": ["accounting"], "summary": "Import bank statement CSV", "security": sec,

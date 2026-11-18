@@ -43,7 +43,7 @@ export default function BankReconciliationWorkbenchPage() {
   useEffect(() => {
     setStatementId((id) => statements.some((row) => row.id === id) ? id : statements.find((row) => row.status === 'draft')?.id || statements[0]?.id || '');
   }, [statements]);
-  const bankFeedConnectors = useMemo(() => connectors.filter((connector) => connector.enabled && ['casso_bank_feed', 'sepay_bank_feed'].includes(connector.config?.adapter)), [connectors]);
+  const bankFeedConnectors = useMemo(() => connectors.filter((connector) => connector.enabled && ['casso_bank_feed', 'sepay_bank_feed', 'plaid_bank_feed'].includes(connector.config?.adapter)), [connectors]);
   useEffect(() => {
     setBankFeedConnectorId((id) => bankFeedConnectors.some((connector) => connector.id === id) ? id : bankFeedConnectors[0]?.id || '');
   }, [bankFeedConnectors]);
@@ -102,9 +102,9 @@ export default function BankReconciliationWorkbenchPage() {
   }
   async function syncCasso() {
     if (!selected || !selectedBankFeed) return;
-    const isSePay = selectedBankFeed.config?.adapter === 'sepay_bank_feed';
-    const provider = isSePay ? 'SePay' : 'Casso';
-    const endpoint = isSePay ? 'sync-sepay' : 'sync-casso';
+    const adapter = selectedBankFeed.config?.adapter;
+    const provider = adapter === 'sepay_bank_feed' ? 'SePay' : adapter === 'plaid_bank_feed' ? 'Plaid' : 'Casso';
+    const endpoint = adapter === 'sepay_bank_feed' ? 'sync-sepay' : adapter === 'plaid_bank_feed' ? 'sync-plaid' : 'sync-casso';
     await run(`${selected.id}:${endpoint}`, async () => api(tenantPath(`/accounting/bank-statements/${selected.id}/${endpoint}`), {
       method: 'POST', body: {
         connectorId: bankFeedConnectorId,

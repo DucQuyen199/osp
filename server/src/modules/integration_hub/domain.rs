@@ -98,6 +98,7 @@ fn validate_connector(document: &Value) -> Vec<String> {
                 Some("http_event_sink") => validate_http_event_sink(config, &mut errors),
                 Some("casso_bank_feed") => validate_casso_bank_feed(config, &mut errors),
                 Some("sepay_bank_feed") => validate_sepay_bank_feed(config, &mut errors),
+                Some("plaid_bank_feed") => validate_plaid_bank_feed(config, &mut errors),
                 _ => errors.push("Enabled connector must use a supported adapter".into()),
             }
         }
@@ -137,6 +138,41 @@ fn validate_sepay_bank_feed(config: &Value, errors: &mut Vec<String>) {
         Some("sandbox" | "production")
     ) {
         errors.push("SePay environment must be sandbox or production".into());
+    }
+}
+
+fn validate_plaid_bank_feed(config: &Value, errors: &mut Vec<String>) {
+    match config.get("client_id").and_then(Value::as_str) {
+        Some(value)
+            if !value.trim().is_empty()
+                && value.len() <= 256
+                && !value.chars().any(char::is_control) => {}
+        _ => errors.push("Plaid bank feed requires a valid client_id".into()),
+    }
+    match config.get("secret").and_then(Value::as_str) {
+        Some(value)
+            if (16..=512).contains(&value.len()) && !value.chars().any(char::is_control) => {}
+        _ => errors.push("Plaid bank feed requires an API secret of 16 to 512 characters".into()),
+    }
+    if !matches!(
+        config.get("environment").and_then(Value::as_str),
+        Some("sandbox" | "development" | "production")
+    ) {
+        errors.push("Plaid environment must be sandbox, development, or production".into());
+    }
+    const COUNTRIES: &[&str] = &[
+        "US", "CA", "GB", "AT", "BE", "DK", "EE", "FI", "FR", "DE", "IE", "IT", "LV", "LT", "NL",
+        "NO", "PL", "PT", "ES", "SE",
+    ];
+    match config.get("country_codes").and_then(Value::as_array) {
+        Some(countries)
+            if (1..=10).contains(&countries.len())
+                && countries.iter().all(|country| {
+                    country
+                        .as_str()
+                        .is_some_and(|country| COUNTRIES.contains(&country))
+                }) => {}
+        _ => errors.push("Plaid country_codes must contain 1 to 10 supported country codes".into()),
     }
 }
 
