@@ -8,6 +8,7 @@ import { estimateUtilityCharge } from './domain/utilityEstimate.js';
 import { can, loadRefs, recordLabel, loadAllResponse, loadIndependentData } from '../../lib/state.js';
 import utilitiesEnglish from './utilities.en.js';
 import TariffTiersEditor from './components/TariffTiersEditor.jsx';
+import UtilityReadingsRegister from './components/UtilityReadingsRegister.jsx';
 const t = (text) => uiTextWith(text, utilitiesEnglish);
 const currentPeriod = localMonth;
 const MAX_TARIFF_TIERS = 20;
@@ -128,6 +129,24 @@ export default function UtilitiesWorkbenchPage() {
     } catch (reason) { setError(reason.message || t("Không thể cập nhật hóa đơn.")); }
     finally { setBusy(false); }
   }
+  const canReadBills = can('utilities.utility_bill.read');
+  const readingRows = meterReadings.map((item) => {
+    const bill = billByReading.get(item.id);
+    const invoice = bill && invoiceByBill.get(bill.id);
+    return {
+      id: item.id,
+      period: item.period,
+      previousReading: item.previous_reading,
+      reading: item.reading,
+      consumption: item.consumption,
+      rate: money(item.rate),
+      amount: money(item.amount),
+      amountDetails: [t('Tiêu thụ {base} + phí cố định {fixed}').replace('{base}', money(item.base_amount ?? item.amount)).replace('{fixed}', money(item.fixed_charge || 0)), ...(item.tier_breakdown || []).map((band, index) => t('Bậc {number}: {units} × {rate} = {amount}').replace('{number}', String(index + 1)).replace('{units}', money(band.units)).replace('{rate}', money(band.rate)).replace('{amount}', money(band.amount)))],
+      bill: bill ? { status: statusLabel(bill.status), invoiceHref: invoice ? `#/e/accounting/invoice/${invoice.id}` : '' } : null,
+      canCreateBill: can('utilities.utility_bill.create'),
+      onCreateBill: () => createBill(item),
+    };
+  });
   return <div className="page">
     <div className="page-head"><div><h1>{t("Ghi chỉ số và hóa đơn tiện ích")}</h1><p className="sub">{t("Ghi lần lượt theo kỳ để giữ chính xác tiêu thụ lũy kế, sau đó phát hành và theo dõi thu tiền qua kế toán.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={load}>{t("Làm mới")}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
@@ -172,9 +191,7 @@ export default function UtilitiesWorkbenchPage() {
         </form>}
       </>}
     </section>
-    <section className="card card-pad u-mt-20" ><h2>{t("Lịch sử chỉ số")}</h2>
-      {!selectedMeter ? <div className="empty">{t("Chọn một công tơ để xem lịch sử.")}</div> : !meterReadings.length ? <div className="empty">{t("Chưa có chỉ số.")}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t("Kỳ")}</th><th>{t("Chỉ số trước")}</th><th>{t("Chỉ số mới")}</th><th>{t("Tiêu thụ")}</th><th>{t("Đơn giá")}</th><th>{t("Thành tiền")}</th><th>{t("Hóa đơn")}</th></tr></thead><tbody>{meterReadings.map((item) => { const bill = billByReading.get(item.id); const invoice = bill && invoiceByBill.get(bill.id); return <tr key={item.id}><td>{item.period}</td><td>{item.previous_reading}</td><td>{item.reading}</td><td>{item.consumption}</td><td>{money(item.rate)}</td><td>{money(item.amount)}<div className="small muted">{t("Tiêu thụ {base} + phí cố định {fixed}").replace('{base}', money(item.base_amount ?? item.amount)).replace('{fixed}', money(item.fixed_charge || 0))}</div>{(item.tier_breakdown || []).map((band, index) => <div className="small muted" key={index}>{t("Bậc {number}: {units} × {rate} = {amount}").replace('{number}', String(index + 1)).replace('{units}', money(band.units)).replace('{rate}', money(band.rate)).replace('{amount}', money(band.amount))}</div>)}</td><td>{!can('utilities.utility_bill.read') ? '—' : bill ? <span>{statusLabel(bill.status)} {invoice && <a href={`#/e/accounting/invoice/${invoice.id}`}>{t("· Mở hóa đơn phải thu")}</a>}</span> : can('utilities.utility_bill.create') && <button className="btn btn-secondary btn-sm" type="button" disabled={busy} onClick={() => createBill(item)}>{t("Lập hóa đơn nháp")}</button>}</td></tr>; })}</tbody></table></div>}
-    </section>
+    <section className="card card-pad u-mt-20"><h2>{t('Lịch sử chỉ số')}</h2><UtilityReadingsRegister selectedMeter={selectedMeter} readings={readingRows} canReadBills={canReadBills} busy={busy} t={t} /></section>
     {can('utilities.utility_bill.read') && <section className="card card-pad u-mt-20" ><h2>{t("Hóa đơn tiêu thụ")}</h2>{!bills.length ? <div className="empty">{t("Chưa có hóa đơn.")}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t("Thuê bao")}</th><th>{t("Kỳ")}</th><th>{t("Tiêu thụ")}</th><th>{t("Đơn giá")}</th><th>{t("Số tiền")}</th><th>{t("Trạng thái")}</th><th>{t("Thao tác")}</th></tr></thead><tbody>{bills.map((bill) => { const reading = readingForBill.get(bill.meter_reading); const billMeter = meters.find((item) => item.id === reading?.meter); const invoice = invoiceByBill.get(bill.id); return <tr key={bill.id}><td>{billMeter?.code || parties.get(bill.party)?.name || t('Thuê bao')}</td><td>{bill.period}</td><td>{bill.consumption}</td><td>{money(bill.unit_rate)}</td><td>{money(bill.amount)}<div className="small muted">{t("Tiêu thụ {base} + phí cố định {fixed}").replace('{base}', money(bill.base_amount ?? bill.amount)).replace('{fixed}', money(bill.fixed_charge || 0))}</div>{(bill.tier_breakdown || []).map((band, index) => <div className="small muted" key={index}>{t("Bậc {number}: {units} × {rate} = {amount}").replace('{number}', String(index + 1)).replace('{units}', money(band.units)).replace('{rate}', money(band.rate)).replace('{amount}', money(band.amount))}</div>)}</td><td>{statusLabel(bill.status)}</td><td className="row wrap">{bill.status === 'draft' && can('utilities.utility_bill.issued') && <button className="btn btn-primary btn-sm" type="button" disabled={busy} onClick={() => transition(bill, 'issued')}>{t("Phát hành")}</button>}{invoice && <a className="btn btn-secondary btn-sm" href={`#/e/accounting/invoice/${invoice.id}`}>{invoice.status === 'paid' ? t("Hóa đơn đã thu đủ") : t("Mở hóa đơn / thu tiền")}</a>}{bill.status === 'issued' && invoice?.status === 'paid' && can('utilities.utility_bill.paid') && <button className="btn btn-secondary btn-sm" type="button" disabled={busy} onClick={() => transition(bill, 'paid')}>{t("Đồng bộ đã thanh toán")}</button>}</td></tr>; })}</tbody></table></div>}
       <p className="small muted">{t("Phát hành tạo khoản phải thu kế toán. Ghi nhận hóa đơn tiện ích đã thanh toán chỉ được phép sau khi hóa đơn kế toán đã thu đủ.")}</p>
     </section>}

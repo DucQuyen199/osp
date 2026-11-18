@@ -13,6 +13,7 @@ import PosReturnDialog from './components/PosReturnDialog.jsx';
 import PosSessionPanel from './components/PosSessionPanel.jsx';
 import PosCashOperationsPanel from './components/PosCashOperationsPanel.jsx';
 import PosRecentTransactions from './components/PosRecentTransactions.jsx';
+import PosCartContents from './components/PosCartContents.jsx';
 import { calculatePosTotals } from './domain/posTotals.js';
 import { buildPosReturnLines, estimatePosReturnTotal, remainingPosReturnQuantity } from './domain/posReturns.js';
 import retailEnglish from './retail.en.js';
@@ -88,6 +89,8 @@ export default function PosTerminalPage() {
   useEffect(() => { if (!rxRequired && prescriptionId) setPrescriptionId(''); }, [rxRequired, prescriptionId]);
   const { subtotal, tax: estimatedTax, total, lines: estimatedLines } = calculatePosTotals(cart, units, taxes);
   const filteredProducts = [...products.values()].filter((product) => product.active !== false && (!query || `${product.name} ${product.sku || ''} ${product.barcode || ''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()))).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
+  const partyOptions = [...parties.values()].filter((item) => item.active !== false && item.is_customer !== false);
+  const eligiblePrescriptions = prescriptions.filter((item) => ['verified', 'partially_dispensed'].includes(item.status) && item.valid_until && item.valid_until >= localDate());
 
   const startSession = async (event) => {
     event.preventDefault();
@@ -341,10 +344,30 @@ export default function PosTerminalPage() {
           formatMoney={fmtMoney}
           t={t}
         />
-        <aside className="card pos-cart"><h2>{t('Đơn hàng')}</h2>{cart.length ? <div className="pos-cart-lines">{cart.map(({ product, uom, qty }, index) => <div className="pos-cart-line" key={product.id}><div><strong>{product.name}</strong>{unitsFor(product).length > 1 && <select className="select" aria-label={`${t('Đơn vị bán')} ${product.name}`} value={uom} onChange={(event) => setSelectedUnits((current) => ({ ...current, [product.id]: event.target.value }))}>{unitsFor(product).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` · ${unit.ratio} × ${t('đơn vị gốc')}` : ` · ${t('đơn vị gốc')}`}</option>)}</select>}<div className="small muted">{fmtMoney(priceFor(product, uom))} / {units.get(uom)?.name || t('sp')}</div></div><div className="pos-qty"><button className="btn btn-ghost btn-sm" type="button" aria-label={`${t('Giảm')} ${product.name}`} onClick={() => adjustQty(product.id, -1)}>−</button><input className="input num" type="number" min="0" step="any" aria-label={`${t('Số lượng')} ${product.name}`} value={qty} onChange={(event) => setQty(product.id, event.target.value)} /><button className="btn btn-ghost btn-sm" type="button" aria-label={`${t('Tăng')} ${product.name}`} onClick={() => adjustQty(product.id, 1)}>+</button></div><strong className="num">{fmtMoney(estimatedLines[index].net)}</strong></div>)}</div> : <div className="empty">{t('Chọn sản phẩm để thêm vào đơn.')}</div>}
-          <label className="field"><span className="label">{t('Khách hàng')} {rxRequired ? '*' : t('(tùy chọn)')}</span><select className="select" required={rxRequired} value={partyId} onChange={(event) => setPartyId(event.target.value)}><option value="">{t('Khách lẻ')}</option>{[...parties.values()].filter((item) => item.active !== false && item.is_customer !== false).map((item) => <option key={item.id} value={item.id}>{recordLabel('master-data.party', item)}</option>)}</select></label>
-          {loyaltyEnabled && <label className="field"><span className="label">{t('Mã voucher thành viên')}</span><input className="input" maxLength="80" autoCapitalize="characters" value={voucherCode} onChange={(event) => setVoucherCode(event.target.value.toUpperCase())}/><span className="small muted">{t('Cần chọn khách hàng đã đăng ký thành viên; mã chỉ được sử dụng một lần.')}</span></label>}
-          {pharmacyEnabled && rxRequired && <label className="field"><span className="label">{t('Đơn thuốc *')}</span><select className="select" required={rxRequired} value={prescriptionId} onChange={(event) => { const id = event.target.value; setPrescriptionId(id); const rx = prescriptions.find((item) => item.id === id); if (rx?.party) setPartyId(rx.party); }}><option value="">{t('Chọn đơn còn thuốc được kê')}</option>{prescriptions.filter((item) => ['verified', 'partially_dispensed'].includes(item.status) && item.valid_until && item.valid_until >= localDate()).map((item) => <option key={item.id} value={item.id}>{item.prescription_no} · {t(item.status === 'partially_dispensed' ? 'cấp một phần' : 'đã xác minh')} · {t('hết hạn')} {item.valid_until}</option>)}</select>{rxRequired && <small className="muted">{t('Thuốc kê đơn chỉ được bán theo đơn còn hạn, đúng khách hàng; số lượng bán cộng dồn không vượt số lượng kê.')}</small>}</label>}
+        <aside className="card pos-cart"><PosCartContents
+          cart={cart}
+          units={units}
+          unitsFor={unitsFor}
+          priceFor={priceFor}
+          estimatedLines={estimatedLines}
+          partyOptions={partyOptions}
+          partyId={partyId}
+          rxRequired={rxRequired}
+          loyaltyEnabled={loyaltyEnabled}
+          voucherCode={voucherCode}
+          pharmacyEnabled={pharmacyEnabled}
+          prescriptionOptions={eligiblePrescriptions}
+          prescriptionId={prescriptionId}
+          onQuantityAdjust={adjustQty}
+          onQuantityChange={setQty}
+          onUnitChange={(productId, unitId) => setSelectedUnits((current) => ({ ...current, [productId]: unitId }))}
+          onPartyChange={setPartyId}
+          onVoucherCodeChange={(value) => setVoucherCode(value.toUpperCase())}
+          onPrescriptionChange={(id) => { setPrescriptionId(id); const prescription = eligiblePrescriptions.find((item) => item.id === id); if (prescription?.party) setPartyId(prescription.party); }}
+          formatMoney={fmtMoney}
+          recordLabel={recordLabel}
+          t={t}
+        />
           <PosCheckoutPanel method={method} onMethodChange={setMethod} cashReceived={cashReceived} onCashReceived={setCashReceived} subtotal={subtotal} estimatedTax={estimatedTax} total={total} hasItems={cart.length > 0} busy={busy} canCreate={can('pos.pos_order.create')} onCheckout={checkout} formatMoney={fmtMoney} t={t} />
           {sessionOrders.length > 0 && <section className="pos-pending"><h3>{t('Đơn chờ xử lý')} ({sessionOrders.length})</h3>{sessionOrders.map((order) => <div className="pos-pending-item" key={order.id}><div><strong>{fmtMoney(order.total || 0)}</strong><div className="small muted">{fmtDateTime(order.created_at)} · {statusLabel(order.status)}</div>{order.method === 'cash' && <label className="field"><span className="label">{t('Khách đưa')}</span><input className="input num" type="number" min={order.total || 0} step="0.01" value={pendingCashReceived[order.id] ?? (order.cash_received ?? '')} onChange={(event) => setPendingCashReceived((current) => ({ ...current, [order.id]: event.target.value }))} aria-label={`${t('Tiền khách đưa cho đơn')} ${String(order.id).slice(0, 8)}`} /></label>}</div><button className="btn btn-primary btn-sm" type="button" disabled={busy || !can('pos.pos_order.completed')} onClick={() => completeOrder(order)}>{t('Hoàn tất')}</button><button className="btn btn-ghost btn-sm" type="button" disabled={busy || !can('pos.pos_order.delete')} onClick={() => removeOrder(order)}>{t('Hủy')}</button></div>)}</section>}
           <PosRecentTransactions
