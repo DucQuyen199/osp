@@ -1244,22 +1244,12 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
             ],
         ) => {
             let payload = parse_json(&bytes)?;
-            let bank_account_id = payload
-                .get("bankAccountId")
-                .and_then(Value::as_str)
-                .ok_or_else(|| {
-                    ApiError::validation(
-                        "accounting.bank_statement",
-                        vec!["bankAccountId is required".into()],
-                    )
-                })?;
             return json_ok(
                 crate::modules::accounting::import_statement_casso(
                     k,
                     &actor,
                     &t,
                     statement_id,
-                    bank_account_id,
                     &payload,
                 )
                 .await?,
@@ -1274,17 +1264,6 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                 "import-camt053",
             ],
         ) => {
-            let bank_account_id = query
-                .iter()
-                .find(|(key, _)| key == "bankAccountId")
-                .map(|(_, value)| value.as_str())
-                .filter(|value| !value.trim().is_empty())
-                .ok_or_else(|| {
-                    ApiError::validation(
-                        "accounting.bank_statement",
-                        vec!["bankAccountId is required for CAMT.053 import".into()],
-                    )
-                })?;
             let xml = std::str::from_utf8(&bytes).map_err(|_| {
                 ApiError::new(400, "INVALID_XML", "CAMT.053 body must be UTF-8 XML")
             })?;
@@ -1294,7 +1273,6 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     &actor,
                     &t,
                     statement_id,
-                    bank_account_id,
                     xml,
                 )
                 .await?,

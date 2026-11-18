@@ -38,6 +38,28 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
             {
                 errors.push("Account name is required".into());
             }
+            let bank_identifiers = ["bank_account_id", "bank_iban", "casso_bank_account_id"];
+            let has_bank_identifier = bank_identifiers.iter().any(|field| {
+                document
+                    .get(*field)
+                    .and_then(Value::as_str)
+                    .is_some_and(|value| !value.trim().is_empty())
+            });
+            if has_bank_identifier && document.get("kind").and_then(Value::as_str) != Some("asset")
+            {
+                errors.push("Bank identifiers can only be configured on asset accounts".into());
+            }
+            for field in bank_identifiers {
+                if let Some(value) = document.get(field).and_then(Value::as_str)
+                    && (!value.trim().is_empty()
+                        && (value.trim().chars().count() > 128
+                            || value.chars().any(char::is_control)))
+                {
+                    errors.push(format!(
+                        "{field} must be at most 128 characters without control characters"
+                    ));
+                }
+            }
         }
         "period" => {
             if let (Some(start), Some(end)) =

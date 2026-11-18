@@ -13,6 +13,18 @@ pub(super) struct BankLine {
     pub(super) currency: Option<String>,
 }
 
+#[derive(Clone)]
+pub(super) enum BankAccountIdentity {
+    AccountId(String),
+    Iban(String),
+    Casso(String),
+}
+
+pub(super) struct ParsedBankStatement {
+    pub(super) identity: BankAccountIdentity,
+    pub(super) lines: Vec<BankLine>,
+}
+
 pub(super) fn validation(message: impl Into<String>) -> ApiError {
     ApiError::validation("accounting.bank_statement_line", vec![message.into()])
 }

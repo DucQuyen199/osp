@@ -1026,8 +1026,7 @@ pub fn build(reg: &Registry) -> Value {
             "tags": ["accounting"], "summary": "Import Casso bank transactions", "security": sec,
             "parameters": [tid, { "name": "statementId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
             "requestBody": { "required": true, "content": { "application/json": { "schema": {
-                "type": "object", "required": ["bankAccountId", "data"], "properties": {
-                    "bankAccountId": { "type": "string", "minLength": 1, "maxLength": 128, "description": "Expected bank_sub_acc_id/subAccId from the selected bank account; all rows must match" },
+                "type": "object", "required": ["data"], "properties": {
                     "data": { "oneOf": [
                         { "type": "array", "items": { "$ref": "#/components/schemas/CassoBankTransaction" } },
                         { "type": "object", "required": ["records"], "properties": { "records": { "type": "array", "items": { "$ref": "#/components/schemas/CassoBankTransaction" } } } }
@@ -1059,7 +1058,7 @@ pub fn build(reg: &Registry) -> Value {
         "/api/t/{tenantId}/accounting/bank-statements/{statementId}/import-camt053".into(),
         json!({ "post": {
             "tags": ["accounting"], "summary": "Import ISO 20022 CAMT.053 bank statement", "security": sec,
-            "parameters": [tid, { "name": "statementId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }, { "name": "bankAccountId", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Account IBAN or CAMT Othr/Id value to confirm against the imported file" }],
+            "parameters": [tid, { "name": "statementId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
             "requestBody": { "required": true, "content": {
                 "application/xml": { "schema": { "type": "string", "description": "UTF-8 CAMT.053.001.01–.14 document, one statement, up to 20,000 booked entries and 5 MB" } },
                 "text/xml": { "schema": { "type": "string", "description": "UTF-8 CAMT.053.001.01–.14 document, one statement, up to 20,000 booked entries and 5 MB" } }

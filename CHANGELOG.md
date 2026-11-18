@@ -5,7 +5,7 @@
 ## [Unreleased]
 ### Added
 - Unmatched bank credits can suggest open invoices and prefill a reviewable receipt draft; the statement line remains unmatched until its posted payment or journal is selected.
-- CAMT.053 imports now require the user-confirmed IBAN or `Acct/Id` value and reject files whose account identity does not match.
+- CAMT.053 and Casso imports now verify file account identity against identifiers configured on the ledger account linked to the statement; uploads no longer trust user-entered identity claims.
 - Clinic encounters may now complete with a zero patient fee only when a documented no-charge reason is supplied; these visits remain in the clinical record without creating a receivable.
 - HRM rotating schedule and reusable template state now lives in a feature hook, leaving the workbench to compose its controlled form/table and workflow actions.
 - React routes now use a keyed error boundary so failed lazy-loaded screens show recovery actions and can reset when users navigate to another screen.

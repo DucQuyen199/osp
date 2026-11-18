@@ -22,7 +22,6 @@ export default function EntityDetailPage({ qname, id }) {
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState('');
   const [statementFile, setStatementFile] = useState(null);
-  const [cassoBankAccountId, setCassoBankAccountId] = useState('');
   const [tab, setTab] = useState('info');
   const [editOpen, setEditOpen] = useState(false);
   const [events, setEvents] = useState(null);
@@ -151,7 +150,7 @@ export default function EntityDetailPage({ qname, id }) {
       const content = await statementFile.text();
       const payload = isCasso ? JSON.parse(content) : content;
       const result = await api(tenantPath(`/accounting/bank-statements/${id}/${endpoint}`), {
-        method: 'POST', body: isCasso ? { ...payload, bankAccountId: cassoBankAccountId.trim() } : content, headers: { 'content-type': contentType },
+        method: 'POST', body: isCasso ? payload : content, headers: { 'content-type': contentType },
       });
       setStatementFile(null);
       entityChanged('accounting.bank_statement_line');
@@ -197,8 +196,7 @@ export default function EntityDetailPage({ qname, id }) {
               {canEditRecord && <button className="btn btn-sm" type="button" disabled={Boolean(working)} onClick={edit}>{uiText('Sửa')}</button>}
               {qname === 'accounting.bank_statement' && record?.status === 'draft' && can('accounting.bank_statement_line.create') && <>
                 <input className="input" type="file" accept=".csv,.xml,.camt,.json,text/csv,application/xml,text/xml,application/json" aria-label={uiText('Tệp sao kê CSV, CAMT.053 hoặc JSON Casso')} disabled={Boolean(working)} onChange={(event) => setStatementFile(event.target.files?.[0] || null)} />
-                {statementFile && /\.json$/i.test(statementFile.name) && <label className="field"><span className="label">{uiText('Số tài khoản Casso trên sao kê *')}</span><input className="input" required maxLength={128} value={cassoBankAccountId} onChange={(event) => setCassoBankAccountId(event.target.value)} /><span className="small muted">{uiText('Xác nhận số này khớp với tài khoản ngân hàng của sao kê đang chọn.')}</span></label>}
-                <button className="btn btn-sm" type="button" disabled={!statementFile || (statementFile && /\.json$/i.test(statementFile.name) && !cassoBankAccountId.trim()) || Boolean(working)} onClick={importStatementFile}>{working === 'import' ? uiText('Đang nhập…') : `${uiText('Nhập')} ${statementFile && /\.json$/i.test(statementFile.name) ? 'Casso JSON' : statementFile && /\.(xml|camt)$/i.test(statementFile.name) ? 'CAMT.053' : 'CSV'}`}</button>
+                <button className="btn btn-sm" type="button" disabled={!statementFile || Boolean(working)} onClick={importStatementFile}>{working === 'import' ? uiText('Đang nhập…') : `${uiText('Nhập')} ${statementFile && /\.json$/i.test(statementFile.name) ? 'Casso JSON' : statementFile && /\.(xml|camt)$/i.test(statementFile.name) ? 'CAMT.053' : 'CSV'}`}</button>
               </>}
               {can(`${qname}.delete`) && <button className="btn btn-sm btn-danger" type="button" disabled={Boolean(working)} onClick={remove}>{uiText('Xóa')}</button>}
             </div>

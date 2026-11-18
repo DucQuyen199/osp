@@ -1,5 +1,5 @@
 //! Casso bank transaction webhook/API payload adapter.
-use super::model::{BankLine, validation};
+use super::model::{BankAccountIdentity, BankLine, ParsedBankStatement, validation};
 use crate::{
     error::{ApiError, R},
     money,
@@ -8,11 +8,7 @@ use chrono::{DateTime, NaiveDate, NaiveDateTime};
 use rust_decimal::Decimal;
 use serde_json::Value;
 
-pub(super) fn parse(payload: &Value, expected_account: &str) -> R<Vec<BankLine>> {
-    let expected_account = expected_account.trim();
-    if expected_account.is_empty() || expected_account.len() > 128 {
-        return Err(validation("A valid Casso bank account number is required"));
-    }
+pub(super) fn parse(payload: &Value) -> R<ParsedBankStatement> {
     let records = payload
         .as_array()
         .or_else(|| payload.get("data").and_then(Value::as_array))
@@ -29,7 +25,8 @@ pub(super) fn parse(payload: &Value, expected_account: &str) -> R<Vec<BankLine>>
         ));
     }
 
-    records
+    let mut statement_account: Option<String> = None;
+    let lines = records
         .iter()
         .enumerate()
         .map(|(index, record)| {
@@ -54,11 +51,21 @@ pub(super) fn parse(payload: &Value, expected_account: &str) -> R<Vec<BankLine>>
                         "Casso transaction {row}: bank_sub_acc_id or subAccId is required to verify the statement account"
                     ))
                 })?;
-            if account.trim() != expected_account {
+            let account = account.trim().to_owned();
+            if account.len() > 128 {
                 return Err(validation(format!(
-                    "Casso transaction {row}: account does not match the selected bank account"
+                    "Casso transaction {row}: invalid bank account id"
                 )));
             }
+            if statement_account
+                .as_deref()
+                .is_some_and(|expected| expected != account)
+            {
+                return Err(validation(format!(
+                    "Casso transaction {row}: account differs from the other transactions in this payload"
+                )));
+            }
+            statement_account.get_or_insert(account);
             let id = value("id")
                 .filter(|id| !id.trim().is_empty())
                 .ok_or_else(|| {
@@ -120,7 +127,13 @@ pub(super) fn parse(payload: &Value, expected_account: &str) -> R<Vec<BankLine>>
                 currency: None,
             })
         })
-        .collect()
+        .collect::<R<Vec<_>>>()?;
+    let identity =
+        statement_account.ok_or_else(|| validation("Casso payload contains no bank account id"))?;
+    Ok(ParsedBankStatement {
+        identity: BankAccountIdentity::Casso(identity),
+        lines,
+    })
 }
 
 fn parse_casso_date(value: &str) -> Option<NaiveDate> {

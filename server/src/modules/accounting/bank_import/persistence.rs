@@ -1,4 +1,4 @@
-use super::model::{BankLine, validation};
+use super::model::{BankAccountIdentity, BankLine, validation};
 use crate::{
     db::Tx,
     error::{ApiError, R},
@@ -47,6 +47,7 @@ pub(super) async fn import_lines(
     tenant: &Tenant,
     statement_id: Uuid,
     lines: Vec<BankLine>,
+    identity: Option<BankAccountIdentity>,
     reference_format: &str,
     row_label: &str,
 ) -> R<Value> {
@@ -59,7 +60,7 @@ pub(super) async fn import_lines(
         .to_ascii_uppercase();
     let statement = tx
         .query_opt(
-            "SELECT statement.status, statement.start_date, statement.end_date, upper(COALESCE(currency.code, $3)) FROM accounting__bank_statement statement LEFT JOIN master_data__currency currency ON currency.tenant_id = statement.tenant_id AND currency.id = statement.currency WHERE statement.tenant_id = $1 AND statement.id = $2 FOR UPDATE OF statement",
+            "SELECT statement.status, statement.start_date, statement.end_date, upper(COALESCE(currency.code, $3)), account.kind, account.bank_account_id, account.bank_iban, account.casso_bank_account_id FROM accounting__bank_statement statement LEFT JOIN master_data__currency currency ON currency.tenant_id = statement.tenant_id AND currency.id = statement.currency JOIN accounting__account account ON account.tenant_id = statement.tenant_id AND account.id = statement.account WHERE statement.tenant_id = $1 AND statement.id = $2 FOR UPDATE OF statement, account",
             &[&tenant.id, &statement_id, &base_currency],
         )
         .await?
@@ -68,6 +69,46 @@ pub(super) async fn import_lines(
     let start: NaiveDate = statement.get(1);
     let end: NaiveDate = statement.get(2);
     let statement_currency: String = statement.get(3);
+    if let Some(identity) = identity {
+        let kind: Option<String> = statement.get(4);
+        if kind.as_deref() != Some("asset") {
+            return Err(validation(
+                "Bank imports require a statement linked to an asset account",
+            ));
+        }
+        let expected: Option<String> = match &identity {
+            BankAccountIdentity::AccountId(_) => statement.get(5),
+            BankAccountIdentity::Iban(_) => statement.get(6),
+            BankAccountIdentity::Casso(_) => statement.get(7),
+        };
+        let expected = expected
+            .filter(|value| !value.trim().is_empty())
+            .ok_or_else(|| validation("Configure the matching bank identifier on the selected ledger account before importing this file"))?;
+        let (actual, matches) = match &identity {
+            BankAccountIdentity::AccountId(actual) => {
+                (actual.as_str(), actual.trim() == expected.trim())
+            }
+            BankAccountIdentity::Iban(actual) => {
+                let normalize = |value: &str| {
+                    value
+                        .chars()
+                        .filter(|character| !character.is_ascii_whitespace())
+                        .flat_map(char::to_uppercase)
+                        .collect::<String>()
+                };
+                let matches = normalize(actual) == normalize(&expected);
+                (actual.as_str(), matches)
+            }
+            BankAccountIdentity::Casso(actual) => {
+                (actual.as_str(), actual.trim() == expected.trim())
+            }
+        };
+        if !matches {
+            return Err(validation(format!(
+                "Imported bank account identifier {actual} does not match the identifier configured on the selected ledger account"
+            )));
+        }
+    }
     if status != "draft" {
         return Err(ApiError::new(
             409,

@@ -15,7 +15,17 @@ pub async fn import_statement_csv(
 ) -> R<Value> {
     let statement_id = authorize_import(kernel, actor, tenant, statement_id)?;
     let lines = csv::parse_csv(csv_text)?;
-    persistence::import_lines(kernel, actor, tenant, statement_id, lines, "CSV", "CSV row").await
+    persistence::import_lines(
+        kernel,
+        actor,
+        tenant,
+        statement_id,
+        lines,
+        None,
+        "CSV",
+        "CSV row",
+    )
+    .await
 }
 
 pub async fn import_statement_camt053(
@@ -23,17 +33,17 @@ pub async fn import_statement_camt053(
     actor: &Actor,
     tenant: &Tenant,
     statement_id: &str,
-    bank_account_id: &str,
     xml_text: &str,
 ) -> R<Value> {
     let statement_id = authorize_import(kernel, actor, tenant, statement_id)?;
-    let lines = camt053::parse(xml_text, bank_account_id)?;
+    let parsed = camt053::parse(xml_text)?;
     persistence::import_lines(
         kernel,
         actor,
         tenant,
         statement_id,
-        lines,
+        parsed.lines,
+        Some(parsed.identity),
         "CAMT053",
         "CAMT.053 entry",
     )
@@ -45,17 +55,17 @@ pub async fn import_statement_casso(
     actor: &Actor,
     tenant: &Tenant,
     statement_id: &str,
-    bank_account_id: &str,
     payload: &Value,
 ) -> R<Value> {
     let statement_id = authorize_import(kernel, actor, tenant, statement_id)?;
-    let lines = super::casso::parse(payload, bank_account_id)?;
+    let parsed = super::casso::parse(payload)?;
     persistence::import_lines(
         kernel,
         actor,
         tenant,
         statement_id,
-        lines,
+        parsed.lines,
+        Some(parsed.identity),
         "CASSO",
         "Casso transaction",
     )

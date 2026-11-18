@@ -42,6 +42,21 @@
       "expense",
       "clearing"
      ]
+    },
+    {
+     "name": "bank_account_id",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "bank_iban",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "casso_bank_account_id",
+     "type": "string",
+     "required": false
     }
    ],
    "states": null,

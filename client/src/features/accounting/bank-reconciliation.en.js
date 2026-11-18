@@ -90,6 +90,7 @@ export default {
   'Tự khớp chỉ chạy khi backend tìm được duy nhất một bút toán TK 112 đã ghi sổ đúng ngày, chiều và số tiền. Khi có nhiều ứng viên, chọn payment hoặc bút toán thủ công; server vẫn kiểm tra đồng tiền, số tiền quy đổi và việc một bút toán không bị dùng hai lần.': 'Automatic matching runs only when the server finds exactly one posted account 112 journal entry with the same date, direction, and amount. If there are multiple candidates, select a payment or journal entry manually. The server still validates currency, converted amount, and that a journal entry is not used twice.',
   'Tự khớp duy nhất': 'Match unique candidate',
   'Từ ngày *': 'From date *',
+  'Với CAMT.053 và Casso, hãy cấu hình IBAN, mã tài khoản hoặc mã tài khoản Casso trên tài khoản kế toán đã chọn trước khi nhập.': 'For CAMT.053 and Casso, configure the IBAN, account ID, or Casso account ID on the selected ledger account before importing.',
   'Xóa dòng': 'Delete line',
   'Xóa dòng chưa đối chiếu này khỏi sao kê?': 'Delete this unreconciled line from the statement?',
   'Xóa dòng sao kê': 'Delete statement line',

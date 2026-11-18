@@ -1,5 +1,5 @@
 //! ISO 20022 CAMT.053 statement-file parser.
-use super::model::{BankLine, parse_date, validation};
+use super::model::{BankAccountIdentity, BankLine, ParsedBankStatement, parse_date, validation};
 use crate::error::{ApiError, R};
 use chrono::{DateTime, NaiveDate};
 use roxmltree::{Document, Node, ParsingOptions};
@@ -57,7 +57,7 @@ fn statement_nodes<'a, 'input>(node: Node<'a, 'input>) -> Vec<Node<'a, 'input>> 
         .collect()
 }
 
-pub(super) fn parse(xml: &str, expected_account_id: &str) -> R<Vec<BankLine>> {
+pub(super) fn parse(xml: &str) -> R<ParsedBankStatement> {
     if xml.len() > MAX_XML_BYTES {
         return Err(ApiError::new(
             413,
@@ -119,27 +119,14 @@ pub(super) fn parse(xml: &str, expected_account_id: &str) -> R<Vec<BankLine>> {
         .map(|(value, is_iban)| (value.trim(), is_iban))
         .filter(|(value, _)| !value.is_empty())
         .ok_or_else(|| validation("CAMT.053 account identifier is missing"))?;
-    let normalize_iban = |value: &str| {
-        value
-            .chars()
-            .filter(|character| !character.is_ascii_whitespace())
-            .flat_map(char::to_uppercase)
-            .collect::<String>()
-    };
-    let expected = expected_account_id.trim();
-    if expected.is_empty() {
-        return Err(validation("Expected bank account identifier is required"));
+    if account_id.chars().count() > 128 || account_id.chars().any(char::is_control) {
+        return Err(validation("CAMT.053 account identifier is invalid"));
     }
-    let account_id_matches = if is_iban {
-        normalize_iban(account_id) == normalize_iban(expected)
+    let identity = if is_iban {
+        BankAccountIdentity::Iban(account_id.to_owned())
     } else {
-        account_id == expected
+        BankAccountIdentity::AccountId(account_id.to_owned())
     };
-    if !account_id_matches {
-        return Err(validation(
-            "CAMT.053 account identifier does not match the confirmed bank account",
-        ));
-    }
     let account_currency = child_text(account, "Ccy").map(str::to_ascii_uppercase);
     let entries = statement
         .children()
@@ -250,5 +237,5 @@ pub(super) fn parse(xml: &str, expected_account_id: &str) -> R<Vec<BankLine>> {
             "CAMT.053 contains no booked transaction entries",
         ));
     }
-    Ok(lines)
+    Ok(ParsedBankStatement { identity, lines })
 }

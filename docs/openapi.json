@@ -102,6 +102,15 @@
       "accounting_account": {
         "description": "Tài khoản kế toán",
         "properties": {
+          "bank_account_id": {
+            "type": "string"
+          },
+          "bank_iban": {
+            "type": "string"
+          },
+          "casso_bank_account_id": {
+            "type": "string"
+          },
           "code": {
             "type": "string"
           },
@@ -146,6 +155,15 @@
         "additionalProperties": false,
         "description": "Tài khoản kế toán (dữ liệu gửi lên)",
         "properties": {
+          "bank_account_id": {
+            "type": "string"
+          },
+          "bank_iban": {
+            "type": "string"
+          },
+          "casso_bank_account_id": {
+            "type": "string"
+          },
           "code": {
             "type": "string"
           },
@@ -19171,15 +19189,6 @@
               "format": "uuid",
               "type": "string"
             }
-          },
-          {
-            "description": "Account IBAN or CAMT Othr/Id value to confirm against the imported file",
-            "in": "query",
-            "name": "bankAccountId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
           }
         ],
         "requestBody": {
@@ -19301,12 +19310,6 @@
             "application/json": {
               "schema": {
                 "properties": {
-                  "bankAccountId": {
-                    "description": "Expected bank_sub_acc_id/subAccId from the selected bank account; all rows must match",
-                    "maxLength": 128,
-                    "minLength": 1,
-                    "type": "string"
-                  },
                   "data": {
                     "oneOf": [
                       {
@@ -19333,7 +19336,6 @@
                   }
                 },
                 "required": [
-                  "bankAccountId",
                   "data"
                 ],
                 "type": "object"
