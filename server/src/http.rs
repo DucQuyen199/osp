@@ -1808,7 +1808,15 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                 .map(|(_, value)| value.as_str())
                 .unwrap_or("dead");
             return json_ok(
-                crate::modules::integration_hub::list_deliveries(k, &actor, &t, status).await?,
+                crate::modules::integration_hub::list_deliveries(
+                    k,
+                    &actor,
+                    &t,
+                    status,
+                    qnum("limit", 50),
+                    qnum("offset", 0),
+                )
+                .await?,
             );
         }
         (&Method::POST, ["outbox", id, "retry"]) => {

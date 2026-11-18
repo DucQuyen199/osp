@@ -424,10 +424,25 @@ async fn messaging(kernel: &Arc<Kernel>) {
     assert_eq!(messages[0]["recipient"], id(&party));
     let (status, deliveries) = t.api("GET", "/outbox?status=pending", json!(null)).await;
     assert_eq!(status, 200, "{deliveries}");
+    assert_eq!(deliveries["total"], 1, "{deliveries}");
+    assert_eq!(deliveries["pageSize"], 50, "{deliveries}");
+    assert_eq!(deliveries["offset"], 0, "{deliveries}");
     assert!(
-        deliveries.to_string().contains(&id(&webhook)),
+        deliveries["items"].to_string().contains(&id(&webhook)),
         "{deliveries}"
     );
+    let (status, outbox_page) = t
+        .api(
+            "GET",
+            "/outbox?status=pending&limit=1&offset=1",
+            json!(null),
+        )
+        .await;
+    assert_eq!(status, 200, "{outbox_page}");
+    assert_eq!(outbox_page["total"], 1, "{outbox_page}");
+    assert_eq!(outbox_page["offset"], 1, "{outbox_page}");
+    assert_eq!(outbox_page["items"].as_array().unwrap().len(), 0);
+    assert_eq!(outbox_page["hasMore"], false);
     assert!(
         osp_server::modules::integration_hub::run_once(kernel)
             .await
@@ -438,7 +453,7 @@ async fn messaging(kernel: &Arc<Kernel>) {
     let (status, retries) = t.api("GET", "/outbox?status=retry", json!(null)).await;
     assert_eq!(status, 200, "{retries}");
     assert!(
-        retries.as_array().unwrap().iter().any(|delivery| {
+        retries["items"].as_array().unwrap().iter().any(|delivery| {
             delivery["webhookId"] == id(&webhook)
                 && delivery["status"] == "retry"
                 && delivery["attempts"] == 1

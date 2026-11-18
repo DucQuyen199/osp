@@ -192,6 +192,8 @@ pub async fn list_deliveries(
     actor: &Actor,
     tenant: &Tenant,
     status: &str,
+    limit: i64,
+    offset: i64,
 ) -> R<Value> {
     kernel.authorize(tenant, actor, "tenant.admin")?;
     if !matches!(
@@ -205,13 +207,31 @@ pub async fn list_deliveries(
         ));
     }
     let conn = kernel.pool.get().await?;
+    let total: i64 = conn
+        .query_one(
+            "SELECT count(*) FROM osp_outbox WHERE tenant_id = $1 AND status = $2",
+            &[&tenant.id, &status],
+        )
+        .await?
+        .get(0);
+    let page_size = limit.clamp(1, 100);
+    let offset = offset.max(0).min(i64::MAX - page_size);
     let rows = conn.query(
-        "SELECT jsonb_build_object('id', id, 'webhookId', webhook_id, 'destinationKind', destination_kind, 'destinationId', destination_id, 'eventId', event_id, 'eventType', event_type, 'status', status, 'attempts', attempts, 'error', last_error, 'createdAt', created_at, 'deliveredAt', delivered_at) FROM osp_outbox WHERE tenant_id = $1 AND status = $2 ORDER BY created_at DESC LIMIT 200",
-        &[&tenant.id, &status],
+        "SELECT jsonb_build_object('id', id, 'webhookId', webhook_id, 'destinationKind', destination_kind, 'destinationId', destination_id, 'eventId', event_id, 'eventType', event_type, 'status', status, 'attempts', attempts, 'error', last_error, 'createdAt', created_at, 'deliveredAt', delivered_at) FROM osp_outbox WHERE tenant_id = $1 AND status = $2 ORDER BY created_at DESC, id DESC LIMIT $3 OFFSET $4",
+        &[&tenant.id, &status, &page_size, &offset],
     ).await?;
-    Ok(Value::Array(
-        rows.into_iter().map(|row| row.get(0)).collect(),
-    ))
+    let items = rows
+        .into_iter()
+        .map(|row| row.get(0))
+        .collect::<Vec<Value>>();
+    let has_more = offset + (items.len() as i64) < total;
+    Ok(json!({
+        "items": items,
+        "total": total,
+        "pageSize": page_size,
+        "offset": offset,
+        "hasMore": has_more,
+    }))
 }
 
 pub async fn dead_delivery_count(kernel: &Kernel, tenant: &Tenant) -> R<i64> {

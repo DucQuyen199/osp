@@ -1244,6 +1244,14 @@ pub fn build(reg: &Registry) -> Value {
             "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Các bút toán đã ghi sổ và số dư lũy kế theo thời gian" })), ("422".to_string(), err("Tài khoản hoặc khoảng ngày không hợp lệ"))]))
         } }),
     );
+    paths.insert(
+        "/api/t/{tenantId}/outbox".into(),
+        json!({ "get": {
+            "tags": ["integration-hub"], "summary": "Tenant webhook delivery queue", "security": sec,
+            "parameters": [tid, { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["pending", "processing", "retry", "delivered", "dead", "cancelled"], "default": "dead" } }, { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 } }, { "name": "offset", "in": "query", "schema": { "type": "integer", "minimum": 0, "default": 0 } }],
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Tenant-scoped delivery page with matching status total and pagination metadata", "content": { "application/json": { "schema": { "type": "object", "required": ["items", "total", "pageSize", "offset", "hasMore"], "properties": { "items": { "type": "array", "items": { "type": "object" } }, "total": { "type": "integer" }, "pageSize": { "type": "integer" }, "offset": { "type": "integer" }, "hasMore": { "type": "boolean" } } } } } })), ("400".to_string(), err("Unsupported outbox status")), ("403".to_string(), err("Requires tenant.admin"))]))
+        } }),
+    );
     let tags: Vec<Value> = reg
         .order
         .iter()
