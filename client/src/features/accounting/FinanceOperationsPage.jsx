@@ -3,6 +3,7 @@ import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { addCalendarMonths, localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, statusLabel, fmtNumber, uiText } from '../../lib/i18n.js';
+import { compareDecimals } from '../../lib/decimal.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import LoanRepaymentPanel from './workbenches/LoanRepaymentPanel.jsx';
 import InsurancePolicyPanel from './workbenches/InsurancePolicyPanel.jsx';
@@ -75,7 +76,7 @@ export default function FinanceOperationsPage() {
   async function createLoan(event) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
-      await api(dataPath('lending.loan'), { method: 'POST', body: { ...loanForm, principal: Number(loanForm.principal), rate: Number(loanForm.rate), term_months: Number(loanForm.term_months), status: 'applied' } });
+      await api(dataPath('lending.loan'), { method: 'POST', body: { ...loanForm, principal: String(loanForm.principal), rate: String(loanForm.rate), term_months: Number(loanForm.term_months), status: 'applied' } });
       setLoanForm((x) => ({ ...x, principal: '', rate: '' })); setNotice(uiText("Đã tiếp nhận hồ sơ vay ở trạng thái chờ thẩm định.")); await load();
     } catch (reason) { setError(reason.message || uiText("Không thể tiếp nhận hồ sơ vay.")); }
     finally { setBusy(false); }
@@ -102,7 +103,7 @@ export default function FinanceOperationsPage() {
   async function createPolicy(event) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
-      await api(dataPath('insurance.policy'), { method: 'POST', body: { ...policyForm, premium: Number(policyForm.premium), coverage_limit: Number(policyForm.coverage_limit), status: 'quoted' } });
+      await api(dataPath('insurance.policy'), { method: 'POST', body: { ...policyForm, premium: String(policyForm.premium), coverage_limit: String(policyForm.coverage_limit), status: 'quoted' } });
       setPolicyForm((x) => ({ ...x, number: '', product: '', premium: '', coverage_limit: '' })); setNotice(uiText("Đã tạo báo giá bảo hiểm.")); await load();
     } catch (reason) { setError(reason.message || uiText("Không thể tạo hợp đồng bảo hiểm.")); }
     finally { setBusy(false); }
@@ -129,8 +130,10 @@ export default function FinanceOperationsPage() {
     try {
       let body;
       if (action === 'approved') {
-        const approvedAmount = Number(claimApprovalAmounts[claim.id] ?? claim.amount);
-        if (!Number.isFinite(approvedAmount) || approvedAmount <= 0 || approvedAmount > Number(claim.amount)) {
+        const approvedAmount = String(claimApprovalAmounts[claim.id] ?? claim.amount ?? '').trim();
+        let validAmount = false;
+        try { validAmount = compareDecimals(approvedAmount || 0, '0') > 0 && compareDecimals(approvedAmount, claim.amount || 0) <= 0; } catch { validAmount = false; }
+        if (!validAmount) {
           throw new Error(uiText("Số tiền duyệt phải lớn hơn 0 và không vượt số tiền yêu cầu."));
         }
         body = { approved_amount: approvedAmount };
