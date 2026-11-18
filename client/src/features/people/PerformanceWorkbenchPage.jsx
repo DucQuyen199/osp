@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { useLatestRequest } from '../../lib/useLatestRequest.js';
-import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
 import performanceEnglish from './performance.en.js';
 import KeyResultProgressCard from './components/KeyResultProgressCard.jsx';
+import PerformanceReviewRegister from './components/PerformanceReviewRegister.jsx';
 const emptyObjective = { title: '', owner: '', period: '' };
 const emptyKeyResult = { title: '', target: '', unit: '' };
 const emptyReview = { employee: '', reviewer: '', period: '', score: '', comment: '' };
@@ -63,6 +63,13 @@ export default function PerformanceWorkbenchPage() {
     const employee = employees.get(id);
     return employee ? recordLabel('hrm.employee', employee) : (id ? `#${String(id).slice(0, 8)}` : t('Chưa phân công'));
   };
+  const reviewRows = visibleReviews.map((review) => ({
+    id: review.id,
+    employeeName: employeeName(review.employee),
+    periodLabel: review.period || t('Chưa có kỳ'),
+    reviewerName: employeeName(review.reviewer),
+    statusLabel: statusLabel(review.status || 'draft'),
+  }));
   useEffect(() => {
     if (!visibleReviews.some((row) => row.id === selectedReviewId)) setSelectedReviewId(visibleReviews[0]?.id || '');
   }, [reviewFilter, reviews, selectedReviewId]);
@@ -178,7 +185,7 @@ export default function PerformanceWorkbenchPage() {
         <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !employees.size}>{t("Tạo phiếu nháp")}</button></div>
       </form>}
       {!can('performance.review.read') ? <div className="empty">{t("Bạn chưa có quyền xem phiếu đánh giá.")}</div> : loading ? <div className="skeleton" data-h="row"/> : !visibleReviews.length ? <div className="empty">{t("Không có phiếu đánh giá trong bộ lọc này.")}</div> : <div className="layout-split u-mt-12" >
-        <section className="table-wrap"><table className="table"><thead><tr><th>{t("Nhân viên / kỳ")}</th><th>{t("Người đánh giá")}</th><th>{t("Trạng thái")}</th></tr></thead><tbody>{visibleReviews.map((review) => <tr {...selectableTableRowProps} key={review.id} aria-selected={selectedReviewId === review.id} className={[selectedReviewId === review.id ? 'selected' : '', 'u-pointer'].filter(Boolean).join(' ')} onClick={() => setSelectedReviewId(review.id)} ><td><strong>{employeeName(review.employee)}</strong><div className="small muted">{review.period || t('Chưa có kỳ')}</div></td><td>{employeeName(review.reviewer)}</td><td><span className="badge plain">{statusLabel(review.status || 'draft')}</span></td></tr>)}</tbody></table></section>
+        <PerformanceReviewRegister reviews={reviewRows} selectedId={selectedReviewId} onSelect={setSelectedReviewId} t={t} />
         {selectedReview && <section className="card card-pad"><div className="row wrap"><div><h3>{t('Đánh giá')} {employeeName(selectedReview.employee)}</h3><div className="small muted">{t('Kỳ')} {selectedReview.period || t('chưa ghi')} · {t('Người đánh giá')}: {employeeName(selectedReview.reviewer)} · {t('Tạo lúc')} {fmtDateTime(selectedReview.createdAt)}</div></div><span className="grow"/><span className="badge warning">{statusLabel(selectedReview.status || 'draft')}</span></div>
           {(selectedReview.status === 'draft' || selectedReview.status === 'returned') && can('performance.review.update') ? <form className="form-grid u-mt-12"  onSubmit={saveReview}><label className="field"><span className="label">{t("Kỳ đánh giá *")}</span><input className="input" required maxLength="80" value={reviewEdit.period} onChange={(event) => setReviewEdit((form) => ({ ...form, period: event.target.value }))}/></label><label className="field"><span className="label">{t("Người đánh giá")}</span><select className="select" value={reviewEdit.reviewer} onChange={(event) => setReviewEdit((form) => ({ ...form, reviewer: event.target.value }))}><option value="">{t("Chọn người đánh giá")}</option>{[...employees.values()].map((employee) => <option key={employee.id} value={employee.id} disabled={employee.id === selectedReview.employee}>{recordLabel('hrm.employee', employee)}{employee.id === selectedReview.employee ? ` · ${t('không thể tự đánh giá')}` : ''}</option>)}</select></label><label className="field"><span className="label">{t("Điểm (0–100) *")}</span><input className="input" type="number" min="0" max="100" step="any" required value={reviewEdit.score} onChange={(event) => setReviewEdit((form) => ({ ...form, score: event.target.value }))}/></label><label className="field full"><span className="label">{t("Nhận xét *")}</span><textarea className="textarea" rows="4" required maxLength="10000" value={reviewEdit.comment} onChange={(event) => setReviewEdit((form) => ({ ...form, comment: event.target.value }))}/></label><div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy) || !can('performance.review.update')}>{t("Lưu nội dung")}</button>{can('performance.review.submitted') && <button className="btn btn-primary" type="button" disabled={Boolean(busy) || !can('performance.review.update') || !reviewEdit.period.trim() || !reviewEdit.comment.trim() || reviewEdit.score === '' || !reviewEdit.reviewer || reviewEdit.reviewer === selectedReview.employee} onClick={() => submitReview(selectedReview)}>{t("Gửi đánh giá")}</button>}</div></form> : <div className="card card-pad u-mt-12" ><div className="row wrap"><strong>{t('Điểm')}: {selectedReview.score ?? t('Chưa chấm')}/100</strong><span className="grow"/><span className="small muted">{fmtDateTime(selectedReview.updatedAt || selectedReview.createdAt)}</span></div><p className="pre-wrap">{selectedReview.comment || t('Chưa có nhận xét.')}</p>{selectedReview.revision_note && <div className="alert warning"><strong>{t("Lý do yêu cầu chỉnh sửa")}</strong><p className="pre-wrap">{selectedReview.revision_note}</p></div>}</div>}
           {selectedReview.status === 'submitted' && can('performance.review.returned') && can('performance.review.update') && <form className="form-grid u-mt-12"  onSubmit={returnReview}><label className="field full"><span className="label">{t("Lý do yêu cầu chỉnh sửa *")}</span><textarea className="textarea" required minLength="3" maxLength="4000" rows="3" value={revisionNote} onChange={(event) => setRevisionNote(event.target.value)} placeholder={t('Nêu rõ nội dung hoặc bằng chứng cần bổ sung')}/></label><div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy)}>{t("Trả để chỉnh sửa")}</button></div></form>}

@@ -60,6 +60,7 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 - The automotive workbench keeps repair-quote line estimates in `features/automotive/domain/repairQuoteTotals.js`, applying exact unit conversion and the server's four-place line rounding.
 - The school workbench keeps attendance persistence and permission checks in `EducationWorkbenchPage`; `AttendanceRosterTable` renders the roster and requests marks through a callback.
 - The school workbench owns class and session permissions, validation, and persistence; `CourseClassForm` and `ClassSessionForm` render controlled schedule fields and submit through callbacks.
+- `AuthPage` owns catalog loading and every authentication flow; `AuthLandingHero` renders the localized product introduction and catalog counts from controlled props.
 - The school workbench owns session selection, attendance state, permissions, and transitions; `ClassSessionRegister` renders the controlled session register and selected-session attendance workflow through callbacks.
 - The school workbench owns the atomic contact-and-student creation flow and pending-contact recovery; `StudentIntakeForm` renders controlled learner fields and submits through a callback.
 - The school workbench owns tuition issuance permissions and invoice actions; `TuitionLedgerTable` renders controlled fee and invoice records and emits issuance requests through a callback.
@@ -110,6 +111,7 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 - The HR workbench owns schedule-pattern permissions, template selection, date limits and persistence; `WorkSchedulePatternForm` renders the controlled rotation schedule and emits form edits through callbacks.
 - The HR workbench owns employee visibility and schedule data; `EmployeeWeekScheduleTable` renders saved weekly defaults and explains how dated schedule entries override them.
 - The performance workbench owns key-result permissions and updates; `KeyResultProgressCard` renders a controlled progress meter and value field and emits edits and submit requests.
+- The performance workbench owns review filtering, selection, permissions and actions; `PerformanceReviewRegister` renders the prepared, selectable review rows through callbacks.
 - The inventory stock-count workbench owns the count draft, validation and persistence; `StockCountLinesEditor` renders controlled product, lot, location and quantity fields and emits line edits through callbacks.
 - The stock-count workbench delegates permission-gated count, warehouse, product, unit, lot, location and approval reads plus loading/error state to `features/inventory/hooks/useStockCountData.js`; the page owns count selection, the Decimal quantity draft and reconciliation actions.
 - The LMS workbench delegates permission-gated course, lesson, enrollment, progress, certificate and learner reads plus refresh/loading/error state to `features/education/hooks/useLmsWorkbenchData.js`; the page owns course/learner selection, forms and learning actions.
@@ -191,6 +193,7 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 - Utility and real-estate workbenches use `loadIndependentData` for their permission-gated meters/readings/bills/invoices and properties/reservations/viewings/leases/rent cycles/parties/invoices; a failed related read no longer rejects all workbench data.
 - The project workbench loads projects, tasks, dependencies, timesheets, parties and employees independently so a failed lookup does not hide unrelated project records.
 - The project workbench owns task, assignment, dependency and status rules; `ProjectTasksSection` renders the controlled task form and register and emits assignment and transition requests through callbacks.
+- The project workbench owns timesheet rules, permissions, dates and API creation; `ProjectTimesheetsPanel` renders controlled time-entry fields and the selected project's timesheet register.
 - The automotive workshop loads vehicles, repair orders, customers, products, units, warehouses and invoices independently; one unavailable reference list no longer prevents other service records from loading.
 - The agriculture workbench delegates permission-gated farm, crop-cycle, harvest, input-application, product, unit, warehouse, party, and lot reads to `features/agriculture/hooks/useAgricultureData.js`; it keeps the current cycle and new-farm selection synchronized when loaded records change, while the page retains fieldwork drafts and actions.
 - The agriculture workbench owns cycle selection, permissions and fieldwork actions; `AgricultureCycleHistory` renders the selected cycle's saved harvests and farm-input records with controlled lookup and formatting props.

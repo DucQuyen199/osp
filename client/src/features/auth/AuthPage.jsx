@@ -3,6 +3,7 @@ import { api, session } from '../../lib/api.js';
 import { uiTextWith } from '../../lib/i18n.js';
 import authEnglish from './auth.en.js';
 import AuthVerticalPicker from './components/AuthVerticalPicker.jsx';
+import AuthLandingHero from './components/AuthLandingHero.jsx';
 
 const t = (text) => uiTextWith(text, authEnglish);
 
@@ -179,11 +180,7 @@ export default function AuthPage({ route, onSignedIn }) {
   if (!catalog) return <div className="landing"><main className="landing-panel">{catalogError ? <div className="alert danger" role="alert">{t(catalogError)}</div> : <div className="skeleton" data-h="row" />}</main></div>;
 
   return <div className="landing">
-    <section className="landing-hero" aria-label={t('Giới thiệu')}>
-      <a className="brand" href="#/login"><span className="brand-mark">O</span>OSP Suite</a>
-      <div><h1>{t('Một hệ thống cho cả doanh nghiệp, đúng với ngành của bạn.')}</h1><p>{t('CRM, bán hàng, kho, kế toán, nhân sự… dùng chung một nguồn dữ liệu. Làm ở đâu, các bước còn lại tự chạy theo.')}</p></div>
-      <ul className="hero-points"><li>{catalog.modules.length} {t('module, bật dần theo nhu cầu')}</li><li>{catalog.verticals.length} {t('gói ngành với thuật ngữ và quy trình sẵn có')}</li><li>{t('Dữ liệu của bạn: xuất toàn bộ bất cứ lúc nào')}</li></ul>
-    </section>
+    <AuthLandingHero moduleCount={catalog.modules.length} verticalCount={catalog.verticals.length} t={t} />
     <main className="landing-panel" id="main">
       <div><h2>{t(mode === 'login' ? 'Chào mừng trở lại' : mode === 'mfa' ? 'Xác thực hai lớp' : mode === 'signup' ? 'Bắt đầu trong vài phút' : mode === 'forgot' ? 'Khôi phục mật khẩu' : mode === 'verify-request' ? 'Gửi lại email xác minh' : mode === 'verify' ? 'Đang xác minh email' : 'Đặt mật khẩu mới')}</h2><p className="muted">{t(mode === 'login' ? 'Đăng nhập để tiếp tục.' : mode === 'mfa' ? 'Nhập mã 6 chữ số từ ứng dụng xác thực hoặc một mã khôi phục chưa dùng.' : mode === 'signup' ? 'Chọn ngành, hệ thống bật sẵn các module và thuật ngữ phù hợp.' : mode === 'forgot' ? 'Nhập mã doanh nghiệp và email đăng nhập.' : mode === 'verify-request' ? 'Nhập mã doanh nghiệp và email đăng ký.' : mode === 'verify' ? 'Đang xác minh liên kết dùng một lần.' : 'Liên kết đặt lại chỉ dùng được một lần trong 30 phút.')}</p></div>
       {['login', 'signup'].includes(mode) && <div className="tabs" role="tablist" aria-label={t('Tài khoản')}>
