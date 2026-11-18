@@ -1,53 +1,26 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
-import { app, can, loadAll, loadRefs, recordLabel } from '../../lib/state.js';
+import { app, can, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
+import { usePurchasingSourcingData } from './hooks/usePurchasingSourcingData.js';
 const number = (value) => Number(value || 0);
 const action = (row, verb) => api(dataPath('purchasing.rfq', row.id, verb), { method: 'POST' });
 export default function PurchasingSourcingWorkbenchPage() {
   useDocumentTitle(`${uiText('RFQ và so sánh báo giá')} · OSP Suite`);
   const emailQueueEnabled = app.meta?.modules?.some((module) => module.id === 'communication') || false;
-  const [requisitions, setRequisitions] = useState([]);
-  const [rfqs, setRfqs] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [suppliers, setSuppliers] = useState(new Map());
-  const [products, setProducts] = useState(new Map());
-  const [units, setUnits] = useState(new Map());
-  const [taxes, setTaxes] = useState(new Map());
+  const { requisitions, rfqs, orders, suppliers, products, units, taxes, loading, error, setError, load } = usePurchasingSourcingData();
   const [selectedId, setSelectedId] = useState('');
   const [supplierId, setSupplierId] = useState('');
   const [responseDue, setResponseDue] = useState('');
   const [quoteDrafts, setQuoteDrafts] = useState({});
   const [quoteMeta, setQuoteMeta] = useState({});
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const [requisitionRows, rfqRows, orderRows, supplierMap, productMap, unitMap, taxRows] = await Promise.all([
-        can('purchasing.purchase_requisition.read') ? loadAll('purchasing.purchase_requisition') : Promise.resolve([]),
-        can('purchasing.rfq.read') ? loadAll('purchasing.rfq') : Promise.resolve([]),
-        can('purchasing.purchase_order.read') ? loadAll('purchasing.purchase_order') : Promise.resolve([]),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
-        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
-        can('master-data.tax.read') ? loadAll('master-data.tax') : Promise.resolve([]),
-      ]);
-      const activeRequisitions = requisitionRows.filter((row) => row.sourcing_method === 'competitive' && ['approved', 'sourced'].includes(row.status)).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
-      setRequisitions(activeRequisitions); setRfqs(rfqRows); setOrders(orderRows);
-      setSuppliers(new Map([...supplierMap].filter(([, row]) => row.is_supplier !== false)));
-      setProducts(productMap); setUnits(unitMap); setTaxes(new Map(taxRows.map((row) => [row.id, row])));
-      setSelectedId((current) => activeRequisitions.some((row) => row.id === current) ? current : activeRequisitions[0]?.id || '');
-    } catch (reason) { setError(reason.message || uiText('Không tải được hồ sơ RFQ và đề nghị mua cạnh tranh.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { setSelectedId((current) => current && requisitions.some((row) => row.id === current) ? current : requisitions[0]?.id || ''); }, [requisitions]);
   const selected = requisitions.find((row) => row.id === selectedId);
   const quotes = useMemo(() => rfqs.filter((row) => row.purchase_requisition === selectedId).sort((a, b) => quoteTotal(a) - quoteTotal(b)), [rfqs, selectedId, taxes]);
   const winner = quotes.find((row) => row.status === 'accepted');
