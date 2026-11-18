@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { addCalendarMonths, localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, statusLabel, fmtNumber, uiText } from '../../lib/i18n.js';
 import { compareDecimals } from '../../lib/decimal.js';
-import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { can, recordLabel } from '../../lib/state.js';
+import { useFinanceOperationsData } from './hooks/useFinanceOperationsData.js';
 import LoanRepaymentPanel from './workbenches/LoanRepaymentPanel.jsx';
 import InsurancePolicyPanel from './workbenches/InsurancePolicyPanel.jsx';
 import InsuranceClaimsPanel from './workbenches/InsuranceClaimsPanel.jsx';
@@ -14,13 +15,7 @@ const money = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 
 const actions = async (qname, row, action) => api(dataPath(qname, row.id, action), { method: 'POST' });
 export default function FinanceOperationsPage() {
   useDocumentTitle(`${uiText('Điều hành cho vay và bảo hiểm')} · OSP Suite`);
-  const [parties, setParties] = useState(new Map());
-  const [accounts, setAccounts] = useState([]);
-  const [loans, setLoans] = useState([]);
-  const [repayments, setRepayments] = useState([]);
-  const [policies, setPolicies] = useState([]);
-  const [claims, setClaims] = useState([]);
-  const [invoices, setInvoices] = useState([]);
+  const { parties, accounts, loans, repayments, policies, claims, invoices, loading, loadError, load } = useFinanceOperationsData();
   const [claimPay, setClaimPay] = useState({});
   const [policyCancellationReasons, setPolicyCancellationReasons] = useState({});
   const [claimApprovalAmounts, setClaimApprovalAmounts] = useState({});
@@ -30,41 +25,23 @@ export default function FinanceOperationsPage() {
   const [policyForm, setPolicyForm] = useState({ number: '', party: '', product: '', premium: '', coverage_limit: '', start_date: today(), end_date: '' });
   const [claimForm, setClaimForm] = useState({ number: '', policy: '', amount: '', incident_date: today(), description: '' });
   const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const load = useCallback(async () => {
-    setLoading(true); setError('');
-    try {
-      const [partyMap, accountRes, loanRes, repaymentRes, policyRes, claimRes, invoiceRes] = await Promise.all([
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('accounting.account.read') ? loadAllResponse('accounting.account') : Promise.resolve({ items: [] }),
-        can('lending.loan.read') ? loadAllResponse('lending.loan') : Promise.resolve({ items: [] }),
-        can('lending.repayment.read') ? loadAllResponse('lending.repayment') : Promise.resolve({ items: [] }),
-        can('insurance.policy.read') ? loadAllResponse('insurance.policy') : Promise.resolve({ items: [] }),
-        can('insurance.claim.read') ? loadAllResponse('insurance.claim') : Promise.resolve({ items: [] }),
-        can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
-      ]);
-      setParties(partyMap); setAccounts(accountRes.items || []);
-      setLoans((loanRes.items || []).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))));
-      setRepayments(repaymentRes.items || []); setPolicies(policyRes.items || []); setClaims(claimRes.items || []); setInvoices(invoiceRes.items || []);
-      setClaimApprovalAmounts((current) => {
-        const next = { ...current };
-        for (const claim of claimRes.items || []) next[claim.id] ??= String(claim.approved_amount ?? claim.amount ?? '');
-        return next;
-      });
-      setLoanForm((x) => ({ ...x, party: x.party || [...partyMap.keys()][0] || '' }));
-      setPolicyForm((x) => ({ ...x, party: x.party || [...partyMap.keys()][0] || '' }));
-      setClaimForm((x) => ({ ...x, policy: x.policy || (policyRes.items || []).find((p) => p.status === 'active')?.id || '' }));
-      setClaimPay((current) => {
-        const next = { ...current };
-        for (const claim of claimRes.items || []) if (!next[claim.id]) next[claim.id] = { method: 'bank', expense_account: (accountRes.items || []).find((a) => a.kind === 'expense')?.id || '' };
-        return next;
-      });
-    } catch (reason) { setError(reason.message || uiText("Không tải được dữ liệu hồ sơ tài chính.")); }
-    finally { setLoading(false); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    setClaimApprovalAmounts((current) => {
+      const next = { ...current };
+      for (const claim of claims) next[claim.id] ??= String(claim.approved_amount ?? claim.amount ?? '');
+      return next;
+    });
+    setLoanForm((x) => ({ ...x, party: x.party || [...parties.keys()][0] || '' }));
+    setPolicyForm((x) => ({ ...x, party: x.party || [...parties.keys()][0] || '' }));
+    setClaimForm((x) => ({ ...x, policy: x.policy || policies.find((p) => p.status === 'active')?.id || '' }));
+    setClaimPay((current) => {
+      const next = { ...current };
+      for (const claim of claims) if (!next[claim.id]) next[claim.id] = { method: 'bank', expense_account: accounts.find((a) => a.kind === 'expense')?.id || '' };
+      return next;
+    });
+  }, [accounts, claims, parties, policies]);
   const invoiceByPolicy = useMemo(() => new Map(invoices.filter((item) => item.source === 'policy').map((item) => [item.source_id, item])), [invoices]);
   const repaymentsByLoan = useMemo(() => {
     const map = new Map();
@@ -73,6 +50,7 @@ export default function FinanceOperationsPage() {
     return map;
   }, [repayments]);
   const activePolicies = policies.filter((policy) => policy.status === 'active');
+  const refresh = () => { setError(''); load(); };
   async function createLoan(event) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
@@ -163,8 +141,8 @@ export default function FinanceOperationsPage() {
     finally { setBusy(false); }
   }
   return <div className="page">
-    <div className="page-head"><div><h1>{uiText("Điều hành cho vay và bảo hiểm")}</h1><p className="sub">{uiText("Theo dõi hồ sơ qua các bước tiếp nhận, thẩm định, giải ngân hoặc chi trả và thu nợ.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={load}>{uiText("Làm mới")}</button></div>
-    {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
+    <div className="page-head"><div><h1>{uiText("Điều hành cho vay và bảo hiểm")}</h1><p className="sub">{uiText("Theo dõi hồ sơ qua các bước tiếp nhận, thẩm định, giải ngân hoặc chi trả và thu nợ.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={refresh}>{uiText("Làm mới")}</button></div>
+    {(error || loadError) && <div className="alert danger" role="alert">{uiText(error || loadError)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
     <LoanRepaymentPanel {...{ can, loans, loading, uiText, loanForm, setLoanForm, parties, recordLabel, createLoan, busy, repaymentsByLoan, statusLabel, today, loanAction, repaymentMethods, setRepaymentMethods, repaymentAction, money }} />
     <InsurancePolicyPanel {...{ can, policies, loading, uiText, policyForm, setPolicyForm, parties, createPolicy, busy, recordLabel, invoiceByPolicy, fmtDate, statusLabel, policyCancellationReasons, setPolicyCancellationReasons, policyAction }} />
     <InsuranceClaimsPanel {...{ can, claims, loading, uiText, claimForm, setClaimForm, activePolicies, today, createClaim, policies, parties, money, claimPay, claimApprovalAmounts, setClaimApprovalAmounts, claimAction, claimRejectionReasons, setClaimRejectionReasons, busy, payClaim, accounts, fmtDate }} />
