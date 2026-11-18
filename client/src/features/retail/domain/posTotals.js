@@ -13,8 +13,9 @@ function lineAmounts({ product, uom, qty }, units, taxes) {
 export function calculatePosTotals(cart, units, taxes) {
   const lines = cart.map((line) => lineAmounts(line, units, taxes));
   return {
-    subtotal: Number(addDecimals(lines.map((line) => line.net))),
-    tax: Number(addDecimals(lines.map((line) => line.tax))),
-    total: Number(addDecimals(lines.map((line) => line.total))),
+    subtotal: addDecimals(lines.map((line) => line.net)),
+    tax: addDecimals(lines.map((line) => line.tax)),
+    total: addDecimals(lines.map((line) => line.total)),
+    lines,
   };
 }
