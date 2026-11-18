@@ -3,6 +3,7 @@ import { fmtNumber, uiText } from '../../lib/i18n.js';
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, tenantPath } from '../../lib/api.js';
 import { can } from '../../lib/state.js';
+import { compareDecimals } from '../../lib/decimal.js';
 const quantity = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
 export default function InventoryReplenishmentPage() {
   useDocumentTitle(`${uiText('Đề xuất bổ sung tồn kho')} · OSP Suite`);
@@ -45,7 +46,7 @@ export default function InventoryReplenishmentPage() {
     }
   };
   const suggestedByWarehouse = (report?.items || []).reduce((groups, item) => {
-    if (Number(item.suggestedQty) > 0.000001) {
+    if (compareDecimals(item.suggestedQty || 0, '0.000001') > 0) {
       const group = groups.get(item.warehouseId) || { id: item.warehouseId, name: item.warehouse, count: 0 };
       group.count += 1;
       groups.set(item.warehouseId, group);
