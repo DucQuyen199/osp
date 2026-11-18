@@ -6,6 +6,7 @@ import { can } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import logisticsEnglish from './logistics.en.js';
 const t = (text) => uiTextWith(text, logisticsEnglish);
+const PAGE_SIZE = 100;
 const LANES = [
   ['failed', 'Giao thất bại · cần xử lý'],
   ['partial', 'Giao thiếu · cần giao bù'],
@@ -16,7 +17,9 @@ export default function LogisticsDeliveryBoardPage() {
   useDocumentTitle(`${t('Điều phối giao hàng')} · OSP Suite`);
   const [items, setItems] = useState([]);
   const [counts, setCounts] = useState({ created: 0, dispatched: 0, failed: 0, partial: 0 });
-  const [truncated, setTruncated] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState('');
@@ -25,17 +28,18 @@ export default function LogisticsDeliveryBoardPage() {
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
-      const result = await api(tenantPath('/reports/logistics/delivery-board'));
+      const result = await api(tenantPath(`/reports/logistics/delivery-board?limit=${PAGE_SIZE}&offset=${offset}`));
       setItems(result.items || []);
       setCounts(result.counts || { created: 0, dispatched: 0, failed: 0, partial: 0 });
-      setTruncated(Boolean(result.truncated));
+      setTotal(Number(result.itemCount || 0));
+      setHasMore(Boolean(result.hasMore));
       setLastUpdated(new Date().toISOString());
     } catch (reason) {
       setError(reason.message || t('Không tải được bảng điều phối giao hàng.'));
     } finally {
       if (!quiet) setLoading(false);
     }
-  }, []);
+  }, [offset]);
   useEffect(() => { load();
     const timer = window.setInterval(() => load(true), 15000);
     return () => window.clearInterval(timer);
@@ -180,12 +184,17 @@ export default function LogisticsDeliveryBoardPage() {
     <div className="page-head"><div><h1>{t('Điều phối giao hàng')}</h1><p className="sub">{t('Theo dõi vận đơn cần xử lý, chuyến đang giao và giao thất bại. Xác nhận giao thành công sẽ chạy luồng xuất kho và cập nhật tiến độ đơn bán.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading} onClick={() => load()}>{loading ? t('Đang tải…') : t('Làm mới')}</button></div>
     <div className="row wrap delivery-summary"><span className="badge plain">{t('Chờ xuất phát')}: {counts.created}</span><span className="badge warning">{t('Đang giao')}: {counts.dispatched}</span><span className="badge danger">{t('Giao thất bại')}: {counts.failed}</span><span className="badge warning">{t('Giao thiếu')}: {counts.partial}</span>{lastUpdated && <span className="small muted">{t('Cập nhật lúc')} {fmtDateTime(lastUpdated)}</span>}</div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}
-    {truncated && <div className="alert warning" role="status">{t('Đang hiển thị tối đa 500 vận đơn đang mở. Xử lý vận đơn để xem các mục cũ hơn.')}</div>}
     {loading && !lastUpdated ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <div className="delivery-board">
       {LANES.map(([status, title]) => <section className="delivery-lane" key={status} aria-labelledby={`delivery-${status}`}>
-        <header className="delivery-lane-head"><h2 id={`delivery-${status}`}>{t(title)}</h2><span className="badge plain">{grouped[status].length}</span></header>
-        <div className="stack-sm">{grouped[status].map(renderShipment)}{!grouped[status].length && <div className="empty">{t('Không có vận đơn')}</div>}</div>
+        <header className="delivery-lane-head"><h2 id={`delivery-${status}`}>{t(title)}</h2><span className="badge plain">{counts[status]}</span></header>
+        <div className="stack-sm">{grouped[status].map(renderShipment)}{!grouped[status].length && <div className="empty">{counts[status] > 0 ? t('Vận đơn ở trang khác') : t('Không có vận đơn')}</div>}</div>
       </section>)}
     </div>}
+    <nav className="row wrap" aria-label={t('Phân trang điều phối giao hàng')}>
+      <span className="small muted" aria-live="polite">{t('Đang hiển thị {from}–{to} trên {total} vận đơn').replace('{from}', String(total ? offset + 1 : 0)).replace('{to}', String(Math.min(offset + items.length, total))).replace('{total}', String(total))}{loading ? ` · ${t('Đang tải…')}` : ''}</span>
+      <span className="grow" />
+      <button className="btn btn-secondary btn-sm" type="button" disabled={loading || offset === 0} onClick={() => setOffset((current) => Math.max(0, current - PAGE_SIZE))}>{t('Trang trước')}</button>
+      <button className="btn btn-secondary btn-sm" type="button" disabled={loading || !hasMore} onClick={() => setOffset((current) => current + PAGE_SIZE)}>{t('Trang sau')}</button>
+    </nav>
   </div>;
 }

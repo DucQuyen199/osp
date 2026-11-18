@@ -475,6 +475,9 @@ for (const [vertical, hash, label, summaryEntity, setupEntity] of verticalScreen
     must(!(await page.$('.route-error')), `${label} vertical route failed to render`);
     must(!(await page.$('.not-found-page')), `${label} vertical route resolved to not found`);
     await axe(`${label} vertical`);
+    if (vertical === 'logistics') {
+      must(await page.$('nav[aria-label="Phân trang điều phối giao hàng"]'), 'Delivery dispatch pagination is missing');
+    }
     if (vertical === 'home-services') {
       await page.goto(`${BASE}/#/reports/helpdesk/sla`, { waitUntil: 'networkidle0' });
       await page.waitForSelector('#main h1');

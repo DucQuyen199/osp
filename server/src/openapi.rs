@@ -1154,8 +1154,8 @@ pub fn build(reg: &Registry) -> Value {
         "/api/t/{tenantId}/reports/logistics/delivery-board".into(),
         json!({ "get": {
             "tags": ["logistics"], "summary": "Open shipment dispatch and delivery board", "security": sec,
-            "parameters": [tid],
-            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Tenant-scoped failed, short-delivered, created and dispatched shipments ordered by operational priority and age, with latest tracking event; result is capped at 500 rows" })), ("403".to_string(), err("Requires logistics.shipment.read")), ("404".to_string(), err("Logistics module is not enabled"))]))
+            "parameters": [tid, { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 200, "default": 100 } }, { "name": "offset", "in": "query", "schema": { "type": "integer", "minimum": 0, "default": 0 } }],
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "A page of tenant-scoped failed, short-delivered, created and dispatched shipments ordered by operational priority and age, with full queue counts and paging metadata" })), ("403".to_string(), err("Requires logistics.shipment.read")), ("404".to_string(), err("Logistics module is not enabled"))]))
         } }),
     );
     paths.insert(

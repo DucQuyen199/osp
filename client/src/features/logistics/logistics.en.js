@@ -28,8 +28,7 @@ const logisticsEnglish = {
   'Theo dõi vận đơn cần xử lý, chuyến đang giao và giao thất bại. Xác nhận giao thành công sẽ chạy luồng xuất kho và cập nhật tiến độ đơn bán.': 'Track shipments requiring action, in transit, or failed. Confirming delivery posts the inventory issue and updates the sales order.',
   'Đang tải…': 'Loading…', 'Làm mới': 'Refresh', 'Giao thất bại': 'Failed deliveries',
   'Giao thiếu': 'Short deliveries', 'Cập nhật lúc': 'Updated',
-  'Đang hiển thị tối đa 500 vận đơn đang mở. Xử lý vận đơn để xem các mục cũ hơn.': 'Showing up to 500 open shipments. Resolve shipments to see older items.',
-  'Không có vận đơn': 'No shipments',
+  'Không có vận đơn': 'No shipments', 'Vận đơn ở trang khác': 'Shipments are on another page', 'Phân trang điều phối giao hàng': 'Delivery dispatch pagination', 'Trang trước': 'Previous page', 'Trang sau': 'Next page', 'Đang hiển thị {from}–{to} trên {total} vận đơn': 'Showing {from}–{to} of {total} shipments',
 };
 
 export default logisticsEnglish;

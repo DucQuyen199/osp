@@ -651,6 +651,44 @@ async fn logistics(kernel: &Arc<Kernel>) {
             .len(),
         1
     );
+    for _ in 0..2 {
+        let queued_order = t.create("sales.sales_order", json!({ "party": id(&party), "warehouse": warehouse, "shipping_address": "Destination A", "lines": [{ "product": id(&product), "qty": 1, "price": 100 }] })).await;
+        t.act("sales.sales_order", &id(&queued_order), "confirmed")
+            .await;
+    }
+    let (status, board) = t
+        .api(
+            "GET",
+            "/reports/logistics/delivery-board?limit=1&offset=0",
+            json!(null),
+        )
+        .await;
+    assert_eq!(status, 200, "delivery board page: {board}");
+    let item_count = board["itemCount"].as_i64().unwrap_or_default();
+    assert!(item_count >= 2);
+    assert_eq!(
+        item_count,
+        board["counts"]["created"].as_i64().unwrap_or_default()
+            + board["counts"]["dispatched"].as_i64().unwrap_or_default()
+            + board["counts"]["failed"].as_i64().unwrap_or_default()
+            + board["counts"]["partial"].as_i64().unwrap_or_default()
+    );
+    assert_eq!(board["items"].as_array().map(Vec::len), Some(1));
+    assert_eq!(board["pageSize"], 1);
+    assert_eq!(board["offset"], 0);
+    assert_eq!(board["hasMore"], true);
+    let (status, last_page) = t
+        .api(
+            "GET",
+            "/reports/logistics/delivery-board?limit=1&offset=1",
+            json!(null),
+        )
+        .await;
+    assert_eq!(status, 200, "delivery board last page: {last_page}");
+    assert_eq!(last_page["itemCount"], board["itemCount"]);
+    assert_eq!(last_page["items"].as_array().map(Vec::len), Some(1));
+    assert_eq!(last_page["offset"], 1);
+    assert_eq!(last_page["hasMore"], false);
     println!(
         "✔ logistics: load limits, partial deliveries, immutable deduplicated tracking, single stock issue"
     );

@@ -86,8 +86,14 @@ impl Kernel {
         Ok(delivered)
     }
 
-    /// Lists open and failed shipments for the dispatch board, oldest first.
-    pub async fn logistics_delivery_board(&self, actor: &Actor, tenant: &Tenant) -> R<Value> {
+    /// Lists a page of open and failed shipments plus full queue counts.
+    pub async fn logistics_delivery_board(
+        &self,
+        actor: &Actor,
+        tenant: &Tenant,
+        limit: i64,
+        offset: i64,
+    ) -> R<Value> {
         if !tenant.has_module("logistics") {
             return Err(ApiError::new(
                 404,
@@ -97,7 +103,7 @@ impl Kernel {
         }
         self.authorize(tenant, actor, "logistics.shipment.read")?;
         let mut conn = self.pool.get().await?;
-        let tx = Tx::begin(&mut conn, &tenant.id, false).await?;
+        let tx = Tx::begin_snapshot(&mut conn, &tenant.id).await?;
         let mut items = tx
             .query_json(
                 "SELECT jsonb_build_object( \
@@ -127,8 +133,8 @@ impl Kernel {
                    ORDER BY event.occurred_at DESC, event.id DESC LIMIT 1) latest ON true \
                  WHERE shipment.tenant_id = $1 AND (shipment.status IN ('created', 'dispatched') OR (shipment.status = 'failed' OR (shipment.status = 'delivered' AND NULLIF(btrim(shipment.short_delivery_reason), '') IS NOT NULL)) AND NOT EXISTS (SELECT 1 FROM logistics__shipment retry WHERE retry.tenant_id = shipment.tenant_id AND retry.redelivery_of = shipment.id)) \
                  ORDER BY CASE WHEN shipment.status = 'failed' THEN 0 WHEN shipment.status = 'delivered' THEN 1 WHEN shipment.status = 'created' THEN 2 ELSE 3 END, shipment.created_at, shipment.id \
-                 LIMIT 500",
-                &[&tenant.id],
+                 LIMIT $2 OFFSET $3",
+                &[&tenant.id, &limit, &offset],
             )
             .await?;
         for item in &mut items {
@@ -140,28 +146,29 @@ impl Kernel {
                 fields.insert("remainingLines".into(), remaining);
             }
         }
-        let created = items
-            .iter()
-            .filter(|item| item["status"] == "created")
-            .count();
-        let dispatched = items
-            .iter()
-            .filter(|item| item["status"] == "dispatched")
-            .count();
-        let failed = items
-            .iter()
-            .filter(|item| item["status"] == "failed")
-            .count();
-        let partial = items
-            .iter()
-            .filter(|item| item["status"] == "partial")
-            .count();
-        let truncated = items.len() == 500;
+        let counts = tx
+            .query_one_row(
+                "SELECT count(*)::bigint, \
+                   count(*) FILTER (WHERE shipment.status = 'created')::bigint, \
+                   count(*) FILTER (WHERE shipment.status = 'dispatched')::bigint, \
+                   count(*) FILTER (WHERE shipment.status = 'failed' AND NOT EXISTS (SELECT 1 FROM logistics__shipment retry WHERE retry.tenant_id = shipment.tenant_id AND retry.redelivery_of = shipment.id))::bigint, \
+                   count(*) FILTER (WHERE shipment.status = 'delivered' AND NULLIF(btrim(shipment.short_delivery_reason), '') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM logistics__shipment retry WHERE retry.tenant_id = shipment.tenant_id AND retry.redelivery_of = shipment.id))::bigint \
+                 FROM logistics__shipment shipment WHERE shipment.tenant_id = $1 AND (shipment.status IN ('created', 'dispatched') OR (shipment.status = 'failed' OR (shipment.status = 'delivered' AND NULLIF(btrim(shipment.short_delivery_reason), '') IS NOT NULL)) AND NOT EXISTS (SELECT 1 FROM logistics__shipment retry WHERE retry.tenant_id = shipment.tenant_id AND retry.redelivery_of = shipment.id))",
+                &[&tenant.id],
+            )
+            .await?;
+        let total: i64 = counts.get(0);
+        let created: i64 = counts.get(1);
+        let dispatched: i64 = counts.get(2);
+        let failed: i64 = counts.get(3);
+        let partial: i64 = counts.get(4);
         Ok(json!({
             "items": items,
-            "itemCount": created + dispatched + failed + partial,
+            "itemCount": total,
             "counts": { "created": created, "dispatched": dispatched, "failed": failed, "partial": partial },
-            "truncated": truncated
+            "pageSize": limit,
+            "offset": offset,
+            "hasMore": total > offset + limit
         }))
     }
 
