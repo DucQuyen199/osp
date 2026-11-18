@@ -1,50 +1,26 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
-import { can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
+import { can, recordLabel } from '../../lib/state.js';
+import { useLmsWorkbenchData } from './hooks/useLmsWorkbenchData.js';
 import lmsEnglish from './lms.en.js';
 const t = (text) => uiTextWith(text, lmsEnglish);
-const rows = (response) => Array.isArray(response?.items) ? response.items : [];
 const courseStatus = { draft: 'Bản nháp', published: 'Đang mở học', archived: 'Đã lưu trữ' };
 export default function LmsWorkbenchPage() {
   useDocumentTitle(`${t('Đào tạo trực tuyến')} · OSP Suite`);
-  const [courses, setCourses] = useState([]);
-  const [lessons, setLessons] = useState([]);
-  const [enrollments, setEnrollments] = useState([]);
-  const [progress, setProgress] = useState([]);
-  const [certificates, setCertificates] = useState([]);
-  const [parties, setParties] = useState(new Map());
+  const { courses, lessons, enrollments, progress, certificates, parties, loading, error, setError, load } = useLmsWorkbenchData();
   const [courseId, setCourseId] = useState('');
   const [courseForm, setCourseForm] = useState({ title: '', description: '' });
   const [lessonForm, setLessonForm] = useState({ title: '', content: '', required: true });
   const [learner, setLearner] = useState('');
   const [busy, setBusy] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [certificateLookup, setCertificateLookup] = useState('');
   const [printingCertificate, setPrintingCertificate] = useState('');
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const [courseRes, lessonRes, enrollmentRes, progressRes, certificateRes, partyMap] = await Promise.all([
-        can('lms.course.read') ? loadAllResponse('lms.course') : Promise.resolve({ items: [] }),
-        can('lms.lesson.read') ? loadAllResponse('lms.lesson') : Promise.resolve({ items: [] }),
-        can('lms.enrollment.read') ? loadAllResponse('lms.enrollment') : Promise.resolve({ items: [] }),
-        can('lms.lesson_progress.read') ? loadAllResponse('lms.lesson_progress') : Promise.resolve({ items: [] }),
-        can('lms.certificate.read') ? loadAllResponse('lms.certificate') : Promise.resolve({ items: [] }),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-      ]);
-      const courseRows = rows(courseRes).sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')));
-      setCourses(courseRows); setLessons(rows(lessonRes)); setEnrollments(rows(enrollmentRes)); setProgress(rows(progressRes)); setCertificates(rows(certificateRes)); setParties(partyMap);
-      setCourseId((id) => courseRows.some((course) => course.id === id) ? id : courseRows[0]?.id || '');
-      setLearner((id) => id && partyMap.has(id) ? id : [...partyMap.keys()][0] || '');
-    } catch (reason) { setError(t(reason.message || 'Không tải được dữ liệu đào tạo.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { setCourseId((id) => courses.some((course) => course.id === id) ? id : courses[0]?.id || ''); }, [courses]);
+  useEffect(() => { setLearner((id) => id && parties.has(id) ? id : [...parties.keys()][0] || ''); }, [parties]);
   const selected = courses.find((course) => course.id === courseId);
   const courseLessons = useMemo(() => lessons.filter((lesson) => lesson.course === courseId).sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || ''))), [lessons, courseId]);
   const courseEnrollments = useMemo(() => enrollments.filter((row) => row.course === courseId).sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))), [enrollments, courseId]);
