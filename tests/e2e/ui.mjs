@@ -657,7 +657,11 @@ await step('di động 390px: không tràn ngang, mở được menu', async () 
   await page.click('button[aria-controls="nav"]');
   await sleep(350);
   must(await page.evaluate(() => document.querySelector('.sidebar').classList.contains('open')), 'menu không mở');
+  must(await page.evaluate(() => document.querySelector('#nav')?.contains(document.activeElement)), 'focus không chuyển vào menu di động');
   await shot('mobile-nav');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.sidebar').classList.contains('open'));
+  must(await page.evaluate(() => document.activeElement.matches('button[aria-controls="nav"]')), 'focus không trở về nút mở menu sau khi đóng');
 });
 
 await step('đăng xuất', async () => {

@@ -5,7 +5,7 @@ The client is a React 19 application built with Vite. It uses JavaScript and the
 ## Application layers
 
 - `client/src/main.jsx` mounts React and registers the production service worker.
-- `client/src/app/App.jsx` owns session startup, authentication redirects, route changes, and the shared application shell; `components/AccountMenu.jsx` renders account details, language/number preferences, security navigation, and logout through controlled callbacks.
+- `client/src/app/App.jsx` owns session startup, authentication redirects, route changes, and the shared application shell; `app/useAppNavigation.js` owns responsive navigation state, focus placement, keyboard trapping, and Escape behavior; `components/AccountMenu.jsx` renders account details, language/number preferences, security navigation, and logout through controlled callbacks.
 - `client/src/app/parseRoute.js` translates the current hash into a route object. Unknown paths resolve to the not-found screen.
 - `client/src/app/PageRouter.jsx` uses explicit screen and settings registries. Screens load with `React.lazy` inside shared suspense boundaries that announce route loading to assistive technology; a keyed error boundary provides localized reload and home actions when a screen fails.
 - `client/src/components/` contains shared shell and UI pieces such as navigation, global search, and icons.

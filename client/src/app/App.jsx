@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import AuthPage from '../features/auth/AuthPage.jsx';
 import PageRouter from './PageRouter.jsx';
 import { parseRoute } from './parseRoute.js';
@@ -6,6 +6,7 @@ import GlobalSearch from '../components/GlobalSearch.jsx';
 import Icon from '../components/Icon.jsx';
 import Sidebar from '../components/Sidebar.jsx';
 import AccountMenu from '../components/AccountMenu.jsx';
+import useAppNavigation from './useAppNavigation.js';
 import { api, onUnauthorized, session } from '../lib/api.js';
 import { setBusinessTimezone } from '../lib/dates.js';
 import { enhanceScrollableRegions } from '../lib/scrollableRegions.js';
@@ -16,25 +17,13 @@ export default function App() {
   const [route, setRoute] = useState(() => parseRoute());
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
-  const [navOpen, setNavOpen] = useState(false);
-  const [mobileNav, setMobileNav] = useState(() => window.matchMedia('(max-width: 960px)').matches);
-  const navToggleRef = useRef(null);
+  const { open: navOpen, mobile: mobileNav, toggleRef: navToggleRef, toggle: toggleNav, close: closeNav } = useAppNavigation();
   const [theme, setTheme] = useState(() => { try { return localStorage.getItem('osp.theme') || ''; } catch { return ''; } });
   const [numberLocale, setNumberLocale] = useState(formatLocale);
   const [interfaceLanguage, setInterfaceLanguage] = useState(uiLocale);
   const meta = app.meta;
   const user = app.user;
 
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 960px)');
-    const update = () => {
-      setMobileNav(media.matches);
-      if (!media.matches) setNavOpen(false);
-    };
-    update();
-    media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
-  }, []);
 
   useEffect(() => {
     document.documentElement.lang = interfaceLanguage === 'en-US' ? 'en' : 'vi';
@@ -44,13 +33,6 @@ export default function App() {
     if (!ready || !meta || !user) return undefined;
     return enhanceScrollableRegions(document.getElementById('main'));
   }, [ready, meta, user]);
-
-  useEffect(() => {
-    if (!mobileNav || !navOpen) return;
-    [...document.querySelectorAll('#nav a[href], #nav summary, #nav button:not([disabled])')]
-      .find((element) => element.getClientRects().length > 0)?.focus();
-  }, [mobileNav, navOpen]);
-  const authenticated = Boolean(session.current());
 
   const signedIn = useCallback(async () => {
     try {
@@ -68,7 +50,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const changed = () => { setRoute(parseRoute()); setNavOpen(false); };
+    const changed = () => { setRoute(parseRoute()); closeNav(); };
     const metaChanged = () => {
       setBusinessTimezone(app.meta?.settings?.businessTimezone || 'UTC');
       publishAppState();
@@ -78,7 +60,7 @@ export default function App() {
     document.documentElement.dataset.theme = theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     const stop = onUnauthorized(() => { session.clear(); resetAppState(); setError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'); location.hash = '#/login'; });
     return () => { window.removeEventListener('hashchange', changed); window.removeEventListener('osp:meta', metaChanged); stop?.(); };
-  }, [theme]);
+  }, [theme, closeNav]);
 
   useEffect(() => {
     let alive = true;
@@ -150,29 +132,10 @@ export default function App() {
         event.preventDefault();
         document.querySelector('.global-search-input')?.focus();
       }
-      if (event.key === 'Escape') {
-        if (mobileNav && navOpen) {
-          setNavOpen(false);
-          navToggleRef.current?.focus();
-        }
-      }
-      if (mobileNav && navOpen && event.key === 'Tab') {
-        const focusable = [...document.querySelectorAll('#nav a[href], #nav summary, #nav button:not([disabled])')].filter((element) => element.getClientRects().length > 0);
-        if (!focusable.length) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (event.shiftKey && (document.activeElement === first || !document.querySelector('#nav')?.contains(document.activeElement))) {
-          event.preventDefault();
-          last.focus();
-        } else if (!event.shiftKey && (document.activeElement === last || !document.querySelector('#nav')?.contains(document.activeElement))) {
-          event.preventDefault();
-          first.focus();
-        }
-      }
     };
     document.addEventListener('keydown', shortcut);
     return () => document.removeEventListener('keydown', shortcut);
-  }, [mobileNav, navOpen]);
+  }, []);
 
   useEffect(() => {
     if (!ready || !session.current() || !meta || !user) return;
@@ -194,20 +157,20 @@ export default function App() {
     <a className="skip-link" href="#main">{uiText('Bỏ qua điều hướng')}</a>
     <div className="app">
       <header className="topbar">
-        <button ref={navToggleRef} className="btn btn-ghost btn-icon nav-toggle" type="button" aria-label={uiText(navOpen ? 'Đóng menu' : 'Mở menu')} aria-expanded={navOpen} aria-controls="nav" onClick={() => setNavOpen((open) => !open)}><Icon name="menu" /></button>
+        <button ref={navToggleRef} className="btn btn-ghost btn-icon nav-toggle" type="button" aria-label={uiText(navOpen ? 'Đóng menu' : 'Mở menu')} aria-expanded={navOpen} aria-controls="nav" onClick={toggleNav}><Icon name="menu" /></button>
         <a className="brand" href="#/"><span className="brand-mark">O</span>OSP</a>
         <span className="tenant-chip">{meta.name}</span>
         <span className="grow" />
-        <GlobalSearch meta={meta} onNavigate={() => setNavOpen(false)} />
+        <GlobalSearch meta={meta} onNavigate={closeNav} />
         <button className="btn btn-ghost btn-icon" type="button" aria-label={uiText(theme === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối')} title={uiText(theme === 'dark' ? 'Giao diện sáng' : 'Giao diện tối')} onClick={toggleTheme}><Icon name={theme === 'dark' ? 'sun' : 'moon'} /></button>
         <AccountMenu user={user} interfaceLanguage={interfaceLanguage} numberLocale={numberLocale} onInterfaceLanguageChange={changeInterfaceLanguage} onNumberLocaleChange={changeNumberLocale} onLogout={logout} />
       </header>
-      <Sidebar meta={meta} route={route} open={navOpen} mobile={mobileNav} onNavigate={() => setNavOpen(false)} />
+      <Sidebar meta={meta} route={route} open={navOpen} mobile={mobileNav} onNavigate={closeNav} />
       <main className="main" id="main" tabIndex="-1">
       <PageRouter route={route} meta={meta} summary={app.summary} />
       </main>
     </div>
-    {navOpen && <button className="scrim" type="button" aria-label={uiText('Đóng menu')} onClick={() => { setNavOpen(false); navToggleRef.current?.focus(); }} />}
+    {navOpen && <button className="scrim" type="button" aria-label={uiText('Đóng menu')} onClick={() => closeNav(true)} />}
   </>;
 }
 
