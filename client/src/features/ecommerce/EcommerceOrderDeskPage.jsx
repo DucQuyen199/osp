@@ -7,6 +7,7 @@ import { app, can, recordLabel } from '../../lib/state.js';
 import ecommerceEnglish from './ecommerce.en.js';
 import WebOrderCard from './components/WebOrderCard.jsx';
 import WebOrderCreateForm from './components/WebOrderCreateForm.jsx';
+import WebOrderRegisters from './components/WebOrderRegisters.jsx';
 import { useEcommerceOrderData } from './hooks/useEcommerceOrderData.js';
 const t = (text) => uiTextWith(text, ecommerceEnglish);
 export default function EcommerceOrderDeskPage() {
@@ -138,8 +139,15 @@ export default function EcommerceOrderDeskPage() {
         onSubmit={createCart}
         t={t}
       />}
-      <section className="ecommerce-order-section"><header><h2>{t('Giỏ chờ xác nhận')}</h2><span className="badge plain">{draftCarts.length}</span></header><div className="ecommerce-orders">{draftCarts.map(renderOrder)}{!draftCarts.length && <div className="empty">{t('Không có giỏ hàng chờ xử lý.')}</div>}</div></section>
-      <section className="ecommerce-order-section"><header><h2>{t('Đơn đã đặt')}</h2><span className="badge plain">{placedOrders.length}</span></header><div className="ecommerce-orders">{placedOrders.map(renderOrder)}{!placedOrders.length && <div className="empty">{t('Chưa có đơn online được đặt.')}</div>}</div></section>
+      <WebOrderRegisters
+        draftOrders={draftCarts}
+        placedOrders={placedOrders}
+        draftTitle={t('Giỏ chờ xác nhận')}
+        draftEmptyMessage={t('Không có giỏ hàng chờ xử lý.')}
+        placedTitle={t('Đơn đã đặt')}
+        placedEmptyMessage={t('Chưa có đơn online được đặt.')}
+        renderOrder={renderOrder}
+      />
     </>}
   </div>;
 }
