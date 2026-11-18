@@ -1603,7 +1603,23 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                 .iter()
                 .find(|(key, _)| key == "station")
                 .map(|(_, value)| value.as_str());
-            return json_ok(k.restaurant_kitchen_board(&actor, &t, station).await?);
+            let page_size = query
+                .iter()
+                .find(|(key, _)| key == "limit")
+                .and_then(|(_, value)| value.parse::<i64>().ok())
+                .unwrap_or(50)
+                .clamp(1, 100);
+            let offset = query
+                .iter()
+                .find(|(key, _)| key == "offset")
+                .and_then(|(_, value)| value.parse::<i64>().ok())
+                .unwrap_or(0)
+                .max(0)
+                .min(i64::MAX - page_size);
+            return json_ok(
+                k.restaurant_kitchen_board(&actor, &t, station, page_size, offset)
+                    .await?,
+            );
         }
         (&Method::GET, ["reports", "logistics", "delivery-board"]) => {
             let page_size = query

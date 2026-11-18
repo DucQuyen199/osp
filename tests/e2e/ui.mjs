@@ -478,6 +478,15 @@ for (const [vertical, hash, label, summaryEntity, setupEntity] of verticalScreen
     if (vertical === 'logistics') {
       must(await page.$('nav[aria-label="Phân trang điều phối giao hàng"]'), 'Delivery dispatch pagination is missing');
     }
+    if (vertical === 'fnb') {
+      await page.goto(`${BASE}/#/reports/restaurant/kitchen-board`, { waitUntil: 'networkidle0' });
+      await page.waitForSelector('#main h1');
+      must(!(await page.$('.route-error')), 'Kitchen display failed to render');
+      must(await page.$('nav[aria-label="Phân trang phiếu bếp"]'), 'Kitchen ticket pagination is missing');
+      await axe('Restaurant kitchen display');
+      await page.goto(`${BASE}/${hash}`, { waitUntil: 'networkidle0' });
+      await page.waitForSelector('#main h1');
+    }
     if (vertical === 'home-services') {
       await page.goto(`${BASE}/#/reports/helpdesk/sla`, { waitUntil: 'networkidle0' });
       await page.waitForSelector('#main h1');

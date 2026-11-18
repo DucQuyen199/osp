@@ -786,6 +786,45 @@ async fn restaurant(kernel: &Arc<Kernel>) {
         .list("restaurant.kitchen_ticket", &[("order", &id(&order))])
         .await;
     assert_eq!(tickets.len(), 2);
+    let second_table = t
+        .create("restaurant.table", json!({ "name": "Table B", "seats": 2 }))
+        .await;
+    let service_dish = t
+        .create(
+            "master-data.product",
+            json!({ "sku": "KDS-SERVICE", "name": "Counter service", "kind": "service", "tracked": false, "price": 5 }),
+        )
+        .await;
+    t.create(
+        "restaurant.menu_item",
+        json!({ "product": id(&service_dish), "station": "kitchen", "available": true }),
+    )
+    .await;
+    let second_order = t.create("restaurant.table_order", json!({ "table": id(&second_table), "warehouse": warehouse, "method": "cash", "lines": [{ "product": id(&service_dish), "qty": 1, "price": 5 }] })).await;
+    t.act("restaurant.table_order", &id(&second_order), "sent")
+        .await;
+    let (status, first_page) = t
+        .api(
+            "GET",
+            "/reports/restaurant/kitchen-board?station=kitchen&limit=1&offset=0",
+            json!(null),
+        )
+        .await;
+    assert_eq!(status, 200, "kitchen board page: {first_page}");
+    assert_eq!(first_page["itemCount"], 2);
+    assert_eq!(first_page["counts"]["queued"], 2);
+    assert_eq!(first_page["items"].as_array().map(Vec::len), Some(1));
+    assert_eq!(first_page["hasMore"], true);
+    let (status, last_page) = t
+        .api(
+            "GET",
+            "/reports/restaurant/kitchen-board?station=kitchen&limit=1&offset=1",
+            json!(null),
+        )
+        .await;
+    assert_eq!(status, 200, "kitchen board last page: {last_page}");
+    assert_eq!(last_page["items"].as_array().map(Vec::len), Some(1));
+    assert_eq!(last_page["hasMore"], false);
     assert!(
         kernel
             .act(&t.a, &t.t, "restaurant.table_order", &id(&order), "served")
@@ -808,6 +847,21 @@ async fn restaurant(kernel: &Arc<Kernel>) {
             .await[0]["amount"]),
         220.0
     );
+    let second_ticket = t
+        .list(
+            "restaurant.kitchen_ticket",
+            &[("order", &id(&second_order))],
+        )
+        .await
+        .remove(0);
+    for action in ["preparing", "ready"] {
+        t.act("restaurant.kitchen_ticket", &id(&second_ticket), action)
+            .await;
+    }
+    for action in ["served", "completed"] {
+        t.act("restaurant.table_order", &id(&second_order), action)
+            .await;
+    }
     assert!(
         kernel
             .act(

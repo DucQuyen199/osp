@@ -50,7 +50,7 @@ const restaurantEnglish = {
   'Tất cả trạm': 'All stations', 'In phiếu bếp': 'Print kitchen ticket', 'Đang tải…': 'Loading…', 'Đang cập nhật…': 'Updating…',
   'Bắt đầu chế biến': 'Start preparing', 'Báo món đã xong': 'Mark item ready', 'Phiếu theo thứ tự nhận món. Bảng tự làm mới mỗi 15 giây; trạng thái món được dùng để cho phép phục vụ order.': 'Tickets are shown in the order received. The board refreshes every 15 seconds; item status controls when an order can be served.',
   'Trạm': 'Station', 'Làm mới màn hình bếp': 'Refresh kitchen display', 'Cập nhật lúc': 'Updated',
-  'Đang hiển thị tối đa 500 phiếu đang mở. Hãy lọc theo trạm để xem ít phiếu hơn.': 'Showing up to 500 open tickets. Filter by station to see fewer tickets.',
+  'Đang hiển thị {from}–{to} trên {total} phiếu': 'Showing {from}–{to} of {total} tickets', 'Phiếu ở trang khác': 'Tickets are on another page', 'Phân trang phiếu bếp': 'Kitchen ticket pagination', 'Trang trước': 'Previous page', 'Trang sau': 'Next page',
   'Chờ chế biến': 'Queued', 'Đang chế biến': 'Preparing', 'Đã xong · chờ phục vụ': 'Ready · awaiting service',
   'Không có phiếu': 'No tickets', 'Order chỉ được chuyển sang phục vụ khi tất cả phiếu bếp và quầy pha chế đã sẵn sàng.': 'An order can be served after all kitchen and bar tickets are ready.',
 };

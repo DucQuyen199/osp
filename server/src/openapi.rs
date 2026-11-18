@@ -1146,8 +1146,8 @@ pub fn build(reg: &Registry) -> Value {
         "/api/t/{tenantId}/reports/restaurant/kitchen-board".into(),
         json!({ "get": {
             "tags": ["restaurant"], "summary": "Active restaurant kitchen and bar tickets", "security": sec,
-            "parameters": [tid, { "name": "station", "in": "query", "schema": { "type": "string", "enum": ["all", "kitchen", "bar"], "default": "all" } }],
-            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Oldest-first kitchen tickets attached to sent or served table orders; completed and cancelled orders are omitted. Result is capped at 500 rows." })), ("403".to_string(), err("Requires restaurant.kitchen_ticket.read")), ("422".to_string(), err("Invalid kitchen station"))]))
+            "parameters": [tid, { "name": "station", "in": "query", "schema": { "type": "string", "enum": ["all", "kitchen", "bar"], "default": "all" } }, { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 } }, { "name": "offset", "in": "query", "schema": { "type": "integer", "minimum": 0, "default": 0 } }],
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "One oldest-first page of active kitchen tickets with full per-lane counts and paging metadata" })), ("403".to_string(), err("Requires restaurant.kitchen_ticket.read")), ("422".to_string(), err("Invalid kitchen station"))]))
         } }),
     );
     paths.insert(
