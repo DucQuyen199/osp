@@ -5,8 +5,11 @@ import { api, dataPath } from '../../lib/api.js';
 import { fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
+import { absDecimal, addDecimals, compareDecimals, multiplyDecimals, subtractDecimals, minDecimal } from '../../lib/decimal.js';
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
+const sameDecimal = (left, right) => compareDecimals(left ?? 0, right ?? 0) === 0;
+const samePrice = (left, right) => compareDecimals(absDecimal(subtractDecimals(left ?? 0, right ?? 0)), '0.005') <= 0;
 export default function SalesReturnsWorkbenchPage() {
   useDocumentTitle(`${uiText('Trả hàng bán')} · OSP Suite`);
   const [orders, setOrders] = useState([]);
@@ -88,24 +91,26 @@ export default function SalesReturnsWorkbenchPage() {
       const tax = line.tax || '';
       const taxRate = Number(line.tax_rate || 0);
       const key = [line.product, price.toFixed(2), uom, discount.toFixed(6), tax, taxRate.toFixed(6)].join(':');
-      const current = groups.get(key) || { key, product: line.product, price, uom: line.uom, uom_name: line.uom_name, uom_ratio: line.uom_ratio, discount_pct: discount, tax: line.tax ?? null, tax_rate: taxRate, ordered: 0, name: products.get(line.product)?.name || uiText('Mặt hàng') };
-      current.ordered += Number(line.qty || 0);
+      const current = groups.get(key) || { key, product: line.product, price, uom: line.uom, uom_name: line.uom_name, uom_ratio: line.uom_ratio, discount_pct: discount, tax: line.tax ?? null, tax_rate: taxRate, ordered: '0', name: products.get(line.product)?.name || uiText('Mặt hàng') };
+      current.ordered = addDecimals([current.ordered, line.qty || 0]);
       groups.set(key, current);
     }
     const requiresDelivery = logisticsEnabled && Boolean(order?.shipping_address?.trim());
     return [...groups.values()].map((line) => {
       const delivered = requiresDelivery
-        ? shipmentsFor(order).filter((shipment) => shipment.status === 'delivered').flatMap((shipment) => shipment.delivered_lines || shipment.lines || []).filter((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && Math.abs(Number(item.price || 0) - line.price) <= .005 && Number(item.effective_discount_pct ?? item.discount_pct ?? 0) === line.discount_pct && (item.tax || '') === (line.tax || '') && Number(item.tax_rate || 0) === line.tax_rate).reduce((sum, item) => sum + Number(item.qty || 0), 0)
+        ? shipmentsFor(order).filter((shipment) => shipment.status === 'delivered').flatMap((shipment) => shipment.delivered_lines || shipment.lines || []).filter((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && samePrice(item.price, line.price) && sameDecimal(item.effective_discount_pct ?? item.discount_pct ?? 0, line.discount_pct) && (item.tax || '') === (line.tax || '') && sameDecimal(item.tax_rate || 0, line.tax_rate)).reduce((sum, item) => addDecimals([sum, item.qty || 0]), '0')
         : line.ordered;
-      const reserved = returns.filter((row) => row.sales_order === order.id && ['submitted','approved','received'].includes(row.status)).flatMap((row) => row.lines || []).filter((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && Math.abs(Number(item.price || 0) - line.price) <= .005 && Number(item.discount_pct || 0) === line.discount_pct && (item.tax || '') === (line.tax || '') && Number(item.tax_rate || 0) === line.tax_rate).reduce((sum, item) => sum + Number(item.qty || 0), 0);
-      return { ...line, delivered: Math.min(line.ordered, delivered), remaining: Math.max(0, Math.min(line.ordered, delivered) - reserved) };
+      const reserved = returns.filter((row) => row.sales_order === order.id && ['submitted','approved','received'].includes(row.status)).flatMap((row) => row.lines || []).filter((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && samePrice(item.price, line.price) && sameDecimal(item.discount_pct || 0, line.discount_pct) && (item.tax || '') === (line.tax || '') && sameDecimal(item.tax_rate || 0, line.tax_rate)).reduce((sum, item) => addDecimals([sum, item.qty || 0]), '0');
+      const deliveredQuantity = minDecimal(line.ordered, delivered);
+      const remainingQuantity = subtractDecimals(deliveredQuantity, reserved);
+      return { ...line, delivered: Number(deliveredQuantity), remaining: compareDecimals(remainingQuantity, 0) > 0 ? Number(remainingQuantity) : 0 };
     }).filter((line) => line.remaining > .000001);
   }
   const eligible = formOrder ? eligibleLines(formOrder) : [];
   const formInvoices = formOrder ? invoicesFor(formOrder) : [];
   const selectedInvoice = formOrder ? invoiceFor(formOrder, returnInvoiceId) : null;
   const linkedInvoice = selected ? invoiceFor(selectedOrder, selected.invoice || linkedInvoiceId) : null;
-  const returnedTotal = selected ? (selected.lines || []).reduce((sum, line) => sum + Number(line.line_total ?? Number(line.price || 0) * Number(line.qty || 0)), 0) : 0;
+  const returnedTotal = selected ? Number(addDecimals((selected.lines || []).map((line) => line.line_total ?? multiplyDecimals([line.price || 0, line.qty || 0])))) : 0;
   useEffect(() => {
     setReturnInvoiceId((current) => formInvoices.some((invoice) => invoice.id === current) ? current : formInvoices.length === 1 ? formInvoices[0].id : '');
   }, [orderId, invoices]);
