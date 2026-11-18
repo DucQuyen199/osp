@@ -1,12 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { confirmDialog } from '../../lib/feedback.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
-import { app, can, loadAll } from '../../lib/state.js';
+import { app, can } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
+import { useAccountingPeriodCloseData } from './hooks/useAccountingPeriodCloseData.js';
 const today = localDate;
 const monthStart = () => `${today().slice(0, 7)}-01`;
 const monthEnd = () => new Date(Date.UTC(Number(today().slice(0, 4)), Number(today().slice(5, 7)), 0)).toISOString().slice(0, 10);
@@ -14,30 +15,12 @@ const dateForJournal = (row) => row.posting_date || String(row.createdAt || '').
 const inPeriod = (date, period) => Boolean(date && period && date >= period.start_date && date <= period.end_date);
 export default function AccountingPeriodClosePage() {
   useDocumentTitle(`${uiText('Khóa sổ kế toán')} · OSP Suite`);
-  const [periods, setPeriods] = useState([]);
-  const [draftStatements, setDraftStatements] = useState([]);
-  const [draftJournals, setDraftJournals] = useState([]);
+  const { periods, draftStatements, draftJournals, loading, error, setError, load } = useAccountingPeriodCloseData();
   const [periodId, setPeriodId] = useState('');
   const [form, setForm] = useState({ name: `${today().slice(0, 7)}`, start_date: monthStart(), end_date: monthEnd() });
   const [busy, setBusy] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const [periodRows, statementRows, journalRows] = await Promise.all([
-        can('accounting.period.read') ? loadAll('accounting.period') : Promise.resolve([]),
-        can('accounting.bank_statement.read') ? loadAll('accounting.bank_statement', { status: 'draft' }) : Promise.resolve([]),
-        can('accounting.journal_entry.read') ? loadAll('accounting.journal_entry', { status: 'draft' }) : Promise.resolve([]),
-      ]);
-      periodRows.sort((a, b) => String(b.start_date || '').localeCompare(String(a.start_date || '')));
-      setPeriods(periodRows); setDraftStatements(statementRows); setDraftJournals(journalRows);
-      setPeriodId((id) => periodRows.some((row) => row.id === id) ? id : periodRows.find((row) => row.status === 'open')?.id || periodRows[0]?.id || '');
-    } catch (reason) { setError(reason.message || uiText('Không tải được dữ liệu khóa sổ.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { setPeriodId((id) => id && periods.some((row) => row.id === id) ? id : periods.find((row) => row.status === 'open')?.id || periods[0]?.id || ''); }, [periods]);
   const selected = periods.find((row) => row.id === periodId);
   const blockingStatements = useMemo(() => selected ? draftStatements.filter((row) => row.start_date <= selected.end_date && row.end_date >= selected.start_date) : [], [draftStatements, selected]);
   const blockingJournals = useMemo(() => selected ? draftJournals.filter((row) => inPeriod(dateForJournal(row), selected)) : [], [draftJournals, selected]);

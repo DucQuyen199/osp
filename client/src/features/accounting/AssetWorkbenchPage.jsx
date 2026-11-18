@@ -1,43 +1,26 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate, localMonth } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { addDecimals, compareDecimals, subtractDecimals } from '../../lib/decimal.js';
-import { can, loadAllResponse } from '../../lib/state.js';
+import { can } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
-const rows = (response) => Array.isArray(response?.items) ? response.items : [];
+import { useAssetWorkbenchData } from './hooks/useAssetWorkbenchData.js';
 const statuses = { draft: 'Bản nháp', active: 'Đang sử dụng', disposed: 'Đã thanh lý' };
 const methods = { straight_line: 'Đường thẳng', declining_balance: 'Số dư giảm dần' };
 const acquisitionMethods = { cash: 'Tiền mặt', bank: 'Ngân hàng', opening_balance: 'Số dư đầu kỳ' };
 const currentMonth = localMonth();
 export default function AssetWorkbenchPage() {
   useDocumentTitle(`${uiText('Sổ tài sản cố định')} · OSP Suite`);
-  const [assets, setAssets] = useState([]);
-  const [depreciations, setDepreciations] = useState([]);
+  const { assets, depreciations, loading, error, setError, load } = useAssetWorkbenchData();
   const [form, setForm] = useState({ name: '', code: '', category: '', purchase_date: '', in_service_date: localDate(), cost: '', salvage_value: '0', useful_life_months: '60', depreciation_method: 'straight_line', declining_balance_factor: '2', acquisition_method: 'bank', opening_accumulated_depreciation: '0', location: '' });
   const [depreciationForm, setDepreciationForm] = useState({ asset: '', period: currentMonth });
   const [disposals, setDisposals] = useState({});
   const [filter, setFilter] = useState('all');
   const [busy, setBusy] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const [assetRes, depreciationRes] = await Promise.all([
-        can('asset.asset.read') ? loadAllResponse('asset.asset') : Promise.resolve({ items: [] }),
-        can('asset.depreciation.read') ? loadAllResponse('asset.depreciation') : Promise.resolve({ items: [] }),
-      ]);
-      const assetRows = rows(assetRes).sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')));
-      const depreciationRows = rows(depreciationRes).sort((a, b) => String(b.period || '').localeCompare(String(a.period || '')));
-      setAssets(assetRows); setDepreciations(depreciationRows);
-      setDepreciationForm((current) => ({ ...current, asset: current.asset && assetRows.some((asset) => asset.id === current.asset && asset.status === 'active') ? current.asset : assetRows.find((asset) => asset.status === 'active')?.id || '' }));
-    } catch (reason) { setError(reason.message || uiText('Không tải được sổ tài sản.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { setDepreciationForm((current) => ({ ...current, asset: current.asset && assets.some((asset) => asset.id === current.asset && asset.status === 'active') ? current.asset : assets.find((asset) => asset.status === 'active')?.id || '' })); }, [assets]);
   const visibleAssets = useMemo(() => assets.filter((asset) => filter === 'all' || asset.status === filter), [assets, filter]);
   const activeAssets = assets.filter((asset) => asset.status === 'active');
   const activeBookValue = addDecimals(activeAssets.map((asset) => asset.book_value ?? asset.cost ?? 0));
