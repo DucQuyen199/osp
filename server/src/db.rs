@@ -2,7 +2,9 @@
 use crate::error::{ApiError, R};
 use deadpool_postgres::{Config, ManagerConfig, Pool, RecyclingMethod, Runtime};
 use serde_json::Value;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
+use tokio_postgres::config::SslMode;
 use tokio_postgres::types::ToSql;
 use tokio_postgres::{IsolationLevel, NoTls, Row};
 
@@ -24,8 +26,45 @@ pub fn make_pool(url: &str, max: usize) -> Result<Pool, String> {
         recycling_method: RecyclingMethod::Fast,
     });
     cfg.pool = Some(deadpool_postgres::PoolConfig::new(max));
-    cfg.create_pool(Some(Runtime::Tokio1), NoTls)
-        .map_err(|e| e.to_string())
+    if connection.get_ssl_mode() == SslMode::Disable {
+        cfg.create_pool(Some(Runtime::Tokio1), NoTls)
+            .map_err(|e| e.to_string())
+    } else {
+        cfg.create_pool(Some(Runtime::Tokio1), database_tls()?)
+            .map_err(|e| e.to_string())
+    }
+}
+
+fn database_tls() -> Result<tokio_postgres_rustls::MakeRustlsConnect, String> {
+    let native = rustls_native_certs::load_native_certs();
+    let mut roots = rustls::RootCertStore::empty();
+    let mut loaded = 0usize;
+    for certificate in native.certs {
+        roots
+            .add(certificate)
+            .map_err(|error| format!("Không nạp được chứng chỉ CA hệ thống: {error}"))?;
+        loaded += 1;
+    }
+    if loaded == 0 {
+        let details = native
+            .errors
+            .into_iter()
+            .map(|error| error.to_string())
+            .collect::<Vec<_>>()
+            .join("; ");
+        return Err(if details.is_empty() {
+            "Không tìm thấy CA hệ thống cho kết nối PostgreSQL TLS".into()
+        } else {
+            format!("Không nạp được CA hệ thống cho PostgreSQL TLS: {details}")
+        });
+    }
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let client = rustls::ClientConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .map_err(|error| format!("Không khởi tạo được phiên bản TLS an toàn: {error}"))?
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+    Ok(tokio_postgres_rustls::MakeRustlsConnect::new(client))
 }
 
 /// Giao dịch gắn với một tenant: đặt app.tenant_id (RLS) và (khi ghi) khóa tư vấn theo tenant.
@@ -137,4 +176,25 @@ impl<'a> Tx<'a> {
 
 pub fn pool_err(e: deadpool_postgres::PoolError) -> ApiError {
     ApiError::internal(e)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{database_tls, make_pool};
+
+    #[test]
+    fn tls_connector_builds_from_system_trust_roots() {
+        assert!(database_tls().is_ok());
+    }
+
+    #[test]
+    fn explicit_disable_keeps_plain_local_pool_available() {
+        assert!(
+            make_pool(
+                "postgresql://osp:secret@127.0.0.1:5432/osp?sslmode=disable",
+                1
+            )
+            .is_ok()
+        );
+    }
 }

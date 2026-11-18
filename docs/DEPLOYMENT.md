@@ -77,7 +77,7 @@ Doanh nghiệp tạo ra chỉ chọn được trong số module đã cài; modul
 | `OSP_PROCESS_ROLE` | `all` | `api` chỉ phục vụ HTTP, `worker` chỉ chạy tác vụ nền, `all` chạy cả hai; Compose đặt riêng role cho từng service |
 | `OSP_RATE_LIMIT` | `600` | Hạn mức API theo IP hiệu dụng mỗi phút; bộ đếm hiện giữ trong bộ nhớ của từng tiến trình |
 | `OSP_TRUSTED_PROXIES` | rỗng | Danh sách IP/CIDR reverse proxy tin cậy, phân cách bằng dấu phẩy. Chỉ khi peer trực tiếp thuộc danh sách, ứng dụng mới đọc `X-Forwarded-For` từ phải sang trái để xác định IP client và bỏ qua các hop proxy đã tin cậy. Ví dụ: `127.0.0.1/32,10.0.0.0/8`. Không đưa IP client hoặc mạng Internet vào danh sách này. |
-| `DATABASE_URL` | — | Chuỗi kết nối PostgreSQL bắt buộc khi chạy Rust production |
+| `DATABASE_URL` | — | Chuỗi kết nối PostgreSQL bắt buộc; `sslmode` nhận `prefer`, `require` hoặc `disable` |
 | `OSP_MODULES` / `--modules=` | tất cả | Danh sách module cần cài |
 | `OSP_JOBS_INTERVAL_SEC` | `60` | Chu kỳ scheduler; đặt `0` để tắt |
 | `OSP_COMM_CONCURRENCY` | `4` | Số lần gửi đồng thời trên mỗi worker (1–64); giới hạn theo rate limit của nhà cung cấp |
@@ -93,6 +93,13 @@ Doanh nghiệp tạo ra chỉ chọn được trong số module đã cài; modul
 | `NODE_ENV=production` | — | Tắt demo mặc định, bật log truy cập JSON (thời gian, request ID, phương thức, trạng thái, thời gian xử lý) |
 
 Máy chủ tắt êm khi nhận `SIGINT`/`SIGTERM` (đóng DB).
+
+`DATABASE_URL` hỗ trợ `sslmode=disable`, `prefer` (mặc định) và `require`.
+Connector Rustls xác minh chuỗi chứng chỉ và hostname theo CA hệ điều hành; chế
+độ `prefer` chỉ rơi về kết nối rõ nếu máy chủ không hỗ trợ TLS. Với PostgreSQL
+managed hoặc mạng không tin cậy, đặt `sslmode=require`. Cài CA riêng vào trust
+store của hệ điều hành hoặc đặt `SSL_CERT_FILE` trỏ đến PEM CA. Chỉ dùng
+`sslmode=disable` cho mạng cô lập có kiểm soát.
 
 ## 3. Dữ liệu và lưu trữ PostgreSQL
 
