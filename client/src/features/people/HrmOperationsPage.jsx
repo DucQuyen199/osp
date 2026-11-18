@@ -13,6 +13,7 @@ import SalaryRevisionForm from './components/SalaryRevisionForm.jsx';
 import WorkScheduleEntriesPanel from './components/WorkScheduleEntriesPanel.jsx';
 import WorkSchedulePatternsTable from './components/WorkSchedulePatternsTable.jsx';
 import { EmployeeDirectoryTable, LeaveRequestsTable, SalaryRevisionsTable } from './components/HrmWorkflowTables.jsx';
+import EmployeeWeekScheduleTable from './components/EmployeeWeekScheduleTable.jsx';
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const fmtTime = (value) => value ? localTime(new Date(value)) : '--';
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
@@ -334,7 +335,7 @@ export default function HrmOperationsPage() {
       recordLabel={recordLabel}
       t={uiText}
     />}
-    {can('hrm.employee.read') && employees.some((row) => Array.isArray(row.work_weekdays) || row.standard_hours_per_day) && <section className="card card-pad u-legacy-92c18f6bda" ><h2>{uiText("Lịch tuần riêng")}</h2><div className="table-wrap"><table className="table"><thead><tr><th>{uiText("Nhân viên")}</th><th>{uiText("Ngày làm việc")}</th><th>{uiText("Giờ chuẩn mỗi ngày")}</th></tr></thead><tbody>{employees.filter((row) => Array.isArray(row.work_weekdays) || row.standard_hours_per_day).map((row) => <tr key={row.id}><td>{recordLabel('hrm.employee', row)}</td><td>{Array.isArray(row.work_weekdays) ? row.work_weekdays.map((day) => weekdayOptions.find(([number]) => number === Number(day))?.[1]).filter(Boolean).join(', ') : uiText('Theo lịch kỳ lương')}</td><td>{row.standard_hours_per_day || uiText('Theo lịch kỳ lương')}</td></tr>)}</tbody></table></div><p className="small muted u-legacy-df928149c5" >{uiText("Lịch tuần là mặc định; các ca và ngày nghỉ cụ thể ghi ở phần Lịch ca theo ngày phía trên sẽ được ưu tiên.")}</p></section>}
+    {can('hrm.employee.read') && <EmployeeWeekScheduleTable employees={employees} weekdays={weekdayOptions} recordLabel={recordLabel} t={uiText} />}
     <div className="layout-split u-legacy-92c18f6bda" >
       {can('hrm.leave_request.create') && <LeaveRequestForm
         form={leaveForm}
