@@ -5,7 +5,9 @@ import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
+import { addDecimals, compareDecimals } from '../../lib/decimal.js';
 import QuotationComposer from './components/QuotationComposer.jsx';
+import { eligibleWholesaleReturnLines, estimateWholesaleSubtotal, remainingWholesaleShipmentLines, wholesalePrice } from './domain/wholesaleSelectors.js';
 import wholesaleEnglish from './wholesale.en.js';
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const today = localDate;
@@ -76,12 +78,8 @@ export default function WholesaleSalesDeskPage() {
   const selectedList = priceLists.find((item) => item.id === priceList);
   const unitsFor = (product) => product?.uom ? [...units.values()].filter((unit) => unit.id === product.uom || unit.base_uom === product.uom) : [];
   const cart = Object.entries(quantities).map(([id, qty]) => ({ product: products.get(id), qty: Number(qty), uom: selectedUnits[id] || products.get(id)?.uom })).filter((line) => line.product && line.qty > 0);
-  const getPrice = (product, uomId) => {
-    const basePrice = Number(selectedList?.items?.find((item) => item.product === product.id)?.price ?? product.price ?? 0) || 0;
-    const unit = units.get(uomId);
-    return basePrice * (unit?.base_uom ? Number(unit.ratio || 0) : 1);
-  };
-  const estimate = cart.reduce((total, line) => total + getPrice(line.product, line.uom) * line.qty, 0);
+  const getPrice = (product, uomId) => wholesalePrice(product, uomId, selectedList, units);
+  const estimate = estimateWholesaleSubtotal(cart, selectedList, units);
   const setQuantity = (id, value) => setQuantities((current) => { const next = { ...current }; const qty = Math.max(0, Number(value) || 0); if (qty) next[id] = qty; else delete next[id]; return next; });
   const createQuote = async (event) => {
     event.preventDefault(); if (!party || !warehouse || !cart.length) return;
@@ -127,51 +125,9 @@ export default function WholesaleSalesDeskPage() {
   const shipmentForOrder = (order) => shipments.filter((shipment) => shipment.source === 'sales_order' && shipment.source_id === order.id);
   const invoiceForOrder = (order) => invoices.find((invoice) => invoice.source === 'sales_order' && invoice.source_id === order.id);
   const expired = (quote) => quote.valid_until && quote.valid_until < today();
-  const eligibleReturnLines = (order) => {
-    const groups = new Map();
-    for (const line of order.lines || []) {
-      const product = line.product;
-      const price = Number(line.price || 0);
-      const uom = line.uom || products.get(product)?.uom || '';
-      const key = `${product}:${price.toFixed(2)}:${uom}`;
-      const current = groups.get(key) || { key, product, price, uom: uom || undefined, uom_name: line.uom_name, ordered: 0, name: products.get(product)?.name || 'Mặt hàng' };
-      current.ordered += Number(line.qty || 0);
-      groups.set(key, current);
-    }
-    const requiresDelivery = app.meta?.modules?.some((module) => module.id === 'logistics') && Boolean(order.shipping_address?.trim());
-    return [...groups.values()].map((line) => {
-      const eligible = requiresDelivery
-        ? shipmentForOrder(order).filter((shipment) => shipment.status === 'delivered').flatMap((shipment) => shipment.delivered_lines || shipment.lines || []).filter((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && Math.abs(Number(item.price || 0) - line.price) <= .005).reduce((sum, item) => sum + Number(item.qty || 0), 0)
-        : line.ordered;
-      const alreadyReturned = returns.filter((record) => record.sales_order === order.id && ['submitted', 'approved', 'received'].includes(record.status)).flatMap((record) => record.lines || []).filter((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && Math.abs(Number(item.price || 0) - line.price) <= .005).reduce((sum, item) => sum + Number(item.qty || 0), 0);
-      return { ...line, eligible, remaining: Math.max(0, eligible - alreadyReturned) };
-    }).filter((line) => line.remaining > 0);
-  };
-  const remainingShipmentLines = (order) => {
-    const groups = new Map();
-    for (const line of order.lines || []) {
-      if (['service', 'digital'].includes(line.kind)) continue;
-      const product = line.product;
-      const price = Number(line.price || 0);
-      const uom = line.uom || products.get(product)?.uom || '';
-      const key = `${product}:${price.toFixed(2)}:${uom}`;
-      const current = groups.get(key) || { key, product, price, uom: uom || undefined, uom_name: line.uom_name, ordered: 0 };
-      current.ordered += Number(line.qty || 0);
-      groups.set(key, current);
-    }
-    const reserved = new Map();
-    for (const shipment of shipmentForOrder(order).filter((row) => ['created', 'dispatched', 'delivered'].includes(row.status))) {
-      const reservedLines = shipment.status === 'delivered' ? (shipment.delivered_lines || shipment.lines || []) : (shipment.lines || []);
-      for (const line of reservedLines) {
-        const key = `${line.product}:${Number(line.price || 0).toFixed(2)}:${line.uom || products.get(line.product)?.uom || ''}`;
-        reserved.set(key, (reserved.get(key) || 0) + Number(line.qty || 0));
-      }
-    }
-    return [...groups.values()].map((line) => ({
-      ...line,
-      remaining: Math.max(0, line.ordered - (reserved.get(line.key) || 0)),
-    })).filter((line) => line.remaining > 0.000001);
-  };
+  const eligibleReturnLines = (order) => eligibleWholesaleReturnLines(order, shipments, returns, products,
+    app.meta?.modules?.some((module) => module.id === 'logistics') && Boolean(order.shipping_address?.trim()));
+  const remainingShipmentLines = (order) => remainingWholesaleShipmentLines(order, shipments, products);
   const createShipment = async (order) => {
     const openLines = remainingShipmentLines(order);
     const lines = openLines.map((line) => ({
@@ -181,7 +137,7 @@ export default function WholesaleSalesDeskPage() {
       qty: Number(shipmentQuantities[order.id]?.[line.key]) || 0,
       remaining: line.remaining,
     })).filter((line) => line.qty > 0);
-    if (!lines.length || lines.some((line) => line.qty > line.remaining + 0.000001)) return;
+    if (!lines.length || lines.some((line) => compareDecimals(line.qty, addDecimals([line.remaining, '0.000001'])) > 0)) return;
     setBusy(`${order.id}:shipment`); setError(''); setNotice('');
     try {
       const created = await api(dataPath('logistics.shipment'), { method: 'POST', body: {
@@ -198,7 +154,7 @@ export default function WholesaleSalesDeskPage() {
     } finally { setBusy(''); }
   };
   const createReturn = async (order) => {
-    const lines = eligibleReturnLines(order).map((line) => ({ ...line, qty: Number(returnQuantities[`${order.id}:${line.key}`]) || 0 })).filter((line) => line.qty > 0).map(({ product, price, qty, uom }) => ({ product, price, qty, uom }));
+    const lines = eligibleReturnLines(order).map((line) => ({ ...line, qty: Number(returnQuantities[`${order.id}:${line.key}`]) || 0 })).filter((line) => line.qty > 0).map(({ product, price, qty, uom, discount_pct, tax, tax_rate }) => ({ product, price, qty, uom, discount_pct, tax, tax_rate }));
     if (!lines.length || !returnReasons[order.id]?.trim()) return;
     setBusy(`${order.id}:return`); setError(''); setNotice('');
     try {

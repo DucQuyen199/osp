@@ -90,7 +90,7 @@ export default function SalesReturnsWorkbenchPage() {
       const discount = Number(line.effective_discount_pct ?? line.discount_pct ?? 0);
       const tax = line.tax || '';
       const taxRate = Number(line.tax_rate || 0);
-      const key = [line.product, price.toFixed(2), uom, discount.toFixed(6), tax, taxRate.toFixed(6)].join(':');
+      const key = [line.product, price.toFixed(2), uom, discount, tax, taxRate].join(':');
       const current = groups.get(key) || { key, product: line.product, price, uom: line.uom, uom_name: line.uom_name, uom_ratio: line.uom_ratio, discount_pct: discount, tax: line.tax ?? null, tax_rate: taxRate, ordered: '0', name: products.get(line.product)?.name || uiText('Mặt hàng') };
       current.ordered = addDecimals([current.ordered, line.qty || 0]);
       groups.set(key, current);
