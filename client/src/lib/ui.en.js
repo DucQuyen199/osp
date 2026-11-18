@@ -1444,5 +1444,6 @@ const uiTextEnglish = {
   'Submit manual journal entries for independent approval before posting': 'Hãy gửi bút toán thủ công để người khác phê duyệt trước khi ghi sổ.',
   'Journal rejection must come from an approval decision': 'Bút toán chỉ bị từ chối theo quyết định trong luồng phê duyệt.',
   'Mật khẩu tối thiểu 15 ký tự': 'Password must be at least 15 characters.',
+  'Mật khẩu phổ biến, hãy chọn mật khẩu khác': 'This password is too common. Choose a different one.',
 };
 export default uiTextEnglish;

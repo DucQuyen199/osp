@@ -7,6 +7,7 @@ const authEnglish = {
   'Đăng nhập bằng tài khoản doanh nghiệp': 'Sign in with your business identity', 'Đang chuyển tới nhà cung cấp…': 'Redirecting to identity provider…', 'Nhập mã doanh nghiệp trước khi đăng nhập bằng tài khoản doanh nghiệp.': 'Enter your business ID before using your business identity.', 'Không bắt đầu được đăng nhập doanh nghiệp.': 'Could not start business sign-in.',
   'Đăng nhập doanh nghiệp': 'Business sign-in', 'Nhập mã từ ứng dụng xác thực hoặc mã khôi phục.': 'Enter a code from your authenticator app or a recovery code.', 'Đang xác minh tài khoản của bạn…': 'Verifying your account…', 'Bạn có thể quay lại trang đăng nhập và thử lại.': 'You can return to the sign-in page and try again.', 'Phản hồi đăng nhập không đầy đủ. Hãy thử đăng nhập lại.': 'The sign-in response is incomplete. Please try again.', 'Đăng nhập doanh nghiệp không thành công.': 'Business sign-in failed.',
   'Mật khẩu tối thiểu 15 ký tự': 'Password must be at least 15 characters.',
+  'Mật khẩu phổ biến, hãy chọn mật khẩu khác': 'This password is too common. Choose a different one.',
 };
 
 export default authEnglish;

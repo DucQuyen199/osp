@@ -14,7 +14,7 @@ Tài liệu mô tả những gì hệ thống **đã làm**, những gì **chưa
 
 ## 2. Xác thực và phiên
 
-- **Mật khẩu:** Argon2id (`m=19456 KiB`, `t=2`, `p=1`, salt 16 byte ngẫu nhiên, khóa 32 byte), so sánh bằng `subtle::ConstantTimeEq` và chạy trong `spawn_blocking`. Mật khẩu mới dài từ 15 đến 200 Unicode code point; chấp nhận khoảng trắng và Unicode, không ép trộn nhóm ký tự. Mật khẩu hiện có vẫn đăng nhập được. Khi tài khoản không tồn tại vẫn chạy Argon2id với giá trị giả để giảm khả năng dò tài khoản qua thời gian phản hồi.
+- **Mật khẩu:** Argon2id (`m=19456 KiB`, `t=2`, `p=1`, salt 16 byte ngẫu nhiên, khóa 32 byte), so sánh bằng `subtle::ConstantTimeEq` và chạy trong `spawn_blocking`. Mật khẩu mới dài từ 15 đến 200 Unicode code point; chấp nhận khoảng trắng và Unicode, không ép trộn nhóm ký tự. Chặn mật khẩu phổ biến bằng blocklist SecLists 10.000 mục được đóng gói cục bộ và so khớp không phân biệt hoa thường; không gửi mật khẩu đến dịch vụ ngoài. Mật khẩu hiện có vẫn đăng nhập được. Khi tài khoản không tồn tại vẫn chạy Argon2id với giá trị giả để giảm khả năng dò tài khoản qua thời gian phản hồi.
 - **Token:** tiền tố `osp_` và hai UUID v4 ngẫu nhiên ở dạng hex. Chỉ lưu **SHA-256** của token; DB bị lộ không đủ để dùng lại token. Danh sách token chỉ trả 12 ký tự đầu của băm làm mã định danh.
 - **Phiên** hết hạn sau 12 giờ; bị thu hồi khi đăng xuất, đổi mật khẩu, khóa tài khoản. **API token** có thể đặt hạn.
 - Người dùng có thể xem thời gian bắt đầu/hết hạn và tự thu hồi mọi phiên trình duyệt khác trong **Bảo mật tài khoản**; thao tác này chỉ tác động các phiên của chính họ.
@@ -90,6 +90,6 @@ Giao diện chỉ chèn dữ liệu vào DOM bằng `textContent`; không dùng 
 | **Không mã hóa dữ liệu khi lưu** (at-rest) | Ai có quyền đọc volume có thể đọc dữ liệu | Mã hóa đĩa (BitLocker/LUKS), hoặc mã hóa volume PostgreSQL |
 | Audit append-only chưa chống được DBA/superuser có quyền đổi schema hoặc vô hiệu hóa trigger | Người có quyền quản trị PostgreSQL vẫn có thể thay đổi dữ liệu | Sao chép định kỳ sang kho WORM/độc lập nếu cần bằng chứng chống quản trị DB |
 | Chưa có kiểm thử xâm nhập độc lập, chưa rà soát chuỗi cung ứng thư viện | | Cần làm trước khi bán cho khách có yêu cầu bảo mật |
-| Chưa kiểm mật khẩu mới với danh sách mật khẩu phổ biến/bị lộ | Mật khẩu dài nhưng đã phổ biến hoặc bị lộ vẫn có thể được chọn | Dùng blocklist được duy trì và kiểm tra cục bộ để không gửi mật khẩu ra dịch vụ bên ngoài |
+| Blocklist mật khẩu là snapshot 10.000 mật khẩu phổ biến, chưa bao quát mọi mật khẩu bị lộ | Một mật khẩu đã bị lộ nhưng không có trong snapshot vẫn có thể được chọn | Rà soát và cập nhật định kỳ blocklist cục bộ; không gửi mật khẩu gốc ra dịch vụ ngoài |
 
 **Báo lỗi bảo mật:** gửi riêng cho chủ dự án, không mở issue công khai.

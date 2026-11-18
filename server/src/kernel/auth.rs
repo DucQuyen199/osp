@@ -6,8 +6,9 @@ use crate::error::{ApiError, R};
 use argon2::{Algorithm, Argon2, Params, Version};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::env;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use std::time::{Duration, Instant};
 use subtle::ConstantTimeEq;
 use uuid::Uuid;
@@ -17,6 +18,13 @@ pub(crate) mod oidc;
 
 const LOGIN_MAX_FAILS: u32 = 5;
 const LOGIN_WINDOW: Duration = Duration::from_secs(15 * 60);
+static COMMON_PASSWORDS: LazyLock<HashSet<String>> = LazyLock::new(|| {
+    include_str!("password_blocklist.txt")
+        .lines()
+        .filter(|password| !password.is_empty() && !password.starts_with('#'))
+        .map(str::to_lowercase)
+        .collect()
+});
 
 fn valid_api_scope(scope: &str) -> bool {
     if scope.len() > 160 {
@@ -116,6 +124,13 @@ pub fn check_password(pw: &str) -> R<()> {
     }
     if length > 200 {
         return Err(ApiError::new(422, "WEAK_PASSWORD", "Mật khẩu quá dài"));
+    }
+    if COMMON_PASSWORDS.contains(&pw.to_lowercase()) {
+        return Err(ApiError::new(
+            422,
+            "WEAK_PASSWORD",
+            "Mật khẩu phổ biến, hãy chọn mật khẩu khác",
+        ));
     }
     Ok(())
 }
