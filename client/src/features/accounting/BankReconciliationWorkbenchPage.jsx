@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate } from '../../lib/dates.js';
@@ -6,10 +6,11 @@ import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { confirmDialog } from '../../lib/feedback.js';
 import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { absDecimal, compareDecimals, subtractDecimals } from '../../lib/decimal.js';
-import { app, can, loadAll, loadRefs, recordLabel } from '../../lib/state.js';
+import { app, can, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import { amountsEqualWithin, calculateBankNet, calculateStatementTotals } from './domain/bankReconciliation.js';
 import bankReconciliationEnglish from './bank-reconciliation.en.js';
+import { useBankReconciliationData } from './hooks/useBankReconciliationData.js';
 const t = (text) => uiTextWith(text, bankReconciliationEnglish);
 const today = localDate;
 const shiftDate = (value, days) => { const date = new Date(`${value}T00:00:00Z`); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0, 10); };
@@ -19,16 +20,11 @@ const sameAmount = amountsEqualWithin;
 const isBankAccount = (account) => /^112\d*$/.test(String(account?.code || '')) && account.kind === 'asset';
 export default function BankReconciliationWorkbenchPage() {
   useDocumentTitle(`${t('Đối soát ngân hàng')} · OSP Suite`);
-  const [statements, setStatements] = useState([]);
-  const [allLines, setAllLines] = useState([]);
-  const [linesLoading, setLinesLoading] = useState(false);
   const [matchCandidates, setMatchCandidates] = useState({});
   const [candidateLoading, setCandidateLoading] = useState({});
   const [matcherOpen, setMatcherOpen] = useState({});
-  const [accounts, setAccounts] = useState(new Map());
-  const [currencies, setCurrencies] = useState(new Map());
-  const [parties, setParties] = useState(new Map());
   const [statementId, setStatementId] = useState('');
+  const { statements, allLines, linesLoading, accounts, currencies, parties, baseCurrency, loading, error: dataError, setError: setDataError, load: loadData, loadLines } = useBankReconciliationData(statementId, t);
   const [statementForm, setStatementForm] = useState({ account: '', currency: '', statement_number: '', start_date: `${today().slice(0, 7)}-01`, end_date: today(), opening_balance: '', closing_balance: '' });
   const [lineForm, setLineForm] = useState({ transaction_date: today(), reference: '', description: '', direction: 'credit', amount: '' });
   const [statementFile, setStatementFile] = useState(null);
@@ -36,42 +32,22 @@ export default function BankReconciliationWorkbenchPage() {
   const [ignoreReasons, setIgnoreReasons] = useState({});
   const [ignoreOpen, setIgnoreOpen] = useState({});
   const [busy, setBusy] = useState('');
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const lineLoadVersion = useRef(0);
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const [statementRows, accountMap, currencyMap, partyMap] = await Promise.all([
-        can('accounting.bank_statement.read') ? loadAll('accounting.bank_statement') : Promise.resolve([]),
-        can('accounting.account.read') ? loadRefs('accounting.account') : Promise.resolve(new Map()),
-        can('master-data.currency.read') ? loadRefs('master-data.currency') : Promise.resolve(new Map()),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-      ]);
-      statementRows.sort((a, b) => String(b.start_date || '').localeCompare(String(a.start_date || '')));
-      setStatements(statementRows);
-      setAccounts(accountMap); setCurrencies(currencyMap); setParties(partyMap);
-      setStatementId((id) => statementRows.some((row) => row.id === id) ? id : statementRows.find((row) => row.status === 'draft')?.id || statementRows[0]?.id || '');
-      const baseCurrency = [...currencyMap.values()].find((currency) => String(currency.code).toUpperCase() === String(app.meta?.settings?.baseCurrency || 'VND').toUpperCase());
-      setStatementForm((form) => ({ ...form, account: form.account || [...accountMap.values()].find((account) => account.code === '112')?.id || [...accountMap.values()].find(isBankAccount)?.id || '', currency: form.currency || baseCurrency?.id || '' }));
-    } catch (reason) { setError(reason.message || t('Không tải được dữ liệu đối soát ngân hàng.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
-  const loadLines = useCallback(async (id) => {
-    const version = ++lineLoadVersion.current;
-    if (!id || !can('accounting.bank_statement_line.read')) { setAllLines([]); setLinesLoading(false); return; }
-    setLinesLoading(true);
-    try { const rows = await loadAll('accounting.bank_statement_line', { statement: id }); if (version === lineLoadVersion.current) setAllLines(rows); }
-    catch (reason) { if (version === lineLoadVersion.current) setError(reason.message || t('Không tải được các dòng trong sao kê.')); }
-    finally { if (version === lineLoadVersion.current) setLinesLoading(false); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => { loadLines(statementId); }, [statementId, loadLines]);
+  useEffect(() => {
+    setStatementId((id) => statements.some((row) => row.id === id) ? id : statements.find((row) => row.status === 'draft')?.id || statements[0]?.id || '');
+  }, [statements]);
+  useEffect(() => {
+    setStatementForm((form) => ({ ...form, account: form.account || [...accounts.values()].find((account) => account.code === '112')?.id || [...accounts.values()].find(isBankAccount)?.id || '', currency: form.currency || baseCurrency?.id || '' }));
+  }, [accounts, baseCurrency]);
+  const load = async (quiet = false) => {
+    if (!quiet) setError('');
+    setDataError('');
+    await loadData(quiet);
+  };
   const selected = statements.find((row) => row.id === statementId);
   const selectedLines = useMemo(() => [...allLines].sort((a, b) => String(a.transaction_date || '').localeCompare(String(b.transaction_date || '')) || String(a.reference || '').localeCompare(String(b.reference || ''))), [allLines]);
   const bankAccount = useMemo(() => accounts.get(selected?.account) || [...accounts.values()].find((account) => account.code === '112'), [accounts, selected?.account]);
-  const baseCurrency = useMemo(() => [...currencies.values()].find((currency) => String(currency.code).toUpperCase() === String(app.meta?.settings?.baseCurrency || 'VND').toUpperCase()), [currencies]);
   const matchedPaymentIds = useMemo(() => new Set(allLines.filter((line) => line.status === 'matched' && line.payment).map((line) => line.payment)), [allLines]);
   const matchedJournalIds = useMemo(() => new Set(allLines.filter((line) => line.status === 'matched' && line.journal_entry).map((line) => line.journal_entry)), [allLines]);
   const totals = useMemo(() => calculateStatementTotals(selected, selectedLines), [selected, selectedLines]);
@@ -191,7 +167,7 @@ export default function BankReconciliationWorkbenchPage() {
   const readyToReconcile = Boolean(selected && selected.status === 'draft' && selectedLines.length && totals.unmatched === 0 && compareDecimals(absDecimal(totals.difference), '0.005') <= 0);
   return <div className="page">
     <div className="page-head"><div><h1>{t("Đối soát ngân hàng")}</h1><p className="sub">{t("Nhập sao kê, khớp từng giao dịch với payment hoặc bút toán đã ghi sổ, giải trình dòng bỏ qua và khóa kỳ khi số dư khớp.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={async () => { await load(); await loadLines(statementId); }}>{t("Làm mới")}</button></div>
-    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
+    {(error || dataError) && <div className="alert danger" role="alert">{t(error || dataError)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     {can('accounting.bank_statement.create') && <section className="card card-pad"><h2>{t("Mở sao kê ngân hàng")}</h2><form className="form-grid" onSubmit={createStatement}>
       <label className="field"><span className="label">{t("Tài khoản ngân hàng *")}</span><select className="select" required value={statementForm.account} onChange={(event) => setStatementForm((form) => ({ ...form, account: event.target.value }))}><option value="">{t("Chọn tài khoản nhóm 112")}</option>{[...accounts.values()].filter(isBankAccount).map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}</select></label>
       <label className="field"><span className="label">{t("Đồng tiền sao kê *")}</span><select className="select" required value={statementForm.currency} onChange={(event) => setStatementForm((form) => ({ ...form, currency: event.target.value }))}><option value="">{t("Chọn đồng tiền")}</option>{[...currencies.values()].map((currency) => <option key={currency.id} value={currency.id}>{currency.code} · {currency.name}</option>)}</select></label>
