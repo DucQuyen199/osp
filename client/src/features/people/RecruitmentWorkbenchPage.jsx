@@ -2,14 +2,12 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
-import { api, dataPath } from '../../lib/api.js';
 import { statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import recruitmentEnglish from './recruitment.en.js';
+import { RECRUITMENT_STAGES, useRecruitmentWorkflow } from './hooks/useRecruitmentWorkflow.js';
 const t = (text) => uiTextWith(text, recruitmentEnglish);
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
-const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
-const stages = ['Sàng lọc hồ sơ', 'Phỏng vấn', 'Tham chiếu', 'Đề nghị tuyển dụng'];
 export default function RecruitmentWorkbenchPage() {
   useDocumentTitle(`${t('Tuyển dụng')} · OSP Suite`);
   const [jobs, setJobs] = useState([]);
@@ -17,14 +15,9 @@ export default function RecruitmentWorkbenchPage() {
   const [applications, setApplications] = useState([]);
   const [departments, setDepartments] = useState(new Map());
   const [positions, setPositions] = useState(new Map());
-  const [jobForm, setJobForm] = useState({ title: '', department: '', position: '', headcount: '' });
-  const [candidateForm, setCandidateForm] = useState({ name: '', email: '', phone: '' });
-  const [applicationForm, setApplicationForm] = useState({ job: '', candidate: '' });
   const [selectedId, setSelectedId] = useState('');
-  const [busy, setBusy] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const latestRequest = useLatestRequest();
   const load = useCallback(async (quiet = false) => {
     const isLatest = latestRequest();
@@ -43,7 +36,6 @@ export default function RecruitmentWorkbenchPage() {
       if (isLatest()) {
         setJobs(jobRows); setCandidates(candidateRows); setApplications(applicationRows); setDepartments(departmentMap); setPositions(positionMap);
         setSelectedId((id) => applicationRows.some((row) => row.id === id) ? id : applicationRows[0]?.id || '');
-        setApplicationForm((form) => ({ ...form, job: form.job || jobRows.find((row) => row.status === 'open')?.id || '', candidate: form.candidate || candidateRows[0]?.id || '' }));
       }
     } catch (reason) { if (isLatest()) setError(t(reason.message || 'Không tải được dữ liệu tuyển dụng.')); }
     finally { if (isLatest()) setLoading(false); }
@@ -52,46 +44,16 @@ export default function RecruitmentWorkbenchPage() {
   const jobById = useMemo(() => new Map(jobs.map((row) => [row.id, row])), [jobs]);
   const candidateById = useMemo(() => new Map(candidates.map((row) => [row.id, row])), [candidates]);
   const selected = applications.find((row) => row.id === selectedId);
+  const workflow = useRecruitmentWorkflow({ jobs, candidates, candidateById, load, setSelectedId, setError, t });
+  const {
+    jobForm, setJobForm, candidateForm, setCandidateForm,
+    applicationForm, setApplicationForm, busy, notice,
+    saveJob, saveCandidate, createApplication, updateStage, decide, closeJob,
+  } = workflow;
   const openJobs = jobs.filter((row) => row.status === 'open');
   const activeApplications = applications.filter((row) => row.status === 'applied');
   const hiredApplications = applications.filter((row) => row.status === 'hired');
   const rejectedApplications = applications.filter((row) => row.status === 'rejected');
-  async function run(key, operation, success) {
-    setBusy(key); setError(''); setNotice('');
-    try { await operation(); setNotice(t(success)); await load(true); }
-    catch (reason) { setError(t(reason.message || 'Thao tác không thành công.')); await load(true); }
-    finally { setBusy(''); }
-  }
-  async function saveJob(event) {
-    event.preventDefault();
-    const payload = { title: jobForm.title.trim(), department: jobForm.department || undefined, position: jobForm.position || undefined, headcount: jobForm.headcount ? Number(jobForm.headcount) : undefined };
-    await run('job:create', async () => { const row = await api(dataPath('recruitment.job_opening'), { method: 'POST', body: payload }); setJobForm({ title: '', department: '', position: '', headcount: '' }); setApplicationForm((form) => ({ ...form, job: form.job || row.id })); }, 'Đã mở vị trí tuyển dụng.');
-  }
-  async function saveCandidate(event) {
-    event.preventDefault();
-    const payload = { name: candidateForm.name.trim(), email: candidateForm.email.trim() || undefined, phone: candidateForm.phone.trim() || undefined };
-    await run('candidate:create', async () => { const row = await api(dataPath('recruitment.candidate'), { method: 'POST', body: payload }); setCandidateForm({ name: '', email: '', phone: '' }); setApplicationForm((form) => ({ ...form, candidate: form.candidate || row.id })); }, 'Đã lưu hồ sơ ứng viên.');
-  }
-  async function createApplication(event) {
-    event.preventDefault();
-    const candidate = candidateById.get(applicationForm.candidate);
-    if (!candidate) return;
-    await run('application:create', async () => {
-      const row = await api(dataPath('recruitment.application'), { method: 'POST', body: { job: applicationForm.job, candidate: candidate.id, candidate_name: candidate.name, stage: stages[0] } });
-      await action('recruitment.application', row, 'applied'); setSelectedId(row.id);
-    }, 'Đã ghi nhận hồ sơ ứng tuyển ở vòng sàng lọc.');
-  }
-  async function updateStage(row, stage) {
-    if (!stage || stage === row.stage) return;
-    await run(`${row.id}:stage`, () => api(dataPath('recruitment.application', row.id), { method: 'PATCH', body: { stage } }), 'Đã cập nhật vòng tuyển dụng.');
-  }
-  async function decide(row, verb) {
-    const messages = { hired: 'Đã tuyển ứng viên; hồ sơ nhân viên được tạo tự động trong HRM.', rejected: 'Đã từ chối hồ sơ và lưu lại lịch sử tuyển dụng.' };
-    await run(`${row.id}:${verb}`, () => action('recruitment.application', row, verb), messages[verb]);
-  }
-  async function closeJob(row) {
-    await run(`${row.id}:closed`, () => action('recruitment.job_opening', row, 'closed'), 'Đã đóng vị trí tuyển dụng.');
-  }
   const hiredFor = (jobId) => applications.filter((row) => row.job === jobId && row.status === 'hired').length;
   return <div className="page">
     <div className="page-head"><div><h1>{t('Tuyển dụng và quản lý ứng viên')}</h1><p className="sub">{t('Mở vị trí, lưu hồ sơ ứng viên, theo dõi từng vòng tuyển và chuyển ứng viên trúng tuyển thành nhân viên.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div>
@@ -107,7 +69,7 @@ export default function RecruitmentWorkbenchPage() {
       <section className="card card-pad"><h2>{t('Hồ sơ ứng tuyển')}</h2>{loading ? <div className="skeleton" data-h="row"/> : !applications.length ? <div className="empty">{t('Chưa có hồ sơ ứng tuyển.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Ứng viên / vị trí')}</th><th>{t('Vòng tuyển')}</th><th>{t('Trạng thái')}</th></tr></thead><tbody>{applications.map((row) => <tr {...selectableTableRowProps} key={row.id} aria-selected={selectedId === row.id} className={[selectedId === row.id ? 'selected' : '', 'u-pointer'].filter(Boolean).join(' ')} onClick={() => setSelectedId(row.id)} ><td><strong>{candidateById.get(row.candidate)?.name || row.candidate_name}</strong><div className="small muted">{jobById.get(row.job)?.title || t('Vị trí')}</div></td><td>{row.stage || t('Chưa phân loại')}</td><td>{statusLabel(row.status)}</td></tr>)}</tbody></table></div>}</section>
     </div>
     {selected && <section className="card card-pad u-mt-16" ><div className="row wrap"><div><h2>{candidateById.get(selected.candidate)?.name || selected.candidate_name}</h2><div className="small muted">{candidateById.get(selected.candidate)?.email || t('Không có email')} · {jobById.get(selected.job)?.title || t('Vị trí tuyển dụng')}</div></div><span className="grow"/><span className="badge warning">{statusLabel(selected.status)}</span></div>
-      {selected.status === 'applied' && <><label className="field u-mt-12-max-w-360" ><span className="label">{t('Vòng tuyển dụng')}</span><select className="select" value={stages.includes(selected.stage) ? selected.stage : stages[0]} disabled={!can('recruitment.application.update') || Boolean(busy)} onChange={(event) => updateStage(selected, event.target.value)}>{stages.map((stage) => <option key={stage} value={stage}>{t(stage)}</option>)}</select></label><div className="row wrap u-mt-12" ><span className="grow"/>{can('recruitment.application.rejected') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => decide(selected, 'rejected')}>{t('Từ chối')}</button>}{can('recruitment.application.hired') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy) || (jobById.get(selected.job)?.headcount != null && hiredFor(selected.job) >= Number(jobById.get(selected.job).headcount))} onClick={() => decide(selected, 'hired')}>{t('Tuyển và tạo hồ sơ nhân viên')}</button>}</div></>}
+      {selected.status === 'applied' && <><label className="field u-mt-12-max-w-360" ><span className="label">{t('Vòng tuyển dụng')}</span><select className="select" value={RECRUITMENT_STAGES.includes(selected.stage) ? selected.stage : RECRUITMENT_STAGES[0]} disabled={!can('recruitment.application.update') || Boolean(busy)} onChange={(event) => updateStage(selected, event.target.value)}>{RECRUITMENT_STAGES.map((stage) => <option key={stage} value={stage}>{t(stage)}</option>)}</select></label><div className="row wrap u-mt-12" ><span className="grow"/>{can('recruitment.application.rejected') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => decide(selected, 'rejected')}>{t('Từ chối')}</button>}{can('recruitment.application.hired') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy) || (jobById.get(selected.job)?.headcount != null && hiredFor(selected.job) >= Number(jobById.get(selected.job).headcount))} onClick={() => decide(selected, 'hired')}>{t('Tuyển và tạo hồ sơ nhân viên')}</button>}</div></>}
       {selected.status === 'hired' && <p className="alert success u-mt-12" >{t('Ứng viên đã được tuyển. Hồ sơ nhân viên được tạo tự động trong module HRM.')}</p>}
     </section>}
     <p className="small muted u-mt-12" >{t('Mỗi ứng viên chỉ được ứng tuyển một lần cho cùng vị trí. Số lượng tuyển và email ứng viên được kiểm tra ở máy chủ; khi tuyển thành công, hồ sơ nhân viên được tạo trong cùng luồng sự kiện.')}</p>

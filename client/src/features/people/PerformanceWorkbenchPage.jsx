@@ -1,15 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { useLatestRequest } from '../../lib/useLatestRequest.js';
-import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
 import performanceEnglish from './performance.en.js';
 import KeyResultProgressCard from './components/KeyResultProgressCard.jsx';
 import PerformanceReviewRegister from './components/PerformanceReviewRegister.jsx';
-const emptyObjective = { title: '', owner: '', period: '' };
-const emptyKeyResult = { title: '', target: '', unit: '' };
-const emptyReview = { employee: '', reviewer: '', period: '', score: '', comment: '' };
+import { usePerformanceWorkflow } from './hooks/usePerformanceWorkflow.js';
 const rows = (response) => Array.isArray(response?.items) ? response.items : [];
 const t = (text) => uiTextWith(text, performanceEnglish);
 export default function PerformanceWorkbenchPage() {
@@ -21,16 +18,8 @@ export default function PerformanceWorkbenchPage() {
   const [selectedObjectiveId, setSelectedObjectiveId] = useState('');
   const [selectedReviewId, setSelectedReviewId] = useState('');
   const [reviewFilter, setReviewFilter] = useState('all');
-  const [objectiveForm, setObjectiveForm] = useState(emptyObjective);
-  const [keyResultForm, setKeyResultForm] = useState(emptyKeyResult);
-  const [reviewForm, setReviewForm] = useState(emptyReview);
-  const [reviewEdit, setReviewEdit] = useState({ period: '', reviewer: '', score: '', comment: '' });
-  const [progress, setProgress] = useState({});
-  const [revisionNote, setRevisionNote] = useState('');
-  const [busy, setBusy] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const latestRequest = useLatestRequest();
   const load = useCallback(async (quiet = false) => {
     const isLatest = latestRequest();
@@ -73,77 +62,16 @@ export default function PerformanceWorkbenchPage() {
   useEffect(() => {
     if (!visibleReviews.some((row) => row.id === selectedReviewId)) setSelectedReviewId(visibleReviews[0]?.id || '');
   }, [reviewFilter, reviews, selectedReviewId]);
-  useEffect(() => {
-    setReviewEdit({ period: selectedReview?.period || '', reviewer: selectedReview?.reviewer || '', score: selectedReview?.score ?? '', comment: selectedReview?.comment || '' });
-    setRevisionNote('');
-  }, [selectedReviewId]);
-  async function run(key, operation, success) {
-    setBusy(key); setError(''); setNotice('');
-    try { await operation(); await load(true); if (success) setNotice(success); }
-    catch (reason) { setError(reason.message || t('Thao tác không thành công.')); await load(true); }
-    finally { setBusy(''); }
-  }
-  async function createObjective(event) {
-    event.preventDefault();
-    await run('objective:create', async () => {
-      const created = await api(dataPath('performance.objective'), { method: 'POST', body: {
-        title: objectiveForm.title.trim(), ...(objectiveForm.owner ? { owner: objectiveForm.owner } : {}),
-        ...(objectiveForm.period.trim() ? { period: objectiveForm.period.trim() } : {}),
-      } });
-      setObjectiveForm((form) => ({ ...emptyObjective, owner: form.owner })); setSelectedObjectiveId(created.id);
-    }, t('Đã tạo mục tiêu.'));
-  }
-  async function createKeyResult(event) {
-    event.preventDefault(); if (!selectedObjective) return;
-    await run('key-result:create', async () => {
-      await api(dataPath('performance.key_result'), { method: 'POST', body: {
-        objective: selectedObjective.id, title: keyResultForm.title.trim(), target: Number(keyResultForm.target), current: 0,
-        ...(keyResultForm.unit.trim() ? { unit: keyResultForm.unit.trim() } : {}),
-      } });
-      setKeyResultForm(emptyKeyResult);
-    }, t('Đã thêm kết quả then chốt, tiến độ bắt đầu từ 0.'));
-  }
-  async function updateProgress(event, keyResult) {
-    event.preventDefault();
-    const value = Number(progress[keyResult.id] ?? keyResult.current ?? 0);
-    await run(`${keyResult.id}:progress`, () => api(dataPath('performance.key_result', keyResult.id), { method: 'PATCH', body: { current: value } }), t('Đã cập nhật tiến độ kết quả then chốt.'));
-  }
-  async function createReview(event) {
-    event.preventDefault();
-    const created = await run('review:create', async () => {
-      const review = await api(dataPath('performance.review'), { method: 'POST', body: {
-        employee: reviewForm.employee, reviewer: reviewForm.reviewer || null,
-        period: reviewForm.period.trim(), ...(reviewForm.score !== '' ? { score: Number(reviewForm.score) } : {}),
-        ...(reviewForm.comment.trim() ? { comment: reviewForm.comment.trim() } : {}),
-      } });
-      setReviewForm((form) => ({ ...emptyReview, employee: form.employee })); setSelectedReviewId(review.id); setReviewFilter('all');
-    }, t('Đã tạo phiếu đánh giá nháp.'));
-    return created;
-  }
-  async function saveReview(event) {
-    event.preventDefault(); if (!selectedReview) return;
-    await run(`${selectedReview.id}:save`, () => api(dataPath('performance.review', selectedReview.id), { method: 'PATCH', body: {
-      reviewer: reviewEdit.reviewer || null, period: reviewEdit.period.trim(),
-      score: reviewEdit.score === '' ? null : Number(reviewEdit.score), comment: reviewEdit.comment.trim(),
-    } }), t('Đã lưu nội dung đánh giá.'));
-  }
-  async function transition(review, action, message) {
-    await run(`${review.id}:${action}`, () => api(dataPath('performance.review', review.id, action), { method: 'POST' }), message);
-  }
-  async function submitReview(review) {
-    await run(`${review.id}:submitted`, () => api(dataPath('performance.review', review.id, 'submitted'), {
-      method: 'POST', body: {
-        period: reviewEdit.period.trim(), reviewer: reviewEdit.reviewer || null,
-        score: reviewEdit.score === '' ? null : Number(reviewEdit.score), comment: reviewEdit.comment.trim(),
-      },
-    }), t('Đã gửi đánh giá; nội dung được khóa chờ nhân viên xác nhận.'));
-  }
-  async function returnReview(event) {
-    event.preventDefault(); if (!selectedReview) return;
-    await run(`${selectedReview.id}:returned`, () => api(dataPath('performance.review', selectedReview.id, 'returned'), {
-      method: 'POST', body: { revision_note: revisionNote.trim() },
-    }), t('Đã trả phiếu đánh giá kèm lý do cần chỉnh sửa.'));
-  }
+  const workflow = usePerformanceWorkflow({
+    load, selectedObjective, selectedReview, selectedReviewId, setSelectedObjectiveId,
+    setSelectedReviewId, setReviewFilter, setError, t,
+  });
+  const {
+    objectiveForm, setObjectiveForm, keyResultForm, setKeyResultForm, reviewForm, setReviewForm,
+    reviewEdit, setReviewEdit, progress, setProgress, revisionNote, setRevisionNote,
+    busy, notice, createObjective, createKeyResult, updateProgress, createReview,
+    saveReview, transition, submitReview, returnReview,
+  } = workflow;
   const completedReviews = reviews.filter((row) => row.status === 'acknowledged').length;
   const pendingReviews = reviews.filter((row) => ['draft', 'returned', 'submitted'].includes(row.status)).length;
   return <div className="page">
