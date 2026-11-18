@@ -8,6 +8,7 @@ import { recordHref } from '../../lib/routes.js';
 import autoServiceEnglish from './auto-service.en.js';
 import { repairQuoteLineTotal, storedRepairLineTotal } from './domain/repairQuoteTotals.js';
 import RepairQuoteEditor from './components/RepairQuoteEditor.jsx';
+import RepairOrderVehicleSummary from './components/RepairOrderVehicleSummary.jsx';
 const t = (text) => uiTextWith(text, autoServiceEnglish);
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 export default function AutoServiceWorkshopPage() {
@@ -240,11 +241,20 @@ export default function AutoServiceWorkshopPage() {
         </button>; })}</div> : <div className="card-pad muted">{t('Chưa có lệnh sửa chữa.')}</div>}
       </section>
       <section className="workshop-detail card">{selected ? <>
-        <header className="workshop-section-head"><div><h2>{orderVehicle?.plate || t('Lệnh sửa chữa')}</h2><div className="muted">{recordLabel('master-data.party', parties.get(selected.party))} · {warehouses.get(selected.warehouse)?.name || t('Chưa chọn kho')}</div></div><span className={`badge ${['completed', 'delivered'].includes(selected.status) ? 'success' : selected.status === 'quote_declined' ? 'plain' : 'warning'}`}>{statusLabel(selected.status)}</span></header>
-        <dl className="workshop-summary"><div><dt>{t('Xe')}</dt><dd>{[orderVehicle?.make, orderVehicle?.model].filter(Boolean).join(' ') || t('Chưa khai báo')}</dd></div><div><dt>{t('Km lúc tiếp nhận')}</dt><dd>{selected.odometer_reading == null ? t('Chưa ghi') : `${fmtNumber(selected.odometer_reading)} km`}</dd></div><div><dt>{t('Km ghi nhận gần nhất')}</dt><dd>{orderVehicle && lastOdometerByVehicle.has(orderVehicle.id) ? `${fmtNumber(lastOdometerByVehicle.get(orderVehicle.id))} km` : '—'}</dd></div><div><dt>{t('VIN')}</dt><dd>{orderVehicle?.vin || '—'}</dd></div><div><dt>{t('Ngày nhận')}</dt><dd>{fmtDateTime(selected.created_at)}</dd></div></dl>
-        {currentVehicle && can('auto-service.vehicle.update') && <form className="workshop-form u-margin-12-0"  onSubmit={updateOdometer}><label className="field"><span>{t('Số công-tơ-mét hiện tại (km)')}</span><input className="input" type="number" min={currentOdometer ?? 0} step="1" required value={odometerReading} onChange={(event) => setOdometerReading(event.target.value)} /></label><button className="btn" disabled={busy === 'odometer' || odometerReading === '' || Number(odometerReading) === Number(currentOdometer || 0)}>{t('Cập nhật số km')}</button><span className="small muted">{t('Số km không được thấp hơn lần ghi nhận trước hoặc lịch sử xưởng.')}</span></form>}
-        {selected.complaint && <p className="workshop-complaint"><strong>{t('Yêu cầu:')}</strong> {selected.complaint}</p>}
-        {selected.status === 'quote_declined' && selected.declined_reason && <div className="alert">{t('Khách từ chối báo giá:')} {selected.declined_reason}</div>}
+        <RepairOrderVehicleSummary
+          selected={selected}
+          vehicle={orderVehicle}
+          partyName={recordLabel('master-data.party', parties.get(selected.party))}
+          warehouseName={warehouses.get(selected.warehouse)?.name}
+          latestOdometer={orderVehicle && lastOdometerByVehicle.has(orderVehicle.id) ? lastOdometerByVehicle.get(orderVehicle.id) : null}
+          currentOdometer={currentOdometer}
+          odometerReading={odometerReading}
+          canUpdateOdometer={can('auto-service.vehicle.update')}
+          odometerBusy={busy === 'odometer'}
+          onOdometerChange={setOdometerReading}
+          onOdometerSubmit={updateOdometer}
+          t={t}
+        />
         {selected.status === 'intake' && can('auto-service.repair_order.update') && quoteDraft?.repairOrderId !== selected.id && <button type="button" className="btn" disabled={Boolean(busy)} onClick={() => startQuoteEdit(selected)}>{t('Điều chỉnh báo giá')}</button>}
         {selected.status === 'intake' && can('auto-service.repair_order.update') && quoteDraft?.repairOrderId === selected.id && <RepairQuoteEditor draft={quoteDraft} products={products} productChoices={productChoices} warehouses={warehouses} unitsFor={unitsFor} unitRatio={unitRatio} fmtMoney={fmtMoney} t={t} busy={busy === `${selected.id}:quote`} onDraftChange={updateQuoteDraft} onLineChange={updateQuoteLine} onAddLine={addQuoteLine} onRemoveLine={removeQuoteLine} onSubmit={saveQuoteEdit} onCancel={() => setQuoteDraft(null)} />}
         <h3>{t('Báo giá')}</h3><ul className="workshop-estimate">{(selected.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{line.product_name || products.get(line.product)?.name || t('Sản phẩm')} × {line.qty} {line.uom_name || units.get(line.uom)?.name || ''}</span><strong className="num">{fmtMoney(storedRepairLineTotal(line))}</strong></li>)}</ul>
