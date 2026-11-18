@@ -1,4 +1,4 @@
-use super::{camt053, csv, persistence};
+use super::{camt053, csv, ofx, persistence};
 use crate::{
     db::Tx,
     error::{ApiError, R},
@@ -48,6 +48,28 @@ pub async fn import_statement_camt053(
         Some(parsed.identity),
         "CAMT053",
         "CAMT.053 entry",
+    )
+    .await
+}
+
+pub async fn import_statement_ofx(
+    kernel: &Kernel,
+    actor: &Actor,
+    tenant: &Tenant,
+    statement_id: &str,
+    ofx_text: &str,
+) -> R<Value> {
+    let statement_id = authorize_import(kernel, actor, tenant, statement_id)?;
+    let parsed = ofx::parse(ofx_text)?;
+    persistence::import_lines(
+        kernel,
+        actor,
+        tenant,
+        statement_id,
+        parsed.lines,
+        Some(parsed.identity),
+        "OFX",
+        "OFX transaction",
     )
     .await
 }

@@ -1186,6 +1186,23 @@ pub fn build(reg: &Registry) -> Value {
         } }),
     );
     paths.insert(
+        "/api/t/{tenantId}/accounting/bank-statements/{statementId}/import-ofx".into(),
+        json!({ "post": {
+            "tags": ["accounting"], "summary": "Import OFX/QFX bank statement", "security": sec,
+            "parameters": [tid, { "name": "statementId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "requestBody": { "required": true, "content": {
+                "text/plain": { "schema": { "type": "string", "description": "UTF-8 OFX 1.x SGML or 2.x XML statement, one bank account, up to 20,000 transactions and 5 MB" } },
+                "application/x-ofx": { "schema": { "type": "string", "description": "UTF-8 OFX/QFX statement, up to 20,000 transactions and 5 MB" } }
+            } },
+            "responses": with_common(Map::from_iter([
+                ("200".to_string(), json!({ "description": "Rows imported or skipped as exact idempotent replays" })),
+                ("409".to_string(), err("Only a draft statement accepts imported rows")),
+                ("413".to_string(), err("File exceeds 5 MB or has more than 20,000 transactions")),
+                ("422".to_string(), err("Invalid OFX account identity, transaction date, amount, or duplicate reference"))
+            ]))
+        } }),
+    );
+    paths.insert(
         "/api/t/{tenantId}/approvals/approvers".into(),
         json!({ "get": {
             "tags": ["workflow-approval"], "summary": "List tenant users available as approval-rule approvers", "security": sec,

@@ -1,5 +1,9 @@
 export default {
   'IBAN hoặc mã tài khoản trong CAMT.053 *': 'IBAN or account ID in CAMT.053 *',
+  'Tệp CSV, CAMT.053, OFX/QFX hoặc JSON Casso': 'CSV, CAMT.053, OFX/QFX, or Casso JSON file',
+  'Không giải mã được tệp OFX theo bảng mã {charset}.': 'Could not decode the OFX file using charset {charset}.',
+  'Tệp OFX dùng bảng mã chưa hỗ trợ: {charset}.': 'The OFX file uses an unsupported charset: {charset}.',
+  'Với CAMT.053, OFX/QFX và Casso, hãy cấu hình IBAN hoặc mã tài khoản tương ứng trên tài khoản kế toán đã chọn trước khi nhập.': 'For CAMT.053, OFX/QFX, and Casso, configure the matching IBAN or bank account ID on the selected ledger account before importing.',
   'Mã tài khoản được đối chiếu với Acct/Id trước khi nhập.': 'The account ID is checked against Acct/Id before import.',
   'Không tải được hóa đơn còn dư để gợi ý.': 'Could not load open invoices for suggestions.',
   'Bỏ qua có giải trình': 'Ignore with explanation',
