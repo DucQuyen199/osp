@@ -5,7 +5,7 @@ import { fetchEvents } from '../../lib/events.js';
 import { fmtNumber, uiText } from '../../lib/i18n.js';
 import { app, can, entity, entityLabel, isAdmin } from '../../lib/state.js';
 import { listHref } from '../../lib/routes.js';
-import { EventTimeline } from '../entities/EntityDetailPage.jsx';
+import EventTimeline from '../../components/EventTimeline.jsx';
 const PRIORITY = [
   'master-data.party', 'master-data.product', 'sales.sales_order', 'pos.pos_order', 'ecommerce.web_order', 'accounting.invoice', 'crm.deal', 'crm.lead',
   'clinic.encounter', 'school.student', 'hotel.reservation', 'restaurant.table_order', 'booking.booking', 'hrm.employee', 'helpdesk.ticket', 'project.project',

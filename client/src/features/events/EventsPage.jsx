@@ -3,7 +3,7 @@ import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { uiText } from '../../lib/i18n.js';
 import EntityListPager from '../entities/components/EntityListPager.jsx';
-import { EventTimeline } from '../entities/EntityDetailPage.jsx';
+import EventTimeline from '../../components/EventTimeline.jsx';
 
 const PAGE_SIZE = 50;
 

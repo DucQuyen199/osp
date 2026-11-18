@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api, session } from '../../lib/api.js';
 import { uiTextWith } from '../../lib/i18n.js';
 import authEnglish from './auth.en.js';
+import AuthVerticalPicker from './components/AuthVerticalPicker.jsx';
 
 const t = (text) => uiTextWith(text, authEnglish);
 
@@ -204,13 +205,7 @@ export default function AuthPage({ route, onSignedIn }) {
         <button className="btn btn-ghost" type="button" onClick={() => chooseMode('forgot')}>{t('Quên mật khẩu?')}</button>
         <button className="btn btn-ghost" type="button" onClick={() => { setError(''); setNotice(''); setMode('verify-request'); }}>{t('Gửi lại email xác minh')}</button>
       </form> : mode === 'signup' ? <form className="stack" onSubmit={signup}>
-        <fieldset className="field"><legend className="label">{t('1. Chọn ngành của bạn')}</legend>
-          <div className="vertical-grid" role="group" aria-label={t('Chọn ngành')}>
-            <button className="vertical-card" type="button" aria-pressed={!vertical} onClick={() => setVertical('')}><strong>{t('Tự chọn module')}</strong><span>{t('Bắt đầu gọn, bật thêm sau')}</span></button>
-            {catalog.verticals.map((item) => <button className="vertical-card" key={item.id} type="button" aria-pressed={vertical === item.id} title={t(item.description)} onClick={() => setVertical(item.id)}><strong>{t(item.name)}</strong><span>{item.modules.length} {t('module')}</span></button>)}
-          </div>
-          <p className="hint" aria-live="polite">{t(catalog.verticals.find((item) => item.id === vertical)?.description || 'Chỉ có dữ liệu gốc. Bạn bật thêm module trong Cài đặt.')}</p>
-        </fieldset>
+        <AuthVerticalPicker verticals={catalog.verticals} value={vertical} onChange={setVertical} t={t}/>
         <fieldset className="field"><legend className="label">{t('2. Thông tin doanh nghiệp')}</legend>
           <div className="form-grid">
             <div className="field full"><label htmlFor="signup-company">{t('Tên doanh nghiệp')}</label><input className="input" id="signup-company" name="company" required autoComplete="organization" /></div>
