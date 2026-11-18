@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
-import { api, dataPath, tenantPath } from '../../lib/api.js';
+import { api, tenantPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, fmtNumber, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { addDecimals, compareDecimals, divideDecimals, multiplyDecimals } from '../../lib/decimal.js';
 import { can, recordLabel } from '../../lib/state.js';
@@ -10,6 +10,7 @@ import agricultureEnglish from './agriculture.en.js';
 import { AgricultureHarvestForm, AgricultureInputForm } from './components/AgricultureFieldworkForms.jsx';
 import AgricultureCycleHistory from './components/AgricultureCycleHistory.jsx';
 import { useAgricultureData } from './hooks/useAgricultureData.js';
+import { useAgricultureOperationsWorkflow } from './hooks/useAgricultureOperationsWorkflow.js';
 const t = (text) => uiTextWith(text, agricultureEnglish);
 const today = localDate;
 export default function AgricultureOperationsPage() {
@@ -18,48 +19,30 @@ export default function AgricultureOperationsPage() {
   const [inputCostReport, setInputCostReport] = useState(null);
   const [inputCostError, setInputCostError] = useState('');
   const [cycleId, setCycleId] = useState('');
-  const [farmName, setFarmName] = useState('');
-  const [farmLocation, setFarmLocation] = useState('');
-  const [farmArea, setFarmArea] = useState('');
-  const [farmOwner, setFarmOwner] = useState('');
-  const [newCycleFarm, setNewCycleFarm] = useState('');
-  const [crop, setCrop] = useState('');
-  const [plantedOn, setPlantedOn] = useState(today());
-  const [expectedHarvest, setExpectedHarvest] = useState('');
-  const [inputKind, setInputKind] = useState('fertilizer');
-  const [inputProduct, setInputProduct] = useState('');
-  const [inputUom, setInputUom] = useState('');
-  const [inputWarehouse, setInputWarehouse] = useState('');
-  const [inputQty, setInputQty] = useState('');
-  const [inputDate, setInputDate] = useState(today());
-  const [harvestProduct, setHarvestProduct] = useState('');
-  const [harvestUom, setHarvestUom] = useState('');
-  const [harvestWarehouse, setHarvestWarehouse] = useState('');
-  const [harvestQty, setHarvestQty] = useState('');
-  const [harvestGrade, setHarvestGrade] = useState('');
-  const [harvestLotCode, setHarvestLotCode] = useState('');
-  const [harvestExpiry, setHarvestExpiry] = useState('');
-  const [harvestDate, setHarvestDate] = useState(today());
-  const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const load = async (preserveNotice = false) => {
     setError('');
-    if (!preserveNotice) setNotice('');
+    if (!preserveNotice) clearNotice();
     await loadData();
   };
   useEffect(() => {
     setCycleId((current) => cycles.some((item) => item.id === current) ? current : cycles.find((item) => item.status === 'growing')?.id || cycles[0]?.id || '');
   }, [cycles]);
-  useEffect(() => {
-    setNewCycleFarm((current) => farms.some((item) => item.id === current) ? current : farms[0]?.id || '');
-  }, [farms]);
   const selectedCycle = cycles.find((item) => item.id === cycleId) || null;
   const selectedFarm = selectedCycle && farms.find((farm) => farm.id === selectedCycle.farm);
   const unitsFor = (productId) => {
     const baseUnit = products.get(productId)?.uom;
     return baseUnit ? [...units.values()].filter((unit) => unit.id === baseUnit || unit.base_uom === baseUnit) : [];
   };
+  const {
+    farmName, setFarmName, farmLocation, setFarmLocation, farmArea, setFarmArea, farmOwner, setFarmOwner,
+    newCycleFarm, setNewCycleFarm, crop, setCrop, plantedOn, setPlantedOn, expectedHarvest, setExpectedHarvest,
+    inputKind, setInputKind, inputProduct, setInputProduct, inputUom, setInputUom, inputWarehouse, setInputWarehouse,
+    inputQty, setInputQty, inputDate, setInputDate, harvestProduct, setHarvestProduct, harvestUom, setHarvestUom,
+    harvestWarehouse, setHarvestWarehouse, harvestQty, setHarvestQty, harvestGrade, setHarvestGrade,
+    harvestLotCode, setHarvestLotCode, harvestExpiry, setHarvestExpiry, harvestDate, setHarvestDate,
+    busy, error: workflowError, notice, clearNotice, createFarm, createCycle, createInput, createHarvest, closeCycle,
+  } = useAgricultureOperationsWorkflow({ farms, selectedCycle, products, unitsFor, setCycleId, load, t });
   const unitLabel = (item) => item.uom_name || units.get(item.uom)?.name || '';
   const cycleHarvests = useMemo(() => harvests.filter((item) => item.cycle === cycleId).sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))), [harvests, cycleId]);
   const cycleInputs = useMemo(() => applications.filter((item) => item.cycle === cycleId).sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))), [applications, cycleId]);
@@ -127,48 +110,6 @@ export default function AgricultureOperationsPage() {
   const hasArea = compareDecimals(selectedFarm?.area || 0, 0) > 0;
   const activeCycles = cycles.filter((item) => item.status === 'growing').length;
   const upcomingCycles = cycles.filter((item) => item.status === 'growing' && item.expected_harvest && item.expected_harvest >= today()).length;
-  const createFarm = async (event) => {
-    event.preventDefault(); setBusy('farm'); setError(''); setNotice('');
-    try {
-      const created = await api(dataPath('agriculture.farm'), { method: 'POST', body: { name: farmName.trim(), location: farmLocation.trim() || undefined, area: farmArea ? Number(farmArea) : undefined, owner: farmOwner || undefined } });
-      setFarmName(''); setFarmLocation(''); setFarmArea(''); setFarmOwner('');
-      await load(true); setNewCycleFarm(created.id); setNotice(t('Đã tạo trang trại.'));
-    } catch (reason) { setError(reason.message || t('Không tạo được trang trại.')); }
-    finally { setBusy(''); }
-  };
-  const createCycle = async (event) => {
-    event.preventDefault(); setBusy('cycle'); setError(''); setNotice('');
-    try {
-      const created = await api(dataPath('agriculture.crop_cycle'), { method: 'POST', body: { farm: newCycleFarm, crop: crop.trim(), planted_on: plantedOn, expected_harvest: expectedHarvest || undefined } });
-      setCrop(''); setExpectedHarvest(''); await load(true); setCycleId(created.id); setNotice(t('Đã mở vụ mùa mới.'));
-    } catch (reason) { setError(reason.message || t('Không tạo được vụ mùa.')); }
-    finally { setBusy(''); }
-  };
-  const createInput = async (event) => {
-    event.preventDefault(); if (!selectedCycle) return;
-    setBusy('input'); setError(''); setNotice('');
-    try {
-      await api(dataPath('agriculture.input_application'), { method: 'POST', body: { cycle: selectedCycle.id, kind: inputKind, qty: String(inputQty), date: inputDate, ...(inputProduct ? { product: inputProduct, warehouse: inputWarehouse, ...(unitsFor(inputProduct).length ? { uom: inputUom || products.get(inputProduct)?.uom } : {}) } : {}) } });
-      setInputQty(''); await load(true); setNotice(t('Đã ghi nhật ký sử dụng vật tư và cập nhật tồn kho nếu có sản phẩm.'));
-    } catch (reason) { setError(reason.message || t('Không ghi được nhật ký vật tư. Kiểm tra kho và tồn khả dụng.')); }
-    finally { setBusy(''); }
-  };
-  const createHarvest = async (event) => {
-    event.preventDefault(); if (!selectedCycle) return;
-    setBusy('harvest'); setError(''); setNotice('');
-    try {
-      await api(dataPath('agriculture.harvest'), { method: 'POST', body: { cycle: selectedCycle.id, product: harvestProduct, warehouse: harvestWarehouse, qty: String(harvestQty), ...(unitsFor(harvestProduct).length ? { uom: harvestUom || products.get(harvestProduct)?.uom } : {}), date: harvestDate, expiry: harvestExpiry || undefined, grade: harvestGrade.trim() || undefined, lot_code: harvestLotCode.trim() || undefined } });
-      setHarvestQty(''); setHarvestGrade(''); setHarvestLotCode(''); setHarvestExpiry(''); await load(true); setNotice(t('Đã nhập sản lượng thu hoạch vào kho; mã lô được gắn cho truy xuất khi sản phẩm yêu cầu.'));
-    } catch (reason) { setError(reason.message || t('Không ghi nhận được thu hoạch. Kiểm tra ngày vụ mùa và kho nhận.')); }
-    finally { setBusy(''); }
-  };
-  const closeCycle = async (action) => {
-    if (!selectedCycle) return;
-    setBusy(`cycle:${action}`); setError(''); setNotice('');
-    try { await api(dataPath('agriculture.crop_cycle', selectedCycle.id, action), { method: 'POST' }); await load(true); setNotice(t(action === 'harvested' ? 'Đã kết thúc vụ mùa sau khi xác nhận sản lượng.' : 'Đã đánh dấu vụ mùa thất bại.')); }
-    catch (reason) { setError(reason.message || t('Không cập nhật được trạng thái vụ mùa.')); }
-    finally { setBusy(''); }
-  };
   const inputKinds = [['fertilizer', 'Phân bón'], ['pesticide', 'Thuốc bảo vệ thực vật'], ['seed', 'Giống'], ['water', 'Nước tưới']];
   const requiresProduct = ['fertilizer', 'pesticide', 'seed'].includes(inputKind);
   const pesticideIntervalMissing = inputKind === 'pesticide' && Boolean(inputProduct)
@@ -178,7 +119,7 @@ export default function AgricultureOperationsPage() {
   return <div className="page agriculture-page">
     <div className="page-head"><div><h1>{t('Điều hành mùa vụ')}</h1><p className="sub">{t('Quản lý trang trại, theo dõi vụ đang canh tác, ghi vật tư và nhập sản lượng thu hoạch vào kho.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{loading ? t('Đang tải…') : t('Làm mới')}</button></div>
     <div className="row wrap agriculture-summary"><span className="badge success">{t('Vụ đang canh tác')}: {activeCycles}</span><span className="badge warning">{t('Có ngày thu dự kiến')}: {upcomingCycles}</span><span className="badge plain">{t('Trang trại')}: {farms.length}</span></div>
-    {(error || dataError) && <div className="alert danger" role="alert">{t(error || dataError)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
+    {(workflowError || error || dataError) && <div className="alert danger" role="alert">{t(workflowError || error || dataError)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     {loading ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <>
       <div className="agriculture-setup">
         <details className="card agriculture-panel"><summary>{t('Tạo trang trại')}</summary><form className="agriculture-form" onSubmit={createFarm}>

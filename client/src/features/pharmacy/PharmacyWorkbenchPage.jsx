@@ -1,8 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
-import { api, dataPath } from '../../lib/api.js';
-import { textDialog } from '../../lib/feedback.js';
 import { statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { addDecimals, compareDecimals, subtractDecimals } from '../../lib/decimal.js';
 import { can, loadRefs, recordLabel, loadAllResponse, loadIndependentData } from '../../lib/state.js';
@@ -11,9 +9,9 @@ import pharmacyEnglish from './pharmacy.en.js';
 import PrescriptionForm from './components/PrescriptionForm.jsx';
 import PrescriptionRegister from './components/PrescriptionRegister.jsx';
 import ReturnedMedicineInspectionCard from './components/ReturnedMedicineInspectionCard.jsx';
+import { usePharmacyWorkbenchWorkflow } from './hooks/usePharmacyWorkbenchWorkflow.js';
 const t = (text) => uiTextWith(text, pharmacyEnglish);
 const today = localDate;
-const newLine = () => ({ rowId: crypto.randomUUID(), product: '', uom: '', qty: '1', dosage: '' });
 export default function PharmacyWorkbenchPage() {
   useDocumentTitle(`${t('Quản lý đơn thuốc')} · OSP Suite`);
   const [products, setProducts] = useState([]);
@@ -22,16 +20,10 @@ export default function PharmacyWorkbenchPage() {
   const [prescriptions, setPrescriptions] = useState([]);
   const [returnInspections, setReturnInspections] = useState([]);
   const [returnDispositions, setReturnDispositions] = useState([]);
-  const [disposalDrafts, setDisposalDrafts] = useState({});
   const [dispensedByPrescription, setDispensedByPrescription] = useState(new Map());
   const [dispensedDataAvailable, setDispensedDataAvailable] = useState(false);
-  const [editingId, setEditingId] = useState('');
-  const [form, setForm] = useState({ prescription_no: '', party: '', prescriber: '', prescriber_license: '', issued_at: today(), valid_until: today(), notes: '' });
-  const [lines, setLines] = useState([newLine()]);
-  const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const beginRequest = useLatestRequest();
   const load = useCallback(async () => {
     const isCurrent = beginRequest();
@@ -74,98 +66,15 @@ export default function PharmacyWorkbenchPage() {
     finally { if (isCurrent()) setLoading(false); }
   }, [beginRequest]);
   useEffect(() => { load(); }, [load]);
+  const {
+    disposalDrafts, updateDisposalDraft, editingId, form, lines, busy, notice,
+    updateForm, updateLine, addLine, removeLine, createPrescription, editPrescription, cancelEdit,
+    transition, failReturnedMedicine, disposeReturnedMedicine,
+  } = usePharmacyWorkbenchWorkflow({ products, returnDispositions, setReturnDispositions, load, setError, t });
   const activeLines = useMemo(() => lines.filter((line) => line.product), [lines]);
-  const updateForm = (field, value) => setForm((current) => ({ ...current, [field]: value }));
-  const updateLine = (index, field, value) => setLines((current) => current.map((line, i) => i === index ? { ...line, [field]: value, ...(field === 'product' ? { uom: products.find((product) => product.id === value)?.uom || '' } : {}) } : line));
   const unitsFor = (productId) => {
     const baseUnit = products.find((product) => product.id === productId)?.uom;
     return baseUnit ? [...units.values()].filter((unit) => unit.active !== false && (unit.id === baseUnit || unit.base_uom === baseUnit)) : [];
-  };
-  const createPrescription = async (event) => {
-    event.preventDefault(); setBusy(true); setError(''); setNotice('');
-    try {
-      const items = activeLines.map((line) => ({ product: line.product, qty: String(line.qty), ...(line.uom ? { uom: line.uom } : {}), dosage: line.dosage.trim() }));
-      const payload = { ...form, prescription_no: form.prescription_no.trim(), items };
-      if (editingId) {
-        await api(dataPath('pharmacy.prescription', editingId), { method: 'PATCH', body: payload });
-      } else {
-        await api(dataPath('pharmacy.prescription'), { method: 'POST', body: { ...payload, status: 'draft' } });
-      }
-      const wasEditing = Boolean(editingId);
-      setEditingId('');
-      setForm({ prescription_no: '', party: '', prescriber: '', prescriber_license: '', issued_at: today(), valid_until: today(), notes: '' });
-      setLines([newLine()]);
-      setNotice(t(wasEditing ? 'Đã cập nhật đơn thuốc nháp. Hãy đối chiếu lại bản gốc trước khi xác minh.' : 'Đã lưu đơn thuốc ở trạng thái nháp. Hãy đối chiếu bản gốc rồi xác minh.'));
-      await load();
-    } catch (reason) { setError(t(reason.message || 'Không lưu được đơn thuốc.')); }
-    finally { setBusy(false); }
-  };
-  const editPrescription = (prescription) => {
-    setEditingId(prescription.id);
-    setForm({
-      prescription_no: prescription.prescription_no || '', party: prescription.party || '', prescriber: prescription.prescriber || '',
-      prescriber_license: prescription.prescriber_license || '', issued_at: prescription.issued_at || today(),
-      valid_until: prescription.valid_until || today(), notes: prescription.notes || '',
-    });
-    setLines((prescription.items || []).map((item) => ({ rowId: crypto.randomUUID(), product: item.product || '', uom: item.uom || '', qty: String(item.qty ?? ''), dosage: item.dosage || '' })));
-    setError(''); setNotice('');
-    document.getElementById('pharmacy-prescription-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    document.getElementById('pharmacy-prescription-number')?.focus({ preventScroll: true });
-  };
-  const cancelEdit = () => {
-    setEditingId('');
-    setForm({ prescription_no: '', party: '', prescriber: '', prescriber_license: '', issued_at: today(), valid_until: today(), notes: '' });
-    setLines([newLine()]); setError(''); setNotice('');
-  };
-  const transition = async (prescription, action) => {
-    setBusy(true); setError(''); setNotice('');
-    try {
-      await api(dataPath('pharmacy.prescription', prescription.id, action), { method: 'POST' });
-      setNotice(action === 'verified' ? `${t('Đã xác minh đơn')} ${prescription.prescription_no}${t('. Có thể chọn đơn này tại quầy POS.')}` : t('Đã hủy đơn thuốc.')); await load();
-    } catch (reason) { setError(t(reason.message || 'Không cập nhật được trạng thái đơn thuốc.')); }
-    finally { setBusy(false); }
-  };
-  const failReturnedMedicine = async (inspection) => {
-    const note = await textDialog({ title: t('Xác nhận thuốc trả không đạt'), message: t('Ghi rõ đánh giá tình trạng thuốc. Thuốc khách trả không được giải phóng để bán lại.'), label: t('Lý do không đạt'), minLength: 5, maxLength: 500, confirmLabel: t('Cách ly') });
-    if (!note) return;
-    setBusy(true); setError(''); setNotice('');
-    try {
-      await api(dataPath('quality.inspection', inspection.id), { method: 'PATCH', body: { note } });
-      await api(dataPath('quality.inspection', inspection.id, 'failed'), { method: 'POST' });
-      setNotice(t('Thuốc trả đã được ghi nhận không đạt và tiếp tục nằm trong khu cách ly.'));
-      await load();
-    } catch (reason) { setError(t(reason.message || 'Không thể ghi nhận kết quả kiểm tra thuốc trả.')); }
-    finally { setBusy(false); }
-  };
-  const disposeReturnedMedicine = async (event, inspection) => {
-    event.preventDefault();
-    const draft = disposalDrafts[inspection.id] || {};
-    const qtyText = String(draft.qty ?? '').trim();
-    const note = String(draft.note || '').trim();
-    const disposed = addDecimals(returnDispositions.filter((item) => item.inspection === inspection.id && item.status === 'posted').map((item) => item.qty || 0));
-    const remaining = compareDecimals(subtractDecimals(inspection.qty || 0, disposed), '0') < 0 ? '0' : subtractDecimals(inspection.qty || 0, disposed);
-    let quantityValid = false;
-    try { quantityValid = compareDecimals(qtyText || 0, '0') > 0 && compareDecimals(qtyText, remaining) <= 0; } catch { quantityValid = false; }
-    if (!quantityValid || note.length < 5 || note.length > 500) {
-      setError(t('Nhập số lượng hủy hợp lệ trong giới hạn còn cách ly và ghi lý do từ 5 đến 500 ký tự.'));
-      return;
-    }
-    setBusy(true); setError(''); setNotice('');
-    try {
-      let disposition = returnDispositions.find((item) => item.inspection === inspection.id && item.status === 'draft');
-      if (!disposition) {
-        disposition = await api(dataPath('pharmacy.return_disposition'), { method: 'POST', body: { inspection: inspection.id, qty: qtyText, note } });
-        setReturnDispositions((items) => [...items, disposition]);
-      } else if (compareDecimals(disposition.qty || 0, qtyText) !== 0 || disposition.note !== note) {
-        disposition = await api(dataPath('pharmacy.return_disposition', disposition.id), { method: 'PATCH', body: { qty: qtyText, note } });
-        setReturnDispositions((items) => items.map((item) => item.id === disposition.id ? disposition : item));
-      }
-      await api(dataPath('pharmacy.return_disposition', disposition.id, 'posted'), { method: 'POST' });
-      setDisposalDrafts((items) => ({ ...items, [inspection.id]: { qty: '', note: '' } }));
-      setNotice(t('Đã ghi sổ hủy thuốc và xuất khỏi tồn kho cách ly.'));
-      await load();
-    } catch (reason) { setError(t(reason.message || 'Không thể ghi sổ hủy thuốc. Phiếu nháp được giữ để thử lại.')); }
-    finally { setBusy(false); }
   };
   const productName = (id) => products.find((product) => product.id === id)?.name || `${t('Sản phẩm')} ${String(id || '').slice(0, 8)}`;
   const prescriptionLines = (prescription) => {
@@ -213,8 +122,8 @@ export default function PharmacyWorkbenchPage() {
       t={t}
       onFormChange={updateForm}
       onLineChange={updateLine}
-      onAddLine={() => setLines((current) => [...current, newLine()])}
-      onRemoveLine={(index) => setLines((current) => current.filter((_, row) => row !== index))}
+      onAddLine={addLine}
+      onRemoveLine={removeLine}
       onSubmit={createPrescription}
       onCancel={cancelEdit}
     />
@@ -242,8 +151,8 @@ export default function PharmacyWorkbenchPage() {
           t={t}
           onFail={() => failReturnedMedicine(inspection)}
           onSubmit={(event) => disposeReturnedMedicine(event, inspection)}
-          onQuantityChange={(value) => setDisposalDrafts((items) => ({ ...items, [inspection.id]: { ...items[inspection.id], qty: value } }))}
-          onNoteChange={(value) => setDisposalDrafts((items) => ({ ...items, [inspection.id]: { ...items[inspection.id], note: value } }))}
+          onQuantityChange={(value) => updateDisposalDraft(inspection.id, 'qty', value)}
+          onNoteChange={(value) => updateDisposalDraft(inspection.id, 'note', value)}
         />;
       })}
     </section>

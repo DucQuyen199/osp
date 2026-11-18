@@ -4,8 +4,8 @@ Bộ phần mềm quản trị doanh nghiệp dạng **module**: ERP, CRM, kế 
 
 | | |
 |---|---|
-| Module | 50 (lõi, bán hàng, chuỗi cung ứng, tài chính, nhân sự, vận hành, nền tảng, chuyên ngành) |
-| Loại dữ liệu · sự kiện | 202 · 921 |
+| Module | 51 (lõi, bán hàng, chuỗi cung ứng, tài chính, nhân sự, vận hành, nền tảng, chuyên ngành) |
+| Loại dữ liệu · sự kiện | 208 · 948 |
 | Luồng liên module | Handler Rust trong các bounded context; catalog không còn luật nghiệp vụ JSON |
 | Gói ngành | 22 |
 | Kiểm tra build/catalog | `npm run check`; Rust test suite và E2E chạy riêng khi cần |
@@ -16,7 +16,7 @@ gzip, cache revalidation, tracing và quota truy cập. Quyết định dùng th
 `npm run test:container` diễn tập image Linux và backup/restore trên tài nguyên
 Docker tạm riêng; xem [hướng dẫn triển khai](docs/DEPLOYMENT.md).
 
-> **Trạng thái: v0.2 — khung chạy được, chưa phải sản phẩm hoàn chỉnh để bán.** Máy chủ triển khai chính thức là Rust + PostgreSQL, có lưu trữ bền vững, đăng nhập thật, giao diện web và tài liệu đầy đủ; **chưa có** kế toán đúng chuẩn Việt Nam, hóa đơn điện tử thật, tích hợp ngân hàng/Zalo, nghiệp vụ sâu từng ngành. Xem [lộ trình](docs/ROADMAP.md).
+> **Trạng thái: v0.2 — khung chạy được, chưa phải sản phẩm hoàn chỉnh để bán.** Máy chủ triển khai chính thức là Rust + PostgreSQL, có lưu trữ bền vững, đăng nhập thật, giao diện web và tài liệu đầy đủ. Đối soát ngân hàng đã hỗ trợ Casso, SePay, Plaid và Salt Edge; việc đồng bộ do người dùng khởi chạy và phạm vi ngân hàng phụ thuộc quốc gia/quyền của từng dự án. Hệ thống vẫn **chưa có** bộ kê khai kế toán/thuế Việt Nam được xác minh, adapter phát hành hóa đơn điện tử riêng cho nhà cung cấp Việt Nam, API trực tiếp từng ngân hàng, Zalo và toàn bộ nghiệp vụ chuyên sâu đã sẵn sàng production. Xem [lộ trình](docs/ROADMAP.md).
 
 Kiến trúc Rust modular monolith được mô tả tại [Rust modular architecture](docs/RUST-MODULAR-ARCHITECTURE.md), [hướng dẫn cấu trúc module](docs/MODULE-ARCHITECTURE.md) và [ADR-0007](docs/adr/0007-rust-bounded-contexts.md). Runtime nghiệp vụ và API dùng Rust; catalog module/ngành là JSON. Nguồn và cấu hình TypeScript đã được gỡ khỏi dự án. Client Vite/React hiện render các luồng đăng nhập, dữ liệu ERP và toàn bộ tab cài đặt tenant. Sản phẩm vẫn đang được hoàn thiện; chưa tuyên bố đủ mọi nghiệp vụ ERP để phát hành thương mại.
 
