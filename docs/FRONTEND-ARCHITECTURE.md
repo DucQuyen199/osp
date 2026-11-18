@@ -35,7 +35,8 @@ Wrap every user-visible literal with `uiText()` or the feature-local translator,
 Run `npm run lint:translations` while changing a screen or dictionary. The check verifies that literal `uiText()` and feature `t()` calls resolve through the shared or feature-local English dictionary, and catches raw Vietnamese JSX text, accessible text attributes, and static page titles. It is part of `npm run check`.
 
 ### Feature-local workflow components
-- The authentication page owns tenant creation, login and recovery state; `AuthVerticalPicker` renders controlled industry choices for signup and emits the selected vertical through a callback.
+- `useAuthWorkflow` owns authentication, tenant creation, login, MFA challenge, OIDC, demo, password recovery and email verification actions; `AuthPage` retains catalog loading, signup availability and presentation, while `AuthVerticalPicker` renders controlled industry choices.
+- `useMfaSettingsWorkflow`, `useTokensWorkflow` and `useUsersSettingsWorkflow` own account-security and tenant-user mutations; their settings pages retain permission gates, reads and composition. Newly created API secrets remain in hook state for their one-time reveal flow.
 - The consolidation workbench owns report snapshot permissions, API actions and grant rechecks; its saved report history renders snapshot metadata and opens immutable payloads through the feature API.
 - The consolidation workbench owns elimination-journal permissions, validation and persistence; `EliminationJournalForm` and `EliminationJournalsTable` render controlled fields and records through props without owning API or business logic.
 - `useConsolidationWorkbenchWorkflow` owns group/member/share/grant drafts, report snapshots and elimination submission; the page keeps permission-gated reads and composes the controlled views.
@@ -227,7 +228,7 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 - The communication workbench pages reminders at 25 rows and delivery logs at 50 rows through the tenant entity API; status summary cards use server totals and remain correct when operators browse older pages.
 - The cross-module event stream loads 50 newest-first events per page; the root-only toggle is applied before counting and paging so it never hides matching older roots behind child events.
 - Entity detail event tabs query the complete causal lineage by record ID on the server, instead of searching only the tenant's latest 1,000 events in the browser.
-- `EntityDetailPage` owns route, tab state, event loading, permissions and workflow actions; `EntityDetailTabs` presents typed record fields and the event timeline through controlled props.
+- `useEntityDetailWorkflow` owns record/reference/event reads, status actions, delete, edit-save refresh and bank-statement import; it rejects stale reads and actions after route changes or unmount. `EntityDetailPage` retains route-based permission/action derivation and composition; `EntityDetailTabs` presents typed record fields and event timelines through controlled props.
 
 ## Styling layers
 

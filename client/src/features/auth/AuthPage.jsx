@@ -1,24 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { api, session } from '../../lib/api.js';
+import { api } from '../../lib/api.js';
 import { uiTextWith } from '../../lib/i18n.js';
 import authEnglish from './auth.en.js';
 import AuthVerticalPicker from './components/AuthVerticalPicker.jsx';
 import AuthLandingHero from './components/AuthLandingHero.jsx';
+import { useAuthWorkflow } from './hooks/useAuthWorkflow.js';
 
 const t = (text) => uiTextWith(text, authEnglish);
 
 export default function AuthPage({ route, onSignedIn }) {
   const [catalog, setCatalog] = useState(null);
   const [catalogError, setCatalogError] = useState('');
-  const [loginTenantId, setLoginTenantId] = useState(() => new URLSearchParams(location.search).get('tenant') || '');
-  const [mode, setMode] = useState(route.name === 'signup' ? 'signup' : route.name === 'forgot-password' ? 'forgot' : route.name === 'reset-password' ? 'reset' : route.name === 'verify-email' ? 'verify' : 'login');
-  const [vertical, setVertical] = useState('');
-  const [busy, setBusy] = useState('');
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [mfaChallenge, setMfaChallenge] = useState('');
-  const [mfaTenant, setMfaTenant] = useState('');
-  const [rememberLogin, setRememberLogin] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -27,20 +19,14 @@ export default function AuthPage({ route, onSignedIn }) {
     return () => { active = false; };
   }, []);
 
-  useEffect(() => {
-    setMode(route.name === 'signup' ? 'signup' : route.name === 'forgot-password' ? 'forgot' : route.name === 'reset-password' ? 'reset' : route.name === 'verify-email' ? 'verify' : 'login');
-  }, [route.name]);
 
-  useEffect(() => {
-    if (route.name !== 'verify-email' || !route.token) return;
-    let active = true;
-    setBusy('verify'); setError(''); setNotice('');
-    api('/api/auth/email-verification/complete', { method: 'POST', body: { token: route.token } })
-      .then(() => { if (active) { setNotice('Email đã được xác minh. Bạn có thể đăng nhập.'); setMode('login'); location.hash = '#/login'; } })
-      .catch((reason) => { if (active) setError(reason.message || 'Liên kết xác minh không hợp lệ hoặc đã hết hạn.'); })
-      .finally(() => { if (active) setBusy(''); });
-    return () => { active = false; };
-  }, [route.name, route.token]);
+
+  const workflow = useAuthWorkflow({ route, onSignedIn, t });
+  const {
+    mode, setMode, vertical, setVertical, busy, error, setError, notice, setNotice,
+    loginTenantId, setLoginTenantId, login, completeMfaLogin, signup, demo, startOidc,
+    chooseMode, requestReset, requestVerification, completeReset, returnFromMfa, returnToLogin,
+  } = workflow;
 
   useEffect(() => {
     if (catalog && !catalog.signup && mode === 'signup') {
@@ -49,133 +35,6 @@ export default function AuthPage({ route, onSignedIn }) {
     }
   }, [catalog, mode, route.name]);
 
-  const finish = async (tenantId, token, remember) => {
-    session.set({ tenantId, token }, remember);
-    await onSignedIn();
-  };
-
-  const login = async (event) => {
-    event.preventDefault();
-    const values = new FormData(event.currentTarget);
-    setBusy('login');
-    setError('');
-    const tenantId = String(values.get('tenantId') || '').trim();
-    try {
-      const result = await api('/api/auth/login', { method: 'POST', body: {
-        tenantId, email: String(values.get('email') || '').trim(), password: values.get('password'),
-      } });
-      if (result.mfaRequired) {
-        setMfaChallenge(result.challengeToken);
-        setMfaTenant(tenantId);
-        setRememberLogin(values.get('remember') === 'on');
-        setMode('mfa');
-        return;
-      }
-      await finish(tenantId, result.token, values.get('remember') === 'on');
-    } catch (reason) { setError(reason.message || 'Không đăng nhập được.'); }
-    finally { setBusy(''); }
-  };
-
-  const completeMfaLogin = async (event) => {
-    event.preventDefault();
-    const values = new FormData(event.currentTarget);
-    setBusy('mfa'); setError('');
-    try {
-      const result = await api('/api/auth/mfa/complete', { method: 'POST', body: {
-        challengeToken: mfaChallenge, code: String(values.get('code') || '').trim(),
-      } });
-      await finish(result.tenantId || mfaTenant, result.token, rememberLogin);
-    } catch (reason) { setError(reason.message || 'Mã xác thực không hợp lệ hoặc đã hết hạn.'); }
-    finally { setBusy(''); }
-  };
-
-  const signup = async (event) => {
-    event.preventDefault();
-    const values = new FormData(event.currentTarget);
-    setBusy('signup');
-    setError('');
-    try {
-      const tenant = await api('/api/tenants', { method: 'POST', body: {
-        name: String(values.get('company') || '').trim(), vertical: vertical || undefined,
-        admin: {
-          name: String(values.get('adminName') || '').trim(),
-          email: String(values.get('email') || '').trim(),
-          password: values.get('password'),
-        },
-      } });
-      setNotice(`Doanh nghiệp đã được tạo. Hãy xác minh email để kích hoạt tài khoản. Mã doanh nghiệp: ${tenant.tenantId}`);
-      setMode('login'); location.hash = '#/login';
-    } catch (reason) { setError(reason.message || 'Không tạo được doanh nghiệp.'); }
-    finally { setBusy(''); }
-  };
-
-  const demo = async () => {
-    setBusy('demo');
-    setError('');
-    try {
-      const result = await api('/api/demo', { method: 'POST', body: { vertical: vertical || 'retail' } });
-      await finish(result.tenantId, result.token, false);
-    } catch (reason) { setError(reason.message || 'Không tạo được dữ liệu dùng thử.'); }
-    finally { setBusy(''); }
-  };
-
-  const startOidc = async () => {
-    const tenantId = loginTenantId.trim();
-    if (!tenantId) { setError('Nhập mã doanh nghiệp trước khi đăng nhập bằng tài khoản doanh nghiệp.'); return; }
-    setBusy('oidc'); setError('');
-    try {
-      const result = await api('/api/auth/oidc/start', { method: 'POST', body: { tenantId } });
-      location.assign(result.authorizationUrl);
-    } catch (reason) { setError(reason.message || 'Không bắt đầu được đăng nhập doanh nghiệp.'); setBusy(''); }
-  };
-
-  const chooseMode = (next) => {
-    setError('');
-    setNotice('');
-    setMode(next);
-    location.hash = next === 'signup' ? '#/signup' : next === 'forgot' ? '#/forgot-password' : '#/login';
-  };
-
-  const requestReset = async (event) => {
-    event.preventDefault();
-    const values = new FormData(event.currentTarget);
-    setBusy('forgot'); setError(''); setNotice('');
-    try {
-      await api('/api/auth/password-reset/request', { method: 'POST', body: {
-        tenantId: String(values.get('tenantId') || '').trim(),
-        email: String(values.get('email') || '').trim(),
-      } });
-      setNotice('Nếu tài khoản tồn tại, email hướng dẫn đặt lại mật khẩu sẽ được gửi trong ít phút.');
-    } catch (reason) { setError(reason.message || 'Chưa gửi được yêu cầu. Vui lòng thử lại.'); }
-    finally { setBusy(''); }
-  };
-
-  const requestVerification = async (event) => {
-    event.preventDefault();
-    const values = new FormData(event.currentTarget);
-    setBusy('verify-request'); setError(''); setNotice('');
-    try {
-      await api('/api/auth/email-verification/request', { method: 'POST', body: {
-        tenantId: String(values.get('tenantId') || '').trim(), email: String(values.get('email') || '').trim(),
-      } });
-      setNotice('Nếu tài khoản cần xác minh tồn tại, email hướng dẫn sẽ được gửi trong ít phút.');
-    } catch (reason) { setError(reason.message || 'Chưa gửi được yêu cầu. Vui lòng thử lại.'); }
-    finally { setBusy(''); }
-  };
-
-  const completeReset = async (event) => {
-    event.preventDefault();
-    const values = new FormData(event.currentTarget);
-    const password = String(values.get('password') || '');
-    if (password !== String(values.get('confirm') || '')) { setError('Hai mật khẩu chưa khớp.'); return; }
-    setBusy('reset'); setError(''); setNotice('');
-    try {
-      await api('/api/auth/password-reset/complete', { method: 'POST', body: { token: route.token, password } });
-      setNotice('Mật khẩu đã được cập nhật. Hãy đăng nhập bằng mật khẩu mới.');
-      setMode('login'); location.hash = '#/login';
-    } catch (reason) { setError(reason.message || 'Liên kết không hợp lệ hoặc đã hết hạn.'); }
-    finally { setBusy(''); }
-  };
 
   if (!catalog) return <div className="landing"><main className="landing-panel">{catalogError ? <div className="alert danger" role="alert">{t(catalogError)}</div> : <div className="skeleton" data-h="row" />}</main></div>;
 
@@ -192,7 +51,7 @@ export default function AuthPage({ route, onSignedIn }) {
       {mode === 'mfa' ? <form className="stack" onSubmit={completeMfaLogin}>
         <div className="field"><label htmlFor="mfa-login-code">{t('Mã xác thực hoặc mã khôi phục')}</label><input className="input mono" id="mfa-login-code" name="code" autoComplete="one-time-code" inputMode="numeric" maxLength="40" required autoFocus /></div>
         <button className="btn btn-primary" type="submit" disabled={Boolean(busy)}>{t(busy === 'mfa' ? 'Đang xác minh…' : 'Xác minh và đăng nhập')}</button>
-        <button className="btn btn-ghost" type="button" disabled={Boolean(busy)} onClick={() => { setMfaChallenge(''); setMode('login'); }}>{t('Quay lại đăng nhập')}</button>
+        <button className="btn btn-ghost" type="button" disabled={Boolean(busy)} onClick={() => { returnFromMfa(); }}>{t('Quay lại đăng nhập')}</button>
       </form> : mode === 'login' ? <form className="stack" onSubmit={login}>
         <div className="field"><label htmlFor="auth-tenant">{t('Mã doanh nghiệp')}</label><input className="input mono" id="auth-tenant" name="tenantId" autoComplete="organization" required placeholder="t_xxxxxxxx" value={loginTenantId} onChange={(event) => setLoginTenantId(event.target.value)} /><p className="hint">{t('Mã bắt đầu bằng t_, được cấp khi tạo doanh nghiệp.')}</p></div>
         <div className="field"><label htmlFor="auth-email">{t('Email')}</label><input className="input" id="auth-email" name="email" type="email" autoComplete="username" required /></div>
@@ -222,7 +81,7 @@ export default function AuthPage({ route, onSignedIn }) {
         <div className="field"><label htmlFor="verify-email-address">{t('Email đăng ký')}</label><input className="input" id="verify-email-address" name="email" type="email" autoComplete="email" required /></div>
         <button className="btn btn-primary" type="submit" disabled={Boolean(busy)}>{t(busy === 'verify-request' ? 'Đang gửi…' : 'Gửi liên kết xác minh')}</button>
         <button className="btn btn-ghost" type="button" onClick={() => setMode('login')}>{t('Quay lại đăng nhập')}</button>
-      </form> : mode === 'verify' ? <div className="stack"><p className="muted">{t(busy === 'verify' ? 'Đang xử lý liên kết xác minh…' : 'Bạn có thể quay lại đăng nhập sau khi xác minh.')}</p><button className="btn btn-ghost" type="button" onClick={() => { setMode('login'); location.hash = '#/login'; }}>{t('Quay lại đăng nhập')}</button></div> : <form className="stack" onSubmit={completeReset}>
+      </form> : mode === 'verify' ? <div className="stack"><p className="muted">{t(busy === 'verify' ? 'Đang xử lý liên kết xác minh…' : 'Bạn có thể quay lại đăng nhập sau khi xác minh.')}</p><button className="btn btn-ghost" type="button" onClick={() => { returnToLogin(); }}>{t('Quay lại đăng nhập')}</button></div> : <form className="stack" onSubmit={completeReset}>
         <div className="field"><label htmlFor="new-password">{t('Mật khẩu mới')}</label><input className="input" id="new-password" name="password" type="password" autoComplete="new-password" minLength="15" maxLength="200" required /><p className="hint">{t('Tối thiểu 15 ký tự.')}</p></div>
         <div className="field"><label htmlFor="confirm-password">{t('Nhập lại mật khẩu')}</label><input className="input" id="confirm-password" name="confirm" type="password" autoComplete="new-password" minLength="15" maxLength="200" required /></div>
         <button className="btn btn-primary" type="submit" disabled={Boolean(busy)}>{t(busy === 'reset' ? 'Đang cập nhật…' : 'Đặt lại mật khẩu')}</button>

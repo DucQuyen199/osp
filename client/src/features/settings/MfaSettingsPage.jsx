@@ -1,19 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, tenantPath } from '../../lib/api.js';
-import { confirmDialog } from '../../lib/feedback.js';
 import { fmtDateTime, uiText } from '../../lib/i18n.js';
-import { app, publishAppState } from '../../lib/state.js';
+import { app } from '../../lib/state.js';
+import { useMfaSettingsWorkflow } from './hooks/useMfaSettingsWorkflow.js';
 export default function MfaSettingsPage() {
   useDocumentTitle(`${uiText('Bảo mật tài khoản')} · OSP Suite`);
   const [status, setStatus] = useState(null);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [password, setPassword] = useState('');
-  const [code, setCode] = useState('');
-  const [setup, setSetup] = useState(null);
-  const [recoveryCodes, setRecoveryCodes] = useState([]);
   const [sessions, setSessions] = useState([]);
   const reload = useCallback(async () => {
     setError('');
@@ -27,53 +21,11 @@ export default function MfaSettingsPage() {
     catch (reason) { setError(reason.message || uiText('Không tải được trạng thái bảo mật.')); }
   }, []);
   useEffect(() => {  reload(); }, [reload]);
-  const startSetup = async (event) => {
-    event.preventDefault(); setBusy(true); setError(''); setNotice('');
-    try {
-      const result = await api(tenantPath('/auth/mfa/setup'), { method: 'POST', body: { password } });
-      setSetup(result); setPassword(''); setCode('');
-    } catch (reason) { setError(reason.message || uiText('Không bắt đầu được thiết lập xác thực hai lớp.')); }
-    finally { setBusy(false); }
-  };
-  const confirmSetup = async (event) => {
-    event.preventDefault(); setBusy(true); setError(''); setNotice('');
-    try {
-      const result = await api(tenantPath('/auth/mfa/confirm'), { method: 'POST', body: { code } });
-      setRecoveryCodes(result.recoveryCodes || []); setSetup(null); setCode('');
-      setStatus({ enabled: true, recoveryCodesRemaining: result.recoveryCodes?.length || 0 });
-      app.user.mfaEnabled = true;
-      publishAppState();
-      setNotice(uiText('Đã bật xác thực hai lớp. Hãy lưu các mã khôi phục ở nơi an toàn.'));
-      await reload();
-    } catch (reason) { setError(reason.message || uiText('Mã xác thực không đúng.')); }
-    finally { setBusy(false); }
-  };
-  const disableMfa = async (event) => {
-    event.preventDefault(); setBusy(true); setError(''); setNotice('');
-    try {
-      await api(tenantPath('/auth/mfa/disable'), { method: 'POST', body: { password, code } });
-      setPassword(''); setCode(''); setRecoveryCodes([]); setStatus({ enabled: false, recoveryCodesRemaining: 0 });
-      app.user.mfaEnabled = false;
-      publishAppState();
-      setNotice(uiText('Đã tắt xác thực hai lớp. Các phiên và API token khác đã bị thu hồi.'));
-      await reload();
-    } catch (reason) { setError(reason.message || uiText('Không tắt được xác thực hai lớp.')); }
-    finally { setBusy(false); }
-  };
-  const revokeOtherSessions = async () => {
-    if (!await confirmDialog({ title: uiText('Đăng xuất phiên khác'), message: uiText('Đăng xuất các phiên trình duyệt khác của tài khoản này?'), danger: true, confirmLabel: uiText('Đăng xuất') })) return;
-    setBusy(true); setError(''); setNotice('');
-    try {
-      const result = await api(tenantPath('/auth/sessions/revoke-others'), { method: 'POST' });
-      setNotice(`${uiText('Đã đăng xuất')} ${result.revokedCount || 0} ${uiText('phiên khác.')}`);
-      await reload();
-    } catch (reason) { setError(reason.message || uiText('Không thu hồi được các phiên khác.')); }
-    finally { setBusy(false); }
-  };
-  const copyRecoveryCodes = async () => {
-    try { await navigator.clipboard.writeText(recoveryCodes.join('\n')); setNotice(uiText('Đã sao chép mã khôi phục.')); }
-    catch { setError(uiText('Trình duyệt không cho phép sao chép. Hãy lưu các mã hiển thị bên dưới.')); }
-  };
+  const {
+    notice, busy, password, setPassword, code, setCode, setup, recoveryCodes,
+    startSetup, confirmSetup, disableMfa, revokeOtherSessions,
+    copyRecoveryCodes, cancelSetup, hideRecoveryCodes,
+  } = useMfaSettingsWorkflow({ reload, setStatus, setError });
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Bảo mật tài khoản')}</h1><p className="sub">{uiText('Thêm mã xác thực cho lần đăng nhập bằng mật khẩu. Mã khôi phục chỉ dùng một lần.')}</p></div></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
@@ -98,7 +50,7 @@ export default function MfaSettingsPage() {
       {recoveryCodes.length > 0 && <div className="card card-pad stack">
         <div><h3>{uiText('Lưu mã khôi phục')}</h3><p className="small muted">{uiText('Mỗi mã chỉ dùng được một lần. Chúng sẽ không hiển thị lại sau khi rời trang.')}</p></div>
         <div className="kv mono">{recoveryCodes.map((item) => <code className="chip" key={item}>{item}</code>)}</div>
-        <div><button className="btn btn-secondary" type="button" onClick={copyRecoveryCodes}>{uiText('Sao chép mã')}</button><button className="btn" type="button" onClick={() => setRecoveryCodes([])}>{uiText('Đã lưu, ẩn mã')}</button></div>
+        <div><button className="btn btn-secondary" type="button" onClick={copyRecoveryCodes}>{uiText('Sao chép mã')}</button><button className="btn" type="button" onClick={hideRecoveryCodes}>{uiText('Đã lưu, ẩn mã')}</button></div>
       </div>}
       {!status.enabled && !setup && app.user?.hasPassword && <form className="stack" onSubmit={startSetup}>
         <p>{uiText('Ứng dụng tương thích TOTP như Google Authenticator, Microsoft Authenticator hoặc 1Password có thể dùng mã này.')}</p>
@@ -111,7 +63,7 @@ export default function MfaSettingsPage() {
         <details><summary>{uiText('Liên kết otpauth')}</summary><p className="small mono u-break-words" >{setup.otpauthUrl}</p></details>
         <form className="stack" onSubmit={confirmSetup}>
           <label className="field"><span className="label">{uiText('Mã 6 chữ số trong ứng dụng')}</span><input className="input mono" autoComplete="one-time-code" inputMode="numeric" maxLength="6" required value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} /></label>
-          <div className="row"><button className="btn btn-primary" disabled={busy || code.length !== 6}>{busy ? uiText('Đang xác minh…') : uiText('Bật xác thực hai lớp')}</button><button className="btn" type="button" disabled={busy} onClick={() => { setSetup(null); setCode(''); }}>{uiText('Hủy')}</button></div>
+          <div className="row"><button className="btn btn-primary" disabled={busy || code.length !== 6}>{busy ? uiText('Đang xác minh…') : uiText('Bật xác thực hai lớp')}</button><button className="btn" type="button" disabled={busy} onClick={cancelSetup}>{uiText('Hủy')}</button></div>
         </form>
       </div>}
       {status.enabled && <form className="stack" onSubmit={disableMfa}>

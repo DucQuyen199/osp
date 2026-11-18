@@ -1,69 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { useLatestRequest } from '../../lib/useLatestRequest.js';
+import React from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
-import { api, tenantPath } from '../../lib/api.js';
-import { confirmDialog, toast } from '../../lib/feedback.js';
-import { fmtDateTime, uiText } from '../../lib/i18n.js';
+import { uiText } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
 import SettingsTabs from './SettingsTabs.jsx';
+import { useTokensWorkflow } from './hooks/useTokensWorkflow.js';
 export default function TokensSettingsPage() {
-  const latestRequest = useLatestRequest();
   useDocumentTitle(`${uiText('API token')} · ${uiText('Cài đặt')} · OSP Suite`);
-  const [tokens, setTokens] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState('');
-  const [showCreate, setShowCreate] = useState(false);
-  const [revealed, setRevealed] = useState(null);
-  const [tokenMode, setTokenMode] = useState('scoped');
-  const reload = async () => {
-    const isLatest = latestRequest();
-    setError('');
-    try {
-      const [tokenRows, userRows] = await Promise.all([api(tenantPath('/tokens')), api(tenantPath('/users'))]);
-      if (!isLatest()) return;
-      setTokens(tokenRows);
-      setUsers(userRows);
-    } catch (reason) { if (isLatest()) setError(reason.message || uiText('Không tải được token.')); }
-  };
-  useEffect(() => {  reload(); }, []);
-  const create = async (event) => {
-    event.preventDefault();
-    const values = new FormData(event.currentTarget);
-    const scopes = tokenMode === 'scoped'
-      ? String(values.get('scopes') || '').split(/[\n,;]/).map((scope) => scope.trim()).filter(Boolean)
-      : null;
-    if (tokenMode === 'scoped' && !scopes.length) { setError(uiText('Nhập ít nhất một quyền cho token giới hạn.')); return; }
-    setBusy('create');
-    setError('');
-    try {
-      const result = await api(tenantPath('/tokens'), { method: 'POST', body: {
-        userId: values.get('userId'), label: String(values.get('label') || '').trim() || undefined,
-        ttlDays: values.get('ttlDays') || undefined,
-        ...(scopes ? { scopes } : {}),
-      } });
-      setRevealed({ token: result.token, expiresAt: result.expiresAt });
-      setShowCreate(false);
-      toast(uiText('Đã tạo token. Hãy sao chép ngay vì bí mật chỉ hiển thị một lần.'), 'success');
-      await reload();
-    } catch (reason) { setError(reason.message || uiText('Không tạo được token.')); }
-    finally { setBusy(''); }
-  };
-  const revoke = async (token) => {
-    if (!await confirmDialog({ title: uiText('Thu hồi token'), message: `${token.label || token.id}? ${uiText('Hệ thống đang dùng token này sẽ mất quyền truy cập ngay.')}`, danger: true, confirmLabel: uiText('Thu hồi token') })) return;
-    setBusy(token.id);
-    setError('');
-    try {
-      await api(tenantPath(`/tokens/${token.id}`), { method: 'DELETE' });
-      toast(uiText('Đã thu hồi token.'), 'success');
-      await reload();
-    } catch (reason) { setError(reason.message || uiText('Không thu hồi được token.')); }
-    finally { setBusy(''); }
-  };
-  const copy = async () => {
-    try { await navigator.clipboard.writeText(revealed.token); toast(uiText('Đã sao chép token.'), 'success'); }
-    catch { setError(uiText('Không sao chép được tự động. Hãy chọn token và sao chép thủ công.')); }
-  };
+  const { tokens, users, error, busy, showCreate, setShowCreate, revealed, setRevealed,
+    tokenMode, setTokenMode, create, revoke, copy, fmtDateTime } = useTokensWorkflow({ enabled: can('tenant.admin') });
   if (!can('tenant.admin')) return <div className="page"><div className="alert danger" role="alert">{uiText('Chỉ quản trị viên mới được quản lý API token.')}</div></div>;
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Cài đặt')}</h1><p className="sub">{uiText('API token của doanh nghiệp')} “{app.meta.name}”.</p></div></div>
