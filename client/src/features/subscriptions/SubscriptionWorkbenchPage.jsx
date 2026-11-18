@@ -1,17 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
-import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { localDate } from '../../lib/dates.js';
-import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
-import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { can, recordLabel } from '../../lib/state.js';
 import { addDecimals, divideDecimals, multiplyDecimals } from '../../lib/decimal.js';
 import subscriptionEnglish from './subscription.en.js';
 import SubscriptionBillingCyclesTable from './components/SubscriptionBillingCyclesTable.jsx';
+import { useSubscriptionWorkbenchWorkflow } from './hooks/useSubscriptionWorkbenchWorkflow.js';
 const t = (text) => uiTextWith(text, subscriptionEnglish);
 const today = localDate;
-const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
-const transition = (entity, row, action) => api(dataPath(entity, row.id, action), { method: 'POST' });
 const normalizedMonthly = (plan) => {
   const price = String(plan?.price || 0);
   if (plan?.interval === 'quarterly') return divideDecimals(price, '3', 28);
@@ -20,37 +17,8 @@ const normalizedMonthly = (plan) => {
 };
 export default function SubscriptionWorkbenchPage() {
   useDocumentTitle(`${t('Quản lý thuê bao và gia hạn')} · OSP Suite`);
-  const [plans, setPlans] = useState([]);
-  const [subscriptions, setSubscriptions] = useState([]);
-  const [cycles, setCycles] = useState([]);
-  const [invoices, setInvoices] = useState([]);
-  const [parties, setParties] = useState(new Map());
-  const [form, setForm] = useState({ party: '', plan: '', start: today() });
-  const [busy, setBusy] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const latestRequest = useLatestRequest();
-  const load = useCallback(async (quiet = false) => {
-    const isLatest = latestRequest();
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const [planRes, subscriptionRes, cycleRes, invoiceRes, partyMap] = await Promise.all([
-        can('subscription.plan.read') ? loadAllResponse('subscription.plan') : Promise.resolve({ items: [] }),
-        can('subscription.subscription.read') ? loadAllResponse('subscription.subscription') : Promise.resolve({ items: [] }),
-        can('subscription.billing_cycle.read') ? loadAllResponse('subscription.billing_cycle') : Promise.resolve({ items: [] }),
-        can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-      ]);
-      const planRows = itemsOf(planRes);
-      if (isLatest()) {
-        setPlans(planRows); setSubscriptions(itemsOf(subscriptionRes)); setCycles(itemsOf(cycleRes)); setInvoices(itemsOf(invoiceRes)); setParties(partyMap);
-        setForm((current) => ({ ...current, party: current.party || [...partyMap.keys()][0] || '', plan: current.plan || planRows[0]?.id || '' }));
-      }
-    } catch (reason) { if (isLatest()) setError(t(reason.message || 'Không tải được hồ sơ thuê bao.')); }
-    finally { if (isLatest()) setLoading(false); }
-  }, [latestRequest]);
-  useEffect(() => { load(); }, [load]);
+  const { plans, subscriptions, cycles, invoices, parties, form, setForm, busy, loading, error, notice,
+    load, createSubscription, changeStatus } = useSubscriptionWorkbenchWorkflow({ t });
   const planById = useMemo(() => new Map(plans.map((row) => [row.id, row])), [plans]);
   const invoiceByCycle = useMemo(() => new Map(invoices.filter((row) => row.source === 'subscription').map((row) => [row.source_id, row])), [invoices]);
   const billingCycles = useMemo(() => [...cycles].sort((a, b) => String(a.due_date || '').localeCompare(String(b.due_date || ''))), [cycles]);
@@ -65,24 +33,6 @@ export default function SubscriptionWorkbenchPage() {
   const mrr = addDecimals(activeSubscriptions.map((row) => normalizedMonthly(planById.get(row.plan))));
   const annualRecurring = multiplyDecimals([mrr, '12']);
   const overdue = cycles.filter((cycle) => cycle.status === 'due' && cycle.due_date < today()).length;
-  async function run(key, operation, success) {
-    setBusy(key); setError(''); setNotice('');
-    try { await operation(); setNotice(t(success)); await load(true); }
-    catch (reason) { setError(t(reason.message || 'Thao tác không thành công.')); await load(true); }
-    finally { setBusy(''); }
-  }
-  async function createSubscription(event) {
-    event.preventDefault();
-    await run('create', () => api(dataPath('subscription.subscription'), { method: 'POST', body: { ...form, status: 'active' } }), 'Đã kích hoạt thuê bao. Hệ thống tự tạo kỳ thu đầu tiên theo ngày bắt đầu và giá gói.');
-  }
-  async function changeStatus(row, action) {
-    const messages = {
-      paused: 'Đã tạm dừng; các kỳ chưa đến hạn được hủy.',
-      resumed: 'Đã tiếp tục thuê bao; kỳ tiếp theo được lên lịch lại.',
-      cancelled: 'Đã hủy thuê bao; các kỳ chưa đến hạn được hủy.',
-    };
-    await run(`${row.id}:${action}`, () => transition('subscription.subscription', row, action), messages[action]);
-  }
   return <div className="page">
     <div className="page-head"><div><h1>{t('Thuê bao và gia hạn')}</h1><p className="sub">{t('Theo dõi gói dịch vụ, doanh thu định kỳ, hóa đơn đến hạn và trạng thái khách hàng.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
