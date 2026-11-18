@@ -13,6 +13,12 @@ impl Kernel {
         opts: &Opts,
     ) -> R<Value> {
         let qname = ent.qname();
+        if ent.def.system_managed && !matches!(actor, Actor::System) {
+            return Err(ApiError::validation(
+                &qname,
+                vec!["Bản ghi này chỉ được cập nhật từ luồng nghiệp vụ Rust của hệ thống".into()],
+            ));
+        }
         if qname.starts_with("consolidation.")
             && matches!(actor, Actor::User { .. })
             && matches!(
