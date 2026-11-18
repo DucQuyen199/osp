@@ -39,6 +39,18 @@ impl Kernel {
                 "Elimination journals can only be posted or rejected through an independent approval decision",
             ));
         }
+        // System-managed records normally only transition from internal
+        // business workflows. Approval requests are the exception: an
+        // authorized user must be able to approve or reject them here.
+        if ent.def.system_managed
+            && !matches!(actor, Actor::System)
+            && qname != "workflow-approval.approval_request"
+        {
+            return Err(ApiError::validation(
+                &qname,
+                vec!["Bản ghi này chỉ được xử lý từ luồng nghiệp vụ Rust của hệ thống".into()],
+            ));
+        }
         let states = ent.def.states.as_ref().ok_or_else(|| {
             ApiError::new(
                 404,
