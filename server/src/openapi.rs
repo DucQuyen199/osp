@@ -1059,7 +1059,7 @@ pub fn build(reg: &Registry) -> Value {
         "/api/t/{tenantId}/accounting/bank-statements/{statementId}/import-camt053".into(),
         json!({ "post": {
             "tags": ["accounting"], "summary": "Import ISO 20022 CAMT.053 bank statement", "security": sec,
-            "parameters": [tid, { "name": "statementId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "parameters": [tid, { "name": "statementId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }, { "name": "bankAccountId", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Account IBAN or CAMT Othr/Id value to confirm against the imported file" }],
             "requestBody": { "required": true, "content": {
                 "application/xml": { "schema": { "type": "string", "description": "UTF-8 CAMT.053.001.01–.14 document, one statement, up to 20,000 booked entries and 5 MB" } },
                 "text/xml": { "schema": { "type": "string", "description": "UTF-8 CAMT.053.001.01–.14 document, one statement, up to 20,000 booked entries and 5 MB" } }
@@ -1068,7 +1068,7 @@ pub fn build(reg: &Registry) -> Value {
                 ("200".to_string(), json!({ "description": "Rows imported or skipped as exact idempotent replays" })),
                 ("409".to_string(), err("Only a draft statement accepts imported rows")),
                 ("413".to_string(), err("File exceeds 5 MB or has more than 20,000 entries")),
-                ("422".to_string(), err("Invalid CAMT.053 document, currency, date, or duplicate reference"))
+                ("422".to_string(), err("Invalid CAMT.053 account identity, document, currency, date, or duplicate reference"))
             ]))
         } }),
     );

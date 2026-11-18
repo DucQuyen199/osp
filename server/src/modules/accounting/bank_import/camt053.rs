@@ -57,7 +57,7 @@ fn statement_nodes<'a, 'input>(node: Node<'a, 'input>) -> Vec<Node<'a, 'input>> 
         .collect()
 }
 
-pub(super) fn parse(xml: &str) -> R<Vec<BankLine>> {
+pub(super) fn parse(xml: &str, expected_account_id: &str) -> R<Vec<BankLine>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(ApiError::new(
             413,
@@ -105,6 +105,41 @@ pub(super) fn parse(xml: &str) -> R<Vec<BankLine>> {
     let statement = statements[0];
     let account = child(statement, "Acct")
         .ok_or_else(|| validation("CAMT.053 statement does not contain an account"))?;
+    let identification = child(account, "Id").and_then(|id| {
+        child(id, "IBAN")
+            .and_then(|iban| iban.text())
+            .map(|iban| (iban, true))
+            .or_else(|| {
+                child(id, "Othr")
+                    .and_then(|other| child_text(other, "Id"))
+                    .map(|other_id| (other_id, false))
+            })
+    });
+    let (account_id, is_iban) = identification
+        .map(|(value, is_iban)| (value.trim(), is_iban))
+        .filter(|(value, _)| !value.is_empty())
+        .ok_or_else(|| validation("CAMT.053 account identifier is missing"))?;
+    let normalize_iban = |value: &str| {
+        value
+            .chars()
+            .filter(|character| !character.is_ascii_whitespace())
+            .flat_map(char::to_uppercase)
+            .collect::<String>()
+    };
+    let expected = expected_account_id.trim();
+    if expected.is_empty() {
+        return Err(validation("Expected bank account identifier is required"));
+    }
+    let account_id_matches = if is_iban {
+        normalize_iban(account_id) == normalize_iban(expected)
+    } else {
+        account_id == expected
+    };
+    if !account_id_matches {
+        return Err(validation(
+            "CAMT.053 account identifier does not match the confirmed bank account",
+        ));
+    }
     let account_currency = child_text(account, "Ccy").map(str::to_ascii_uppercase);
     let entries = statement
         .children()

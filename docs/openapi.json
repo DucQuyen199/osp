@@ -1,6 +1,87 @@
 {
   "components": {
     "schemas": {
+      "CassoBankTransaction": {
+        "allOf": [
+          {
+            "anyOf": [
+              {
+                "required": [
+                  "when"
+                ]
+              },
+              {
+                "required": [
+                  "transactionDate"
+                ]
+              }
+            ]
+          },
+          {
+            "anyOf": [
+              {
+                "required": [
+                  "bank_sub_acc_id"
+                ]
+              },
+              {
+                "required": [
+                  "subAccId"
+                ]
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "amount": {
+            "description": "Signed amount: positive is credit, negative is debit",
+            "not": {
+              "const": 0
+            },
+            "type": "number"
+          },
+          "bank_sub_acc_id": {
+            "description": "Casso bank account identifier",
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 1000,
+            "type": "string"
+          },
+          "id": {
+            "description": "Stable Casso transaction identifier",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "subAccId": {
+            "description": "Alternate Casso bank account identifier",
+            "type": "string"
+          },
+          "tid": {
+            "description": "Bank transaction reference",
+            "type": "string"
+          },
+          "transactionDate": {
+            "description": "Alternate transaction date or timestamp",
+            "type": "string"
+          },
+          "when": {
+            "description": "Transaction date or timestamp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "amount"
+        ],
+        "type": "object"
+      },
       "Error": {
         "properties": {
           "error": {
@@ -1683,6 +1764,10 @@
             "format": "date",
             "type": "string"
           },
+          "expiry": {
+            "format": "date",
+            "type": "string"
+          },
           "grade": {
             "type": "string"
           },
@@ -1748,6 +1833,10 @@
             "type": "string"
           },
           "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "expiry": {
             "format": "date",
             "type": "string"
           },
@@ -19076,6 +19165,15 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "description": "Account IBAN or CAMT Othr/Id value to confirm against the imported file",
+            "in": "query",
+            "name": "bankAccountId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -19157,7 +19255,7 @@
                 }
               }
             },
-            "description": "Invalid CAMT.053 document, currency, date, or duplicate reference"
+            "description": "Invalid CAMT.053 account identity, document, currency, date, or duplicate reference"
           }
         },
         "security": [
@@ -19166,6 +19264,149 @@
           }
         ],
         "summary": "Import ISO 20022 CAMT.053 bank statement",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/accounting/bank-statements/{statementId}/import-casso": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "statementId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "bankAccountId": {
+                    "description": "Expected bank_sub_acc_id/subAccId from the selected bank account; all rows must match",
+                    "maxLength": 128,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "data": {
+                    "oneOf": [
+                      {
+                        "items": {
+                          "$ref": "#/components/schemas/CassoBankTransaction"
+                        },
+                        "type": "array"
+                      },
+                      {
+                        "properties": {
+                          "records": {
+                            "items": {
+                              "$ref": "#/components/schemas/CassoBankTransaction"
+                            },
+                            "type": "array"
+                          }
+                        },
+                        "required": [
+                          "records"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "bankAccountId",
+                  "data"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Rows imported or skipped as exact idempotent replays"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Only a draft statement accepts imported rows"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Payload exceeds 1 MB or has more than 20,000 transactions"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Invalid Casso transaction, date, or duplicate reference"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Import Casso bank transactions",
         "tags": [
           "accounting"
         ]

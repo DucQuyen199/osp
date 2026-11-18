@@ -1274,6 +1274,17 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                 "import-camt053",
             ],
         ) => {
+            let bank_account_id = query
+                .iter()
+                .find(|(key, _)| key == "bankAccountId")
+                .map(|(_, value)| value.as_str())
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| {
+                    ApiError::validation(
+                        "accounting.bank_statement",
+                        vec!["bankAccountId is required for CAMT.053 import".into()],
+                    )
+                })?;
             let xml = std::str::from_utf8(&bytes).map_err(|_| {
                 ApiError::new(400, "INVALID_XML", "CAMT.053 body must be UTF-8 XML")
             })?;
@@ -1283,6 +1294,7 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     &actor,
                     &t,
                     statement_id,
+                    bank_account_id,
                     xml,
                 )
                 .await?,

@@ -23,10 +23,11 @@ pub async fn import_statement_camt053(
     actor: &Actor,
     tenant: &Tenant,
     statement_id: &str,
+    bank_account_id: &str,
     xml_text: &str,
 ) -> R<Value> {
     let statement_id = authorize_import(kernel, actor, tenant, statement_id)?;
-    let lines = camt053::parse(xml_text)?;
+    let lines = camt053::parse(xml_text, bank_account_id)?;
     persistence::import_lines(
         kernel,
         actor,
