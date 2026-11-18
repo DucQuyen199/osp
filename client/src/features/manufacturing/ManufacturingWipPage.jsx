@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtMoney, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
-import { can, loadRefs, loadAllResponse } from '../../lib/state.js';
+import { can } from '../../lib/state.js';
 import { compareDecimals } from '../../lib/decimal.js';
 import { recordHref } from '../../lib/routes.js';
 import manufacturingEnglish from './manufacturing.en.js';
@@ -16,31 +16,22 @@ import ProductionDispositionPanel from './components/ProductionDispositionPanel.
 import ReworkOrdersPanel from './components/ReworkOrdersPanel.jsx';
 import BillOfMaterialsSection from './components/BillOfMaterialsSection.jsx';
 import { isWithinFailedQty, productionOutputMatchesPlan, productionOutputQuantities, remainingFailedQty as getRemainingFailedQty } from './domain/inspectionQuantities.js';
+import { useManufacturingWipData } from './hooks/useManufacturingWipData.js';
 const t = (text) => uiTextWith(text, manufacturingEnglish);
 const today = localDate;
 const qty = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
 export default function ManufacturingWipPage() {
   useDocumentTitle(t("WIP sản xuất · OSP Suite"));
   const [asOf, setAsOf] = useState(today());
-  const [report, setReport] = useState(null);
-  const [accounts, setAccounts] = useState(new Map());
+  const { report, accounts, boms, productionOrders, reworkOrders, productionDispositions,
+    conditionalAcceptances, inspections, workCenters, products, warehouses, units,
+    loading, loadError, load } = useManufacturingWipData(asOf);
   const [offsetAccountId, setOffsetAccountId] = useState('');
   const [memo, setMemo] = useState(t("Điều chỉnh đối chiếu WIP"));
   const [adjustment, setAdjustment] = useState(null);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [boms, setBoms] = useState([]);
-  const [productionOrders, setProductionOrders] = useState([]);
-  const [reworkOrders, setReworkOrders] = useState([]);
-  const [productionDispositions, setProductionDispositions] = useState([]);
-  const [conditionalAcceptances, setConditionalAcceptances] = useState([]);
-  const [inspections, setInspections] = useState([]);
-  const [workCenters, setWorkCenters] = useState(new Map());
-  const [products, setProducts] = useState(new Map());
-  const [warehouses, setWarehouses] = useState(new Map());
-  const [units, setUnits] = useState(new Map());
   const [editingBom, setEditingBom] = useState('');
   const [bomProduct, setBomProduct] = useState('');
   const [bomOutputQty, setBomOutputQty] = useState('1');
@@ -68,41 +59,6 @@ export default function ManufacturingWipPage() {
   const [outputs, setOutputs] = useState({});
   const [busy, setBusy] = useState('');
   const [qcNotes, setQcNotes] = useState({});
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const params = new URLSearchParams();
-      if (asOf) params.set('asOf', asOf);
-      const [reportData, bomResponse, orderResponse, reworkResponse, inspectionResponse, dispositionResponse, acceptanceResponse, centerMap, productMap, warehouseMap, unitMap, accountMap] = await Promise.all([
-        api(`${tenantPath('/reports/manufacturing/wip')}?${params}`),
-        can('manufacturing.bom.read') ? loadAllResponse('manufacturing.bom') : Promise.resolve({ items: [] }),
-        can('manufacturing.production_order.read') ? loadAllResponse('manufacturing.production_order') : Promise.resolve({ items: [] }),
-        can('manufacturing.rework_order.read') ? loadAllResponse('manufacturing.rework_order') : Promise.resolve({ items: [] }),
-        can('quality.inspection.read') ? loadAllResponse('quality.inspection') : Promise.resolve({ items: [] }),
-        can('manufacturing.production_disposition.read') ? loadAllResponse('manufacturing.production_disposition') : Promise.resolve({ items: [] }),
-        can('manufacturing.conditional_acceptance.read') ? loadAllResponse('manufacturing.conditional_acceptance') : Promise.resolve({ items: [] }),
-        can('manufacturing.work_center.read') ? loadRefs('manufacturing.work_center') : Promise.resolve(new Map()),
-        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
-        can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
-        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
-        can('accounting.account.read') ? loadRefs('accounting.account') : Promise.resolve(new Map()),
-      ]);
-      setReport(reportData);
-      setBoms(Array.isArray(bomResponse.items) ? bomResponse.items : []);
-      setProductionOrders(Array.isArray(orderResponse.items) ? orderResponse.items : []);
-      setReworkOrders(Array.isArray(reworkResponse.items) ? reworkResponse.items : []);
-      setProductionDispositions(Array.isArray(dispositionResponse.items) ? dispositionResponse.items : []);
-      setConditionalAcceptances(Array.isArray(acceptanceResponse.items) ? acceptanceResponse.items : []);
-      setInspections(Array.isArray(inspectionResponse.items) ? inspectionResponse.items : []);
-      setWorkCenters(centerMap); setProducts(productMap); setWarehouses(warehouseMap); setUnits(unitMap); setAccounts(accountMap);
-    } catch (reason) {
-      setReport(null);
-      setError(reason.message || t("Không tải được báo cáo WIP."));
-    } finally {
-      setLoading(false);
-    }
-  }, [asOf]);
   const unitsFor = (productId) => {
     const baseUnit = products.get(productId)?.uom;
     return baseUnit ? [...units.values()].filter((unit) => unit.id === baseUnit || unit.base_uom === baseUnit) : [];
@@ -260,7 +216,6 @@ export default function ManufacturingWipPage() {
     } catch (reason) { setError(reason.message || t("Không cập nhật được phiếu xử lý thành phẩm.")); }
     finally { setBusy(''); }
   };
-  useEffect(() => { load(); }, [load]);
   const createDraft = async () => {
     setCreating(true);
     setError('');
@@ -281,7 +236,7 @@ export default function ManufacturingWipPage() {
   };
   return <div className="page">
     <div className="page-head"><div><h1>{t("WIP sản xuất")}</h1><p className="sub">{t("Đối chiếu giá trị vật tư theo lệnh sản xuất với số dư tài khoản 154 trên sổ cái.")}</p></div></div>
-    {error && <div className="alert danger" role="alert">{t(error)}</div>}
+    {(error || loadError) && <div className="alert danger" role="alert">{t(error || loadError)}</div>}
     {notice && <div className="alert success" role="status">{t(notice)}</div>}
     <section className="card card-pad manufacturing-workbench">
       <header className="card-head"><div><h2>{t("BOM và lệnh sản xuất")}</h2><p className="small muted">{t("Lập định mức, giữ lịch sử BOM đã dùng, xuất vật tư khi bắt đầu và chuyển thành phẩm sang QC khi hoàn tất.")}</p></div></header>
