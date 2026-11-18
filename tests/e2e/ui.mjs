@@ -487,6 +487,15 @@ for (const [vertical, hash, label, summaryEntity, setupEntity] of verticalScreen
       await page.goto(`${BASE}/${hash}`, { waitUntil: 'networkidle0' });
       await page.waitForSelector('#main h1');
     }
+    if (vertical === 'hospitality') {
+      await page.goto(`${BASE}/#/reports/hotel/housekeeping-board`, { waitUntil: 'networkidle0' });
+      await page.waitForSelector('#main h1');
+      must(!(await page.$('.route-error')), 'Hotel housekeeping board failed to render');
+      must(await page.$('nav[aria-label="Phân trang phòng cần xử lý"]'), 'Housekeeping room pagination is missing');
+      await axe('Hotel housekeeping board');
+      await page.goto(`${BASE}/${hash}`, { waitUntil: 'networkidle0' });
+      await page.waitForSelector('#main h1');
+    }
     if (vertical === 'home-services') {
       await page.goto(`${BASE}/#/reports/helpdesk/sla`, { waitUntil: 'networkidle0' });
       await page.waitForSelector('#main h1');

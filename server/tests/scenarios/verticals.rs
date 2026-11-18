@@ -108,7 +108,7 @@ async fn hotel(kernel: &Arc<Kernel>) {
             json!({ "number": "101", "room_type": id(&kind) }),
         )
         .await;
-    let today = chrono::Utc::now().date_naive();
+    let today = kernel.tenant(&t.t.id).await.unwrap().business_today();
     let start = (today - chrono::Duration::days(2)).to_string();
     let end = (today + chrono::Duration::days(1)).to_string();
     let reservation = t
@@ -154,7 +154,44 @@ async fn hotel(kernel: &Arc<Kernel>) {
         .await
         .is_err()
     );
+    let second_room = t
+        .create(
+            "hotel.room",
+            json!({ "number": "102", "room_type": id(&kind) }),
+        )
+        .await;
+    let second_reservation = t.create("hotel.reservation", json!({ "party": id(&party), "room": id(&second_room), "check_in": today.to_string(), "check_out": (today + chrono::Duration::days(1)).to_string() })).await;
+    t.act("hotel.reservation", &id(&second_reservation), "checked_in")
+        .await;
+    t.act("hotel.reservation", &id(&second_reservation), "checked_out")
+        .await;
+    let (status, first_page) = t
+        .api(
+            "GET",
+            "/reports/hotel/housekeeping-board?limit=1&offset=0",
+            json!(null),
+        )
+        .await;
+    assert_eq!(status, 200, "housekeeping page: {first_page}");
+    assert_eq!(first_page["itemCount"], 2);
+    assert_eq!(first_page["cleaningCount"], 2);
+    assert_eq!(first_page["items"].as_array().map(Vec::len), Some(1));
+    assert_eq!(first_page["pageSize"], 1);
+    assert_eq!(first_page["offset"], 0);
+    assert_eq!(first_page["hasMore"], true);
+    let (status, last_page) = t
+        .api(
+            "GET",
+            "/reports/hotel/housekeeping-board?limit=1&offset=1",
+            json!(null),
+        )
+        .await;
+    assert_eq!(status, 200, "housekeeping last page: {last_page}");
+    assert_eq!(last_page["items"].as_array().map(Vec::len), Some(1));
+    assert_eq!(last_page["offset"], 1);
+    assert_eq!(last_page["hasMore"], false);
     t.act("hotel.room", &id(&room), "ready").await;
+    t.act("hotel.room", &id(&second_room), "ready").await;
     assert_eq!(t.get("hotel.room", &id(&room)).await["status"], "vacant");
     println!("✔ hotel: capacity/overlap, rate snapshot, folio, checkout invoice and housekeeping");
 }

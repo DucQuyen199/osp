@@ -7,13 +7,16 @@ import { recordHref } from '../../lib/routes.js';
 import housekeepingEnglish from './housekeeping.en.js';
 
 const t = (text) => uiTextWith(text, housekeepingEnglish);
+const PAGE_SIZE = 50;
 
 export default function HotelHousekeepingBoardPage() {
   useDocumentTitle(`${t('Buồng phòng')} · OSP Suite`);
   const [items, setItems] = useState([]);
   const [rooms, setRooms] = useState(new Map());
   const [totals, setTotals] = useState({ cleaningCount: 0, dueToday: 0, readyCount: 0, occupiedCount: 0, maintenanceCount: 0 });
-  const [truncated, setTruncated] = useState(false);
+  const [itemCount, setItemCount] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState('');
@@ -26,10 +29,12 @@ export default function HotelHousekeepingBoardPage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [result, roomMap] = await Promise.all([
-        api(tenantPath('/reports/hotel/housekeeping-board')),
+        api(tenantPath(`/reports/hotel/housekeeping-board?limit=${PAGE_SIZE}&offset=${offset}`)),
         loadRefs('hotel.room'),
       ]);
       setItems(result.items || []);
+      setItemCount(Number(result.itemCount || 0));
+      setHasMore(Boolean(result.hasMore));
       setRooms(roomMap);
       setTotals({
         cleaningCount: result.cleaningCount || 0,
@@ -38,14 +43,17 @@ export default function HotelHousekeepingBoardPage() {
         occupiedCount: result.occupiedCount || 0,
         maintenanceCount: result.maintenanceCount || 0,
       });
-      setTruncated(Boolean(result.truncated));
       setLastUpdated(new Date().toISOString());
+      if (offset > 0 && offset >= Number(result.itemCount || 0)) {
+        const lastOffset = result.itemCount > 0 ? Math.floor((result.itemCount - 1) / PAGE_SIZE) * PAGE_SIZE : 0;
+        setOffset(lastOffset);
+      }
     } catch (reason) {
       setError(t(reason.message || 'Không tải được danh sách phòng cần dọn.'));
     } finally {
       if (!quiet) setLoading(false);
     }
-  }, []);
+  }, [offset]);
 
   useEffect(() => { load();
     const timer = window.setInterval(() => load(true), 30000);
@@ -95,7 +103,6 @@ export default function HotelHousekeepingBoardPage() {
       </form> : <p className="small muted">{t('Kh\u00f4ng c\u00f3 ph\u00f2ng tr\u1ed1ng \u0111\u1ec3 \u0111\u01b0a v\u00e0o b\u1ea3o tr\u00ec.')}</p>}
     </section>}
     {error && <div className="alert danger" role="alert">{t(error)}</div>}
-    {truncated && <div className="alert warning" role="status">{t('Đang hiển thị tối đa 500 phòng đang chờ dọn.')}</div>}
     {loading && !lastUpdated ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : items.length ? <div className="housekeeping-grid">
       {items.map((room) => <article className={`card housekeeping-card${room.priority === 'today' ? ' due-today' : ''}`} key={room.id}>
         <header className="card-head">
@@ -109,6 +116,12 @@ export default function HotelHousekeepingBoardPage() {
         {room.status === 'cleaning' && can('hotel.room.maintenance') && <div className="row wrap housekeeping-footer"><label className="field"><span className="label">{t('Ghi nh\u1eadn h\u01b0 h\u1ecfng / c\u1ea7n b\u1ea3o tr\u00ec')}</span><input className="input" maxLength="500" value={maintenanceReasons[room.id] || ''} onChange={(event) => setMaintenanceReasons((current) => ({ ...current, [room.id]: event.target.value }))} placeholder={t('M\u00f4 t\u1ea3 v\u1ea5n \u0111\u1ec1 c\u1ea7n x\u1eed l\u00fd')} /></label><button className="btn btn-secondary" type="button" disabled={Boolean(busy) || !maintenanceReasons[room.id]?.trim()} onClick={() => roomAction(room, 'maintenance')}>{t('\u0110\u01b0a v\u00e0o b\u1ea3o tr\u00ec')}</button></div>}
         {can('hotel.room.ready') && <footer className="row housekeeping-footer"><span className="small muted">{room.status === 'maintenance' ? t('Ch\u1ec9 \u0111\u00e1nh d\u1ea5u s\u1eb5n s\u00e0ng sau khi s\u1eeda ch\u1eefa v\u00e0 ki\u1ec3m tra') : t('X\u00e1c nh\u1eadn sau khi \u0111\u00e3 d\u1ecdn v\u00e0 ki\u1ec3m tra')}</span><span className="grow" /><button className="btn btn-primary" type="button" disabled={Boolean(busy)} onClick={() => roomAction(room, 'ready')}>{busy === room.id ? t('\u0110ang c\u1eadp nh\u1eadt\u2026') : t('\u0110\u00e1nh d\u1ea5u s\u1eb5n s\u00e0ng')}</button></footer>}
       </article>)}
-    </div> : <div className="empty housekeeping-empty">{t('Không có phòng chờ dọn. Kiểm tra danh sách đặt phòng trong ngày trước khi nhận khách.')}</div>}
+    </div> : <div className="empty housekeeping-empty">{itemCount > 0 ? t('Phòng ở trang khác') : t('Không có phòng chờ dọn. Kiểm tra danh sách đặt phòng trong ngày trước khi nhận khách.')}</div>}
+    <nav className="row wrap" aria-label={t('Phân trang phòng cần xử lý')}>
+      <span className="small muted" aria-live="polite">{t('Đang hiển thị {from}–{to} trên {total} phòng').replace('{from}', String(itemCount ? offset + 1 : 0)).replace('{to}', String(Math.min(offset + items.length, itemCount))).replace('{total}', String(itemCount))}{loading ? ` · ${t('Đang tải…')}` : ''}</span>
+      <span className="grow" />
+      <button className="btn btn-secondary btn-sm" type="button" disabled={loading || offset === 0} onClick={() => setOffset((current) => Math.max(0, current - PAGE_SIZE))}>{t('Trang trước')}</button>
+      <button className="btn btn-secondary btn-sm" type="button" disabled={loading || !hasMore} onClick={() => setOffset((current) => current + PAGE_SIZE)}>{t('Trang sau')}</button>
+    </nav>
   </div>;
 }

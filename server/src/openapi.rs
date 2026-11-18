@@ -1170,8 +1170,8 @@ pub fn build(reg: &Registry) -> Value {
         "/api/t/{tenantId}/reports/hotel/housekeeping-board".into(),
         json!({ "get": {
             "tags": ["hotel"], "summary": "Rooms awaiting housekeeping", "security": sec,
-            "parameters": [tid],
-            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Tenant-scoped cleaning rooms prioritized by same-day arrivals, with previous checkout date and room readiness totals; guest identity is omitted and result is capped at 500 rooms" })), ("403".to_string(), err("Requires hotel.room.read")), ("404".to_string(), err("Hotel module is not enabled"))]))
+            "parameters": [tid, { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 } }, { "name": "offset", "in": "query", "schema": { "type": "integer", "minimum": 0, "default": 0 } }],
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "A page of tenant-scoped cleaning and maintenance rooms prioritized by same-day arrivals, with full room readiness totals and paging metadata; guest identity is omitted" })), ("403".to_string(), err("Requires hotel.room.read")), ("404".to_string(), err("Hotel module is not enabled"))]))
         } }),
     );
     paths.insert(
