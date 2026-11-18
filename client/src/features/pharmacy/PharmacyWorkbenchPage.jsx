@@ -11,7 +11,7 @@ import pharmacyEnglish from './pharmacy.en.js';
 import PrescriptionForm from './components/PrescriptionForm.jsx';
 const t = (text) => uiTextWith(text, pharmacyEnglish);
 const today = localDate;
-const newLine = () => ({ product: '', uom: '', qty: '1', dosage: '' });
+const newLine = () => ({ rowId: crypto.randomUUID(), product: '', uom: '', qty: '1', dosage: '' });
 export default function PharmacyWorkbenchPage() {
   useDocumentTitle(`${t('Quản lý đơn thuốc')} · OSP Suite`);
   const [products, setProducts] = useState([]);
@@ -102,7 +102,7 @@ export default function PharmacyWorkbenchPage() {
       prescriber_license: prescription.prescriber_license || '', issued_at: prescription.issued_at || today(),
       valid_until: prescription.valid_until || today(), notes: prescription.notes || '',
     });
-    setLines((prescription.items || []).map((item) => ({ product: item.product || '', uom: item.uom || '', qty: String(item.qty ?? ''), dosage: item.dosage || '' })));
+    setLines((prescription.items || []).map((item) => ({ rowId: crypto.randomUUID(), product: item.product || '', uom: item.uom || '', qty: String(item.qty ?? ''), dosage: item.dosage || '' })));
     setError(''); setNotice('');
     document.getElementById('pharmacy-prescription-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     document.getElementById('pharmacy-prescription-number')?.focus({ preventScroll: true });

@@ -6,7 +6,7 @@ export default function SupplierInvoiceAdjustmentsEditor({ lines, onChange, rece
   return <section className="field full">
     <span className="label">{uiText('Phí và chiết khấu')}</span>
     <p className="small muted">{uiText('Phí có thể hạch toán vào chi phí mua (632) hoặc vốn hóa vào giá trị hàng nhận; thuế của phí được hạch toán riêng.')}</p>
-    {lines.map((line, index) => <div className="row wrap u-legacy-43a97fe494" key={index} >
+    {lines.map((line, index) => <div className="row wrap u-legacy-43a97fe494" key={line.rowId} >
       <select className="input" aria-label={`${uiText('Loại điều chỉnh hóa đơn')} ${index + 1}`} value={line.kind} onChange={(event) => update(index, { kind: event.target.value })}>
         <option value="charge">{uiText('Phí cộng thêm')}</option><option value="discount">{uiText('Chiết khấu')}</option>
       </select>

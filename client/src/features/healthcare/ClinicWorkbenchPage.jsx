@@ -8,6 +8,7 @@ import { app, can, loadAll, loadIndependentData, loadRefs, recordLabel } from '.
 import clinicEnglish from './clinic.en.js';
 import EncounterPrescriptionsPanel from './components/EncounterPrescriptionsPanel.jsx';
 const t = (text) => uiTextWith(text, clinicEnglish);
+const newPrescriptionItem = () => ({ rowId: crypto.randomUUID(), product: '', qty: 1, dosage: '', uom: '' });
 export default function ClinicWorkbenchPage() {
   useDocumentTitle(t("Điều phối phòng khám · OSP Suite"));
   const [patients, setPatients] = useState([]);
@@ -31,7 +32,7 @@ export default function ClinicWorkbenchPage() {
   const [testEncounterId, setTestEncounterId] = useState('');
   const [testResult, setTestResult] = useState({});
   const [rxWarehouse, setRxWarehouse] = useState('');
-  const [rxItems, setRxItems] = useState([{ product: '', qty: 1, dosage: '', uom: '' }]);
+  const [rxItems, setRxItems] = useState(() => [newPrescriptionItem()]);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -146,7 +147,7 @@ export default function ClinicWorkbenchPage() {
     setBusy(true); setError(''); setNotice('');
     try {
       await api(dataPath('clinic.prescription'), { method: 'POST', body: { encounter: selected.id, warehouse: rxWarehouse, items: rxItems.filter((item) => item.product && compareDecimals(item.qty || 0, 0) > 0).map((item) => ({ product: item.product, qty: String(item.qty), ...(item.uom ? { uom: item.uom } : {}), dosage: item.dosage.trim() })) } });
-      await load(true); setRxItems([{ product: '', qty: 1, dosage: '', uom: '' }]); setNotice(t("Đã lưu đơn thuốc nháp. Chỉ có thể phát sau khi hoàn tất lượt khám."));
+      await load(true); setRxItems([newPrescriptionItem()]); setNotice(t("Đã lưu đơn thuốc nháp. Chỉ có thể phát sau khi hoàn tất lượt khám."));
     } catch (reason) { setError(reason.message || t("Không lưu được đơn thuốc.")); }
     finally { setBusy(false); }
   };
@@ -219,7 +220,7 @@ export default function ClinicWorkbenchPage() {
           canCreate={can('clinic.prescription.create')} canDispense={can('clinic.prescription.dispensed')}
           onDispense={dispensePrescription} onWarehouseChange={setRxWarehouse}
           onItemChange={updateRxItem}
-          onAddItem={() => setRxItems((current) => [...current, { product: '', qty: 1, dosage: '', uom: '' }])}
+          onAddItem={() => setRxItems((current) => [...current, newPrescriptionItem()])}
           onRemoveItem={(index) => setRxItems((current) => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : current)}
           onSubmit={createPrescription} recordLabel={recordLabel} statusLabel={statusLabel} t={t}
         />

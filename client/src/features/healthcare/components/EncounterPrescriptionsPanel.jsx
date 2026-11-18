@@ -23,7 +23,7 @@ export default function EncounterPrescriptionsPanel({
             <option key={warehouse.id} value={warehouse.id}>{recordLabel('inventory.warehouse', warehouse)}</option>)}
         </select>
       </label></div>
-      {items.map((item, index) => <div className="clinic-rx-line" key={index}>
+      {items.map((item, index) => <div className="clinic-rx-line" key={item.rowId}>
         <select className="select" required aria-label={`${t('Thuốc dòng')} ${index + 1}`} value={item.product}
           onChange={(event) => onItemChange(index, { product: event.target.value, uom: '' })}>
           <option value="">{t('Chọn thuốc')}</option>
