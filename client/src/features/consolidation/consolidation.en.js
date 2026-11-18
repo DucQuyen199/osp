@@ -94,7 +94,13 @@ const consolidationEnglish = {
   'Mở báo cáo đã lưu': 'Open saved report',
   'invited': 'Invited',
   'Từ đầu kỳ': 'Opening balance',
-  'active': 'Active',
+  'Tuổi tối đa của tỷ giá (ngày)': 'Maximum currency rate age (days)',
+  'Báo cáo quy đổi sẽ dừng nếu tỷ giá gần nhất cũ hơn ngưỡng này.': 'Translated reports stop when the latest rate is older than this limit.',
+  'Đã lưu chính sách tuổi tỷ giá.': 'Currency rate age policy saved.',
+  'Tỷ giá quá hạn sẽ làm báo cáo dừng để tránh quy đổi bằng dữ liệu cũ.': 'Stale rates stop the report to prevent conversion with outdated data.',
+  'Lưu chính sách tỷ giá': 'Save rate policy',
+  'Tuổi tỷ giá': 'Rate age',
+  'ngày': 'days',  'active': 'Active',
   'revoked': 'Revoked',
 };
 

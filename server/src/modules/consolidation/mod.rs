@@ -5,3 +5,5 @@ mod grants;
 mod persistence;
 mod reports;
 mod snapshots;
+
+pub use domain::{validate, validate_update};

@@ -4211,6 +4211,9 @@
             "readOnly": true,
             "type": "string"
           },
+          "max_rate_age_days": {
+            "type": "number"
+          },
           "name": {
             "type": "string"
           },
@@ -4233,6 +4236,9 @@
         "properties": {
           "description": {
             "type": "string"
+          },
+          "max_rate_age_days": {
+            "type": "number"
           },
           "name": {
             "type": "string"
@@ -20043,7 +20049,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Member trial balances and account-code totals in the group reporting currency; requires reciprocal consent and an available effective rate"
+            "description": "Member trial balances and account-code totals in the group reporting currency; requires reciprocal consent, an available effective rate, and compliance with the group's maximum rate age"
           },
           "401": {
             "content": {
@@ -20083,7 +20089,7 @@
                 }
               }
             },
-            "description": "Member consent, currency rate, or accounting data is unavailable"
+            "description": "Member consent, currency rate policy, rate freshness, or accounting data is unavailable"
           }
         },
         "security": [

@@ -13,11 +13,14 @@
       "fields": [
         { "name": "name", "type": "string", "required": true },
         { "name": "reporting_currency", "type": "ref", "required": true, "ref": "master-data.currency" },
+        { "name": "max_rate_age_days", "type": "number", "required": false },
         { "name": "description", "type": "text", "required": false }
       ],
       "states": null,
       "computed": {},
-      "constraints": []
+      "constraints": [
+        { "type": "min", "field": "max_rate_age_days", "value": 1, "message": "Maximum currency rate age must be at least one day" }
+      ]
     },
     {
       "name": "member",

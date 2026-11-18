@@ -88,6 +88,49 @@ async fn currency_rate(
     Ok((rate, effective_date))
 }
 
+fn rate_age_days(effective_date: &str, as_of: &str) -> R<i64> {
+    let effective_date = NaiveDate::parse_from_str(effective_date, "%Y-%m-%d").map_err(|_| {
+        ApiError::new(
+            409,
+            "INVALID_CURRENCY_RATE_DATE",
+            "Currency rate has an invalid effective date",
+        )
+    })?;
+    let as_of = NaiveDate::parse_from_str(as_of, "%Y-%m-%d")
+        .map_err(|_| ApiError::new(422, "INVALID_DATE", "Rate date must use YYYY-MM-DD"))?;
+    let age_days = as_of.signed_duration_since(effective_date).num_days();
+    if age_days < 0 {
+        return Err(ApiError::new(
+            409,
+            "INVALID_CURRENCY_RATE_DATE",
+            "Currency rate is effective after the report end date",
+        ));
+    }
+    Ok(age_days)
+}
+
+fn parse_rate_age_policy(value: Option<&str>) -> R<Option<Decimal>> {
+    value
+        .map(|value| {
+            let days = value.parse::<Decimal>().map_err(|_| {
+                ApiError::new(
+                    409,
+                    "INVALID_CURRENCY_RATE_POLICY",
+                    "Maximum currency rate age must be a positive whole number of days",
+                )
+            })?;
+            if days <= Decimal::ZERO || days.fract() != Decimal::ZERO {
+                return Err(ApiError::new(
+                    409,
+                    "INVALID_CURRENCY_RATE_POLICY",
+                    "Maximum currency rate age must be a positive whole number of days",
+                ));
+            }
+            Ok(days)
+        })
+        .transpose()
+}
+
 fn converted(value: &Value, field: &str, rate: Decimal) -> R<Decimal> {
     let amount = value
         .get(field)
@@ -149,10 +192,12 @@ impl Kernel {
             ));
         }
         let group_row = owner_tx.query_opt(
-            "SELECT currency.code FROM consolidation__company_group group_row JOIN master_data__currency currency ON currency.tenant_id=group_row.tenant_id AND currency.id=group_row.reporting_currency WHERE group_row.tenant_id=$1 AND group_row.id=$2",
+            "SELECT currency.code, group_row.max_rate_age_days::text FROM consolidation__company_group group_row JOIN master_data__currency currency ON currency.tenant_id=group_row.tenant_id AND currency.id=group_row.reporting_currency WHERE group_row.tenant_id=$1 AND group_row.id=$2",
             &[&owner.id, &group_id],
         ).await?.ok_or_else(|| ApiError::not_found("Company group"))?;
         let reporting_currency: String = group_row.get(0);
+        let max_rate_age_days =
+            parse_rate_age_policy(group_row.get::<_, Option<String>>(1).as_deref())?;
         let members = owner_tx.query(
             "SELECT id, member_tenant_id, member_name FROM consolidation__member WHERE tenant_id=$1 AND \"group\"=$2 AND status='active' ORDER BY member_name, member_tenant_id",
             &[&owner.id, &group_id],
@@ -218,6 +263,26 @@ impl Kernel {
                 &as_of,
             )
             .await?;
+            let rate_age_days = rate_age_days(&rate_effective_date, &as_of)?;
+            if !local_currency.eq_ignore_ascii_case(&reporting_currency) {
+                let allowed_age = max_rate_age_days.ok_or_else(|| {
+                    ApiError::new(
+                        409,
+                        "CURRENCY_RATE_POLICY_MISSING",
+                        "Set a maximum currency rate age on the company group before viewing translated reports",
+                    )
+                })?;
+                if Decimal::from(rate_age_days) > allowed_age {
+                    return Err(ApiError::new(
+                        409,
+                        "CURRENCY_RATE_STALE",
+                        format!(
+                            "Tenant {} currency rate is {rate_age_days} days old; this group allows at most {allowed_age} days",
+                            tenant.name
+                        ),
+                    ));
+                }
+            }
             member_tx.commit().await?;
 
             let balance = self
@@ -280,6 +345,8 @@ impl Kernel {
                 "reportingCurrency": reporting_currency,
                 "conversionRate": json_amount(rate)?,
                 "rateEffectiveDate": rate_effective_date,
+                "rateAgeDays": rate_age_days,
+                "maxRateAgeDays": max_rate_age_days.map(json_amount).transpose()?,
                 "accounts": accounts,
             }));
         }
@@ -331,6 +398,7 @@ impl Kernel {
             "from": from_text,
             "to": to_text,
             "reportingCurrency": reporting_currency,
+            "maxRateAgeDays": max_rate_age_days.map(json_amount).transpose()?,
             "rateBasis": "latest direct or inverse currency rate effective on or before the report end date; same rate applied to all balance columns",
             "consolidationMethod": "account-code roll-up; intercompany balances are not eliminated",
             "reconciliation": {

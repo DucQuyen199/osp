@@ -21,7 +21,7 @@ export default function ConsolidationWorkbenchPage() {
   const [users, setUsers] = useState([]);
   const [grantUserId, setGrantUserId] = useState('');
   const [currencies, setCurrencies] = useState([]);
-  const [groupForm, setGroupForm] = useState({ name: '', reporting_currency: '' });
+  const [groupForm, setGroupForm] = useState({ name: '', reporting_currency: '', max_rate_age_days: '30' });
   const [inviteForm, setInviteForm] = useState({ groupId: '', memberTenantId: '' });
   const [acceptForm, setAcceptForm] = useState({ ownerTenantId: '', memberId: '', inviteToken: '' });
   const [inviteResult, setInviteResult] = useState(null);
@@ -29,6 +29,7 @@ export default function ConsolidationWorkbenchPage() {
   const [reportFrom, setReportFrom] = useState('');
   const [reportTo, setReportTo] = useState('');
   const [report, setReport] = useState(null);
+  const [ratePolicyDays, setRatePolicyDays] = useState('30');
   const [reportSnapshots, setReportSnapshots] = useState([]);
   const [selectedSnapshotId, setSelectedSnapshotId] = useState('');
   const [loading, setLoading] = useState(true);
@@ -50,10 +51,12 @@ export default function ConsolidationWorkbenchPage() {
       setGroups(groupRows); setMembers(memberRows); setShares(shareRows); setGrants(grantRows); setCurrencies(currencyRows); setUsers(Array.isArray(userRows) ? userRows : []);
       setInviteForm((form) => ({ ...form, groupId: groupRows.some((row) => row.id === form.groupId) ? form.groupId : groupRows[0]?.id || '' }));
       setReportGroup((id) => groupRows.some((row) => row.id === id) ? id : groupRows[0]?.id || '');
+      const currentGroup = groupRows.find((row) => row.id === reportGroup) || groupRows[0];
+      setRatePolicyDays(String(currentGroup?.max_rate_age_days ?? '30'));
       setGroupForm((form) => ({ ...form, reporting_currency: currencies.some((row) => row.id === form.reporting_currency) ? form.reporting_currency : currencyRows[0]?.id || '' }));
     } catch (reason) { setError(reason.message || t('Không tải được dữ liệu tập đoàn.')); }
     finally { if (!quiet) setLoading(false); }
-  }, []);
+  }, [reportGroup]);
   useEffect(() => { load(); }, [load]);
 
   async function run(key, action, success) {
@@ -65,8 +68,17 @@ export default function ConsolidationWorkbenchPage() {
 
   async function createGroup(event) {
     event.preventDefault();
-    await run('group', () => api(dataPath('consolidation.company_group'), { method: 'POST', body: groupForm }), t('Đã tạo nhóm công ty.'));
+    await run('group', () => api(dataPath('consolidation.company_group'), { method: 'POST', body: { ...groupForm, max_rate_age_days: Number(groupForm.max_rate_age_days) } }), t('Đã tạo nhóm công ty.'));
     setGroupForm((form) => ({ ...form, name: '' }));
+  }
+  function selectReportGroup(groupId) {
+    setReportGroup(groupId);
+    setRatePolicyDays(String(groups.find((group) => group.id === groupId)?.max_rate_age_days ?? '30'));
+    setReport(null); setSelectedSnapshotId('');
+  }
+  async function saveRatePolicy(event) {
+    event.preventDefault();
+    await run('rate-policy', () => api(dataPath('consolidation.company_group', reportGroup), { method: 'PATCH', body: { max_rate_age_days: Number(ratePolicyDays) } }), t('Đã lưu chính sách tuổi tỷ giá.'));
   }
   async function invite(event) {
     event.preventDefault(); setInviteResult(null);
@@ -146,6 +158,7 @@ export default function ConsolidationWorkbenchPage() {
     {canManage && can('consolidation.company_group.create') && <section className="card card-pad"><h2>{t('Tạo nhóm công ty')}</h2><form className="form-grid" onSubmit={createGroup}>
       <label className="field"><span className="label">{t('Tên nhóm')} *</span><input className="input" required maxLength={160} value={groupForm.name} onChange={(event) => setGroupForm((form) => ({ ...form, name: event.target.value }))}/></label>
       <label className="field"><span className="label">{t('Tiền tệ báo cáo')} *</span><select className="input" required value={groupForm.reporting_currency} onChange={(event) => setGroupForm((form) => ({ ...form, reporting_currency: event.target.value }))}><option value="">{t('Chọn tiền tệ')}</option>{currencies.map((currency) => <option key={currency.id} value={currency.id}>{currency.code} · {currency.name}</option>)}</select></label>
+      <label className="field"><span className="label">{t('Tuổi tối đa của tỷ giá (ngày)')} *</span><input className="input" type="number" min="1" step="1" required value={groupForm.max_rate_age_days} onChange={(event) => setGroupForm((form) => ({ ...form, max_rate_age_days: event.target.value }))}/><span className="hint">{t('Báo cáo quy đổi sẽ dừng nếu tỷ giá gần nhất cũ hơn ngưỡng này.')}</span></label>
       <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || loading || !currencies.length}>{t('Tạo nhóm')}</button></div>
     </form></section>}
     {canManage && <div className="layout-split">
@@ -162,22 +175,23 @@ export default function ConsolidationWorkbenchPage() {
       </form></section>
     </div>}
     {canManage && can('consolidation.report_grant.create') && <section className="card card-pad"><h2>{t('Cấp quyền xem báo cáo')}</h2><p className="sub">{t('Chỉ cấp cho người dùng đang hoạt động trong tenant này. Quyền áp dụng riêng cho bảng cân đối phát sinh của một nhóm.')}</p><form className="form-grid" onSubmit={createReportGrant}>
-      <label className="field"><span className="label">{t('Nhóm công ty')} *</span><select className="input" required value={reportGroup} onChange={(event) => setReportGroup(event.target.value)}><option value="">{t('Chọn nhóm')}</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
+      <label className="field"><span className="label">{t('Nhóm công ty')} *</span><select className="input" required value={reportGroup} onChange={(event) => selectReportGroup(event.target.value)}><option value="">{t('Chọn nhóm')}</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
       <label className="field"><span className="label">{t('Người dùng')} *</span><select className="input" required value={grantUserId} onChange={(event) => setGrantUserId(event.target.value)}><option value="">{t('Chọn người dùng')}</option>{users.filter((user) => !user.disabled).map((user) => <option key={user.id} value={user.id}>{user.name} · {user.id}</option>)}</select></label>
       <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || loading || !reportGroup}>{t('Cấp quyền bảng cân đối phát sinh')}</button></div>
     </form>{grants.length > 0 && <div className="table-wrap"><table className="table"><thead><tr><th>{t('ID người dùng')}</th><th>{t('Nhóm')}</th><th>{t('Báo cáo')}</th><th>{t('Trạng thái')}</th><th>{t('Thao tác')}</th></tr></thead><tbody>{grants.map((grant) => <tr key={grant.id}><td>{grant.user_id}</td><td>{groups.find((group) => group.id === grant.group)?.name || grant.group}</td><td>{t('Bảng cân đối phát sinh')}</td><td>{t(grant.status || 'active')}</td><td>{grant.status === 'active' && <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => revokeReportGrant(grant)}>{t('Thu hồi quyền')}</button>}</td></tr>)}</tbody></table></div>}</section>}
     {can('consolidation.company_group.read') && can('accounting.journal_entry.read') && <section className="card card-pad"><h2>{t('Bảng cân đối phát sinh hợp nhất')}</h2><p className="sub">{t('Số dư từng tenant được đọc trong phạm vi RLS riêng, chỉ cộng sau khi xác minh consent hai chiều và quy đổi theo tỷ giá có hiệu lực cuối kỳ.')}</p><form className="form-grid" onSubmit={loadReport}>
-      <label className="field"><span className="label">{t('Nhóm công ty')} *</span><select className="input" required value={reportGroup} onChange={(event) => setReportGroup(event.target.value)}><option value="">{t('Chọn nhóm')}</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
+      <label className="field"><span className="label">{t('Nhóm công ty')} *</span><select className="input" required value={reportGroup} onChange={(event) => selectReportGroup(event.target.value)}><option value="">{t('Chọn nhóm')}</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
       <label className="field"><span className="label">{t('Từ ngày')}</span><input className="input" type="date" value={reportFrom} onChange={(event) => setReportFrom(event.target.value)}/></label>
       <label className="field"><span className="label">{t('Đến ngày')}</span><input className="input" type="date" value={reportTo} onChange={(event) => setReportTo(event.target.value)}/></label>
       <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || loading || !reportGroup}>{t('Xem báo cáo')}</button></div>
-        </form>
+      </form>
+    {reportGroup && can('consolidation.company_group.update') && <form className="row wrap rate-policy-form" onSubmit={saveRatePolicy}><label className="field"><span className="label">{t('Tuổi tối đa của tỷ giá (ngày)')}</span><input className="input" type="number" min="1" step="1" required value={ratePolicyDays} onChange={(event) => setRatePolicyDays(event.target.value)}/></label><span className="sub">{t('Tỷ giá quá hạn sẽ làm báo cáo dừng để tránh quy đổi bằng dữ liệu cũ.')}</span><button className="btn btn-secondary" disabled={Boolean(busy) || !ratePolicyDays}>{t('Lưu chính sách tỷ giá')}</button></form>}
     {reportSnapshots.length > 0 && <section className="snapshot-list" aria-labelledby="report-snapshots-heading"><h3 id="report-snapshots-heading">{t('Lịch sử báo cáo đã lưu')}</h3><ul>{reportSnapshots.map((snapshot) => <li key={snapshot.id}><span>{new Date(snapshot.snapshotAt).toLocaleString()} · {snapshot.from || t('Từ đầu kỳ')} – {snapshot.to} · {snapshot.reportingCurrency}</span><button className="btn btn-secondary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => openReportSnapshot(snapshot)}>{t('Mở báo cáo đã lưu')}</button></li>)}</ul></section>}
     {report && <div className="row"><span className="faint">{selectedSnapshotId ? t('Đang xem ảnh chụp đã lưu') : t('Báo cáo trực tiếp')}</span><span className="grow"/><button className="btn btn-secondary" type="button" disabled={Boolean(busy) || loading} onClick={saveReportSnapshot}>{busy === 'snapshot' ? t('Đang lưu') : t('Lưu ảnh chụp')}</button></div>}
     {report && <><div className="row"><strong>{t('Tiền tệ báo cáo')}: {report.reportingCurrency}</strong><span className="grow"/><span className="faint">{report.companies?.length || 0} {t('tenant')}</span></div><p className="faint">{t('Cơ sở quy đổi')}: {report.rateBasis} · {t('Phương pháp')}: {report.consolidationMethod}</p><div className="table-wrap"><table className="table"><thead><tr><th>{t('Mã tài khoản')}</th><th>{t('Tài khoản')}</th><th>{t('Dư nợ đầu kỳ')}</th><th>{t('Dư có đầu kỳ')}</th><th>{t('Phát sinh nợ')}</th><th>{t('Phát sinh có')}</th><th>{t('Dư nợ cuối kỳ')}</th><th>{t('Dư có cuối kỳ')}</th></tr></thead><tbody>{report.accounts?.map((account) => <tr key={`${account.code}:${account.kind}`}><td>{account.code}</td><td>{account.name}</td><td className="num">{Number(account.openingDebit || 0).toLocaleString()}</td><td className="num">{Number(account.openingCredit || 0).toLocaleString()}</td><td className="num">{Number(account.periodDebit || 0).toLocaleString()}</td><td className="num">{Number(account.periodCredit || 0).toLocaleString()}</td><td className="num">{Number(account.closingDebit || 0).toLocaleString()}</td><td className="num">{Number(account.closingCredit || 0).toLocaleString()}</td></tr>)}</tbody></table></div></>}</section>}
     <section className="card card-pad"><h2>{t('Thành viên nhóm công ty')}</h2>{loading ? <div className="skeleton" data-h="row"/> : !members.length ? <div className="empty">{t('Chưa có tenant thành viên.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Tenant')}</th><th>{t('Nhóm')}</th><th>{t('Trạng thái')}</th>{canManage && <th>{t('Thao tác')}</th>}</tr></thead><tbody>{members.map((member) => <tr key={member.id}><td>{member.member_name}<div className="faint">{member.member_tenant_id}</div></td><td>{groups.find((group) => group.id === member.group)?.name || member.group}</td><td><span className={`badge ${member.status === 'active' ? 'success' : member.status === 'revoked' ? '' : 'warning'}`}>{t(member.status || 'invited')}</span></td>{canManage && <td>{member.status !== 'revoked' && <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => revokeMember(member)}>{t('Thu hồi')}</button>}</td>}</tr>)}</tbody></table></div>}</section>
     <section className="card card-pad"><h2>{t('Tenant đã chấp thuận chia sẻ với đơn vị này')}</h2>{loading ? <div className="skeleton" data-h="row"/> : !shares.length ? <div className="empty">{t('Chưa có consent chia sẻ nào.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Tenant chủ dữ liệu')}</th><th>{t('Trạng thái')}</th>{canManage && <th>{t('Thao tác')}</th>}</tr></thead><tbody>{shares.map((share) => <tr key={share.id}><td>{share.owner_name}<div className="faint">{share.owner_tenant_id}</div></td><td><span className={`badge ${share.status === 'active' ? 'success' : ''}`}>{t(share.status || 'active')}</span></td>{canManage && <td>{share.status === 'active' && <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => revokeShare(share)}>{t('Thu hồi consent')}</button>}</td>}</tr>)}</tbody></table></div>}</section>
-    {report?.companies?.map((company) => <details className="card card-pad" key={company.tenantId}><summary><strong>{company.name}</strong> · {t('Số gốc')} {company.localCurrency} · {t('Tỷ giá')} {Number(company.conversionRate).toLocaleString()} {t('ngày hiệu lực')} {company.rateEffectiveDate}</summary><div className="table-wrap"><table className="table"><thead><tr><th>{t('Mã tài khoản')}</th><th>{t('Tài khoản')}</th><th>{t('Dư nợ gốc')}</th><th>{t('Dư có gốc')}</th><th>{t('Dư nợ quy đổi')}</th><th>{t('Dư có quy đổi')}</th></tr></thead><tbody>{company.accounts?.map((account) => <tr key={`${account.code}:${account.kind}`}><td>{account.code}</td><td>{account.name}</td><td className="num">{Number(account.closingDebit || 0).toLocaleString()}</td><td className="num">{Number(account.closingCredit || 0).toLocaleString()}</td><td className="num">{Number(account.reportingClosingDebit || 0).toLocaleString()}</td><td className="num">{Number(account.reportingClosingCredit || 0).toLocaleString()}</td></tr>)}</tbody></table></div></details>)}
+    {report?.companies?.map((company) => <details className="card card-pad" key={company.tenantId}><summary><strong>{company.name}</strong> · {t('Số gốc')} {company.localCurrency} · {t('Tỷ giá')} {Number(company.conversionRate).toLocaleString()} {t('ngày hiệu lực')} {company.rateEffectiveDate} · {t('Tuổi tỷ giá')} {company.rateAgeDays}/{company.maxRateAgeDays ?? '—'} {t('ngày')}</summary><div className="table-wrap"><table className="table"><thead><tr><th>{t('Mã tài khoản')}</th><th>{t('Tài khoản')}</th><th>{t('Dư nợ gốc')}</th><th>{t('Dư có gốc')}</th><th>{t('Dư nợ quy đổi')}</th><th>{t('Dư có quy đổi')}</th></tr></thead><tbody>{company.accounts?.map((account) => <tr key={`${account.code}:${account.kind}`}><td>{account.code}</td><td>{account.name}</td><td className="num">{Number(account.closingDebit || 0).toLocaleString()}</td><td className="num">{Number(account.closingCredit || 0).toLocaleString()}</td><td className="num">{Number(account.reportingClosingDebit || 0).toLocaleString()}</td><td className="num">{Number(account.reportingClosingCredit || 0).toLocaleString()}</td></tr>)}</tbody></table></div></details>)}
     {report?.reconciliation && <section className="card card-pad"><h2>{t('Đối chiếu số dư')}</h2><div className="row"><span>{t('Tổng dư nợ cuối kỳ')} · {report.reportingCurrency}: {Number(report.reconciliation.closingDebitTotal).toLocaleString()}</span><span>{t('Tổng dư có cuối kỳ')} · {report.reportingCurrency}: {Number(report.reconciliation.closingCreditTotal).toLocaleString()}</span><strong>{t('Chênh lệch')}: {Number(report.reconciliation.difference).toLocaleString()}</strong><span className={`badge ${report.reconciliation.withinCentTolerance ? 'success' : 'warning'}`}>{report.reconciliation.withinCentTolerance ? t('Cân trong ngưỡng một xu') : t('Cần rà soát chênh lệch')}</span></div></section>}
   </div>;
 }

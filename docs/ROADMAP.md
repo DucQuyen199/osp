@@ -4,7 +4,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 
 ## Đã có
 
-- 51 module, 206 loại dữ liệu, 939 sự kiện, 22 gói ngành; nghiệp vụ liên module chạy trong Rust bounded contexts.
+- 51 module, 207 loại dữ liệu, 942 sự kiện, 22 gói ngành; nghiệp vụ liên module chạy trong Rust bounded contexts.
 - Điện/nước/khí/viễn thông hỗ trợ biểu giá lũy tiến theo ngưỡng lũy kế, phí cố định mỗi kỳ và snapshot chi tiết từng bậc trên lịch sử chỉ số/hóa đơn.
 - LMS tự phát hành chứng chỉ bất biến khi học viên hoàn thành đủ bài bắt buộc; lưu snapshot người học/khóa học, tra cứu theo số và in từ workbench.
 - Trường học liên kết lớp với hồ sơ giáo viên HRM tùy chọn, chặn xếp trùng giờ giữa các lớp và không cho chấm dứt nhân viên còn buổi dạy tương lai; buổi học lưu snapshot giáo viên.
@@ -67,7 +67,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Docker image Linux đã build và chạy qua Compose test riêng; đã diễn tập pg_dump/pg_restore, restart, RLS, phiên đăng nhập và luồng bán hàng sau khôi phục. Vẫn cần xác minh vận hành/tải/HA trên hạ tầng production thực tế.
 
 - Hóa đơn nhà cung cấp cho phép ghi giá/thuế thực tế, phí/chiết khấu có thuế riêng, tranh chấp và phê duyệt; phí có thể phân bổ theo số lượng hoặc giá trị trên các phiếu nhận đã chọn. Landed cost được thêm vào valuation layer, phần hàng còn tồn tăng giá trị kho và phần đã tiêu thụ ở lại chi phí; khi trả hàng, giá trị xuất kho và debit note lấy giá vốn đã gồm landed cost theo FIFO hoặc bình quân, phần chênh với giá nhà cung cấp hoàn được ghi nhận riêng. Cách xử lý thuế từng trường hợp vẫn cần chuyên gia xác minh.
-- Nhóm công ty đa tenant yêu cầu tenant thành viên chấp thuận bằng token một lần có hạn dùng; consent được ghi/audit ở hai tenant và thu hồi đồng bộ. Báo cáo bảng cân đối phát sinh hợp nhất chỉ đọc trong RLS riêng từng tenant, yêu cầu grant theo người dùng và loại báo cáo, quy đổi theo tỷ giá gần nhất đến ngày cuối kỳ, giữ số tiền gốc theo từng pháp nhân và cộng theo mã tài khoản.
+- Nhóm công ty đa tenant yêu cầu tenant thành viên chấp thuận bằng token một lần có hạn dùng; consent được ghi/audit ở hai tenant và thu hồi đồng bộ. Báo cáo bảng cân đối phát sinh hợp nhất chỉ đọc trong RLS riêng từng tenant, yêu cầu grant theo người dùng và loại báo cáo, quy đổi theo tỷ giá gần nhất đến ngày cuối kỳ; mỗi nhóm cấu hình tuổi tỷ giá tối đa, báo cáo từ chối khi thiếu chính sách hoặc tỷ giá quá hạn, giữ số tiền gốc theo từng pháp nhân và cộng theo mã tài khoản. Ảnh chụp báo cáo bất biến được audit và chỉ mở khi grant còn hiệu lực.
 
 - Báo cáo hợp nhất đã hỗ trợ lưu ảnh chụp bất biến có audit; mở lại vẫn yêu cầu grant đang hoạt động, còn phần điều chỉnh/xóa bị chặn qua API CRUD chung. Chính sách tỷ giá cũ và loại trừ nội bộ vẫn cần hoàn thiện theo chuẩn kế toán áp dụng.
 ## Còn thiếu

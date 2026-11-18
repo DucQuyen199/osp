@@ -228,10 +228,11 @@ async fn company_group_consent(kernel: &Arc<Kernel>) {
         .into_iter()
         .find(|currency| currency["code"] == "VND")
         .expect("member VND seed");
+    let rate_date = member.t.business_today();
     let rate = member
         .create(
             "master-data.currency_rate",
-            json!({ "from_currency": local_vnd["id"], "to_currency": id(&member_usd), "effective_date": "2020-01-01", "rate": 0.00004 }),
+            json!({ "from_currency": local_vnd["id"], "to_currency": id(&member_usd), "effective_date": rate_date.to_string(), "rate": 0.00004 }),
         )
         .await;
     let expense_account = member
@@ -266,9 +267,19 @@ async fn company_group_consent(kernel: &Arc<Kernel>) {
     let group = owner
         .create(
             "consolidation.company_group",
-            json!({ "name": "Test Group", "reporting_currency": usd["id"] }),
+            json!({ "name": "Test Group", "reporting_currency": usd["id"], "max_rate_age_days": 30 }),
         )
         .await;
+    assert!(
+        owner
+            .try_create(
+                "consolidation.company_group",
+                json!({ "name": "Invalid Rate Policy", "reporting_currency": usd["id"], "max_rate_age_days": 1.5 }),
+            )
+            .await
+            .is_err(),
+        "rate age policies must use whole calendar days"
+    );
     let invite = kernel
         .invite_company_group_member(&owner.a, &owner.t, &id(&group), &member.t.id)
         .await
@@ -332,7 +343,12 @@ async fn company_group_consent(kernel: &Arc<Kernel>) {
     assert_eq!(report["companies"][0]["tenantId"], member.t.id);
     assert_eq!(report["companies"][0]["localCurrency"], "USD");
     assert_eq!(report["companies"][0]["conversionRate"], 25000.0);
-    assert_eq!(report["companies"][0]["rateEffectiveDate"], "2020-01-01");
+    assert_eq!(
+        report["companies"][0]["rateEffectiveDate"],
+        rate_date.to_string()
+    );
+    assert_eq!(report["companies"][0]["rateAgeDays"], 0);
+    assert_eq!(report["companies"][0]["maxRateAgeDays"], 30.0);
     let source_expense = report["companies"][0]["accounts"]
         .as_array()
         .unwrap()
@@ -415,6 +431,28 @@ async fn company_group_consent(kernel: &Arc<Kernel>) {
         )
         .await
         .expect("remove rate to check fail-closed behavior");
+    let stale_rate_date = (rate_date - chrono::Duration::days(31)).to_string();
+    let stale_rate = member
+        .create(
+            "master-data.currency_rate",
+            json!({ "from_currency": local_vnd["id"], "to_currency": id(&member_usd), "effective_date": stale_rate_date, "rate": 0.00004 }),
+        )
+        .await;
+    let stale_rate_error = kernel
+        .consolidated_trial_balance(&owner.a, &owner.t, &id(&group), None, None)
+        .await
+        .expect_err("report must fail closed when the latest quote exceeds group policy");
+    assert_eq!(stale_rate_error.code, "CURRENCY_RATE_STALE");
+    member
+        .k
+        .remove(
+            &member.a,
+            &member.t,
+            "master-data.currency_rate",
+            &id(&stale_rate),
+        )
+        .await
+        .expect("remove stale rate before checking missing-rate behavior");
     let missing_rate = kernel
         .consolidated_trial_balance(&owner.a, &owner.t, &id(&group), None, None)
         .await
@@ -423,7 +461,26 @@ async fn company_group_consent(kernel: &Arc<Kernel>) {
     member
         .create(
             "master-data.currency_rate",
-            json!({ "from_currency": local_vnd["id"], "to_currency": id(&member_usd), "effective_date": "2020-01-01", "rate": 0.00004 }),
+            json!({ "from_currency": local_vnd["id"], "to_currency": id(&member_usd), "effective_date": rate_date.to_string(), "rate": 0.00004 }),
+        )
+        .await;
+    owner
+        .update(
+            "consolidation.company_group",
+            &id(&group),
+            json!({ "max_rate_age_days": null }),
+        )
+        .await;
+    let missing_policy = kernel
+        .consolidated_trial_balance(&owner.a, &owner.t, &id(&group), None, None)
+        .await
+        .expect_err("translated reports require an explicit rate-age policy");
+    assert_eq!(missing_policy.code, "CURRENCY_RATE_POLICY_MISSING");
+    owner
+        .update(
+            "consolidation.company_group",
+            &id(&group),
+            json!({ "max_rate_age_days": 30 }),
         )
         .await;
     let (_, ungranted_token) = kernel

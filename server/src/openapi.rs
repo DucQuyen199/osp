@@ -725,7 +725,7 @@ pub fn build(reg: &Registry) -> Value {
             "parameters": [tid, { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
                 { "name": "from", "in": "query", "schema": { "type": "string", "format": "date" } },
                 { "name": "to", "in": "query", "schema": { "type": "string", "format": "date" } }],
-            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Member trial balances and account-code totals in the group reporting currency; requires reciprocal consent and an available effective rate" })), ("409".to_string(), err("Member consent, currency rate, or accounting data is unavailable"))]))
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Member trial balances and account-code totals in the group reporting currency; requires reciprocal consent, an available effective rate, and compliance with the group's maximum rate age" })), ("409".to_string(), err("Member consent, currency rate policy, rate freshness, or accounting data is unavailable"))]))
         } }),
     );
     paths.insert(
