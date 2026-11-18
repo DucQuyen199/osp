@@ -26,10 +26,10 @@ export default function ExpenseWorkbenchPage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [claimRes, employeeMap, accountMap, paymentRes, requestRes] = await Promise.all([
-        can('expense.expense_claim.read') ? api(`${dataPath('expense.expense_claim')}?limit=2000`) : Promise.resolve({ items: [] }),
+        can('expense.expense_claim.read') ? loadAllResponse('expense.expense_claim') : Promise.resolve({ items: [] }),
         can('hrm.employee.read') ? loadRefs('hrm.employee') : Promise.resolve(new Map()),
         can('accounting.account.read') ? loadRefs('accounting.account') : Promise.resolve(new Map()),
-        can('accounting.payment.read') ? api(`${dataPath('accounting.payment')}?limit=2000`) : Promise.resolve({ items: [] }),
+        can('accounting.payment.read') ? loadAllResponse('accounting.payment') : Promise.resolve({ items: [] }),
         workflowApproval && can('workflow-approval.approval_request.read') ? loadAllResponse('workflow-approval.approval_request') : Promise.resolve({ items: [] }),
       ]);
       const claimRows = itemsOf(claimRes).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));

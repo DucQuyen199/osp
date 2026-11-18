@@ -35,15 +35,15 @@ export default function SalesReturnsWorkbenchPage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [orderRes, returnRes, productMap, unitMap, partyMap, warehouseMap, shipmentRes, invoiceRes, creditRes, approvalRes] = await Promise.all([
-        can('sales.sales_order.read') ? api(`${dataPath('sales.sales_order')}?limit=2000`) : Promise.resolve({ items: [] }),
-        can('sales.sales_return.read') ? api(`${dataPath('sales.sales_return')}?limit=2000`) : Promise.resolve({ items: [] }),
+        can('sales.sales_order.read') ? loadAllResponse('sales.sales_order') : Promise.resolve({ items: [] }),
+        can('sales.sales_return.read') ? loadAllResponse('sales.sales_return') : Promise.resolve({ items: [] }),
         can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
         can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
         can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
         can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
-        logisticsEnabled && can('logistics.shipment.read') ? api(`${dataPath('logistics.shipment')}?limit=3000`) : Promise.resolve({ items: [] }),
-        can('accounting.invoice.read') ? api(`${dataPath('accounting.invoice')}?limit=2000`) : Promise.resolve({ items: [] }),
-        can('accounting.credit_note.read') ? api(`${dataPath('accounting.credit_note')}?limit=2000`) : Promise.resolve({ items: [] }),
+        logisticsEnabled && can('logistics.shipment.read') ? loadAllResponse('logistics.shipment') : Promise.resolve({ items: [] }),
+        can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
+        can('accounting.credit_note.read') ? loadAllResponse('accounting.credit_note') : Promise.resolve({ items: [] }),
         workflowApproval && can('workflow-approval.approval_request.read') ? loadAllResponse('workflow-approval.approval_request') : Promise.resolve({ items: [] }),
       ]);
       const orderRows = itemsOf(orderRes).sort((a, b) => String(b.order_date || '').localeCompare(String(a.order_date || '')));
