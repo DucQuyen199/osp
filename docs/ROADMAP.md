@@ -46,7 +46,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Đối soát ngân hàng lưu liên kết payment/bút toán khớp thủ công và lý do bỏ qua cùng lần đổi trạng thái của dòng sao kê.
 - Phòng khám check-in lịch hẹn sẽ tạo lượt khám gắn đúng hồ sơ bệnh nhân trong cùng giao dịch; lượt khám hoàn tất tự hoàn tất lịch và chỉ lập hóa đơn theo phí khám, tránh thu trùng giá lịch hẹn.
 - Phòng khám hoàn tất lượt khám cùng thông tin bác sĩ, chẩn đoán, phí và hóa đơn phải thu; kết quả xét nghiệm lưu cùng trạng thái hoàn tất.
-- Báo cáo SLA Helpdesk chỉ dừng thời gian phản hồi đầu tiên khi có sự kiện phản hồi gửi khách hàng; sự kiện giải quyết ticket không bị tính thay cho phản hồi.
+- Báo cáo SLA Helpdesk chỉ dừng thời gian phản hồi đầu tiên khi có sự kiện phản hồi gửi khách hàng; sự kiện giải quyết ticket không bị tính thay cho phản hồi. Tổng SLA tính trên toàn bộ ticket và danh sách được phân trang (mặc định 50, tối đa 100 dòng mỗi trang) để không bỏ sót ticket cũ.
 - Ticket Helpdesk có thể gắn người phụ trách với hồ sơ nhân viên đang làm việc; máy chủ kiểm tra tenant và trạng thái khi phân công/phản hồi, đồng thời vẫn hỗ trợ nhà thầu ngoài.
 - Công việc dự án có thể giao cho nhân viên nội bộ bằng hồ sơ HRM; máy chủ kiểm tra cùng tenant và chỉ cho gán nhân viên đang làm việc, đồng thời giữ hỗ trợ người phụ trách ngoài.
 - Timesheet dự án có thể gắn mã nhân viên HRM để tổng hợp giờ/cost theo người; tên nhân viên vẫn được lưu snapshot và dữ liệu timesheet cũ dạng văn bản tiếp tục hiển thị.

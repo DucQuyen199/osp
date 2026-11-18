@@ -1697,7 +1697,19 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
             return json_ok(k.marketing_campaign_performance(&actor, &t, model).await?);
         }
         (&Method::GET, ["reports", "helpdesk", "sla"]) => {
-            return json_ok(k.helpdesk_sla_report(&actor, &t).await?);
+            let page_size = query
+                .iter()
+                .find(|(key, _)| key == "limit")
+                .and_then(|(_, value)| value.parse::<i64>().ok())
+                .unwrap_or(50)
+                .clamp(1, 100);
+            let offset = query
+                .iter()
+                .find(|(key, _)| key == "offset")
+                .and_then(|(_, value)| value.parse::<i64>().ok())
+                .unwrap_or(0)
+                .max(0);
+            return json_ok(k.helpdesk_sla_report(&actor, &t, page_size, offset).await?);
         }
         (&Method::GET, ["reports", "accounting", "general-ledger", account_id]) => {
             let from = query

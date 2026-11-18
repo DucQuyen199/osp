@@ -1230,8 +1230,8 @@ pub fn build(reg: &Registry) -> Value {
         "/api/t/{tenantId}/reports/helpdesk/sla".into(),
         json!({ "get": {
             "tags": ["helpdesk"], "summary": "Helpdesk first response and resolution SLA", "security": sec,
-            "parameters": [tid],
-            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "SLA compliance summary and ticket deadlines, with the latest 500 tickets" })), ("403".to_string(), err("Requires helpdesk.ticket.read"))]))
+            "parameters": [tid, { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 } }, { "name": "offset", "in": "query", "schema": { "type": "integer", "minimum": 0, "default": 0 } }],
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "All ticket SLA compliance totals and one page of the newest ticket deadlines" })), ("403".to_string(), err("Requires helpdesk.ticket.read"))]))
         } }),
     );
     paths.insert(

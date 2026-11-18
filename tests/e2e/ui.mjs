@@ -475,6 +475,14 @@ for (const [vertical, hash, label, summaryEntity, setupEntity] of verticalScreen
     must(!(await page.$('.route-error')), `${label} vertical route failed to render`);
     must(!(await page.$('.not-found-page')), `${label} vertical route resolved to not found`);
     await axe(`${label} vertical`);
+    if (vertical === 'home-services') {
+      await page.goto(`${BASE}/#/reports/helpdesk/sla`, { waitUntil: 'networkidle0' });
+      await page.waitForSelector('#main h1');
+      must(!(await page.$('.route-error')), 'Helpdesk SLA report failed to render for a tenant with helpdesk enabled');
+      await axe('Helpdesk SLA report');
+      await page.goto(`${BASE}/${hash}`, { waitUntil: 'networkidle0' });
+      await page.waitForSelector('#main h1');
+    }
     if (vertical === 'ecommerce') {
       await page.evaluate(() => localStorage.setItem('osp.uiLocale', 'en-US'));
       await page.reload({ waitUntil: 'networkidle0' });

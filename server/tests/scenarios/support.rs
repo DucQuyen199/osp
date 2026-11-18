@@ -29,6 +29,13 @@ async fn reports(kernel: &Arc<Kernel>) {
         ],
     )
     .await;
+    for index in 0..3 {
+        t.create(
+            "helpdesk.ticket",
+            json!({ "subject": format!("SLA page ticket {index}") }),
+        )
+        .await;
+    }
     for route in [
         "accounting/trial-balance",
         "accounting/income-statement",
@@ -54,6 +61,15 @@ async fn reports(kernel: &Arc<Kernel>) {
             .await;
         assert_eq!(status, 200, "report {route}: {result}");
     }
+    let (status, page) = t
+        .api("GET", "/reports/helpdesk/sla?limit=1&offset=1", json!(null))
+        .await;
+    assert_eq!(status, 200, "SLA page: {page}");
+    assert_eq!(page["totalTickets"], 3);
+    assert_eq!(page["pageSize"], 1);
+    assert_eq!(page["offset"], 1);
+    assert_eq!(page["tickets"].as_array().map(Vec::len), Some(1));
+    assert_eq!(page["hasMore"], true);
     let account = t
         .list("accounting.account", &[("code", "112")])
         .await

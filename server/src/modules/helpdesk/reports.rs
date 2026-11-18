@@ -7,8 +7,14 @@ use crate::{
 use serde_json::{Value, json};
 
 impl Kernel {
-    /// Summarizes first-response and resolution SLA status; includes the newest 500 tickets.
-    pub async fn helpdesk_sla_report(&self, actor: &Actor, tenant: &Tenant) -> R<Value> {
+    /// Summarizes all ticket SLA statuses and returns one page of the newest tickets.
+    pub async fn helpdesk_sla_report(
+        &self,
+        actor: &Actor,
+        tenant: &Tenant,
+        limit: i64,
+        offset: i64,
+    ) -> R<Value> {
         if !tenant.has_module("helpdesk") {
             return Err(ApiError::new(
                 404,
@@ -60,10 +66,11 @@ impl Kernel {
                        'priority', priority, 'createdAt', created_at, 'firstResponseAt', first_response_at, \
                        'responseDueAt', response_due_at, 'resolutionDueAt', resolution_due_at, \
                        'responseSla', response_sla, 'resolutionSla', resolution_sla) AS ticket \
-                     FROM ticket_sla ORDER BY created_at DESC, id LIMIT 500 \
+                     FROM ticket_sla ORDER BY created_at DESC, id LIMIT $2 OFFSET $3 \
                    ) recent) \
+                   , 'pageSize', $2, 'offset', $3, 'hasMore', count(*) > $2 + $3 \
                  ) FROM ticket_sla",
-                &[&tenant.id],
+                &[&tenant.id, &limit, &offset],
             )
             .await?;
         Ok(rows
