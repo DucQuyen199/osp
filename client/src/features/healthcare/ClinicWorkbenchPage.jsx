@@ -8,6 +8,7 @@ import { app, can, loadAll, loadIndependentData, loadRefs, recordLabel } from '.
 import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import clinicEnglish from './clinic.en.js';
 import EncounterPrescriptionsPanel from './components/EncounterPrescriptionsPanel.jsx';
+import PatientEncounterSummary from './components/PatientEncounterSummary.jsx';
 const t = (text) => uiTextWith(text, clinicEnglish);
 const newPrescriptionItem = () => ({ rowId: crypto.randomUUID(), product: '', qty: 1, dosage: '', uom: '' });
 export default function ClinicWorkbenchPage() {
@@ -204,19 +205,21 @@ export default function ClinicWorkbenchPage() {
         {encounters.length ? <div className="clinic-encounters">{encounters.map((item) => { const p = patients.find((patientRecord) => patientRecord.id === item.patient); const party = p && parties.get(p.party); return <button type="button" className={`card clinic-encounter${selectedId === item.id ? ' active' : ''}`} key={item.id} onClick={() => { setSelectedId(item.id); setDiagnosis(item.diagnosis || ''); setFee(item.fee ?? ''); }}><strong>{recordLabel('master-data.party', party)}</strong><span className="small muted">{item.doctor || t('Chưa phân bác sĩ')} · {fmtDateTime(item.created_at)}</span><span className={`badge ${item.status === 'completed' ? 'success' : 'warning'}`}>{statusLabel(item.status)}</span><span className="small">{item.complaint || item.diagnosis || t('Chưa ghi nhận nội dung')}</span></button>; })}</div> : <div className="empty">{t("Chưa có lượt khám.")}</div>}
       </section>
       <section className="clinic-records">{selected ? <>
-        <article className="card clinic-record"><header className="clinic-section-head"><div><h2>{recordLabel('master-data.party', patientParty)}</h2><p className="small muted">{patient?.dob ? `Ngày sinh ${patient.dob}` : ''}{patient?.gender ? ` · ${{ male: 'Nam', female: t('Nữ'), other: t('Khác') }[patient.gender] || patient.gender}` : ''}{patient?.blood_type ? ` · Nhóm máu ${patient.blood_type}` : ''}{patient?.insurance_no ? ` · Bảo hiểm ${patient.insurance_no}` : ''}</p></div><span className={`badge ${selected.status === 'completed' ? 'success' : 'warning'}`}>{statusLabel(selected.status)}</span></header>
-          {patient?.allergies && <div className="alert warning clinic-allergy"><strong>{t("Dị ứng:")}</strong> {patient.allergies}</div>}
-          {patient && can('clinic.patient.update') && <details className="u-margin-12-0"><summary className="btn btn-ghost btn-sm u-inline-pointer" >{t("Cập nhật hồ sơ y tế")}</summary><form className="form-grid u-mt-12"  onSubmit={updatePatientRecord}>
+        <PatientEncounterSummary
+          patientLabel={recordLabel('master-data.party', patientParty)} patient={patient} encounter={selected}
+          doctor={doctor} diagnosis={diagnosis} fee={fee} busy={busy}
+          canCompleteEncounter={can('clinic.encounter.update') && can('clinic.encounter.completed')}
+          fmtMoney={fmtMoney} statusLabel={statusLabel}
+          onEncounterFieldChange={(field, value) => ({ doctor: setDoctor, diagnosis: setDiagnosis, fee: setFee }[field](value))}
+          onCompleteEncounter={completeEncounter} t={t}
+        >{patient && can('clinic.patient.update') && <details className="u-margin-12-0"><summary className="btn btn-ghost btn-sm u-inline-pointer" >{t("Cập nhật hồ sơ y tế")}</summary><form className="form-grid u-mt-12"  onSubmit={updatePatientRecord}>
             <label className="field"><span className="label">{t("Ngày sinh")}</span><input className="input" type="date" max={localDate()} value={patientRecordForm.dob} onChange={(event) => setPatientRecordForm((current) => ({ ...current, dob: event.target.value }))} /></label>
             <label className="field"><span className="label">{t("Giới tính")}</span><select className="select" value={patientRecordForm.gender} onChange={(event) => setPatientRecordForm((current) => ({ ...current, gender: event.target.value }))}><option value="">{t("Chưa khai báo")}</option><option value="male">{t("Nam")}</option><option value="female">{t("Nữ")}</option><option value="other">{t("Khác")}</option></select></label>
             <label className="field"><span className="label">{t("Nhóm máu")}</span><input className="input" maxLength="8" value={patientRecordForm.blood_type} onChange={(event) => setPatientRecordForm((current) => ({ ...current, blood_type: event.target.value }))} /></label>
             <label className="field"><span className="label">{t("Số bảo hiểm")}</span><input className="input" maxLength="80" value={patientRecordForm.insurance_no} onChange={(event) => setPatientRecordForm((current) => ({ ...current, insurance_no: event.target.value }))} /></label>
             <label className="field full"><span className="label">{t("Dị ứng cần lưu ý")}</span><textarea className="textarea" maxLength="2000" value={patientRecordForm.allergies} onChange={(event) => setPatientRecordForm((current) => ({ ...current, allergies: event.target.value }))} /></label>
             <div className="row full"><span className="grow"/><button className="btn btn-secondary" type="submit" disabled={busy}>{t("Lưu hồ sơ")}</button></div>
-          </form></details>}
-          <dl className="clinic-summary"><div><dt>{t("Lý do khám")}</dt><dd>{selected.complaint || t('Chưa ghi nhận')}</dd></div><div><dt>{t("Chẩn đoán")}</dt><dd>{selected.diagnosis || t('Chưa ghi nhận')}</dd></div><div><dt>{t("Bác sĩ")}</dt><dd>{selected.doctor || t('Chưa phân công')}</dd></div><div><dt>{t("Phí khám")}</dt><dd>{selected.fee != null ? fmtMoney(selected.fee) : t('Chưa lập')}</dd></div></dl>
-          {selected.status === 'open' && <form className="clinic-complete-form" onSubmit={completeEncounter}><h3>{t("Chẩn đoán và hoàn tất")}</h3><label className="field"><span className="label">{t("Bác sĩ phụ trách *")}</span><input className="input" required value={doctor} onChange={(event) => setDoctor(event.target.value)} /></label><label className="field"><span className="label">{t("Chẩn đoán *")}</span><textarea className="textarea" required value={diagnosis} onChange={(event) => setDiagnosis(event.target.value)} /></label><label className="field"><span className="label">{t("Phí khám *")}</span><input className="input num" required type="number" min="0.01" step="any" value={fee} onChange={(event) => setFee(event.target.value)} /></label><button className="btn btn-primary" type="submit" disabled={busy || !can('clinic.encounter.update') || !can('clinic.encounter.completed')}>{t("Hoàn tất lượt khám")}</button></form>}
-        </article>
+          </form></details>}</PatientEncounterSummary>
         <EncounterPrescriptionsPanel
           prescriptions={encounterPrescriptions} products={products} units={units} warehouses={warehouses}
           unitsFor={unitsFor} encounterOpen={selected.status === 'open'} encounterCompleted={selected.status === 'completed'}
