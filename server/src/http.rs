@@ -1833,7 +1833,10 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                 .find(|(a, _)| a == "status")
                 .map(|(_, v)| v.clone())
                 .unwrap_or_else(|| "open".into());
-            return json_ok(k.list_failures(&actor, &t, &status).await?);
+            return json_ok(
+                k.list_failure_page(&actor, &t, &status, qnum("limit", 50), qnum("offset", 0))
+                    .await?,
+            );
         }
         (&Method::POST, ["failures", id, "retry"]) => {
             return json_ok(k.retry_failure(&actor, &t, id).await?);

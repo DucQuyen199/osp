@@ -141,6 +141,7 @@ const uiTextEnglish = {
   'Chưa có bản ghi nào trong trang này.': 'There are no records on this page.', 'Tạo bản ghi': 'Create record',
   'Chọn tất cả bản ghi trên trang': 'Select all records on this page', 'trang': 'page', 'Trang': 'Page', 'Trước': 'Previous', 'Sau': 'Next',
   'Điều hướng trang delivery': 'Delivery pagination', '{from}–{to} trong {total}': '{from}–{to} of {total}',
+  'Điều hướng trang lỗi': 'Failure pagination',
   'Không xuất được dữ liệu.': 'Could not export data.', 'Không xử lý được các bản ghi đã chọn.': 'Could not process the selected records.',
   'Có': 'Yes', 'Không': 'No', 'Đóng': 'Close', 'Đang tải…': 'Loading…', 'Không mở được bản ghi': 'Could not open record',
   'Không nhập được tệp sao kê.': 'Could not import the bank statement.', 'Không thực hiện được thao tác.': 'Could not complete the action.',

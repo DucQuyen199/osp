@@ -5,17 +5,29 @@ import { confirmDialog, toast } from '../../lib/feedback.js';
 import { fmtDateTime, uiText } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
 import SettingsTabs from './SettingsTabs.jsx';
+import SettingsListPager from './SettingsListPager.jsx';
+const PAGE_SIZE = 50;
 export default function FailuresSettingsPage() {
   useDocumentTitle(`${uiText('Lỗi tích hợp')} · ${uiText('Cài đặt')} · OSP Suite`);
   const [status, setStatus] = useState('open');
   const [entries, setEntries] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
-  const reload = useCallback(async (nextStatus = status) => {
+  const reload = useCallback(async (nextStatus = status, nextPage = page) => {
     setError('');
-    try { setEntries(await api(tenantPath(`/failures?status=${encodeURIComponent(nextStatus)}`))); }
+    try {
+      const query = new URLSearchParams({ status: nextStatus, limit: String(PAGE_SIZE), offset: String(nextPage * PAGE_SIZE) });
+      const response = await api(tenantPath(`/failures?${query}`));
+      setEntries(Array.isArray(response?.items) ? response.items : []);
+      const nextTotal = Number(response?.total || 0);
+      setTotal(nextTotal);
+      if (nextPage > 0 && nextPage * PAGE_SIZE >= nextTotal) setPage(Math.max(0, Math.ceil(nextTotal / PAGE_SIZE) - 1));
+    }
     catch (reason) { setError(reason.message || uiText('Không tải được danh sách lỗi.')); }
-  }, [status]);
+  }, [status, page]);
+  const changeStatus = (nextStatus) => { setStatus(nextStatus); setPage(0); };
   useEffect(() => {  reload(); }, [reload]);
   const act = async (entry, action) => {
     if (action === 'dismiss' && !await confirmDialog({ title: uiText('Bỏ qua cảnh báo'), message: uiText('Bỏ qua cảnh báo này? Bạn vẫn có thể xem lại trong bộ lọc đã bỏ qua.'), confirmLabel: uiText('Bỏ qua') })) return;
@@ -32,12 +44,13 @@ export default function FailuresSettingsPage() {
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Cài đặt')}</h1><p className="sub">{uiText('Theo dõi và xử lý lỗi tích hợp của')} “{app.meta.name}”.</p></div></div>
     <SettingsTabs active="failures" />
-    <section className="card"><div className="card-head"><h2>{uiText('Luồng tích hợp lỗi')}</h2><label className="field"><span className="sr-only">{uiText('Trạng thái cảnh báo')}</span><select className="select" value={status} onChange={(event) => setStatus(event.target.value)}><option value="open">{uiText('Đang mở')}</option><option value="resolved">{uiText('Đã xử lý')}</option><option value="dismissed">{uiText('Đã bỏ qua')}</option></select></label></div>
+    <section className="card"><div className="card-head"><h2>{uiText('Luồng tích hợp lỗi')}</h2><label className="field"><span className="sr-only">{uiText('Trạng thái cảnh báo')}</span><select className="select" value={status} onChange={(event) => changeStatus(event.target.value)}><option value="open">{uiText('Đang mở')}</option><option value="resolved">{uiText('Đã xử lý')}</option><option value="dismissed">{uiText('Đã bỏ qua')}</option></select></label></div>
       {error && <div className="card-pad"><div className="alert danger" role="alert">{uiText(error)}</div></div>}
       {entries.length === 0 ? <div className="card-pad muted">{uiText(status === 'open' ? 'Không có luồng lỗi đang mở.' : 'Không có cảnh báo trong trạng thái này.')}</div> : <div className="table-wrap"><table className="table">
         <thead><tr><th>{uiText('Thời gian')}</th><th>{uiText('Sự kiện')}</th><th>Module</th><th>{uiText('Lần thử')}</th><th>{uiText('Lỗi')}</th><th><span className="sr-only">{uiText('Thao tác')}</span></th></tr></thead>
         <tbody>{entries.map((entry) => <tr key={entry.id}><td className="nowrap">{fmtDateTime(entry.createdAt)}</td><td className="mono small">{entry.eventType}</td><td>{entry.module}</td><td className="right">{entry.attempts}</td><td className="small">{entry.error}</td><td className="right">{status === 'open' && <div className="row wrap"><button className="btn btn-sm btn-primary" type="button" disabled={Boolean(busy)} onClick={() => act(entry, 'retry')}>{busy === entry.id ? uiText('Đang xử lý…') : uiText('Thử lại')}</button><button className="btn btn-sm" type="button" disabled={Boolean(busy)} onClick={() => act(entry, 'dismiss')}>{uiText('Bỏ qua')}</button></div>}</td></tr>)}</tbody>
       </table></div>}
+      <SettingsListPager total={total} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} label="Điều hướng trang lỗi" />
     </section>
   </div>;
 }

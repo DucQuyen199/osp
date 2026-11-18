@@ -1252,6 +1252,14 @@ pub fn build(reg: &Registry) -> Value {
             "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Tenant-scoped delivery page with matching status total and pagination metadata", "content": { "application/json": { "schema": { "type": "object", "required": ["items", "total", "pageSize", "offset", "hasMore"], "properties": { "items": { "type": "array", "items": { "type": "object" } }, "total": { "type": "integer" }, "pageSize": { "type": "integer" }, "offset": { "type": "integer" }, "hasMore": { "type": "boolean" } } } } } })), ("400".to_string(), err("Unsupported outbox status")), ("403".to_string(), err("Requires tenant.admin"))]))
         } }),
     );
+    paths.insert(
+        "/api/t/{tenantId}/failures".into(),
+        json!({ "get": {
+            "tags": ["tenant operations"], "summary": "Tenant integration and scheduler failures", "security": sec,
+            "parameters": [tid, { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["open", "resolved", "dismissed"], "default": "open" } }, { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 } }, { "name": "offset", "in": "query", "schema": { "type": "integer", "minimum": 0, "default": 0 } }],
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Tenant-scoped failure page with matching status total and pagination metadata", "content": { "application/json": { "schema": { "type": "object", "required": ["items", "total", "pageSize", "offset", "hasMore"], "properties": { "items": { "type": "array", "items": { "type": "object" } }, "total": { "type": "integer" }, "pageSize": { "type": "integer" }, "offset": { "type": "integer" }, "hasMore": { "type": "boolean" } } } } } })), ("403".to_string(), err("Requires tenant.admin"))]))
+        } }),
+    );
     let tags: Vec<Value> = reg
         .order
         .iter()

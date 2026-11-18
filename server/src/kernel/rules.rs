@@ -381,19 +381,43 @@ impl Kernel {
     }
 
     pub async fn list_failures(&self, actor: &Actor, t: &Tenant, status: &str) -> R<Value> {
+        let page = self.list_failure_page(actor, t, status, 100, 0).await?;
+        Ok(page["items"].clone())
+    }
+
+    pub async fn list_failure_page(
+        &self,
+        actor: &Actor,
+        t: &Tenant,
+        status: &str,
+        limit: i64,
+        offset: i64,
+    ) -> R<Value> {
         self.authorize(t, actor, "tenant.admin")?;
-        let conn = self.pool.get().await?;
-        let rows = conn
-            .query(
+        let page_size = limit.clamp(1, 100);
+        let offset = offset.max(0).min(i64::MAX - page_size);
+        let mut conn = self.pool.get().await?;
+        let tx = Tx::begin_snapshot(&mut conn, &t.id).await?;
+        let status_value = status.to_string();
+        let total: i64 = tx
+            .query_one_row(
+                "SELECT count(*) FROM osp_failures WHERE tenant_id = $1 AND status = $2",
+                &[&t.id, &status_value],
+            )
+            .await?
+            .get(0);
+        let items = tx
+            .query_json(
                 "SELECT jsonb_build_object('id', id, 'eventType', event_type, 'module', module, 'rule', rule_index, 'error', error, \
                  'status', status, 'attempts', attempts, 'createdAt', created_at, 'updatedAt', updated_at, 'recordId', event->'payload'->>'id') \
-                 FROM osp_failures WHERE tenant_id = $1 AND status = $2 ORDER BY created_at DESC LIMIT 200",
-                &[&t.id, &status],
+                 FROM osp_failures WHERE tenant_id = $1 AND status = $2 ORDER BY created_at DESC, id DESC LIMIT $3 OFFSET $4",
+                &[&t.id, &status_value, &page_size, &offset],
             )
             .await?;
-        Ok(Value::Array(
-            rows.into_iter().map(|r| r.get::<_, Value>(0)).collect(),
-        ))
+        let has_more = offset + (items.len() as i64) < total;
+        Ok(
+            json!({ "items": items, "total": total, "pageSize": page_size, "offset": offset, "hasMore": has_more }),
+        )
     }
 
     pub async fn open_failure_count(&self, t: &Tenant) -> R<i64> {

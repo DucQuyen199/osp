@@ -5,6 +5,7 @@ import { confirmDialog, toast } from '../../lib/feedback.js';
 import { fmtDateTime, uiText } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
 import SettingsTabs from './SettingsTabs.jsx';
+import SettingsListPager from './SettingsListPager.jsx';
 const STATES = ['dead', 'retry', 'processing', 'pending', 'delivered', 'cancelled'];
 const LABELS = { dead: 'Dead-letter', retry: 'Đang chờ thử lại', processing: 'Đang gửi', pending: 'Đang chờ', delivered: 'Đã gửi', cancelled: 'Đã hủy' };
 const PAGE_SIZE = 50;
@@ -53,13 +54,7 @@ export default function OutboxSettingsPage() {
         <thead><tr><th>{uiText('Thời gian')}</th><th>{uiText('Đích')}</th><th>{uiText('Sự kiện')}</th><th>{uiText('Trạng thái')}</th><th>{uiText('Lần thử')}</th><th>{uiText('Lỗi cuối')}</th><th><span className="sr-only">{uiText('Thao tác')}</span></th></tr></thead>
         <tbody>{entries.map((entry) => <tr key={entry.id}><td className="nowrap">{fmtDateTime(entry.createdAt)}</td><td><span className="badge plain">{entry.destinationKind === 'connector' ? 'Connector' : 'Webhook'}</span><div className="mono small muted">{String(entry.destinationId || entry.webhookId || '').slice(0, 8)}</div></td><td className="mono small">{entry.eventType}</td><td><span className="badge plain">{uiText(LABELS[entry.status] || entry.status)}</span></td><td className="right">{entry.attempts}</td><td className="small">{entry.error || ''}</td><td className="right">{status === 'dead' && <div className="row wrap"><button className="btn btn-sm btn-primary" type="button" disabled={Boolean(busy)} onClick={() => act(entry, 'retry')}>{busy === entry.id ? uiText('Đang xử lý…') : uiText('Đẩy lại')}</button><button className="btn btn-sm" type="button" disabled={Boolean(busy)} onClick={() => act(entry, 'dismiss')}>{uiText('Bỏ qua')}</button></div>}</td></tr>)}</tbody>
       </table></div>}
-      {total > PAGE_SIZE && <nav className="card-pad row wrap" aria-label={uiText('Điều hướng trang delivery')}>
-        <span className="small muted">{uiText('{from}–{to} trong {total}').replace('{from}', String(page * PAGE_SIZE + 1)).replace('{to}', String(Math.min(total, (page + 1) * PAGE_SIZE))).replace('{total}', String(total))}</span>
-        <span className="grow" />
-        <button className="btn btn-ghost btn-sm" type="button" disabled={page === 0} onClick={() => setPage((current) => current - 1)}>{uiText('Trước')}</button>
-        <span className="small">{uiText('Trang')} {page + 1} / {Math.ceil(total / PAGE_SIZE)}</span>
-        <button className="btn btn-ghost btn-sm" type="button" disabled={(page + 1) * PAGE_SIZE >= total} onClick={() => setPage((current) => current + 1)}>{uiText('Sau')}</button>
-      </nav>}
+      <SettingsListPager total={total} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} label="Điều hướng trang delivery" />
     </section>
   </div>;
 }

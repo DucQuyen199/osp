@@ -1065,6 +1065,14 @@ async fn run(k: Arc<Kernel>, url: String, defs: PathBuf) {
         let period = t.create("accounting.period", json!({ "name": "Closed for retry", "start_date": "2001-01-01", "end_date": "2001-01-31" })).await;
         t.act("accounting.period", &id(&period), "closed").await;
         assert_eq!(k.run_jobs(&t.t).await.unwrap(), 0);
+        let (failure_page_status, failure_page) = t
+            .api("GET", "/failures?status=open&limit=1&offset=0", json!(null))
+            .await;
+        assert_eq!(failure_page_status, 200, "{failure_page}");
+        assert_eq!(failure_page["total"], 1, "{failure_page}");
+        assert_eq!(failure_page["pageSize"], 1, "{failure_page}");
+        assert_eq!(failure_page["offset"], 0, "{failure_page}");
+        assert_eq!(failure_page["items"].as_array().unwrap().len(), 1);
         let failure = k.list_failures(&t.a, &t.t, "open").await.unwrap()[0].clone();
         let failure_id = id(&failure);
         assert_eq!(
