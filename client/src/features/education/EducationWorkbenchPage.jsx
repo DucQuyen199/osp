@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate as formatLocalDate, localDateTime as businessDateTime, localDateTimeToIso } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
-import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { can, recordLabel } from '../../lib/state.js';
 import educationEnglish from './education.en.js';
 import AttendanceRosterTable from './components/AttendanceRosterTable.jsx';
 import StudentIntakeForm from './components/StudentIntakeForm.jsx';
@@ -11,23 +11,14 @@ import TuitionLedgerTable from './components/TuitionLedgerTable.jsx';
 import GradebookSection from './components/GradebookSection.jsx';
 import CourseClassForm from './components/CourseClassForm.jsx';
 import ClassSessionForm from './components/ClassSessionForm.jsx';
+import { useEducationWorkbenchData } from './hooks/useEducationWorkbenchData.js';
 const t = (text) => uiTextWith(text, educationEnglish);
 const localDate = formatLocalDate;
 const attendanceLabels = { present: t("Có mặt"), absent: t("Vắng"), late: t("Đi muộn"), excused: t("Có phép") };
 const sessionDate = () => businessDateTime(new Date(Date.now() + 60 * 60 * 1000));
 export default function EducationWorkbenchPage() {
   useDocumentTitle(t("Lịch lớp và điểm danh · OSP Suite"));
-  const [classes, setClasses] = useState([]);
-  const [enrollments, setEnrollments] = useState([]);
-  const [students, setStudents] = useState(new Map());
-  const [parties, setParties] = useState(new Map());
-  const [employees, setEmployees] = useState(new Map());
-  const [sessions, setSessions] = useState([]);
-  const [attendance, setAttendance] = useState([]);
-  const [grades, setGrades] = useState([]);
-  const [fees, setFees] = useState([]);
-  const [tuitionBatches, setTuitionBatches] = useState([]);
-  const [invoices, setInvoices] = useState([]);
+  const { classes, enrollments, students, parties, employees, sessions, attendance, grades, fees, tuitionBatches, invoices, loading, error: dataError, load } = useEducationWorkbenchData();
   const [selectedId, setSelectedId] = useState('');
   const [enrollmentForm, setEnrollmentForm] = useState({ class: '', student: '' });
   const [enrollmentClass, setEnrollmentClass] = useState('');
@@ -41,42 +32,17 @@ export default function EducationWorkbenchPage() {
   const [pendingStudentParty, setPendingStudentParty] = useState(null);
   const [form, setForm] = useState({ class: '', topic: '', starts_at: sessionDate(), ends_at: businessDateTime(new Date(Date.now() + 2 * 60 * 60 * 1000)) });
   const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const load = useCallback(async () => {
-    setLoading(true); setError('');
-    try {
-      const [classRes, enrollmentRes, studentRes, partyMap, employeeMap, sessionRes, attendanceRes, gradeRes, feeRes, tuitionBatchRes, invoiceRes] = await Promise.all([
-        can('school.course_class.read') ? loadAllResponse('school.course_class') : Promise.resolve({ items: [] }),
-        can('school.class_enrollment.read') ? loadAllResponse('school.class_enrollment') : Promise.resolve({ items: [] }),
-        can('school.student.read') ? loadAllResponse('school.student') : Promise.resolve({ items: [] }),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('hrm.employee.read') ? loadRefs('hrm.employee') : Promise.resolve(new Map()),
-        can('school.class_session.read') ? loadAllResponse('school.class_session') : Promise.resolve({ items: [] }),
-        can('school.attendance.read') ? loadAllResponse('school.attendance') : Promise.resolve({ items: [] }),
-        can('school.grade.read') ? loadAllResponse('school.grade') : Promise.resolve({ items: [] }),
-        can('school.fee.read') ? loadAllResponse('school.fee') : Promise.resolve({ items: [] }),
-        can('school.tuition_batch.read') ? loadAllResponse('school.tuition_batch') : Promise.resolve({ items: [] }),
-        can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
-      ]);
-      const classItems = classRes.items || []; const sessionItems = sessionRes.items || [];
-      setClasses(classItems); setEnrollments(enrollmentRes.items || []); setStudents(new Map((studentRes.items || []).map((x) => [x.id, x])));
-      setParties(partyMap); setEmployees(employeeMap); setSessions(sessionItems.sort((a, b) => String(b.starts_at).localeCompare(String(a.starts_at))));
-      setAttendance(attendanceRes.items || []);
-      setGrades(gradeRes.items || []);
-      setFees(feeRes.items || []); setTuitionBatches(tuitionBatchRes.items || []); setInvoices(invoiceRes.items || []);
-      setForm((current) => ({ ...current, class: current.class || classItems[0]?.id || '' }));
-      setEnrollmentForm((current) => ({ ...current, class: current.class || classItems[0]?.id || '', student: current.student || studentRes.items?.[0]?.id || '' }));
-      setEnrollmentClass((current) => current || classItems[0]?.id || '');
-      setGradeClass((current) => current || classItems[0]?.id || '');
-      setSelectedId((current) => current && sessionItems.some((x) => x.id === current) ? current : sessionItems[0]?.id || '');
-      setFeeForm((current) => ({ ...current, student: current.student || studentRes.items?.[0]?.id || '' }));
-      setTuitionBatchForm((current) => ({ ...current, class: classItems.some((item) => item.id === current.class) ? current.class : classItems.find((item) => Number(item.tuition) > 0)?.id || '' }));
-    } catch (reason) { setError(reason.message || t("Không tải được dữ liệu lớp học.")); }
-    finally { setLoading(false); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    setForm((current) => ({ ...current, class: current.class || classes[0]?.id || '' }));
+    setEnrollmentForm((current) => ({ ...current, class: current.class || classes[0]?.id || '', student: current.student || students.keys().next().value || '' }));
+    setEnrollmentClass((current) => current || classes[0]?.id || '');
+    setGradeClass((current) => current || classes[0]?.id || '');
+    setSelectedId((current) => current && sessions.some((item) => item.id === current) ? current : sessions[0]?.id || '');
+    setFeeForm((current) => ({ ...current, student: current.student || students.keys().next().value || '' }));
+    setTuitionBatchForm((current) => ({ ...current, class: classes.some((item) => item.id === current.class) ? current.class : classes.find((item) => Number(item.tuition) > 0)?.id || '' }));
+  }, [classes, sessions, students]);
   const selected = sessions.find((session) => session.id === selectedId);
   const selectedClass = classes.find((item) => item.id === selected?.class);
   const roster = useMemo(() => enrollments.filter((item) => item.class === selected?.class && item.status === 'active')
@@ -244,7 +210,7 @@ export default function EducationWorkbenchPage() {
   }
   return <div className="page">
     <div className="page-head"><div><h1>{t("Lịch lớp và điểm danh")}</h1><p className="sub">{t("Lên lịch buổi học, ghi nhận từng học viên và chốt danh sách sau khi buổi học kết thúc.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={load}>{t("Làm mới")}</button></div>
-    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
+    {(error || dataError) && <div className="alert danger" role="alert">{t(error || dataError)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     <div className="grid-2 u-legacy-eee3f850c9" >
       {can('school.course_class.create') && <CourseClassForm
         classForm={classForm}
