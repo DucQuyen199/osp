@@ -1,11 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
-import { api, dataPath } from '../../lib/api.js';
-import { textDialog } from '../../lib/feedback.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { addDecimals, compareDecimals, subtractDecimals } from '../../lib/decimal.js';
 import { can, recordLabel } from '../../lib/state.js';
 import { usePaymentsWorkbenchData } from './hooks/usePaymentsWorkbenchData.js';
+import { usePaymentsWorkbenchWorkflow } from './hooks/usePaymentsWorkbenchWorkflow.js';
 const providerLabels = { vnpay: 'VNPay', momo: 'MoMo', zalopay: 'ZaloPay', stripe: 'Stripe', bank: 'Ngân hàng' };
 const methodLabels = { cash: 'Tiền mặt', card: 'Thẻ', transfer: 'Chuyển khoản', ewallet: 'Ví điện tử', bank: 'Ngân hàng' };
 const transactionLabels = { pending: 'Chờ xác nhận', succeeded: 'Thành công', failed: 'Thất bại', partially_refunded: 'Hoàn một phần', refunded: 'Đã hoàn' };
@@ -13,65 +12,13 @@ const refundLabels = { pending: 'Chờ xử lý', succeeded: 'Đã hoàn', faile
 export default function PaymentsWorkbenchPage() {
   useDocumentTitle(`${uiText('Giao dịch thanh toán')} · OSP Suite`);
   const { transactions, refunds, parties, invoices, bills, loading, error, setError, load } = usePaymentsWorkbenchData();
-  const [form, setForm] = useState({ provider: 'bank', method: 'transfer', party: '', amount: '', invoice: '', bill: '', reference: '' });
-  const [refundForm, setRefundForm] = useState({ payment_txn: '', amount: '', reference: '' });
+  const { form, setForm, refundForm, setRefundForm, busy, notice, createTransaction, recordOutcome,
+    createRefund, recordRefund } = usePaymentsWorkbenchWorkflow({ parties, load, setError });
   const [filter, setFilter] = useState('all');
-  const [busy, setBusy] = useState('');
-  const [notice, setNotice] = useState('');
-  useEffect(() => {
-    setForm((current) => ({ ...current, party: current.party && parties.has(current.party) ? current.party : [...parties.keys()][0] || '' }));
-  }, [parties]);
   const visible = useMemo(() => transactions.filter((row) => filter === 'all' || row.status === filter), [transactions, filter]);
   const paidCount = transactions.filter((row) => row.status === 'succeeded').length;
   const pendingCount = transactions.filter((row) => row.status === 'pending').length;
   const refundTotal = addDecimals(refunds.filter((row) => row.status === 'succeeded').map((row) => row.amount));
-  async function run(key, operation, message) {
-    setBusy(key); setError(''); setNotice('');
-    try { await operation(); await load(true); setNotice(message); }
-    catch (reason) { setError(reason.message || uiText('Thao tác không thành công.')); }
-    finally { setBusy(''); }
-  }
-  async function createTransaction(event) {
-    event.preventDefault();
-    if (compareDecimals(form.amount || 0, 0) <= 0 || !form.party || Boolean(form.invoice) === Boolean(form.bill)) { setError(uiText('Chọn đúng một hóa đơn bán hoặc hóa đơn mua và nhập số tiền hợp lệ.')); return; }
-    const payload = { provider: form.provider, method: form.method, party: form.party, amount: String(form.amount), ...(form.invoice ? { invoice: form.invoice } : { bill: form.bill }), ...(form.reference.trim() ? { reference: form.reference.trim() } : {}) };
-    await run('transaction:create', async () => {
-      await api(dataPath('payments.payment_txn'), { method: 'POST', body: payload });
-      setForm((current) => ({ ...current, amount: '', reference: '', invoice: '', bill: '' }));
-    }, uiText('Đã tạo giao dịch chờ kết quả nhà cung cấp.'));
-  }
-  async function recordOutcome(transaction, action) {
-    const reference = await textDialog({ title: uiText(action === 'succeeded' ? 'Ghi nhận thanh toán thành công' : 'Ghi nhận giao dịch thất bại'), message: '', label: uiText(action === 'succeeded' ? 'Mã giao dịch nhà cung cấp trả về' : 'Mã tham chiếu (nếu đã có)'), initialValue: transaction.reference || '', minLength: 0, maxLength: 500, confirmLabel: uiText('Lưu') });
-    if (reference === null) return;
-    await run(`${transaction.id}:${action}`, async () => {
-      const normalizedReference = reference.trim();
-      const changed = normalizedReference !== (transaction.reference || '');
-      await api(dataPath('payments.payment_txn', transaction.id, action), {
-        method: 'POST',
-        ...(changed ? { body: { reference: normalizedReference } } : {}),
-      });
-    }, uiText(action === 'succeeded' ? 'Đã ghi nhận thanh toán thành công và cập nhật công nợ.' : 'Đã ghi nhận giao dịch thất bại.'));
-  }
-  async function createRefund(event) {
-    event.preventDefault();
-    if (!refundForm.payment_txn || compareDecimals(refundForm.amount || 0, 0) <= 0) return;
-    await run('refund:create', async () => {
-      await api(dataPath('payments.payment_refund'), { method: 'POST', body: { payment_txn: refundForm.payment_txn, amount: String(refundForm.amount), ...(refundForm.reference.trim() ? { reference: refundForm.reference.trim() } : {}) } });
-      setRefundForm({ payment_txn: '', amount: '', reference: '' });
-    }, uiText('Đã tạo hồ sơ hoàn tiền chờ xử lý.'));
-  }
-  async function recordRefund(refund, action) {
-    const reference = await textDialog({ title: uiText(action === 'succeeded' ? 'Ghi nhận hoàn tiền thành công' : 'Ghi nhận hoàn tiền thất bại'), message: '', label: uiText(action === 'succeeded' ? 'Mã hoàn tiền nhà cung cấp trả về' : 'Ghi chú hoặc mã tham chiếu (nếu có)'), initialValue: refund.reference || '', minLength: 0, maxLength: 500, confirmLabel: uiText('Lưu') });
-    if (reference === null) return;
-    await run(`${refund.id}:${action}`, async () => {
-      const normalizedReference = reference.trim();
-      const changed = normalizedReference !== (refund.reference || '');
-      await api(dataPath('payments.payment_refund', refund.id, action), {
-        method: 'POST',
-        ...(changed ? { body: { reference: normalizedReference } } : {}),
-      });
-    }, uiText(action === 'succeeded' ? 'Đã ghi nhận hoàn tiền; sổ kế toán được cập nhật.' : 'Đã ghi nhận hoàn tiền thất bại.'));
-  }
   const partyLabel = (id) => parties.has(id) ? recordLabel('master-data.party', parties.get(id)) : '—';
   const documentLabel = (txn) => txn.invoice ? uiText('HĐ bán · {number}').replace('{number}', invoices.get(txn.invoice)?.invoice_number || String(txn.invoice).slice(0, 8)) : txn.bill ? uiText('HĐ mua · {number}').replace('{number}', bills.get(txn.bill)?.bill_number || String(txn.bill).slice(0, 8)) : uiText('Chưa gắn hóa đơn');
   const refundsFor = (txn) => refunds.filter((refund) => refund.payment_txn === txn.id);

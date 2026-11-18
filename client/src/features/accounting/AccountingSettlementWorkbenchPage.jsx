@@ -1,24 +1,26 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
-import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { addDecimals, compareDecimals, roundDecimal } from '../../lib/decimal.js';
 import { app, can, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import { useAccountingSettlementData } from './hooks/useAccountingSettlementData.js';
+import { useAccountingSettlementWorkflow } from './hooks/useAccountingSettlementWorkflow.js';
 const today = localDate;
 export default function AccountingSettlementWorkbenchPage() {
   const query = new URLSearchParams(window.location.hash.split('?')[1] || '');
   const suggestedInvoice = query.get('invoice') || '';
   const suggestedAmount = query.get('amount') || '';
   useDocumentTitle(`${uiText('Thu/chi phân bổ công nợ')} · OSP Suite`);
-  const [form, setForm] = useState(() => ({ direction: 'receipt', party: query.get('party') || '', currency: query.get('currency') || '', method: 'bank', payment_date: query.get('date') || today(), reference: query.get('reference') || '' }));
-  const [allocations, setAllocations] = useState(() => suggestedInvoice && suggestedAmount ? { [suggestedInvoice]: suggestedAmount } : {});
-  const [busy, setBusy] = useState('');
-  const [notice, setNotice] = useState('');
   const workflowApproval = app.meta?.modules?.some((module) => module.id === 'workflow-approval');
   const { batches, invoices, bills, payments, parties, currencies, approvals, loading, error, setError, load } = useAccountingSettlementData(workflowApproval);
+  const workflow = useAccountingSettlementWorkflow({
+    load, setError, suggestedParty: query.get('party') || '', suggestedCurrency: query.get('currency') || '',
+    suggestedDate: query.get('date') || '', suggestedReference: query.get('reference') || '',
+    suggestedInvoice, suggestedAmount, today,
+  });
+  const { form, setForm, allocations, setAllocations, busy, notice, changeForm, createDraft, action } = workflow;
   const docs = form.direction === 'receipt' ? invoices : bills;
   const partyField = form.direction === 'receipt' ? 'party' : 'supplier';
   const available = useMemo(() => docs.filter((doc) => doc[partyField] === form.party && ['posted', 'partially_paid', 'partially_settled'].includes(doc.status) && compareDecimals(doc.balance_due || 0, '0.005') > 0), [docs, partyField, form.party]);
@@ -33,29 +35,6 @@ export default function AccountingSettlementWorkbenchPage() {
   const currencyDocs = available.filter((doc) => (doc.currency || currencyOptions.find((currency) => currency.code?.toUpperCase() === String(app.meta?.settings?.baseCurrency || 'VND').toUpperCase())?.id) === selectedCurrency);
   const selectedAllocations = currencyDocs.filter((doc) => compareDecimals(allocations[doc.id] || 0, 0) > 0);
   const total = addDecimals(selectedAllocations.map((doc) => allocations[doc.id]));
-  function changeForm(key, value) {
-    setForm((current) => ({ ...current, [key]: value }));
-    if (['direction', 'party', 'currency'].includes(key)) setAllocations({});
-    if (key === 'direction' || key === 'party') setForm((current) => ({ ...current, [key]: value, currency: '' }));
-  }
-  async function run(key, operation, success) {
-    setBusy(key); setError(''); setNotice('');
-    try { await operation(); setNotice(success); await load(); }
-    catch (reason) { setError(reason.message || uiText('Không cập nhật được phiếu thu/chi.')); }
-    finally { setBusy(''); }
-  }
-  async function createDraft(event) {
-    event.preventDefault();
-    if (!form.party || !selectedCurrency || !selectedAllocations.length || compareDecimals(total, 0) <= 0) return;
-    const allocationRows = selectedAllocations.map((doc) => ({ [form.direction === 'receipt' ? 'invoice' : 'bill']: doc.id, amount: roundDecimal(allocations[doc.id], 2) }));
-    await run('create', async () => {
-      await api(dataPath('accounting.settlement_batch'), { method: 'POST', body: { ...form, currency: selectedCurrency, amount: roundDecimal(total, 2), allocations: allocationRows } });
-      setAllocations({});
-    }, uiText('Đã lưu phiếu nháp. Gửi duyệt khi thông tin và phân bổ đã chính xác.'));
-  }
-  async function action(row, verb) {
-    await run(`${row.id}:${verb}`, () => api(dataPath('accounting.settlement_batch', row.id, verb), { method: 'POST' }), uiText(verb === 'approved' ? 'Đã duyệt và ghi nhận các payment cùng bút toán tổng hợp.' : verb === 'submitted' ? 'Đã gửi phiếu đi duyệt.' : verb === 'rejected' ? 'Đã từ chối phiếu.' : 'Đã hủy phiếu.'));
-  }
   function approvalFor(row) { return approvals.find((request) => request.entity === 'accounting.settlement_batch' && request.record_id === row.id); }
   function allocationLabel(row) {
     const name = row.direction === 'receipt' ? 'invoice' : 'bill';
@@ -67,7 +46,7 @@ export default function AccountingSettlementWorkbenchPage() {
   return <div className="page">
     <div className="page-head"><div><h1>{uiText("Thu/chi phân bổ công nợ")}</h1><p className="sub">{uiText("Gom một lần thu hoặc chi để phân bổ vào nhiều hóa đơn cùng đối tác và tiền tệ. Mỗi hóa đơn vẫn có payment riêng; sổ cái nhận một bút toán tổng hợp để đối soát giao dịch ngân hàng.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={load}>{uiText("Làm mới")}</button></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
-    {can('accounting.settlement_batch.create') && <section className="card card-pad"><h2>{uiText("Lập phiếu thu/chi")}</h2><form className="form-grid" onSubmit={createDraft}>
+    {can('accounting.settlement_batch.create') && <section className="card card-pad"><h2>{uiText("Lập phiếu thu/chi")}</h2><form className="form-grid" onSubmit={(event) => createDraft(event, { selectedCurrency, selectedAllocations, total })}>
       <label className="field"><span className="label">{uiText("Nghiệp vụ *")}</span><select className="select" value={form.direction} onChange={(event) => changeForm('direction', event.target.value)}><option value="receipt">{uiText("Thu khách hàng")}</option><option value="disbursement">{uiText("Chi nhà cung cấp")}</option></select></label>
       <label className="field"><span className="label">{uiText("Đối tác *")}</span><select className="select" required value={form.party} onChange={(event) => changeForm('party', event.target.value)}><option value="">{uiText("Chọn đối tác")}</option>{[...parties.values()].map((party) => <option key={party.id} value={party.id}>{recordLabel('master-data.party', party)}</option>)}</select></label>
       <label className="field"><span className="label">{uiText("Tiền tệ *")}</span><select className="select" required value={selectedCurrency} onChange={(event) => changeForm('currency', event.target.value)}><option value="">{uiText("Chọn tiền tệ")}</option>{currencyOptions.map((currency) => <option key={currency.id} value={currency.id}>{currency.code} · {currency.name}</option>)}</select></label>

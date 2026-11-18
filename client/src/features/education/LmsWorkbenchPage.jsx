@@ -1,26 +1,21 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
-import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { can, recordLabel } from '../../lib/state.js';
 import { useLmsWorkbenchData } from './hooks/useLmsWorkbenchData.js';
+import { useLmsWorkbenchWorkflow } from './hooks/useLmsWorkbenchWorkflow.js';
 import lmsEnglish from './lms.en.js';
 const t = (text) => uiTextWith(text, lmsEnglish);
 const courseStatus = { draft: 'Bản nháp', published: 'Đang mở học', archived: 'Đã lưu trữ' };
 export default function LmsWorkbenchPage() {
   useDocumentTitle(`${t('Đào tạo trực tuyến')} · OSP Suite`);
   const { courses, lessons, enrollments, progress, certificates, parties, loading, error, setError, load } = useLmsWorkbenchData();
-  const [courseId, setCourseId] = useState('');
-  const [courseForm, setCourseForm] = useState({ title: '', description: '' });
-  const [lessonForm, setLessonForm] = useState({ title: '', content: '', required: true });
-  const [learner, setLearner] = useState('');
-  const [busy, setBusy] = useState('');
-  const [notice, setNotice] = useState('');
-  const [certificateLookup, setCertificateLookup] = useState('');
-  const [printingCertificate, setPrintingCertificate] = useState('');
-  useEffect(() => { setCourseId((id) => courses.some((course) => course.id === id) ? id : courses[0]?.id || ''); }, [courses]);
-  useEffect(() => { setLearner((id) => id && parties.has(id) ? id : [...parties.keys()][0] || ''); }, [parties]);
+  const {
+    courseId, setCourseId, courseForm, setCourseForm, lessonForm, setLessonForm, learner, setLearner,
+    busy, notice, certificateLookup, setCertificateLookup, printingCertificate,
+    createCourse, createLesson, courseAction, enroll, completeLesson, printCertificate,
+  } = useLmsWorkbenchWorkflow({ courses, parties, load, setError, t });
   const selected = courses.find((course) => course.id === courseId);
   const courseLessons = useMemo(() => lessons.filter((lesson) => lesson.course === courseId).sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || ''))), [lessons, courseId]);
   const courseEnrollments = useMemo(() => enrollments.filter((row) => row.course === courseId).sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))), [enrollments, courseId]);
@@ -34,49 +29,9 @@ export default function LmsWorkbenchPage() {
   const activeLearners = enrollments.filter((row) => row.status === 'active').length;
   const completedLearners = enrollments.filter((row) => row.status === 'completed').length;
   const learnerName = (id) => parties.has(id) ? recordLabel('master-data.party', parties.get(id)) : 'Học viên';
-  async function run(key, operation, message) {
-    setBusy(key); setError(''); setNotice('');
-    try { await operation(); await load(true); setNotice(t(message)); }
-    catch (reason) { setError(t(reason.message || 'Thao tác không thành công.')); }
-    finally { setBusy(''); }
-  }
-  async function createCourse(event) {
-    event.preventDefault();
-    await run('course:create', async () => {
-      const created = await api(dataPath('lms.course'), { method: 'POST', body: { title: courseForm.title.trim(), ...(courseForm.description.trim() ? { description: courseForm.description.trim() } : {}) } });
-      setCourseId(created.id); setCourseForm({ title: '', description: '' });
-    }, 'Đã tạo khóa học nháp.');
-  }
-  async function createLesson(event) {
-    event.preventDefault(); if (!selected) return;
-    await run(`${courseId}:lesson`, async () => {
-      await api(dataPath('lms.lesson'), { method: 'POST', body: { course: courseId, title: lessonForm.title.trim(), ...(lessonForm.content.trim() ? { content: lessonForm.content.trim() } : {}), required: lessonForm.required } });
-      setLessonForm({ title: '', content: '', required: true });
-    }, 'Đã thêm bài học.');
-  }
-  async function courseAction(course, action) {
-    const message = action === 'published' ? 'Đã mở khóa học để ghi danh.' : 'Đã lưu trữ khóa học.';
-    await run(`${course.id}:${action}`, () => api(dataPath('lms.course', course.id, action), { method: 'POST' }), message);
-  }
-  async function enroll(event) {
-    event.preventDefault(); if (!selected || !learner) return;
-    await run(`${courseId}:enroll`, () => api(dataPath('lms.enrollment'), { method: 'POST', body: { course: courseId, learner } }), 'Đã ghi danh học viên.');
-  }
-  async function completeLesson(enrollment, lesson) {
-    await run(`${enrollment.id}:${lesson.id}`, () => api(dataPath('lms.lesson_progress'), { method: 'POST', body: { enrollment: enrollment.id, lesson: lesson.id } }), 'Đã ghi nhận hoàn thành bài học; tiến độ khóa học được cập nhật tự động.');
-  }
   const requiredLessons = courseLessons.filter((lesson) => lesson.required !== false);
   const activeCourse = selected?.status === 'published';
   const canEditLessons = selected?.status === 'draft' && !courseEnrollments.length;
-  useEffect(() => {
-    const clearPrinting = () => setPrintingCertificate('');
-    window.addEventListener('afterprint', clearPrinting);
-    return () => window.removeEventListener('afterprint', clearPrinting);
-  }, []);
-  function printCertificate(certificate) {
-    setPrintingCertificate(certificate.id);
-    window.setTimeout(() => window.print(), 50);
-  }
   return <div className="page">
     <div className="page-head"><div><h1>{t('Đào tạo trực tuyến')}</h1><p className="sub">{t('Xây dựng khóa học, mở ghi danh, theo dõi tiến độ và lưu lịch sử hoàn thành tự động theo bài học bắt buộc.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
