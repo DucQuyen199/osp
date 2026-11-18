@@ -8,6 +8,7 @@ import { addDecimals, compareDecimals, multiplyDecimals } from '../../lib/decima
 import { app, can, recordLabel } from '../../lib/state.js';
 import PosReceipt from './components/PosReceipt.jsx';
 import PosCheckoutPanel from './components/PosCheckoutPanel.jsx';
+import PosProductCatalog from './components/PosProductCatalog.jsx';
 import PosReturnDialog from './components/PosReturnDialog.jsx';
 import PosSessionPanel from './components/PosSessionPanel.jsx';
 import PosCashOperationsPanel from './components/PosCashOperationsPanel.jsx';
@@ -326,10 +327,20 @@ export default function PosTerminalPage() {
         formatMoney={fmtMoney} recordLabel={recordLabel} t={t}
       />
       {!activeSession ? <div className="empty card-pad">{t('Chọn một ca đang mở hoặc mở ca mới để sử dụng quầy.')}</div> : !activeSession.warehouse ? <div className="alert warning">{t('Ca này được tạo trước khi bắt buộc chọn kho. Hãy chốt ca cũ và mở ca mới để tiếp tục bán.')}<form className="pos-close-form" onSubmit={closeSession}><label className="field"><span className="label">{t('Tiền mặt thực đếm để chốt ca')}</span><input className="input num" type="number" min="0" step="any" required value={closingCash} onChange={(event) => setClosingCash(event.target.value)} /></label><button className="btn btn-secondary" type="submit" disabled={busy || !can('pos.pos_session.update') || !can('pos.pos_session.closed')}>{t('Chốt ca cũ')}</button></form></div> : <div className="pos-layout">
-        <section className="pos-products-panel"><div className="row wrap"><h2>{t('Sản phẩm')}</h2><span className="grow" /><input className="input pos-search" type="search" placeholder={t('Quét/nhập tên, SKU hoặc mã vạch')} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={scanProduct} aria-label={t('Quét barcode hoặc tìm sản phẩm')} /></div><p className="small muted">{t('Đặt con trỏ trong ô tìm kiếm rồi quét mã; máy quét gửi Enter để thêm đúng một sản phẩm vào giỏ.')}</p>
-          <div className="pos-products">{filteredProducts.map((product) => { const uom = selectedUnits[product.id] || product.uom || ''; return <button className={`card pos-product${quantities[product.id] ? ' selected' : ''}`} key={product.id} type="button" disabled={!can('pos.pos_order.create')} onClick={() => adjustQty(product.id, 1)}><strong>{product.name}</strong><span className="small muted">{product.sku || t('Không mã')}</span><span className="num">{fmtMoney(priceFor(product, uom))}{units.get(uom)?.name ? ` / ${units.get(uom).name}` : ''}</span>{product.tracked !== false && <span className="small faint">{t('Quản lý tồn kho')}</span>}</button>; })}</div>
-          {!filteredProducts.length && <div className="empty">{t('Không có sản phẩm phù hợp.')}</div>}
-        </section>
+        <PosProductCatalog
+          products={filteredProducts}
+          query={query}
+          quantities={quantities}
+          selectedUnits={selectedUnits}
+          units={units}
+          canCreate={can('pos.pos_order.create')}
+          onQueryChange={setQuery}
+          onScanKeyDown={scanProduct}
+          onAddProduct={(productId) => adjustQty(productId, 1)}
+          priceFor={priceFor}
+          formatMoney={fmtMoney}
+          t={t}
+        />
         <aside className="card pos-cart"><h2>{t('Đơn hàng')}</h2>{cart.length ? <div className="pos-cart-lines">{cart.map(({ product, uom, qty }, index) => <div className="pos-cart-line" key={product.id}><div><strong>{product.name}</strong>{unitsFor(product).length > 1 && <select className="select" aria-label={`${t('Đơn vị bán')} ${product.name}`} value={uom} onChange={(event) => setSelectedUnits((current) => ({ ...current, [product.id]: event.target.value }))}>{unitsFor(product).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` · ${unit.ratio} × ${t('đơn vị gốc')}` : ` · ${t('đơn vị gốc')}`}</option>)}</select>}<div className="small muted">{fmtMoney(priceFor(product, uom))} / {units.get(uom)?.name || t('sp')}</div></div><div className="pos-qty"><button className="btn btn-ghost btn-sm" type="button" aria-label={`${t('Giảm')} ${product.name}`} onClick={() => adjustQty(product.id, -1)}>−</button><input className="input num" type="number" min="0" step="any" aria-label={`${t('Số lượng')} ${product.name}`} value={qty} onChange={(event) => setQty(product.id, event.target.value)} /><button className="btn btn-ghost btn-sm" type="button" aria-label={`${t('Tăng')} ${product.name}`} onClick={() => adjustQty(product.id, 1)}>+</button></div><strong className="num">{fmtMoney(estimatedLines[index].net)}</strong></div>)}</div> : <div className="empty">{t('Chọn sản phẩm để thêm vào đơn.')}</div>}
           <label className="field"><span className="label">{t('Khách hàng')} {rxRequired ? '*' : t('(tùy chọn)')}</span><select className="select" required={rxRequired} value={partyId} onChange={(event) => setPartyId(event.target.value)}><option value="">{t('Khách lẻ')}</option>{[...parties.values()].filter((item) => item.active !== false && item.is_customer !== false).map((item) => <option key={item.id} value={item.id}>{recordLabel('master-data.party', item)}</option>)}</select></label>
           {loyaltyEnabled && <label className="field"><span className="label">{t('Mã voucher thành viên')}</span><input className="input" maxLength="80" autoCapitalize="characters" value={voucherCode} onChange={(event) => setVoucherCode(event.target.value.toUpperCase())}/><span className="small muted">{t('Cần chọn khách hàng đã đăng ký thành viên; mã chỉ được sử dụng một lần.')}</span></label>}
