@@ -1,61 +1,30 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDateTime as businessDateTime, localDateTimeToIso } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
-import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { can, recordLabel } from '../../lib/state.js';
 import { compareDecimals } from '../../lib/decimal.js';
 import fieldServiceEnglish from './field-service.en.js';
 import { fieldServiceLineTotal, fieldServiceStoredLineTotal, fieldServiceTotal } from './domain/fieldServiceTotals.js';
+import { useFieldServiceData } from './hooks/useFieldServiceData.js';
 const t = (text) => uiTextWith(text, fieldServiceEnglish);
 const localDateTime = (value) => value ? businessDateTime(new Date(value)) : '';
 const futureSlot = (hours) => businessDateTime(new Date(Date.now() + hours * 3600000));
-const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const lineTotal = fieldServiceLineTotal;
 export default function FieldServiceWorkbenchPage() {
   useDocumentTitle(`${t('Điều phối dịch vụ hiện trường')} · OSP Suite`);
-  const [orders, setOrders] = useState([]);
-  const [parties, setParties] = useState(new Map());
-  const [products, setProducts] = useState(new Map());
-  const [units, setUnits] = useState(new Map());
-  const [warehouses, setWarehouses] = useState(new Map());
-  const [employees, setEmployees] = useState(new Map());
-  const [invoices, setInvoices] = useState([]);
-  const [tickets, setTickets] = useState(new Map());
+  const { orders, parties, products, units, warehouses, employees, invoices, tickets, loading, error, setError, load } = useFieldServiceData();
   const [selectedId, setSelectedId] = useState('');
   const [form, setForm] = useState({ party: '', title: '', address: '', technician: '', technician_employee: '', scheduled_at: futureSlot(2), scheduled_end: futureSlot(3), warehouse: '' });
   const [editForm, setEditForm] = useState({ party: '', title: '', address: '', technician: '', technician_employee: '', scheduled_at: '', scheduled_end: '', warehouse: '' });
   const [newLines, setNewLines] = useState([]);
   const [editLines, setEditLines] = useState([]);
   const [busy, setBusy] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const showInvoices = can('accounting.invoice.read');
-      const showTickets = can('helpdesk.ticket.read');
-      const [orderResponse, partyMap, productMap, unitMap, warehouseMap, invoiceResponse, ticketResponse, employeeMap] = await Promise.all([
-        can('field-service.work_order.read') ? loadAllResponse('field-service.work_order') : Promise.resolve({ items: [] }),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
-        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
-        can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
-        showInvoices ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
-        showTickets ? loadAllResponse('helpdesk.ticket') : Promise.resolve({ items: [] }),
-        can('hrm.employee.read') ? loadRefs('hrm.employee') : Promise.resolve(new Map()),
-      ]);
-      const nextOrders = itemsOf(orderResponse).sort((a, b) => String(b.scheduled_at || b.created_at || '').localeCompare(String(a.scheduled_at || a.created_at || '')));
-      setOrders(nextOrders); setParties(partyMap); setProducts(productMap); setUnits(unitMap); setWarehouses(warehouseMap);
-      setInvoices(itemsOf(invoiceResponse)); setTickets(new Map(itemsOf(ticketResponse).map((item) => [item.id, item]))); setEmployees(employeeMap);
-      setSelectedId((current) => nextOrders.some((item) => item.id === current) ? current : nextOrders[0]?.id || '');
-      setForm((current) => ({ ...current, party: current.party || [...partyMap.keys()][0] || '' }));
-    } catch (reason) { setError(reason.message || t('Không tải được lệnh công việc.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { setSelectedId((current) => orders.some((item) => item.id === current) ? current : orders[0]?.id || ''); }, [orders]);
+  useEffect(() => { setForm((current) => ({ ...current, party: current.party || [...parties.keys()][0] || '' })); }, [parties]);
   const selected = orders.find((order) => order.id === selectedId);
   const productChoices = [...products.values()].filter((item) => item.active !== false && ['goods', 'service', undefined].includes(item.kind)).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
   const unitsFor = (productId) => {
