@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, fmtNumber, uiText } from '../../lib/i18n.js';
 import { addDecimals, compareDecimals, multiplyDecimals } from '../../lib/decimal.js';
-import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { app, can, recordLabel } from '../../lib/state.js';
 import PurchaseOrderDraftForm from './components/PurchaseOrderDraftForm.jsx';
 import PurchaseRequisitionForm from './components/PurchaseRequisitionForm.jsx';
 import PurchaseOrdersList from './components/PurchaseOrdersList.jsx';
@@ -15,6 +15,7 @@ import SupplierInvoiceAdjustmentsEditor from './components/SupplierInvoiceAdjust
 import SupplierInvoiceDraftForm from './components/SupplierInvoiceDraftForm.jsx';
 import SupplierInvoicesPanel from './components/SupplierInvoicesPanel.jsx';
 import PurchaseOrderSummary from './components/PurchaseOrderSummary.jsx';
+import { usePurchasingData } from './hooks/usePurchasingData.js';
 import {
   calculateInvoiceableLines,
   calculateReturnableLines,
@@ -28,25 +29,11 @@ import {
   returnUnitRatioFor as getReturnUnitRatio,
   selectReturnableInspections,
 } from './domain/purchasingSelectors.js';
-const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
 export default function PurchasingWorkbenchPage() {
   useDocumentTitle(`${uiText('Mua hàng và nhận hàng')} · OSP Suite`);
-  const [orders, setOrders] = useState([]);
-  const [requisitions, setRequisitions] = useState([]);
-  const [receipts, setReceipts] = useState([]);
-  const [supplierInvoices, setSupplierInvoices] = useState([]);
-  const [purchaseReturns, setPurchaseReturns] = useState([]);
-  const [qualityInspections, setQualityInspections] = useState([]);
-  const [suppliers, setSuppliers] = useState(new Map());
-  const [products, setProducts] = useState(new Map());
-  const [units, setUnits] = useState(new Map());
-  const [warehouses, setWarehouses] = useState(new Map());
-  const [taxes, setTaxes] = useState([]);
-  const [currencies, setCurrencies] = useState(new Map());
-  const [currencyRates, setCurrencyRates] = useState([]);
-  const [bills, setBills] = useState([]);
-  const [approvalRequests, setApprovalRequests] = useState([]);
+  const workflowApproval = app.meta?.modules?.some((module) => module.id === 'workflow-approval') || false;
+  const { orders, requisitions, receipts, supplierInvoices, purchaseReturns, qualityInspections, suppliers, products, units, warehouses, taxes, currencies, currencyRates, bills, approvalRequests, loading, error, setError, load } = usePurchasingData(workflowApproval);
   const [selectedId, setSelectedId] = useState('');
   const [editingId, setEditingId] = useState('');
   const [orderForm, setOrderForm] = useState({ supplier: '', warehouse: '', expected_date: '' });
@@ -67,46 +54,15 @@ export default function PurchasingWorkbenchPage() {
   const [invoiceTaxes, setInvoiceTaxes] = useState({});
   const [invoiceAdjustments, setInvoiceAdjustments] = useState([]);
   const [busy, setBusy] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const workflowApproval = app.meta?.modules?.some((module) => module.id === 'workflow-approval') || false;
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const [orderRes, receiptRes, requisitionRes, supplierInvoiceRes, returnRes, inspectionRes, supplierMap, productMap, unitMap, warehouseMap, taxRes, billRes, approvalRes, currencyMap, currencyRateRes] = await Promise.all([
-        can('purchasing.purchase_order.read') ? loadAllResponse('purchasing.purchase_order') : Promise.resolve({ items: [] }),
-        can('purchasing.purchase_receipt.read') ? loadAllResponse('purchasing.purchase_receipt') : Promise.resolve({ items: [] }),
-        can('purchasing.purchase_requisition.read') ? loadAllResponse('purchasing.purchase_requisition') : Promise.resolve({ items: [] }),
-        can('purchasing.supplier_invoice.read') ? loadAllResponse('purchasing.supplier_invoice') : Promise.resolve({ items: [] }),
-        can('purchasing.purchase_return.read') ? loadAllResponse('purchasing.purchase_return') : Promise.resolve({ items: [] }),
-        can('quality.inspection.read') ? loadAllResponse('quality.inspection') : Promise.resolve({ items: [] }),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
-        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
-        can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
-        can('master-data.tax.read') ? loadAllResponse('master-data.tax') : Promise.resolve({ items: [] }),
-        can('accounting.bill.read') ? loadAllResponse('accounting.bill') : Promise.resolve({ items: [] }),
-        workflowApproval && can('workflow-approval.approval_request.read') ? loadAllResponse('workflow-approval.approval_request') : Promise.resolve({ items: [] }),
-        can('master-data.currency.read') ? loadRefs('master-data.currency') : Promise.resolve(new Map()),
-        can('master-data.currency_rate.read') ? loadAllResponse('master-data.currency_rate') : Promise.resolve({ items: [] }),
-      ]);
-      const orderRows = itemsOf(orderRes).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
-      const requisitionRows = itemsOf(requisitionRes).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
-      const supplierRows = new Map([...supplierMap].filter(([, row]) => row.is_supplier !== false));
-      setOrders(orderRows); setRequisitions(requisitionRows); setReceipts(itemsOf(receiptRes)); setSupplierInvoices(itemsOf(supplierInvoiceRes)); setPurchaseReturns(itemsOf(returnRes)); setQualityInspections(itemsOf(inspectionRes)); setSuppliers(supplierRows); setProducts(productMap); setUnits(unitMap); setWarehouses(warehouseMap);
-      setTaxes(itemsOf(taxRes)); setBills(itemsOf(billRes)); setApprovalRequests(itemsOf(approvalRes));
-      setCurrencies(currencyMap || new Map()); setCurrencyRates(itemsOf(currencyRateRes));
-      setSelectedId((current) => orderRows.some((row) => row.id === current) ? current : orderRows[0]?.id || '');
-      setOrderForm((current) => ({ ...current, supplier: current.supplier || [...supplierRows.keys()][0] || '', warehouse: current.warehouse || [...warehouseMap.keys()][0] || '' }));
-      setLines((current) => current.map((line) => ({ ...line, product: line.product || [...productMap.keys()][0] || '' })));
-      const baseCode = String(app.meta?.settings?.baseCurrency || 'VND').toUpperCase();
-      const baseCurrency = [...(currencyMap || new Map()).values()].find((currency) => String(currency.code || '').toUpperCase() === baseCode);
-      setSupplierInvoiceForm((current) => ({ ...current, currency: current.currency || baseCurrency?.id || '' }));
-    } catch (reason) { setError(reason.message || uiText('Không tải được đơn mua và phiếu nhận hàng.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, [workflowApproval]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    setSelectedId((current) => orders.some((row) => row.id === current) ? current : orders[0]?.id || '');
+    setOrderForm((current) => ({ ...current, supplier: current.supplier || [...suppliers.keys()][0] || '', warehouse: current.warehouse || [...warehouses.keys()][0] || '' }));
+    setLines((current) => current.map((line) => ({ ...line, product: line.product || [...products.keys()][0] || '' })));
+    const baseCode = String(app.meta?.settings?.baseCurrency || 'VND').toUpperCase();
+    const baseCurrency = [...currencies.values()].find((currency) => String(currency.code || '').toUpperCase() === baseCode);
+    setSupplierInvoiceForm((current) => ({ ...current, currency: current.currency || baseCurrency?.id || '' }));
+  }, [orders, suppliers, warehouses, products, currencies]);
   const taxById = useMemo(() => new Map(taxes.map((row) => [row.id, row])), [taxes]);
   const unitsFor = (productId) => {
     const baseUnit = products.get(productId)?.uom;
