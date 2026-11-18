@@ -5,11 +5,12 @@ import { api, dataPath } from '../../lib/api.js';
 import { fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
-import { absDecimal, addDecimals, compareDecimals, multiplyDecimals, subtractDecimals, minDecimal } from '../../lib/decimal.js';
+import { absDecimal, addDecimals, compareDecimals, multiplyDecimals, subtractDecimals, minDecimal, roundDecimal } from '../../lib/decimal.js';
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
 const sameDecimal = (left, right) => compareDecimals(left ?? 0, right ?? 0) === 0;
 const samePrice = (left, right) => compareDecimals(absDecimal(subtractDecimals(left ?? 0, right ?? 0)), '0.005') <= 0;
+const positiveDecimal = (value) => { try { return compareDecimals(value || 0, 0) > 0; } catch { return false; } };
 export default function SalesReturnsWorkbenchPage() {
   useDocumentTitle(`${uiText('Trả hàng bán')} · OSP Suite`);
   const [orders, setOrders] = useState([]);
@@ -85,12 +86,12 @@ export default function SalesReturnsWorkbenchPage() {
   function eligibleLines(order) {
     const groups = new Map();
     for (const line of order?.lines || []) {
-      const price = Number(line.price || 0);
+      const price = addDecimals([line.price || 0]);
       const uom = line.uom || '';
-      const discount = Number(line.effective_discount_pct ?? line.discount_pct ?? 0);
+      const discount = addDecimals([line.effective_discount_pct ?? line.discount_pct ?? 0]);
       const tax = line.tax || '';
-      const taxRate = Number(line.tax_rate || 0);
-      const key = [line.product, price.toFixed(2), uom, discount, tax, taxRate].join(':');
+      const taxRate = addDecimals([line.tax_rate || 0]);
+      const key = [line.product, roundDecimal(price, 2), uom, discount, tax, taxRate].join(':');
       const current = groups.get(key) || { key, product: line.product, price, uom: line.uom, uom_name: line.uom_name, uom_ratio: line.uom_ratio, discount_pct: discount, tax: line.tax ?? null, tax_rate: taxRate, ordered: '0', name: products.get(line.product)?.name || uiText('Mặt hàng') };
       current.ordered = addDecimals([current.ordered, line.qty || 0]);
       groups.set(key, current);
@@ -103,8 +104,8 @@ export default function SalesReturnsWorkbenchPage() {
       const reserved = returns.filter((row) => row.sales_order === order.id && ['submitted','approved','received'].includes(row.status)).flatMap((row) => row.lines || []).filter((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && samePrice(item.price, line.price) && sameDecimal(item.discount_pct || 0, line.discount_pct) && (item.tax || '') === (line.tax || '') && sameDecimal(item.tax_rate || 0, line.tax_rate)).reduce((sum, item) => addDecimals([sum, item.qty || 0]), '0');
       const deliveredQuantity = minDecimal(line.ordered, delivered);
       const remainingQuantity = subtractDecimals(deliveredQuantity, reserved);
-      return { ...line, delivered: Number(deliveredQuantity), remaining: compareDecimals(remainingQuantity, 0) > 0 ? Number(remainingQuantity) : 0 };
-    }).filter((line) => line.remaining > .000001);
+      return { ...line, delivered: deliveredQuantity, remaining: compareDecimals(remainingQuantity, 0) > 0 ? remainingQuantity : '0' };
+    }).filter((line) => compareDecimals(line.remaining, '0.000001') > 0);
   }
   const eligible = formOrder ? eligibleLines(formOrder) : [];
   const formInvoices = formOrder ? invoicesFor(formOrder) : [];
@@ -120,7 +121,8 @@ export default function SalesReturnsWorkbenchPage() {
   async function createReturn(event) {
     event.preventDefault(); if (!formOrder) return;
     if (!selectedInvoice) { setError(uiText('Chọn một hóa đơn đã ghi sổ của đơn bán trước khi gửi duyệt phiếu trả.')); return; }
-    const lines = eligible.map((line) => ({ product: line.product, uom: line.uom || undefined, price: line.price, qty: Number(quantities[line.key]) || 0, discount_pct: line.discount_pct, tax: line.tax, tax_rate: line.tax_rate })).filter((line) => line.qty > 0);
+    if (eligible.some((line) => positiveDecimal(quantities[line.key]) && compareDecimals(quantities[line.key], line.remaining) > 0)) { setError(uiText('Số lượng trả không được vượt số lượng còn đủ điều kiện trả.')); return; }
+    const lines = eligible.map((line) => ({ product: line.product, uom: line.uom || undefined, price: String(line.price), qty: String(quantities[line.key] || '0'), discount_pct: String(line.discount_pct), tax: line.tax, tax_rate: String(line.tax_rate) })).filter((line) => positiveDecimal(line.qty));
     if (!lines.length || !reason.trim()) { setError(uiText('Nhập số lượng trả và lý do cho ít nhất một mặt hàng.')); return; }
     await run('return:create', async () => {
       const row = await api(dataPath('sales.sales_return'), { method: 'POST', body: { sales_order: formOrder.id, invoice: selectedInvoice.id, warehouse: formOrder.warehouse || undefined, lines, reason: reason.trim() } });
@@ -149,7 +151,7 @@ export default function SalesReturnsWorkbenchPage() {
         {eligible.length ? <div className="table-wrap u-legacy-0ee7f66ad9" ><table className="table"><thead><tr><th>{uiText('Mặt hàng')}</th><th>{uiText('Đã giao')}</th><th>{uiText('Còn đủ điều kiện trả')}</th><th>{uiText('Giá bán')}</th><th>{uiText('Số lượng trả')}</th></tr></thead><tbody>{eligible.map((line) => <tr key={line.key}><td>{line.name}</td><td>{line.delivered} {unitName(line)}</td><td>{line.remaining} {unitName(line)}</td><td>{fmtMoney(line.price)}</td><td><input className="input num u-legacy-5e96948257" aria-label={`${uiText('Số lượng trả')} ${line.name}`} type="number" min="0" max={line.remaining} step="any" value={quantities[line.key] || ''} onChange={(event) => setQuantities((current) => ({ ...current, [line.key]: event.target.value }))} /></td></tr>)}</tbody></table></div> : <p className="small muted u-legacy-df928149c5" >{uiText('Không còn số lượng đủ điều kiện trả. Đơn có giao vận chỉ tính những mặt hàng đã giao thành công.')}</p>}
         <label className="field u-legacy-df928149c5" ><span className="label">{uiText('Lý do trả hàng')} *</span><textarea className="input" required rows="2" value={reason} onChange={(event) => setReason(event.target.value)}/></label>
       </>}
-      <div className="row u-legacy-df928149c5" ><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !eligible.some((line) => Number(quantities[line.key]) > 0) || !reason.trim() || !selectedInvoice}>{uiText('Lập và gửi duyệt')}</button></div>
+      <div className="row u-legacy-df928149c5" ><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !eligible.some((line) => positiveDecimal(quantities[line.key])) || !reason.trim() || !selectedInvoice}>{uiText('Lập và gửi duyệt')}</button></div>
       {formOrder && !selectedInvoice && <p className="small muted">{uiText('Cần chọn hóa đơn đã ghi sổ của đơn bán trước khi gửi duyệt để credit note gắn đúng chứng từ.')}</p>}
     </form></section>}
     <div className="layout-split u-legacy-92c18f6bda" >

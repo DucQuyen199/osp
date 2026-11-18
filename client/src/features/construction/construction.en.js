@@ -20,6 +20,7 @@ const constructionEnglish = {
   'Ký hợp đồng ghi nhận cam kết chi phí và kiểm tra ngân sách. Hóa đơn phải trả được lập riêng khi có khối lượng nghiệm thu hoặc hồ sơ thanh toán.': 'Signing a contract records a cost commitment and checks the budget. Create an accounts payable bill separately when work is accepted or a payment claim is submitted.',
   'Không gắn dự án': 'No project linked', 'Ghi chú / số biên bản': 'Notes / acceptance record number', 'Ghi nhận': 'Record', 'Làm mới': 'Refresh', 'Bỏ': 'Remove',
   'Không tải được dữ liệu công trường.': 'Could not load construction site data.', 'Thao tác không thành công.': 'The operation could not be completed.',
+  'Một số dữ liệu công trường không tải được.': 'Some construction site data could not be loaded.',
   'Đã tạo hồ sơ công trường.': 'Construction site created.', 'Đã ghi nhật ký thi công. Nhật ký được lưu thành lịch sử không thể sửa.': 'Construction diary recorded. Diary entries are immutable history.',
   'Đã lập dự toán BOQ nháp; tổng giá trị được máy chủ tính từ khối lượng và đơn giá.': 'Draft BOQ created. The server calculates the total from quantities and unit prices.',
   'Đã lập dự thảo hợp đồng thầu phụ.': 'Subcontract draft created.', 'Đã lập hồ sơ nghiệm thu/đề nghị thanh toán nháp.': 'Draft progress claim created.',

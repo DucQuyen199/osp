@@ -261,6 +261,7 @@ const uiTextEnglish = {
   'Hóa đơn gốc cho credit note': 'Original invoice for credit note', 'Chọn hóa đơn đã ghi sổ': 'Select a posted invoice',
   'Đã giao': 'Delivered', 'Còn đủ điều kiện trả': 'Eligible to return', 'Giá bán': 'Sales price', 'Số lượng trả': 'Return quantity',
   'Không còn số lượng đủ điều kiện trả. Đơn có giao vận chỉ tính những mặt hàng đã giao thành công.': 'No eligible quantities remain. For orders with delivery, only successfully delivered items are eligible.',
+  'Số lượng trả không được vượt số lượng còn đủ điều kiện trả.': 'The return quantity cannot exceed the remaining eligible quantity.',
   'Lý do trả hàng': 'Return reason', 'Lập và gửi duyệt': 'Create and submit for approval',
   'Cần chọn hóa đơn đã ghi sổ của đơn bán trước khi gửi duyệt để credit note gắn đúng chứng từ.': 'Select a posted invoice for the sales order before submitting so the credit note links to the correct document.',
   'Phiếu trả hàng': 'Sales return', 'Chưa có phiếu trả hàng.': 'No sales returns yet.', 'Đơn / khách hàng': 'Order / customer',
