@@ -4,7 +4,8 @@ import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtAgo, fmtDateTime, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { can } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
-import { isDeliveredShort, isDeliveredWithinLimit } from './domain/deliveryQuantities.js';
+import { compareDecimals } from '../../lib/decimal.js';
+import { isDeliveredShort, isDeliveredWithinLimit, sameDeliveryLine } from './domain/deliveryQuantities.js';
 import logisticsEnglish from './logistics.en.js';
 const t = (text) => uiTextWith(text, logisticsEnglish);
 const PAGE_SIZE = 100;
@@ -68,19 +69,17 @@ export default function LogisticsDeliveryBoardPage() {
     const evidence = proof.evidence?.trim() || '';
     const lines = shipment.lines || [];
     const deliveredLines = lines.map((line, index) => {
-      const shippedQty = Number(line.qty || 0);
-      const receivedQty = Number(proof.deliveredQuantities?.[index] ?? shippedQty);
+      const receivedQty = String(proof.deliveredQuantities?.[index] ?? line.qty ?? '0');
       const shipmentLine = { ...line };
       delete shipmentLine.productName;
       return {
         ...shipmentLine,
         qty: receivedQty,
       };
-    }).filter((line) => line.qty > 0);
+    }).filter((line) => { try { return compareDecimals(line.qty, '0') > 0; } catch { return false; } });
     const invalidQuantity = lines.some((line, index) => {
       const receivedValue = proof.deliveredQuantities?.[index] ?? line.qty ?? 0;
-      const receivedQty = Number(receivedValue);
-      return !Number.isFinite(receivedQty) || receivedQty < 0 || !isDeliveredWithinLimit(receivedValue, line.qty || 0);
+      try { return compareDecimals(receivedValue, '0') < 0 || !isDeliveredWithinLimit(receivedValue, line.qty || 0); } catch { return true; }
     });
     const hasShortDelivery = lines.some((line, index) => isDeliveredShort(
       proof.deliveredQuantities?.[index] ?? line.qty ?? 0,
@@ -146,10 +145,10 @@ export default function LogisticsDeliveryBoardPage() {
     {shipment.status === 'partial' && <div className="alert warning delivery-alert">
       <strong>{t('Lý do giao thiếu:')}</strong> {shipment.shortDeliveryReason || t('Chưa ghi lý do')}
       <div className="small u-legacy-301647f506" ><strong>{t('Đã nhận thực tế:')}</strong> {(shipment.deliveredLines || []).map((line, index) => {
-        const sourceLine = (shipment.lines || []).find((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && Math.abs(Number(item.price || 0) - Number(line.price || 0)) <= .005);
-        return <span key={`${line.product}-${index}`}> {sourceLine?.productName || line.name || line.product} {fmtNumber(Number(line.qty || 0), { maximumFractionDigits: 6 })} {line.uom_name || ''}{index < shipment.deliveredLines.length - 1 ? ' ·' : ''}</span>;
+        const sourceLine = (shipment.lines || []).find((item) => sameDeliveryLine(item, line));
+        return <span key={`${line.product}-${index}`}> {sourceLine?.productName || line.name || line.product} {fmtNumber(line.qty || 0, { maximumFractionDigits: 6 })} {line.uom_name || ''}{index < shipment.deliveredLines.length - 1 ? ' ·' : ''}</span>;
       })}</div>
-      <div className="small"><strong>{t('Còn giao bù:')}</strong> {(shipment.remainingLines || []).map((line, index) => <span key={`${line.product}-${index}`}> {(shipment.lines || []).find((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && Math.abs(Number(item.price || 0) - Number(line.price || 0)) <= .005)?.productName || line.name || line.product} {fmtNumber(Number(line.qty || 0), { maximumFractionDigits: 6 })} {line.uom_name || ''}{index < shipment.remainingLines.length - 1 ? ' ·' : ''}</span>)}</div>
+      <div className="small"><strong>{t('Còn giao bù:')}</strong> {(shipment.remainingLines || []).map((line, index) => <span key={`${line.product}-${index}`}> {(shipment.lines || []).find((item) => sameDeliveryLine(item, line))?.productName || line.name || line.product} {fmtNumber(line.qty || 0, { maximumFractionDigits: 6 })} {line.uom_name || ''}{index < shipment.remainingLines.length - 1 ? ' ·' : ''}</span>)}</div>
     </div>}
     <div className="delivery-meta small muted">
       <span>{shipment.driver || t('Chưa phân công tài xế')}</span>
