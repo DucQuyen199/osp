@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { uiText } from '../../../lib/i18n.js';
 import { can, loadAllResponse, loadIndependentData, loadRefs } from '../../../lib/state.js';
+import { useLatestRequest } from '../../../lib/useLatestRequest.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const emptyResponse = () => ({ items: [] });
@@ -11,8 +12,10 @@ export function useAccountingSettlementData(workflowApproval) {
   const [data, setData] = useState(emptyData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const beginRequest = useLatestRequest();
 
   const load = useCallback(async () => {
+    const isCurrent = beginRequest();
     setLoading(true);
     setError('');
     try {
@@ -28,6 +31,7 @@ export function useAccountingSettlementData(workflowApproval) {
         batches: emptyResponse(), invoices: emptyResponse(), bills: emptyResponse(), payments: emptyResponse(),
         parties: emptyMap(), currencies: emptyResponse(), approvals: emptyResponse(),
       });
+      if (!isCurrent()) return;
       const batches = itemsOf(reads.batches).sort((a, b) => String(b.payment_date || '').localeCompare(String(a.payment_date || '')) || String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
       const currencyRows = itemsOf(reads.currencies);
       setData({
@@ -41,11 +45,11 @@ export function useAccountingSettlementData(workflowApproval) {
       });
       if (errors.length) setError(errors.map((reason) => reason?.message || uiText('Không tải được phiếu thu/chi công nợ.')).join(' · '));
     } catch (reason) {
-      setError(reason.message || uiText('Không tải được phiếu thu/chi công nợ.'));
+      if (isCurrent()) setError(reason.message || uiText('Không tải được phiếu thu/chi công nợ.'));
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [workflowApproval]);
+  }, [workflowApproval, beginRequest]);
 
   useEffect(() => { load(); }, [load]);
   return { ...data, loading, error, setError, load };

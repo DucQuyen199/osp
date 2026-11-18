@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { can, loadAllResponse, loadIndependentData, loadRefs } from '../../../lib/state.js';
 import { uiText } from '../../../lib/i18n.js';
+import { useLatestRequest } from '../../../lib/useLatestRequest.js';
 
 export function useFinanceOperationsData() {
   const [parties, setParties] = useState(new Map());
@@ -12,8 +13,10 @@ export function useFinanceOperationsData() {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const beginRequest = useLatestRequest();
 
   const load = useCallback(async () => {
+    const isCurrent = beginRequest();
     setLoading(true);
     setLoadError('');
     const { data, errors } = await loadIndependentData({
@@ -28,6 +31,7 @@ export function useFinanceOperationsData() {
       parties: new Map(), accounts: { items: [] }, loans: { items: [] }, repayments: { items: [] },
       policies: { items: [] }, claims: { items: [] }, invoices: { items: [] },
     });
+    if (!isCurrent()) return;
 
     setParties(data.parties);
     setAccounts(data.accounts.items || []);
@@ -38,7 +42,7 @@ export function useFinanceOperationsData() {
     setInvoices(data.invoices.items || []);
     setLoadError(errors.map((reason) => uiText(reason?.message || 'Không tải được dữ liệu hồ sơ tài chính.')).join(' · '));
     setLoading(false);
-  }, []);
+  }, [beginRequest]);
 
   useEffect(() => { load(); }, [load]);
 

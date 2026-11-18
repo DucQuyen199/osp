@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { uiText } from '../../../lib/i18n.js';
 import { can, loadAllResponse, loadIndependentData, loadRefs } from '../../../lib/state.js';
+import { useLatestRequest } from '../../../lib/useLatestRequest.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const emptyData = () => ({
@@ -12,8 +13,10 @@ export function useEducationWorkbenchData() {
   const [data, setData] = useState(emptyData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const beginRequest = useLatestRequest();
 
   const load = useCallback(async () => {
+    const isCurrent = beginRequest();
     setLoading(true);
     setError('');
     try {
@@ -35,6 +38,7 @@ export function useEducationWorkbenchData() {
         classRes: emptyResponse(), enrollmentRes: emptyResponse(), studentRes: emptyResponse(), partyMap: emptyMap(), employeeMap: emptyMap(), sessionRes: emptyResponse(),
         attendanceRes: emptyResponse(), gradeRes: emptyResponse(), feeRes: emptyResponse(), tuitionBatchRes: emptyResponse(), invoiceRes: emptyResponse(),
       });
+      if (!isCurrent()) return;
       const { classRes, enrollmentRes, studentRes, partyMap, employeeMap, sessionRes, attendanceRes, gradeRes, feeRes, tuitionBatchRes, invoiceRes } = data;
       const classes = itemsOf(classRes);
       const students = new Map(itemsOf(studentRes).map((student) => [student.id, student]));
@@ -53,11 +57,11 @@ export function useEducationWorkbenchData() {
       });
       setError(errors[0]?.message || (errors.length ? uiText('Một số dữ liệu lớp học không tải được.') : ''));
     } catch (reason) {
-      setError(reason.message || uiText('Không tải được dữ liệu lớp học.'));
+      if (isCurrent()) setError(reason.message || uiText('Không tải được dữ liệu lớp học.'));
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, []);
+  }, [beginRequest]);
 
   useEffect(() => { load(); }, [load]);
   return { ...data, loading, error, load };

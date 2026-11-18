@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { uiText } from '../../../lib/i18n.js';
 import { can, loadAllResponse, loadIndependentData, loadRefs } from '../../../lib/state.js';
+import { useLatestRequest } from '../../../lib/useLatestRequest.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const emptyMap = () => new Map();
@@ -10,8 +11,10 @@ export function useAgricultureData() {
   const [data, setData] = useState({ farms: [], cycles: [], harvests: [], applications: [], products: emptyMap(), units: emptyMap(), warehouses: emptyMap(), parties: emptyMap(), lots: emptyMap() });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const beginRequest = useLatestRequest();
 
   const load = useCallback(async () => {
+    const isCurrent = beginRequest();
     setLoading(true);
     setError('');
     try {
@@ -29,6 +32,7 @@ export function useAgricultureData() {
         farmResponse: emptyResponse(), cycleResponse: emptyResponse(), harvestResponse: emptyResponse(), inputResponse: emptyResponse(),
         products: emptyMap(), units: emptyMap(), warehouses: emptyMap(), parties: emptyMap(), lots: emptyMap(),
       });
+      if (!isCurrent()) return;
       const cycles = itemsOf(reads.cycleResponse).sort((a, b) => String(a.expected_harvest || '9999').localeCompare(String(b.expected_harvest || '9999')));
       setData({
         farms: itemsOf(reads.farmResponse), cycles, harvests: itemsOf(reads.harvestResponse), applications: itemsOf(reads.inputResponse),
@@ -36,11 +40,11 @@ export function useAgricultureData() {
       });
       setError(errors[0]?.message || (errors.length ? uiText('Một số dữ liệu nông nghiệp không tải được.') : ''));
     } catch (reason) {
-      setError(reason.message || uiText('Không tải được dữ liệu mùa vụ.'));
+      if (isCurrent()) setError(reason.message || uiText('Không tải được dữ liệu mùa vụ.'));
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, []);
+  }, [beginRequest]);
 
   useEffect(() => { load(); }, [load]);
   return { ...data, loading, error, load };

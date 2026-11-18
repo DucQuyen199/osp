@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { app, can, loadAllResponse, loadIndependentData, loadRefs } from '../../../lib/state.js';
+import { useLatestRequest } from '../../../lib/useLatestRequest.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const emptyData = () => ({
@@ -11,8 +12,10 @@ export function usePosWorkbenchData(translate) {
   const [data, setData] = useState(emptyData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const beginRequest = useLatestRequest();
 
   const load = useCallback(async () => {
+    const isCurrent = beginRequest();
     setLoading(true);
     setError('');
     try {
@@ -36,6 +39,7 @@ export function usePosWorkbenchData(translate) {
         warehouses: emptyMap(), branches: emptyMap(), products: emptyMap(), units: emptyMap(), parties: emptyMap(), taxes: emptyMap(), accounts: emptyMap(),
         sessionResponse: emptyResponse(), orderResponse: emptyResponse(), movementResponse: emptyResponse(), prescriptionResponse: emptyResponse(), returnResponse: emptyResponse(),
       });
+      if (!isCurrent()) return;
       const { warehouses, branches, products, units, parties, taxes, accounts, sessionResponse, orderResponse, movementResponse, prescriptionResponse, returnResponse } = reads;
       setError(errors[0]?.message || (errors.length ? translate('Một số dữ liệu POS không tải được.') : ''));
       setData({
@@ -47,11 +51,11 @@ export function usePosWorkbenchData(translate) {
         prescriptions: itemsOf(prescriptionResponse).filter((row) => ['verified', 'partially_dispensed'].includes(row.status)).sort((a, b) => String(a.valid_until || '').localeCompare(String(b.valid_until || ''))),
       });
     } catch (reason) {
-      setError(translate(reason.message || 'Không tải được dữ liệu quầy POS.'));
+      if (isCurrent()) setError(translate(reason.message || 'Không tải được dữ liệu quầy POS.'));
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [translate]);
+  }, [translate, beginRequest]);
 
   useEffect(() => { load(); }, [load]);
   return { ...data, loading, error, load };

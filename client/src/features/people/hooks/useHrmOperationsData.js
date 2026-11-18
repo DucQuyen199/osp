@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { uiText } from '../../../lib/i18n.js';
 import { can, loadAllResponse, loadIndependentData, loadRefs } from '../../../lib/state.js';
+import { useLatestRequest } from '../../../lib/useLatestRequest.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const emptyData = () => ({
@@ -12,8 +13,10 @@ export function useHrmOperationsData(attendanceDate, scheduleMonthStart, schedul
   const [data, setData] = useState(emptyData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const beginRequest = useLatestRequest();
 
   const load = useCallback(async (quiet = false) => {
+    const isCurrent = beginRequest();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const emptyMap = () => new Map();
@@ -34,6 +37,7 @@ export function useHrmOperationsData(attendanceDate, scheduleMonthStart, schedul
         employeeRes: emptyResponse(), leaveRes: emptyResponse(), attendanceRes: emptyResponse(), revisionRes: emptyResponse(), allocationRes: emptyResponse(), scheduleRes: emptyResponse(),
         patternRes: emptyResponse(), templateRes: emptyResponse(), departmentMap: emptyMap(), positionMap: emptyMap(), requestRes: emptyResponse(),
       });
+      if (!isCurrent()) return;
       const { employeeRes, leaveRes, attendanceRes, revisionRes, allocationRes, scheduleRes, patternRes, templateRes, departmentMap, positionMap, requestRes } = data;
       const employees = itemsOf(employeeRes).sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi'));
       setData({
@@ -52,11 +56,11 @@ export function useHrmOperationsData(attendanceDate, scheduleMonthStart, schedul
       });
       setError(errors[0]?.message || (errors.length ? uiText('Một số dữ liệu nhân sự không tải được.') : ''));
     } catch (reason) {
-      setError(reason.message || uiText('Không tải được dữ liệu nhân sự.'));
+      if (isCurrent()) setError(reason.message || uiText('Không tải được dữ liệu nhân sự.'));
     } finally {
-      if (!quiet) setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [attendanceDate, scheduleMonthEnd, scheduleMonthStart, workflowApproval]);
+  }, [attendanceDate, scheduleMonthEnd, scheduleMonthStart, workflowApproval, beginRequest]);
 
   useEffect(() => { load(); }, [load]);
   return { ...data, loading, error, setError, load };

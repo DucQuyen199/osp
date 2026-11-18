@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { app, can, loadAll, loadIndependentData, loadRefs } from '../../../lib/state.js';
+import { useLatestRequest } from '../../../lib/useLatestRequest.js';
 
 export function useBankReconciliationData(statementId, translate) {
   const [statements, setStatements] = useState([]);
@@ -10,9 +11,11 @@ export function useBankReconciliationData(statementId, translate) {
   const [parties, setParties] = useState(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const lineLoadVersion = useRef(0);
+  const beginRequest = useLatestRequest();
+  const beginLineRequest = useLatestRequest();
 
   const load = useCallback(async (quiet = false) => {
+    const isCurrent = beginRequest();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const emptyRows = () => [];
@@ -23,6 +26,7 @@ export function useBankReconciliationData(statementId, translate) {
         currencyMap: can('master-data.currency.read') ? loadRefs('master-data.currency') : Promise.resolve(emptyMap()),
         partyMap: can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(emptyMap()),
       }, { statementRows: emptyRows(), accountMap: emptyMap(), currencyMap: emptyMap(), partyMap: emptyMap() });
+      if (!isCurrent()) return;
       const { statementRows, accountMap, currencyMap, partyMap } = data;
       statementRows.sort((a, b) => String(b.start_date || '').localeCompare(String(a.start_date || '')));
       setStatements(statementRows);
@@ -31,14 +35,14 @@ export function useBankReconciliationData(statementId, translate) {
       setParties(partyMap);
       setError(errors[0]?.message || (errors.length ? translate('Một số dữ liệu đối soát ngân hàng không tải được.') : ''));
     } catch (reason) {
-      setError(reason.message || translate('Không tải được dữ liệu đối soát ngân hàng.'));
+      if (isCurrent()) setError(reason.message || translate('Không tải được dữ liệu đối soát ngân hàng.'));
     } finally {
-      if (!quiet) setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [translate]);
+  }, [beginRequest, translate]);
 
   const loadLines = useCallback(async (id, quiet = false) => {
-    const version = ++lineLoadVersion.current;
+    const isCurrent = beginLineRequest();
     if (!id || !can('accounting.bank_statement_line.read')) {
       setAllLines([]);
       setLinesLoading(false);
@@ -47,13 +51,13 @@ export function useBankReconciliationData(statementId, translate) {
     if (!quiet) setLinesLoading(true);
     try {
       const rows = await loadAll('accounting.bank_statement_line', { statement: id });
-      if (version === lineLoadVersion.current) setAllLines(rows);
+      if (isCurrent()) setAllLines(rows);
     } catch (reason) {
-      if (version === lineLoadVersion.current) setError(reason.message || translate('Không tải được các dòng trong sao kê.'));
+      if (isCurrent()) setError(reason.message || translate('Không tải được các dòng trong sao kê.'));
     } finally {
-      if (version === lineLoadVersion.current && !quiet) setLinesLoading(false);
+      if (isCurrent()) setLinesLoading(false);
     }
-  }, [translate]);
+  }, [beginLineRequest, translate]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadLines(statementId); }, [statementId, loadLines]);

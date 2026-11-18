@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { uiText } from '../../../lib/i18n.js';
 import { can, loadRefs, loadAllResponse, loadIndependentData } from '../../../lib/state.js';
+import { useLatestRequest } from '../../../lib/useLatestRequest.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const emptyData = () => ({
@@ -13,8 +14,10 @@ export function usePurchasingData(workflowApproval) {
   const [data, setData] = useState(emptyData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const beginRequest = useLatestRequest();
 
   const load = useCallback(async (quiet = false) => {
+    const isCurrent = beginRequest();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const emptyMap = () => new Map();
@@ -39,6 +42,7 @@ export function usePurchasingData(workflowApproval) {
         orderRes: emptyResponse(), receiptRes: emptyResponse(), requisitionRes: emptyResponse(), supplierInvoiceRes: emptyResponse(), returnRes: emptyResponse(), inspectionRes: emptyResponse(),
         supplierMap: emptyMap(), productMap: emptyMap(), unitMap: emptyMap(), warehouseMap: emptyMap(), taxRes: emptyResponse(), billRes: emptyResponse(), approvalRes: emptyResponse(), currencyMap: emptyMap(), currencyRateRes: emptyResponse(),
       });
+      if (!isCurrent()) return;
       const { orderRes, receiptRes, requisitionRes, supplierInvoiceRes, returnRes, inspectionRes, supplierMap, productMap, unitMap, warehouseMap, taxRes, billRes, approvalRes, currencyMap, currencyRateRes } = data;
       const orders = itemsOf(orderRes).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
       const requisitions = itemsOf(requisitionRes).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
@@ -61,11 +65,11 @@ export function usePurchasingData(workflowApproval) {
       });
       setError(errors[0]?.message || (errors.length ? uiText('Một số dữ liệu mua hàng không tải được.') : ''));
     } catch (reason) {
-      setError(reason.message || uiText('Không tải được đơn mua và phiếu nhận hàng.'));
+      if (isCurrent()) setError(reason.message || uiText('Không tải được đơn mua và phiếu nhận hàng.'));
     } finally {
-      if (!quiet) setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [workflowApproval]);
+  }, [workflowApproval, beginRequest]);
 
   useEffect(() => { load(); }, [load]);
   return { ...data, loading, error, setError, load };

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, tenantPath } from '../../../lib/api.js';
 import { can, loadRefs, loadAllResponse, loadIndependentData } from '../../../lib/state.js';
 import { uiTextWith } from '../../../lib/i18n.js';
+import { useLatestRequest } from '../../../lib/useLatestRequest.js';
 import manufacturingEnglish from '../manufacturing.en.js';
 
 const t = (text) => uiTextWith(text, manufacturingEnglish);
@@ -21,8 +22,10 @@ export function useManufacturingWipData(asOf) {
   const [units, setUnits] = useState(new Map());
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
+  const beginRequest = useLatestRequest();
 
   const load = useCallback(async () => {
+    const isCurrent = beginRequest();
     setLoading(true);
     setLoadError('');
     try {
@@ -46,6 +49,7 @@ export function useManufacturingWipData(asOf) {
         inspections: { items: [] }, dispositions: { items: [] }, acceptances: { items: [] },
         workCenters: new Map(), products: new Map(), warehouses: new Map(), units: new Map(), accounts: new Map(),
       });
+      if (!isCurrent()) return;
       setReport(data.report);
       setBoms(Array.isArray(data.boms.items) ? data.boms.items : []);
       setProductionOrders(Array.isArray(data.productionOrders.items) ? data.productionOrders.items : []);
@@ -56,12 +60,13 @@ export function useManufacturingWipData(asOf) {
       setWorkCenters(data.workCenters); setProducts(data.products); setWarehouses(data.warehouses); setUnits(data.units); setAccounts(data.accounts);
       if (errors.length) setLoadError(errors.map((reason) => reason?.message || t('Không tải được báo cáo WIP.')).join(' · '));
     } catch (reason) {
+      if (!isCurrent()) return;
       setReport(null);
       setLoadError(reason.message || t('Không tải được báo cáo WIP.'));
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [asOf]);
+  }, [asOf, beginRequest]);
 
   useEffect(() => { load(); }, [load]);
 

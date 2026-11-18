@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { uiText } from '../../../lib/i18n.js';
 import { can, loadAllResponse, loadIndependentData, loadRefs } from '../../../lib/state.js';
+import { useLatestRequest } from '../../../lib/useLatestRequest.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const emptyResponse = () => ({ items: [] });
@@ -11,8 +12,10 @@ export function useAdjustmentRefundData() {
   const [data, setData] = useState(emptyData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const beginRequest = useLatestRequest();
 
   const load = useCallback(async () => {
+    const isCurrent = beginRequest();
     setLoading(true);
     setError('');
     try {
@@ -27,6 +30,7 @@ export function useAdjustmentRefundData() {
         credits: emptyResponse(), debits: emptyResponse(), invoices: emptyResponse(), bills: emptyResponse(),
         payments: emptyResponse(), parties: emptyMap(),
       });
+      if (!isCurrent()) return;
       setData({
         notes: {
           credit: itemsOf(reads.credits).filter((row) => row.status === 'posted'),
@@ -39,11 +43,11 @@ export function useAdjustmentRefundData() {
       });
       if (errors.length) setError(errors.map((reason) => reason?.message || uiText('Không tải được danh sách phiếu điều chỉnh.')).join(' · '));
     } catch (reason) {
-      setError(reason.message || uiText('Không tải được danh sách phiếu điều chỉnh.'));
+      if (isCurrent()) setError(reason.message || uiText('Không tải được danh sách phiếu điều chỉnh.'));
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, []);
+  }, [beginRequest]);
 
   useEffect(() => { load(); }, [load]);
   return { ...data, loading, error, setError, load };
