@@ -4,6 +4,7 @@ import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtAgo, fmtDateTime, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { can } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
+import { isDeliveredShort, isDeliveredWithinLimit } from './domain/deliveryQuantities.js';
 import logisticsEnglish from './logistics.en.js';
 const t = (text) => uiTextWith(text, logisticsEnglish);
 const PAGE_SIZE = 100;
@@ -69,23 +70,22 @@ export default function LogisticsDeliveryBoardPage() {
     const deliveredLines = lines.map((line, index) => {
       const shippedQty = Number(line.qty || 0);
       const receivedQty = Number(proof.deliveredQuantities?.[index] ?? shippedQty);
-      const ratio = shippedQty > 0 ? receivedQty / shippedQty : 0;
       const shipmentLine = { ...line };
       delete shipmentLine.productName;
       return {
         ...shipmentLine,
         qty: receivedQty,
-        ...(line.base_qty != null ? { base_qty: Number((Number(line.base_qty) * ratio).toFixed(12)) } : {}),
       };
     }).filter((line) => line.qty > 0);
     const invalidQuantity = lines.some((line, index) => {
-      const shippedQty = Number(line.qty || 0);
-      const receivedQty = Number(proof.deliveredQuantities?.[index] ?? shippedQty);
-      return !Number.isFinite(receivedQty) || receivedQty < 0 || receivedQty > shippedQty;
+      const receivedValue = proof.deliveredQuantities?.[index] ?? line.qty ?? 0;
+      const receivedQty = Number(receivedValue);
+      return !Number.isFinite(receivedQty) || receivedQty < 0 || !isDeliveredWithinLimit(receivedValue, line.qty || 0);
     });
-    const hasShortDelivery = lines.some((line, index) =>
-      Number(proof.deliveredQuantities?.[index] ?? line.qty ?? 0) + 0.000001 < Number(line.qty || 0),
-    );
+    const hasShortDelivery = lines.some((line, index) => isDeliveredShort(
+      proof.deliveredQuantities?.[index] ?? line.qty ?? 0,
+      line.qty || 0,
+    ));
     const shortReason = proof.shortDeliveryReason?.trim() || '';
     if (!receivedBy && !evidence) {
       setError(t('Nhập tên người nhận hoặc mã/bằng chứng giao hàng trước khi xác nhận.'));
@@ -166,7 +166,7 @@ export default function LogisticsDeliveryBoardPage() {
           <input className="input num" aria-label={`${t('Số lượng thực nhận dòng')} ${index + 1}`} type="number" min="0" max={line.qty} step="any" value={deliveryProof[shipment.id]?.deliveredQuantities?.[index] ?? line.qty} onChange={(event) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], deliveredQuantities: { ...current[shipment.id]?.deliveredQuantities, [index]: event.target.value } } }))}/>
         </label>)}
       </div>
-      {(shipment.lines || []).some((line, index) => Number(deliveryProof[shipment.id]?.deliveredQuantities?.[index] ?? line.qty ?? 0) + 0.000001 < Number(line.qty || 0)) && <label className="field"><span>{t('Lý do giao thiếu (bắt buộc, 5–500 ký tự)')}</span><textarea className="input" rows="2" maxLength="500" value={deliveryProof[shipment.id]?.shortDeliveryReason || ''} onChange={(event) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], shortDeliveryReason: event.target.value } }))}/></label>}
+      {(shipment.lines || []).some((line, index) => isDeliveredShort(deliveryProof[shipment.id]?.deliveredQuantities?.[index] ?? line.qty ?? 0, line.qty || 0)) && <label className="field"><span>{t('Lý do giao thiếu (bắt buộc, 5–500 ký tự)')}</span><textarea className="input" rows="2" maxLength="500" value={deliveryProof[shipment.id]?.shortDeliveryReason || ''} onChange={(event) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], shortDeliveryReason: event.target.value } }))}/></label>}
       <label className="field"><span>{t('Người nhận hàng (nếu có)')}</span><input className="input" maxLength="160" value={deliveryProof[shipment.id]?.receivedBy || ''} onChange={(event) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], receivedBy: event.target.value } }))}/></label>
       <label className="field"><span>{t('Mã POD / bằng chứng giao hàng')}</span><input className="input" maxLength="1000" value={deliveryProof[shipment.id]?.evidence || ''} onChange={(event) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], evidence: event.target.value } }))}/></label>
       <p className="small muted">{t('Điền tên người nhận hoặc mã tham chiếu/bằng chứng từ đơn vị vận chuyển.')}</p>
