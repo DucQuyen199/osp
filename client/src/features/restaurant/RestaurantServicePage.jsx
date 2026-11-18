@@ -5,12 +5,11 @@ import { localDateTime as businessDateTime, localDateTimeToIso } from '../../lib
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse, loadIndependentData } from '../../lib/state.js';
-import { recordHref } from '../../lib/routes.js';
 import { compareDecimals } from '../../lib/decimal.js';
 import restaurantEnglish from './restaurant.en.js';
 import RestaurantRecipesPanel from './components/RestaurantRecipesPanel.jsx';
 import RestaurantReservationsPanel from './components/RestaurantReservationsPanel.jsx';
-import RestaurantOrderLineItems from './components/RestaurantOrderLineItems.jsx';
+import RestaurantOrderDetailPanel from './components/RestaurantOrderDetailPanel.jsx';
 import { estimateRestaurantSubtotal, restaurantLineTotal } from './domain/restaurantTotals.js';
 const t = (text) => uiTextWith(text, restaurantEnglish);
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -251,18 +250,29 @@ export default function RestaurantServicePage() {
           </button>;
         })}{!orders.length && <div className="empty">{t('Chưa có order.')}</div>}</div>}
       </section>
-      <section className="restaurant-order-detail card">{selected ? <>
-      <header className="restaurant-order-card-head"><div><h2>{tables.find((table) => table.id === selected.table)?.name || t('Mang đi')}</h2><span className="small muted">{fmtDateTime(selected.created_at)}{selected.table ? ` · ${selected.guest_count || 1} ${t('khách')}` : ''}</span></div><span className={`badge ${selected.status === 'completed' ? 'success' : selected.status === 'cancelled' ? 'plain' : 'warning'}`}>{statusLabel(selected.status)}</span></header>
-        {selected.cancellation_reason && <div className="small muted">{t('Lý do hủy:')} {selected.cancellation_reason}</div>}
-        <RestaurantOrderLineItems lines={selected.lines || []} products={products} lineTotal={restaurantLineTotal} t={t} />
-        {compareDecimals(selected.tax_total || 0, '0') > 0 && <div className="restaurant-tax-total"><span>{t('Thuế bán hàng')}</span><strong className="num">{fmtMoney(selected.tax_total)}</strong></div>}
-        <div className="restaurant-cart-total"><span>{t('Tổng đã gồm thuế')}</span><strong className="num">{fmtMoney(selected.total || 0)}</strong></div>
-        {selectedTickets.length > 0 && <div className="restaurant-ticket-status"><h3>{t('Tiến độ bếp')}</h3>{selectedTickets.map((ticket) => <div key={ticket.id}><span>{t(ticket.station === 'bar' ? 'Quầy pha chế' : 'Bếp')}</span><strong>{statusLabel(ticket.status)}</strong></div>)}</div>}
-        {selected.status === 'open' && can('restaurant.table_order.sent') && <div className="restaurant-actions"><button className="btn btn-primary" disabled={!!busy} onClick={() => transition(selected, 'sent')}>{t('Gửi bếp và quầy pha chế')}</button>{can('restaurant.table_order.cancelled') && <button className="btn" disabled={!!busy} onClick={() => transition(selected, 'cancelled')}>{t('Hủy order')}</button>}</div>}
-        {selected.status === 'sent' && <div className="restaurant-actions">{can('restaurant.table_order.served') && <><button className="btn btn-primary" disabled={!!busy || (tickets.length > 0 && !ticketsReady)} onClick={() => transition(selected, 'served')}>{t('Chuyển sang phục vụ')}</button>{tickets.length > 0 && !ticketsReady && <span className="small muted">{t('Chờ tất cả phiếu bếp / quầy báo món xong.')}</span>}</>}{can('restaurant.table_order.cancelled') && can('restaurant.table_order.update') && <><label className="field"><span>{t('Lý do hủy (chỉ hủy được khi các trạm chưa bắt đầu)')}</span><input className="input" maxLength="500" value={cancellationReasons[selected.id] || ''} onChange={(event) => setCancellationReasons((current) => ({ ...current, [selected.id]: event.target.value }))} /></label><button className="btn" disabled={!!busy || !cancellationReasons[selected.id]?.trim()} onClick={() => transition(selected, 'cancelled')}>{t('Hủy order đã gửi')}</button></>}</div>}
-        {selected.status === 'served' && can('restaurant.table_order.completed') && can('restaurant.table_order.update') && <div className="restaurant-payment"><label className="field"><span>{t('Phương thức thanh toán')}</span><select className="select" value={method} onChange={(event) => setMethod(event.target.value)}>{METHODS.map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}</select></label><button className="btn btn-primary" disabled={!!busy || (selectedNeedsWarehouse && !selected.warehouse)} onClick={() => transition(selected, 'completed')}>{t('Thanh toán, xuất kho và đóng order')}</button>{selectedNeedsWarehouse && !selected.warehouse && <span className="small muted">{t('Order có nguyên liệu theo dõi tồn nhưng chưa gắn kho. Cập nhật order trước khi thanh toán.')}</span>}</div>}
-        {selectedPayment && <a className="btn" href={recordHref('accounting.payment', selectedPayment.id)}>{t('Mở phiếu thanh toán')} {String(selectedPayment.id).slice(0, 8)}</a>}
-      </> : <div className="card-pad muted">{t('Chọn order để theo dõi và xử lý.')}</div>}</section>
+      <RestaurantOrderDetailPanel
+        selected={selected}
+        tableName={tables.find((table) => table.id === selected?.table)?.name}
+        products={products}
+        selectedTickets={selectedTickets}
+        selectedPayment={selectedPayment}
+        selectedNeedsWarehouse={selectedNeedsWarehouse}
+        hasUnreadyTickets={tickets.length > 0 && !ticketsReady}
+        busy={busy}
+        method={method}
+        cancellationReason={cancellationReasons[selected?.id] || ''}
+        canSend={can('restaurant.table_order.sent')}
+        canCancel={can('restaurant.table_order.cancelled')}
+        canServe={can('restaurant.table_order.served')}
+        canCancelSent={can('restaurant.table_order.cancelled') && can('restaurant.table_order.update')}
+        canComplete={can('restaurant.table_order.completed') && can('restaurant.table_order.update')}
+        onTransition={transition}
+        onMethodChange={setMethod}
+        onCancellationReasonChange={(value) => setCancellationReasons((current) => ({ ...current, [selected.id]: value }))}
+        methods={METHODS}
+        lineTotal={restaurantLineTotal}
+        t={t}
+      />
     </div>
   </div>;
 }
