@@ -5,7 +5,7 @@ import { api, dataPath } from '../../lib/api.js';
 import { textDialog } from '../../lib/feedback.js';
 import { fmtDateTime, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { addDecimals, compareDecimals, subtractDecimals } from '../../lib/decimal.js';
-import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { can, loadRefs, recordLabel, loadAllResponse, loadIndependentData } from '../../lib/state.js';
 import pharmacyEnglish from './pharmacy.en.js';
 import PrescriptionForm from './components/PrescriptionForm.jsx';
 const t = (text) => uiTextWith(text, pharmacyEnglish);
@@ -31,12 +31,19 @@ export default function PharmacyWorkbenchPage() {
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const [productMap, partyMap, unitMap, rxResponse, orderResponse, inspectionResponse, dispositionResponse] = await Promise.all([
-        loadRefs('master-data.product'), loadRefs('master-data.party'), can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()), loadAllResponse('pharmacy.prescription'),
-        can('pos.pos_order.read') ? loadAllResponse('pos.pos_order') : Promise.resolve({ items: [] }),
-        can('quality.inspection.read') ? loadAllResponse('quality.inspection') : Promise.resolve({ items: [] }),
-        can('pharmacy.return_disposition.read') ? loadAllResponse('pharmacy.return_disposition') : Promise.resolve({ items: [] }),
-      ]);
+      const { data, errors } = await loadIndependentData({
+        products: can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
+        parties: can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
+        units: can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
+        prescriptions: can('pharmacy.prescription.read') ? loadAllResponse('pharmacy.prescription') : Promise.resolve({ items: [] }),
+        orders: can('pos.pos_order.read') ? loadAllResponse('pos.pos_order') : Promise.resolve({ items: [] }),
+        inspections: can('quality.inspection.read') ? loadAllResponse('quality.inspection') : Promise.resolve({ items: [] }),
+        dispositions: can('pharmacy.return_disposition.read') ? loadAllResponse('pharmacy.return_disposition') : Promise.resolve({ items: [] }),
+      }, {
+        products: new Map(), parties: new Map(), units: new Map(), prescriptions: { items: [] },
+        orders: { items: [] }, inspections: { items: [] }, dispositions: { items: [] },
+      });
+      const { products: productMap, parties: partyMap, units: unitMap, prescriptions: rxResponse, orders: orderResponse, inspections: inspectionResponse, dispositions: dispositionResponse } = data;
       setProducts([...productMap.values()].filter((p) => p.active !== false && (p.kind || 'goods') === 'goods' && p.tracked !== false && p.requires_prescription === true).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi')));
       setUnits(unitMap);
       setParties(partyMap);
@@ -54,6 +61,7 @@ export default function PharmacyWorkbenchPage() {
         dispensed.set(order.prescription, quantities);
       }
       setDispensedByPrescription(dispensed);
+      if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được một phần dữ liệu nhà thuốc.')).join(' · '));
     } catch (reason) { setError(t(reason.message || 'Không tải được danh sách đơn thuốc.')); }
     finally { setLoading(false); }
   }, []);

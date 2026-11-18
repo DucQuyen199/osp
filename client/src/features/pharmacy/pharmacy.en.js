@@ -1,4 +1,5 @@
 const pharmacyEnglish = {
+  'Không tải được một phần dữ liệu nhà thuốc.': 'Could not load some pharmacy data.',
   'Thuốc kê đơn phải là hàng hóa tồn kho': 'Prescribed medicines must be inventory goods.',
   'Thuốc kê đơn cần được theo dõi tồn kho': 'Prescribed medicines must be inventory-tracked.',
   'Không tải được danh sách đơn thuốc.': 'Could not load prescriptions.',
