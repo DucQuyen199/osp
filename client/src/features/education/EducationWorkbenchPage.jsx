@@ -11,6 +11,7 @@ import TuitionLedgerTable from './components/TuitionLedgerTable.jsx';
 import GradebookSection from './components/GradebookSection.jsx';
 import CourseClassForm from './components/CourseClassForm.jsx';
 import ClassSessionForm from './components/ClassSessionForm.jsx';
+import TuitionBatchPanel from './components/TuitionBatchPanel.jsx';
 import { useEducationWorkbenchData } from './hooks/useEducationWorkbenchData.js';
 const t = (text) => uiTextWith(text, educationEnglish);
 const localDate = formatLocalDate;
@@ -257,12 +258,25 @@ export default function EducationWorkbenchPage() {
     </section>
     <GradebookSection canRead={can('school.grade.read')} canCreate={can('school.grade.create')} canUpdate={can('school.grade.update')} classes={classes} gradeClass={gradeClass} gradeTerm={gradeTerm} gradeSubject={gradeSubject} gradeRoster={gradeRoster} gradeMap={gradeMap} parties={parties} busy={busy} onGradeClassChange={setGradeClass} onGradeTermChange={setGradeTerm} onGradeSubjectChange={setGradeSubject} onSave={saveGrade} t={t} />
     {can('school.fee.read') && <section className="card card-pad u-mt-20" ><div className="row wrap"><div><h2>{t("Sổ học phí")}</h2><p className="small muted">{t("Học phí phát hành sẽ tạo hóa đơn phải thu. Khi hóa đơn được thanh toán đủ, trạng thái khoản học phí tự chuyển sang đã thu.")}</p></div><span className="grow"/><span className="badge warning">{fees.filter((fee) => fee.status === 'issued').length} {t('chưa thu đủ')}</span></div>
-      {can('school.tuition_batch.create') && <section className="card card-pad u-mt-14" ><h3>{t("Lập đợt học phí theo lớp")}</h3><p className="small muted">{t("Tạo khoản thu nháp cho toàn bộ học viên đang ghi danh. Học phí hiện tại của lớp được lưu thành số tiền từng khoản; có thể rà soát và phát hành hóa đơn riêng sau đó.")}</p><form className="form-grid" onSubmit={createTuitionBatch}>
-        <label className="field"><span className="label">{t("Lớp *")}</span><select className="select" required value={tuitionBatchForm.class} onChange={(event) => setTuitionBatchForm((current) => ({ ...current, class: event.target.value }))}><option value="">{t("Chọn lớp có học phí")}</option>{classes.filter((item) => Number(item.tuition) > 0).map((item) => <option key={item.id} value={item.id}>{item.name} · {fmtMoney(item.tuition)} · {enrollments.filter((row) => row.class === item.id && row.status === 'active').length} {t('học viên')}</option>)}</select></label>
-        <label className="field"><span className="label">{t("Kỳ học phí *")}</span><input className="input" required maxLength="80" value={tuitionBatchForm.period} onChange={(event) => setTuitionBatchForm((current) => ({ ...current, period: event.target.value }))} placeholder={t('Ví dụ: 2026-HK1 hoặc 2026-11')} /></label>
-        <label className="field"><span className="label">{t("Hạn thanh toán *")}</span><input className="input" required type="date" value={tuitionBatchForm.due_date} onChange={(event) => setTuitionBatchForm((current) => ({ ...current, due_date: event.target.value }))} /></label>
-        <div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={busy || loading || !tuitionBatchForm.class || !tuitionBatchForm.period.trim()}>{t("Tạo đợt nháp")}</button></div>
-       </form>{can('school.tuition_batch.read') && <div className="stack-sm u-mt-12" >{tuitionBatches.length === 0 ? <div className="small muted">{t("Chưa có đợt tạo học phí.")}</div> : [...tuitionBatches].sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))).map((batch) => <div className="row wrap card card-pad" key={batch.id}><div><strong>{classById.get(batch.class)?.name || t('Lớp')} · {batch.period}</strong><div className="small muted">{batch.status === 'generated' ? t('Hạn {date} · Tạo {generated} khoản · Bỏ qua {skipped} khoản đã có').replace('{date}', fmtDate(batch.due_date)).replace('{generated}', String(batch.generated_count || 0)).replace('{skipped}', String(batch.skipped_count || 0)) : t('Hạn {date} · Chưa chạy').replace('{date}', fmtDate(batch.due_date))}</div></div><span className="grow"/><span className={`badge ${batch.status === 'generated' ? 'success' : 'warning'}`}>{statusLabel(batch.status)}</span>{batch.status === 'draft' && can('school.tuition_batch.generated') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy) || loading} onClick={() => generateTuitionBatch(batch)}>{t("Tạo khoản thu")}</button>}</div>)}</div>}</section>}
+      {can('school.tuition_batch.create') && <TuitionBatchPanel
+        classes={classes.filter((item) => Number(item.tuition) > 0)}
+        enrollments={enrollments}
+        tuitionBatches={tuitionBatches}
+        classById={classById}
+        form={tuitionBatchForm}
+        canCreate={can('school.tuition_batch.create')}
+        canRead={can('school.tuition_batch.read')}
+        canGenerate={can('school.tuition_batch.generated')}
+        busy={busy}
+        loading={loading}
+        onFormChange={(field, value) => setTuitionBatchForm((current) => ({ ...current, [field]: value }))}
+        onSubmit={createTuitionBatch}
+        onGenerate={generateTuitionBatch}
+        fmtDate={fmtDate}
+        fmtMoney={fmtMoney}
+        statusLabel={statusLabel}
+        t={t}
+      />}
       {can('school.fee.create') && <form className="form-grid u-margin-14-0-20"  onSubmit={createFee}>
         <label className="field"><span className="label">{t("Ghi danh (tùy chọn)")}</span><select className="select" value={feeForm.enrollment} onChange={(event) => { const enrollment = enrollmentById.get(event.target.value); setFeeForm((current) => ({ ...current, enrollment: event.target.value, student: enrollment?.student || current.student })); }}><option value="">{t("Khoản thu khác / chưa gắn lớp")}</option>{enrollments.filter((item) => item.status === 'active').map((item) => { const student = studentById.get(item.student); const party = parties.get(student?.party); const courseClass = classById.get(item.class); return <option key={item.id} value={item.id}>{party ? recordLabel('master-data.party', party) : student?.student_code || t('Học viên')} · {courseClass?.name || t('Lớp')}</option>; })}</select></label>
         {!feeForm.enrollment && <label className="field"><span className="label">{t("Học viên *")}</span><select className="select" required value={feeForm.student} onChange={(event) => setFeeForm((current) => ({ ...current, student: event.target.value }))}><option value="">{t("Chọn học viên")}</option>{[...students.values()].map((student) => <option key={student.id} value={student.id}>{parties.get(student.party) ? recordLabel('master-data.party', parties.get(student.party)) : student.student_code || t('Học viên')}</option>)}</select></label>}
