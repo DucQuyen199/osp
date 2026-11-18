@@ -1,16 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
-import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { app, can, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
-import { addDecimals, compareDecimals, multiplyDecimals } from '../../lib/decimal.js';
+import { compareDecimals, multiplyDecimals } from '../../lib/decimal.js';
 import QuotationComposer from './components/QuotationComposer.jsx';
 import QuotationRegister from './components/QuotationRegister.jsx';
-import { eligibleWholesaleReturnLines, estimateWholesaleSubtotal, remainingWholesaleShipmentLines, wholesalePrice } from './domain/wholesaleSelectors.js';
+import { wholesalePrice } from './domain/wholesaleSelectors.js';
 import wholesaleEnglish from './wholesale.en.js';
 import { useWholesaleSalesData } from './hooks/useWholesaleSalesData.js';
+import { useWholesaleSalesWorkflow } from './hooks/useWholesaleSalesWorkflow.js';
 const today = localDate;
 const t = (text) => uiTextWith(text, wholesaleEnglish);
 export default function WholesaleSalesDeskPage() {
@@ -20,127 +20,23 @@ export default function WholesaleSalesDeskPage() {
   const accountingEnabled = app.meta?.modules?.some((module) => module.id === 'accounting') || false;
   const approvalEnabled = app.meta?.modules?.some((module) => module.id === 'workflow-approval') || false;
   const { parties, products, units, warehouses, priceLists, quotations, orders, shipments, invoices, returns, approvalRequests, creditNotes, loading, error, setError, load } = useWholesaleSalesData(logisticsEnabled, accountingEnabled, approvalEnabled);
-  const [selectedUnits, setSelectedUnits] = useState({});
-  const [party, setParty] = useState('');
-  const [warehouse, setWarehouse] = useState('');
-  const [priceList, setPriceList] = useState('');
-  const [shippingAddress, setShippingAddress] = useState('');
-  const [validUntil, setValidUntil] = useState('');
-  const [note, setNote] = useState('');
-  const [quantities, setQuantities] = useState({});
-  const [returnQuantities, setReturnQuantities] = useState({});
-  const [returnReasons, setReturnReasons] = useState({});
-  const [shipmentQuantities, setShipmentQuantities] = useState({});
-  const [orderVoucherCodes, setOrderVoucherCodes] = useState({});
-  const [busy, setBusy] = useState('');
-  const [notice, setNotice] = useState('');
+  const workflow = useWholesaleSalesWorkflow({ load, emailQueueEnabled, logisticsEnabled, products, units, priceLists, orders, shipments, returns, setError, t });
+  const {
+    selectedUnits, setSelectedUnits, party, setParty, warehouse, setWarehouse, priceList, setPriceList,
+    shippingAddress, setShippingAddress, validUntil, setValidUntil, note, setNote, quantities,
+    returnQuantities, setReturnQuantities, returnReasons, setReturnReasons, shipmentQuantities, setShipmentQuantities,
+    orderVoucherCodes, setOrderVoucherCodes, busy, notice, cart, selectedList, estimate, setQuantity,
+    createQuote, transition, applyVoucher, eligibleReturnLines, remainingShipmentLines, createShipment,
+    createReturn, decideApproval,
+  } = workflow;
   useEffect(() => { const timer = window.setInterval(() => load(true), 20000); return () => window.clearInterval(timer); }, [load]);
   const activeProducts = [...products.values()].filter((product) => product.active !== false).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
-  const selectedList = priceLists.find((item) => item.id === priceList);
   const unitsFor = (product) => product?.uom ? [...units.values()].filter((unit) => unit.id === product.uom || unit.base_uom === product.uom) : [];
-  const cart = Object.entries(quantities).map(([id, qty]) => ({ product: products.get(id), qty: String(qty), uom: selectedUnits[id] || products.get(id)?.uom })).filter((line) => line.product && compareDecimals(line.qty, 0) > 0);
   const getPrice = (product, uomId) => wholesalePrice(product, uomId, selectedList, units);
-  const estimate = estimateWholesaleSubtotal(cart, selectedList, units);
-  const setQuantity = (id, value) => setQuantities((current) => {
-    const next = { ...current };
-    try { if (compareDecimals(value || 0, 0) > 0) next[id] = String(value); else delete next[id]; }
-    catch { delete next[id]; }
-    return next;
-  });
-  const createQuote = async (event) => {
-    event.preventDefault(); if (!party || !warehouse || !cart.length) return;
-    setBusy('create'); setError(''); setNotice('');
-    try {
-      const created = await api(dataPath('sales.quotation'), { method: 'POST', body: {
-        party, warehouse, price_list: priceList || undefined, shipping_address: shippingAddress.trim() || undefined,
-        valid_until: validUntil || undefined, note: note.trim() || undefined,
-        lines: cart.map(({ product, qty, uom }) => ({ product: product.id, qty, uom })),
-      } });
-      setQuantities({}); setSelectedUnits({}); setNote(''); await load(true);
-      setNotice(`${t('Đã tạo báo giá')} ${String(created.id).slice(0, 8)}. ${t('Máy chủ áp dụng bảng giá hoặc giá danh mục và tính thuế.')}`);
-    } catch (reason) { setError(reason.message || t('Không tạo được báo giá. Kiểm tra khách hàng, giá và ngày hiệu lực.')); }
-    finally { setBusy(''); }
-  };
-  const transition = async (entity, record, action) => {
-    setBusy(`${record.id}:${action}`); setError(''); setNotice('');
-    try {
-      await api(dataPath(entity, record.id, action), { method: 'POST' });
-      await load(true);
-      const message = t(action === 'confirmed'
-        ? 'Đơn đã xác nhận. Hạn mức tín dụng và tồn khả dụng đã được kiểm tra; hệ thống tạo hóa đơn và chuyến giao nếu có địa chỉ.'
-        : action === 'accepted' ? 'Báo giá đã duyệt; hệ thống tạo đơn bán nháp.'
-          : action === 'sent' ? (emailQueueEnabled
-            ? 'Báo giá đã gửi và email chi tiết đã xếp vào hàng đợi gửi.'
-            : 'Đã ghi nhận báo giá đã gửi cho khách hàng.')
-            : action === 'expired' ? 'Đã đánh dấu báo giá hết hạn.' : 'Đã cập nhật trạng thái chứng từ.');
-      setNotice(message);
-    } catch (reason) { setError(reason.message || t('Không cập nhật được chứng từ. Kiểm tra giá, tín dụng và tồn kho.')); await load(true); }
-    finally { setBusy(''); }
-  };
-  const applyVoucher = async (order) => {
-    const code = (orderVoucherCodes[order.id] ?? order.voucher_code ?? '').trim().toUpperCase();
-    setBusy(`${order.id}:voucher`); setError(''); setNotice('');
-    try {
-      await api(dataPath('sales.sales_order', order.id), { method: 'PATCH', body: { voucher_code: code } });
-      await load(true);
-      setNotice(t(code ? 'Đã áp dụng voucher; số tiền và thuế đã được máy chủ tính lại.' : 'Đã gỡ voucher khỏi đơn nháp.'));
-    } catch (reason) { setError(reason.message || t('Không áp dụng được voucher. Kiểm tra ngày hiệu lực, thành viên và mã.')); }
-    finally { setBusy(''); }
-  };
   const orderForQuote = (quote) => orders.find((order) => order.source === 'quotation' && order.source_id === quote.id);
   const shipmentForOrder = (order) => shipments.filter((shipment) => shipment.source === 'sales_order' && shipment.source_id === order.id);
   const invoiceForOrder = (order) => invoices.find((invoice) => invoice.source === 'sales_order' && invoice.source_id === order.id);
   const expired = (quote) => quote.valid_until && quote.valid_until < today();
-  const eligibleReturnLines = (order) => eligibleWholesaleReturnLines(order, shipments, returns, products,
-    app.meta?.modules?.some((module) => module.id === 'logistics') && Boolean(order.shipping_address?.trim()));
-  const remainingShipmentLines = (order) => remainingWholesaleShipmentLines(order, shipments, products);
-  const createShipment = async (order) => {
-    const openLines = remainingShipmentLines(order);
-    const lines = openLines.map((line) => ({
-      product: line.product,
-      price: line.price,
-      uom: line.uom,
-      qty: shipmentQuantities[order.id]?.[line.key] || '0',
-      remaining: line.remaining,
-    })).filter((line) => compareDecimals(line.qty, 0) > 0);
-    if (!lines.length || lines.some((line) => compareDecimals(line.qty, addDecimals([line.remaining, '0.000001'])) > 0)) return;
-    setBusy(`${order.id}:shipment`); setError(''); setNotice('');
-    try {
-      const created = await api(dataPath('logistics.shipment'), { method: 'POST', body: {
-        source: 'sales_order', source_id: order.id, party: order.party,
-        warehouse: order.warehouse, destination: order.shipping_address,
-        lines: lines.map(({ product, price, qty, uom }) => ({ product, price, qty, uom })),
-      } });
-      setShipmentQuantities((current) => { const next = { ...current }; delete next[order.id]; return next; });
-      await load(true);
-      setNotice(`${t('Đã tạo vận đơn')} ${String(created.id).slice(0, 8)} ${t('cho số lượng được chọn.')}`);
-    } catch (reason) {
-      setError(reason.message || t('Không tạo được vận đơn. Hệ thống kiểm tra lại lượng còn giao trên đơn.'));
-      await load(true);
-    } finally { setBusy(''); }
-  };
-  const createReturn = async (order) => {
-    const lines = eligibleReturnLines(order).map((line) => ({ ...line, qty: returnQuantities[`${order.id}:${line.key}`] || '0' })).filter((line) => compareDecimals(line.qty, 0) > 0).map(({ product, price, qty, uom, discount_pct, tax, tax_rate }) => ({ product, price, qty, uom, discount_pct, tax, tax_rate }));
-    if (!lines.length || !returnReasons[order.id]?.trim()) return;
-    setBusy(`${order.id}:return`); setError(''); setNotice('');
-    try {
-      const created = await api(dataPath('sales.sales_return'), { method: 'POST', body: {
-        sales_order: order.id, warehouse: order.warehouse, lines, reason: returnReasons[order.id].trim(),
-      } });
-      setReturnReasons((current) => ({ ...current, [order.id]: '' }));
-      setReturnQuantities((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${order.id}:`))));
-      await load(true); setNotice(`${t('Đã lập phiếu trả')} ${String(created.id).slice(0, 8)}. ${t('Gửi duyệt để nhận hàng và lập chứng từ giảm công nợ.')}`);
-    } catch (reason) { setError(reason.message || t('Không lập được phiếu trả. Kiểm tra số lượng đã giao và các phiếu trả trước.')); }
-    finally { setBusy(''); }
-  };
-  const decideApproval = async (request, action) => {
-    setBusy(`${request.id}:${action}`); setError(''); setNotice('');
-    try {
-      await api(dataPath('workflow-approval.approval_request', request.id, action), { method: 'POST' });
-      await load(true); setNotice(t(action === 'approved' ? 'Đã duyệt phiếu trả; hàng có thể được nhận về kho.' : 'Đã từ chối yêu cầu trả hàng.'));
-    } catch (reason) { setError(reason.message || t('Không cập nhật được quyết định phê duyệt.')); await load(true); }
-    finally { setBusy(''); }
-  };
   const quotationCards = quotations.map((quote) => {
     const order = orderForQuote(quote);
     const isExpired = Boolean(expired(quote));

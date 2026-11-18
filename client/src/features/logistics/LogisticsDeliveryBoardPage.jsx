@@ -1,15 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { useLatestRequest } from '../../lib/useLatestRequest.js';
-import { api, dataPath, tenantPath } from '../../lib/api.js';
+import { api, tenantPath } from '../../lib/api.js';
 import { fmtAgo, fmtDateTime, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { can } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
-import { compareDecimals } from '../../lib/decimal.js';
-import { isDeliveredShort, isDeliveredWithinLimit, sameDeliveryLine } from './domain/deliveryQuantities.js';
+import { isDeliveredShort, sameDeliveryLine } from './domain/deliveryQuantities.js';
 import logisticsEnglish from './logistics.en.js';
 import DeliveryProofFields from './components/DeliveryProofFields.jsx';
 import DeliveryShipmentDetails from './components/DeliveryShipmentDetails.jsx';
+import { useLogisticsDeliveryWorkflow } from './hooks/useLogisticsDeliveryWorkflow.js';
 const t = (text) => uiTextWith(text, logisticsEnglish);
 const PAGE_SIZE = 100;
 const LANES = [
@@ -27,9 +27,7 @@ export default function LogisticsDeliveryBoardPage() {
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [busy, setBusy] = useState('');
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [deliveryProof, setDeliveryProof] = useState({});
   const latestRequest = useLatestRequest();
   const load = useCallback(async (quiet = false) => {
     const isLatest = latestRequest();
@@ -49,6 +47,10 @@ export default function LogisticsDeliveryBoardPage() {
       if (isLatest()) setLoading(false);
     }
   }, [offset, latestRequest]);
+  const {
+    busy, deliveryProof, transition, confirmDelivered, redeliver, changeDeliveredQuantity,
+    changeShortDeliveryReason, changeReceivedBy, changeEvidence,
+  } = useLogisticsDeliveryWorkflow({ load, setError, t });
   useEffect(() => { load();
     const timer = window.setInterval(() => load(true), 15000);
     return () => window.clearInterval(timer);
@@ -56,90 +58,6 @@ export default function LogisticsDeliveryBoardPage() {
   const grouped = useMemo(() => Object.fromEntries(
     LANES.map(([status]) => [status, items.filter((item) => item.status === status)]),
   ), [items]);
-  const transition = async (shipment, action) => {
-    const key = `${shipment.id}:${action}`;
-    setBusy(key);
-    setError('');
-    try {
-      await api(dataPath('logistics.shipment', shipment.id, action), { method: 'POST' });
-      await load(true);
-    } catch (reason) {
-      setError(reason.message || t('Không cập nhật được vận đơn.'));
-      await load(true);
-    } finally {
-      setBusy('');
-    }
-  };
-  const confirmDelivered = async (shipment) => {
-    const proof = deliveryProof[shipment.id] || {};
-    const receivedBy = proof.receivedBy?.trim() || '';
-    const evidence = proof.evidence?.trim() || '';
-    const lines = shipment.lines || [];
-    const deliveredLines = lines.map((line, index) => {
-      const receivedQty = String(proof.deliveredQuantities?.[index] ?? line.qty ?? '0');
-      const shipmentLine = { ...line };
-      delete shipmentLine.productName;
-      return {
-        ...shipmentLine,
-        qty: receivedQty,
-      };
-    }).filter((line) => { try { return compareDecimals(line.qty, '0') > 0; } catch { return false; } });
-    const invalidQuantity = lines.some((line, index) => {
-      const receivedValue = proof.deliveredQuantities?.[index] ?? line.qty ?? 0;
-      try { return compareDecimals(receivedValue, '0') < 0 || !isDeliveredWithinLimit(receivedValue, line.qty || 0); } catch { return true; }
-    });
-    const hasShortDelivery = lines.some((line, index) => isDeliveredShort(
-      proof.deliveredQuantities?.[index] ?? line.qty ?? 0,
-      line.qty || 0,
-    ));
-    const shortReason = proof.shortDeliveryReason?.trim() || '';
-    if (!receivedBy && !evidence) {
-      setError(t('Nhập tên người nhận hoặc mã/bằng chứng giao hàng trước khi xác nhận.'));
-      return;
-    }
-    if (!deliveredLines.length || invalidQuantity) {
-      setError(t('Số lượng giao thực tế phải hợp lệ và không vượt số lượng trên vận đơn.'));
-      return;
-    }
-    if (hasShortDelivery && (shortReason.length < 5 || shortReason.length > 500)) {
-      setError(t('Giao thiếu cần lý do từ 5 đến 500 ký tự.'));
-      return;
-    }
-    const key = `${shipment.id}:delivered`;
-    setBusy(key);
-    setError('');
-    try {
-      await api(dataPath('logistics.shipment', shipment.id, 'delivered'), {
-        method: 'POST',
-        body: {
-          ...(receivedBy ? { received_by: receivedBy } : {}),
-          ...(evidence ? { delivery_evidence: evidence } : {}),
-          delivered_lines: deliveredLines,
-          ...(hasShortDelivery ? { short_delivery_reason: shortReason } : {}),
-        },
-      });
-      setDeliveryProof((current) => { const next = { ...current }; delete next[shipment.id]; return next; });
-      await load(true);
-    } catch (reason) {
-      setError(reason.message || t('Không hoàn tất được giao hàng. Kiểm tra bằng chứng giao hàng và số lượng đã điều phối.'));
-      await load(true);
-    } finally {
-      setBusy('');
-    }
-  };
-  const redeliver = async (shipment) => {
-    setBusy(`${shipment.id}:redeliver`);
-    setError('');
-    try {
-      const result = await api(tenantPath(`/reports/logistics/shipments/${encodeURIComponent(shipment.id)}/redeliver`), { method: 'POST' });
-      location.hash = recordHref('logistics.shipment', result.id);
-    } catch (reason) {
-      setError(reason.message || t('Không tạo được vận đơn giao lại.'));
-      await load(true);
-    } finally {
-      setBusy('');
-    }
-  };
   const renderShipment = (shipment) => {
     const shipmentTitle = `${shipment.carrier || t('Vận đơn')}${shipment.trackingNumber ? ` · ${shipment.trackingNumber}` : ''}`;
     const deliveredLines = (shipment.deliveredLines || []).map((line, index) => {
@@ -180,10 +98,10 @@ export default function LogisticsDeliveryBoardPage() {
       shipment={shipment} proof={deliveryProof[shipment.id] || {}}
       hasShortDelivery={(shipment.lines || []).some((line, index) => isDeliveredShort(deliveryProof[shipment.id]?.deliveredQuantities?.[index] ?? line.qty ?? 0, line.qty || 0))}
       t={t}
-      onQuantityChange={(index, value) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], deliveredQuantities: { ...current[shipment.id]?.deliveredQuantities, [index]: value } } }))}
-      onShortReasonChange={(value) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], shortDeliveryReason: value } }))}
-      onReceivedByChange={(value) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], receivedBy: value } }))}
-      onEvidenceChange={(value) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], evidence: value } }))}
+      onQuantityChange={(index, value) => changeDeliveredQuantity(shipment.id, index, value)}
+      onShortReasonChange={(value) => changeShortDeliveryReason(shipment.id, value)}
+      onReceivedByChange={(value) => changeReceivedBy(shipment.id, value)}
+      onEvidenceChange={(value) => changeEvidence(shipment.id, value)}
     />}
     <footer className="row wrap delivery-footer">
       {shipment.source === 'sales_order' && shipment.sourceId && can('sales.sales_order.read') && <a className="small" href={recordHref('sales.sales_order', shipment.sourceId)}>{t('Mở đơn bán')}</a>}
