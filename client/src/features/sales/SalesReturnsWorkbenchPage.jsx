@@ -2,11 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath } from '../../lib/api.js';
-import { fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
+import { fmtMoney, statusLabel, uiText, uiTextWith } from '../../lib/i18n.js';
 import { app, can, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import { absDecimal, addDecimals, compareDecimals, multiplyDecimals, subtractDecimals, minDecimal, roundDecimal } from '../../lib/decimal.js';
 import { useSalesReturnsData } from './hooks/useSalesReturnsData.js';
+import SalesReturnRegisterPanel from './components/SalesReturnRegisterPanel.jsx';
+import wholesaleEnglish from './wholesale.en.js';
+const t = (text) => uiTextWith(text, wholesaleEnglish);
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
 const sameDecimal = (left, right) => compareDecimals(left ?? 0, right ?? 0) === 0;
 const samePrice = (left, right) => compareDecimals(absDecimal(subtractDecimals(left ?? 0, right ?? 0)), '0.005') <= 0;
@@ -78,6 +81,8 @@ export default function SalesReturnsWorkbenchPage() {
   const eligible = formOrder ? eligibleLines(formOrder) : [];
   const formInvoices = formOrder ? invoicesFor(formOrder) : [];
   const selectedInvoice = formOrder ? invoiceFor(formOrder, returnInvoiceId) : null;
+  const hasReturnQuantity = eligible.some((line) => positiveDecimal(quantities[line.key]));
+  const returnSubmitDisabled = !hasReturnQuantity || !reason.trim() || !selectedInvoice;
   const linkedInvoice = selected ? invoiceFor(selectedOrder, selected.invoice || linkedInvoiceId) : null;
   const returnedTotal = selected ? addDecimals((selected.lines || []).map((line) => line.line_total ?? multiplyDecimals([line.price || 0, line.qty || 0]))) : '0';
   useEffect(() => {
@@ -113,15 +118,31 @@ export default function SalesReturnsWorkbenchPage() {
     <div className="page-head"><div><h1>{uiText('Trả hàng và điều chỉnh doanh thu')}</h1><p className="sub">{uiText('Chỉ nhận trả trên số lượng đủ điều kiện, phê duyệt trước khi nhập kho và tạo credit note theo hóa đơn gốc.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{uiText('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
     <div className="stats u-mb-16" ><div className="card stat"><span className="stat-label">{uiText('Nháp / bị từ chối')}</span><strong className="stat-value">{stats.draft}</strong></div><div className="card stat"><span className="stat-label">{uiText('Chờ duyệt')}</span><strong className="stat-value">{stats.pending}</strong></div><div className="card stat"><span className="stat-label">{uiText('Đã duyệt / chờ nhận')}</span><strong className="stat-value">{stats.approved}</strong></div><div className="card stat"><span className="stat-label">{uiText('Đã nhập và điều chỉnh')}</span><strong className="stat-value">{stats.received}</strong></div></div>
-    {can('sales.sales_return.create') && <section className="card card-pad"><h2>{uiText('Lập phiếu trả hàng')}</h2><form onSubmit={createReturn}><label className="field"><span className="label">{uiText('Đơn bán nguồn')} *</span><select className="select" required value={orderId} onChange={(event) => { setOrderId(event.target.value); setQuantities({}); }}><option value="">{uiText('Chọn đơn đã xác nhận')}</option>{returnableOrders.map((order) => <option key={order.id} value={order.id}>{order.number || String(order.id).slice(0, 8)} · {parties.get(order.party) ? recordLabel('master-data.party', parties.get(order.party)) : uiText('Khách hàng')} · {statusLabel(order.status)}</option>)}</select></label>
-      {formOrder && <><div className="small muted u-mt-8" >{uiText('Kho nhận hàng trả')}: {warehouses.get(formOrder.warehouse)?.name || uiText('Kho của đơn bán')} · {uiText('Hóa đơn gốc')}: {selectedInvoice ? `${selectedInvoice.number || String(selectedInvoice.id).slice(0, 8)} (${statusLabel(selectedInvoice.status)})` : uiText('chưa chọn')}</div>
-        {formInvoices.length > 1 && <label className="field u-mt-10" ><span className="label">{uiText('Hóa đơn gốc cho credit note')} *</span><select className="select" required value={returnInvoiceId} onChange={(event) => setReturnInvoiceId(event.target.value)}><option value="">{uiText('Chọn hóa đơn đã ghi sổ')}</option>{formInvoices.map((invoice) => <option key={invoice.id} value={invoice.id}>{invoice.number || String(invoice.id).slice(0, 8)} · {statusLabel(invoice.status)} · {fmtMoney(invoice.total || 0)}</option>)}</select></label>}
-        {eligible.length ? <div className="table-wrap u-mt-12" ><table className="table"><thead><tr><th>{uiText('Mặt hàng')}</th><th>{uiText('Đã giao')}</th><th>{uiText('Còn đủ điều kiện trả')}</th><th>{uiText('Giá bán')}</th><th>{uiText('Số lượng trả')}</th></tr></thead><tbody>{eligible.map((line) => <tr key={line.key}><td>{line.name}</td><td>{line.delivered} {unitName(line)}</td><td>{line.remaining} {unitName(line)}</td><td>{fmtMoney(line.price)}</td><td><input className="input num u-max-w-150" aria-label={`${uiText('Số lượng trả')} ${line.name}`} type="number" min="0" max={line.remaining} step="any" value={quantities[line.key] || ''} onChange={(event) => setQuantities((current) => ({ ...current, [line.key]: event.target.value }))} /></td></tr>)}</tbody></table></div> : <p className="small muted u-mt-10" >{uiText('Không còn số lượng đủ điều kiện trả. Đơn có giao vận chỉ tính những mặt hàng đã giao thành công.')}</p>}
-        <label className="field u-mt-10" ><span className="label">{uiText('Lý do trả hàng')} *</span><textarea className="input" required rows="2" value={reason} onChange={(event) => setReason(event.target.value)}/></label>
-      </>}
-      <div className="row u-mt-10" ><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !eligible.some((line) => positiveDecimal(quantities[line.key])) || !reason.trim() || !selectedInvoice}>{uiText('Lập và gửi duyệt')}</button></div>
-      {formOrder && !selectedInvoice && <p className="small muted">{uiText('Cần chọn hóa đơn đã ghi sổ của đơn bán trước khi gửi duyệt để credit note gắn đúng chứng từ.')}</p>}
-    </form></section>}
+    {can('sales.sales_return.create') && <SalesReturnRegisterPanel
+      returnableOrders={returnableOrders}
+      orderId={orderId}
+      formOrder={formOrder}
+      warehouses={warehouses}
+      selectedInvoice={selectedInvoice}
+      returnInvoiceId={returnInvoiceId}
+      formInvoices={formInvoices}
+      showInvoiceSelector={formInvoices.length > 1}
+      eligibleLines={eligible}
+      quantities={quantities}
+      reason={reason}
+      busy={busy}
+      submitDisabled={returnSubmitDisabled}
+      partyLabel={(partyId) => parties.has(partyId) ? recordLabel('master-data.party', parties.get(partyId)) : ''}
+      unitName={unitName}
+      fmtMoney={fmtMoney}
+      statusLabel={statusLabel}
+      onOrderChange={(value) => { setOrderId(value); setQuantities({}); }}
+      onInvoiceChange={setReturnInvoiceId}
+      onQuantityChange={(key, value) => setQuantities((current) => ({ ...current, [key]: value }))}
+      onReasonChange={setReason}
+      onSubmit={createReturn}
+      t={t}
+    />}
     <div className="layout-split u-mt-16" >
       <section className="card card-pad"><h2>{uiText('Phiếu trả hàng')}</h2>{loading ? <div className="skeleton" data-h="row"/> : !returns.length ? <div className="empty">{uiText('Chưa có phiếu trả hàng.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{uiText('Đơn / khách hàng')}</th><th>{uiText('Lý do')}</th><th>{uiText('Tổng giảm')}</th><th>{uiText('Trạng thái')}</th></tr></thead><tbody>{returns.map((row) => { const order = orderById.get(row.sales_order); return <tr {...selectableTableRowProps} key={row.id} aria-selected={row.id === selectedId} className={[row.id === selectedId ? 'selected' : '', 'u-pointer'].filter(Boolean).join(' ')} onClick={() => setSelectedId(row.id)} ><td><strong>{order ? recordLabel('master-data.party', parties.get(order.party)) : uiText('Khách hàng')}</strong><div className="small muted">{uiText('Đơn')} {String(row.sales_order || '').slice(0, 8)}</div></td><td>{row.reason || '—'}</td><td>{fmtMoney(row.total || 0)}</td><td>{statusLabel(row.status)}</td></tr>; })}</tbody></table></div>}</section>
       {selected && <section className="card card-pad"><div className="row wrap"><div><h2>{uiText('Phiếu trả')} {String(selected.id).slice(0, 8)}</h2><div className="small muted">{uiText('Đơn bán')} {selectedOrder?.number || String(selected.sales_order).slice(0, 8)} · {selected.reason}</div><div className="small muted">{uiText('Hóa đơn gốc')}: {linkedInvoice ? `${linkedInvoice.number || String(linkedInvoice.id).slice(0, 8)} · ${statusLabel(linkedInvoice.status)}` : uiText('chưa chọn')}</div></div><span className="grow"/><span className="badge warning">{statusLabel(selected.status)}</span></div>

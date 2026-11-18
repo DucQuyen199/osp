@@ -76,6 +76,8 @@ export default {
   'Tài khoản 112': 'Account 112',
   'Tài khoản ngân hàng *': 'Bank account *',
   'Tệp CSV, CAMT.053 hoặc JSON Casso': 'CSV, CAMT.053, or Casso JSON file',
+  'Số tài khoản Casso trên sao kê *': 'Casso account number for this statement *',
+  'Xác nhận số này khớp với tài khoản ngân hàng của sao kê đang chọn.': 'Confirm that this number matches the bank account selected for this statement.',
   'Thanh toán': 'Payment',
   'Thao tác đối soát không thành công.': 'Reconciliation action failed.',
   'Thêm dòng': 'Add line',

@@ -1244,12 +1244,22 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
             ],
         ) => {
             let payload = parse_json(&bytes)?;
+            let bank_account_id = payload
+                .get("bankAccountId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    ApiError::validation(
+                        "accounting.bank_statement",
+                        vec!["bankAccountId is required".into()],
+                    )
+                })?;
             return json_ok(
                 crate::modules::accounting::import_statement_casso(
                     k,
                     &actor,
                     &t,
                     statement_id,
+                    bank_account_id,
                     &payload,
                 )
                 .await?,

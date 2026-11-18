@@ -1026,14 +1026,13 @@ pub fn build(reg: &Registry) -> Value {
             "tags": ["accounting"], "summary": "Import Casso bank transactions", "security": sec,
             "parameters": [tid, { "name": "statementId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
             "requestBody": { "required": true, "content": { "application/json": { "schema": {
-                "oneOf": [
-                    { "type": "object", "required": ["data"], "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/CassoBankTransaction" } } } },
-                    { "type": "object", "required": ["data"], "properties": {
-                        "data": { "type": "object", "required": ["records"], "properties": {
-                            "records": { "type": "array", "items": { "$ref": "#/components/schemas/CassoBankTransaction" } }
-                        } }
-                    } }
-                ]
+                "type": "object", "required": ["bankAccountId", "data"], "properties": {
+                    "bankAccountId": { "type": "string", "minLength": 1, "maxLength": 128, "description": "Expected bank_sub_acc_id/subAccId from the selected bank account; all rows must match" },
+                    "data": { "oneOf": [
+                        { "type": "array", "items": { "$ref": "#/components/schemas/CassoBankTransaction" } },
+                        { "type": "object", "required": ["records"], "properties": { "records": { "type": "array", "items": { "$ref": "#/components/schemas/CassoBankTransaction" } } } }
+                    ] }
+                }
             } } } },
             "responses": with_common(Map::from_iter([
                 ("200".to_string(), json!({ "description": "Rows imported or skipped as exact idempotent replays" })),
@@ -1312,11 +1311,17 @@ pub fn build(reg: &Registry) -> Value {
         .iter()
         .map(|id| json!({ "name": id, "description": reg.modules[id].name }))
         .collect();
-    schemas.insert("CassoBankTransaction".into(), json!({ "type": "object", "required": ["id", "amount", "when"], "properties": {
+    schemas.insert("CassoBankTransaction".into(), json!({ "type": "object", "required": ["id", "amount"], "allOf": [
+        { "anyOf": [{ "required": ["when"] }, { "required": ["transactionDate"] }] },
+        { "anyOf": [{ "required": ["bank_sub_acc_id"] }, { "required": ["subAccId"] }] }
+    ], "properties": {
         "id": { "oneOf": [{ "type": "string" }, { "type": "integer" }], "description": "Stable Casso transaction identifier" },
         "tid": { "type": "string", "description": "Bank transaction reference" },
         "amount": { "type": "number", "not": { "const": 0 }, "description": "Signed amount: positive is credit, negative is debit" },
         "when": { "type": "string", "description": "Transaction date or timestamp" },
+        "transactionDate": { "type": "string", "description": "Alternate transaction date or timestamp" },
+        "bank_sub_acc_id": { "type": "string", "description": "Casso bank account identifier" },
+        "subAccId": { "type": "string", "description": "Alternate Casso bank account identifier" },
         "description": { "type": "string", "maxLength": 1000 }
     } }));
     json!({

@@ -24,6 +24,7 @@ export default function PharmacyWorkbenchPage() {
   const [returnDispositions, setReturnDispositions] = useState([]);
   const [disposalDrafts, setDisposalDrafts] = useState({});
   const [dispensedByPrescription, setDispensedByPrescription] = useState(new Map());
+  const [dispensedDataAvailable, setDispensedDataAvailable] = useState(false);
   const [editingId, setEditingId] = useState('');
   const [form, setForm] = useState({ prescription_no: '', party: '', prescriber: '', prescriber_license: '', issued_at: today(), valid_until: today(), notes: '' });
   const [lines, setLines] = useState([newLine()]);
@@ -41,12 +42,12 @@ export default function PharmacyWorkbenchPage() {
         parties: can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
         units: can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
         prescriptions: can('pharmacy.prescription.read') ? loadAllResponse('pharmacy.prescription') : Promise.resolve({ items: [] }),
-        orders: can('pos.pos_order.read') ? loadAllResponse('pos.pos_order') : Promise.resolve({ items: [] }),
+        orders: can('pos.pos_order.read') ? loadAllResponse('pos.pos_order').then((response) => ({ ...response, sourceLoaded: true })) : Promise.resolve({ items: [], sourceLoaded: false }),
         inspections: can('quality.inspection.read') ? loadAllResponse('quality.inspection') : Promise.resolve({ items: [] }),
         dispositions: can('pharmacy.return_disposition.read') ? loadAllResponse('pharmacy.return_disposition') : Promise.resolve({ items: [] }),
       }, {
         products: new Map(), parties: new Map(), units: new Map(), prescriptions: { items: [] },
-        orders: { items: [] }, inspections: { items: [] }, dispositions: { items: [] },
+        orders: { items: [], sourceLoaded: false }, inspections: { items: [] }, dispositions: { items: [] },
       });
       if (!isCurrent()) return;
       const { products: productMap, parties: partyMap, units: unitMap, prescriptions: rxResponse, orders: orderResponse, inspections: inspectionResponse, dispositions: dispositionResponse } = data;
@@ -56,6 +57,7 @@ export default function PharmacyWorkbenchPage() {
       setPrescriptions((rxResponse.items || []).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))));
       setReturnInspections((inspectionResponse.items || []).filter((item) => item.source === 'pharmacy_return').sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))));
       setReturnDispositions(dispositionResponse.items || []);
+      setDispensedDataAvailable(orderResponse.sourceLoaded === true);
       const dispensed = new Map();
       for (const order of orderResponse.items || []) {
         if (order.status !== 'completed' || !order.prescription) continue;
@@ -187,8 +189,8 @@ export default function PharmacyWorkbenchPage() {
         unitName: item.uom_name || units.get(item.uom)?.name || '',
         balance: firstForProduct ? {
           prescribed,
-          dispensed: dispensedQty,
-          remaining: compareDecimals(subtractDecimals(prescribed, dispensedQty), '0') < 0 ? '0' : subtractDecimals(prescribed, dispensedQty),
+          dispensed: dispensedDataAvailable ? dispensedQty : null,
+          remaining: dispensedDataAvailable ? (compareDecimals(subtractDecimals(prescribed, dispensedQty), '0') < 0 ? '0' : subtractDecimals(prescribed, dispensedQty)) : null,
           unit: units.get(baseUnit)?.name || t('đơn vị gốc'),
         } : null,
       };
@@ -254,6 +256,7 @@ export default function PharmacyWorkbenchPage() {
       canVerify={can('pharmacy.prescription.verified')}
       canCancel={can('pharmacy.prescription.cancelled')}
       prescriptionLines={prescriptionLines}
+      dispensedDataAvailable={dispensedDataAvailable}
       productName={productName}
       onEdit={editPrescription}
       onTransition={transition}

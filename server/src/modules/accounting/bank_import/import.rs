@@ -44,10 +44,11 @@ pub async fn import_statement_casso(
     actor: &Actor,
     tenant: &Tenant,
     statement_id: &str,
+    bank_account_id: &str,
     payload: &Value,
 ) -> R<Value> {
     let statement_id = authorize_import(kernel, actor, tenant, statement_id)?;
-    let lines = super::casso::parse(payload)?;
+    let lines = super::casso::parse(payload, bank_account_id)?;
     persistence::import_lines(
         kernel,
         actor,

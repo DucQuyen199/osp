@@ -1,4 +1,5 @@
 const pharmacyEnglish = {
+  'Số lượng đã cấp chưa khả dụng do thiếu quyền đọc đơn POS hoặc dữ liệu chưa tải được.': 'Dispensed and remaining quantities are unavailable because POS order access is missing or the data could not be loaded.',
   'Không tải được một phần dữ liệu nhà thuốc.': 'Could not load some pharmacy data.',
   'Thuốc kê đơn phải là hàng hóa tồn kho': 'Prescribed medicines must be inventory goods.',
   'Thuốc kê đơn cần được theo dõi tồn kho': 'Prescribed medicines must be inventory-tracked.',

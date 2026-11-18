@@ -4,11 +4,15 @@ use crate::{
     error::{ApiError, R},
     money,
 };
-use chrono::NaiveDate;
+use chrono::{DateTime, NaiveDate, NaiveDateTime};
 use rust_decimal::Decimal;
 use serde_json::Value;
 
-pub(super) fn parse(payload: &Value) -> R<Vec<BankLine>> {
+pub(super) fn parse(payload: &Value, expected_account: &str) -> R<Vec<BankLine>> {
+    let expected_account = expected_account.trim();
+    if expected_account.is_empty() || expected_account.len() > 128 {
+        return Err(validation("A valid Casso bank account number is required"));
+    }
     let records = payload
         .as_array()
         .or_else(|| payload.get("data").and_then(Value::as_array))
@@ -42,6 +46,19 @@ pub(super) fn parse(payload: &Value) -> R<Vec<BankLine>> {
                             .map(Value::to_string)
                     })
             };
+            let account = value("bank_sub_acc_id")
+                .or_else(|| value("subAccId"))
+                .filter(|account| !account.trim().is_empty())
+                .ok_or_else(|| {
+                    validation(format!(
+                        "Casso transaction {row}: bank_sub_acc_id or subAccId is required to verify the statement account"
+                    ))
+                })?;
+            if account.trim() != expected_account {
+                return Err(validation(format!(
+                    "Casso transaction {row}: account does not match the selected bank account"
+                )));
+            }
             let id = value("id")
                 .filter(|id| !id.trim().is_empty())
                 .ok_or_else(|| {
@@ -108,17 +125,21 @@ pub(super) fn parse(payload: &Value) -> R<Vec<BankLine>> {
 
 fn parse_casso_date(value: &str) -> Option<NaiveDate> {
     let value = value.trim();
-    [
-        "%Y-%m-%d",
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%dT%H:%M:%S%.f%:z",
-        "%Y-%m-%dT%H:%M:%S%.fZ",
-    ]
-    .iter()
-    .find_map(|format| NaiveDate::parse_from_str(value, format).ok())
-    .or_else(|| {
-        value
-            .get(..10)
-            .and_then(|date| NaiveDate::parse_from_str(date, "%Y-%m-%d").ok())
-    })
+    NaiveDate::parse_from_str(value, "%Y-%m-%d")
+        .ok()
+        .or_else(|| {
+            NaiveDateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S")
+                .ok()
+                .map(|timestamp| timestamp.date())
+        })
+        .or_else(|| {
+            NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S%.f")
+                .ok()
+                .map(|timestamp| timestamp.date())
+        })
+        .or_else(|| {
+            DateTime::parse_from_rfc3339(value)
+                .ok()
+                .map(|timestamp| timestamp.date_naive())
+        })
 }

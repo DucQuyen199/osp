@@ -10,6 +10,7 @@ export default function PrescriptionRegister({
   canVerify,
   canCancel,
   prescriptionLines,
+  dispensedDataAvailable,
   productName,
   onEdit,
   onTransition,
@@ -31,7 +32,7 @@ export default function PrescriptionRegister({
           <td>{rx.valid_until}</td>
           <td>{prescriptionLines(rx).map((item, index) => <div key={`${item.product}-${item.dosage}-${index}`}>
             {productName(item.product)} · {t('kê')} {item.qty} {item.unitName}
-            {item.balance && <span className="small muted"> · {t('tổng kê')} {fmtNumber(item.balance.prescribed)} {item.balance.unit} · {t('đã cấp')} {fmtNumber(item.balance.dispensed)} {item.balance.unit} · {t('còn')} {fmtNumber(item.balance.remaining)} {item.balance.unit}</span>}
+            {item.balance && <span className="small muted"> · {t('tổng kê')} {fmtNumber(item.balance.prescribed)} {item.balance.unit}{dispensedDataAvailable ? <> · {t('đã cấp')} {fmtNumber(item.balance.dispensed)} {item.balance.unit} · {t('còn')} {fmtNumber(item.balance.remaining)} {item.balance.unit}</> : <> · {t('Số lượng đã cấp chưa khả dụng do thiếu quyền đọc đơn POS hoặc dữ liệu chưa tải được.')}</>}</span>}
             <div className="small muted">{item.dosage}</div>
           </div>)}</td>
           <td>{statusLabel(rx.status)}{rx.dispensed_at && <div className="small muted">{fmtDateTime(rx.dispensed_at)}</div>}</td>
