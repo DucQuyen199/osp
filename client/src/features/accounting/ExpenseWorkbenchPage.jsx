@@ -3,6 +3,7 @@ import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
+import { addDecimals } from '../../lib/decimal.js';
 import { can, loadRefs, recordLabel, app, loadAllResponse } from '../../lib/state.js';
 import { listHref, recordHref } from '../../lib/routes.js';
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -44,7 +45,7 @@ export default function ExpenseWorkbenchPage() {
   useEffect(() => { load(); }, [load]);
   const selected = claims.find((row) => row.id === selectedId);
   const stats = useMemo(() => ({ draft: claims.filter((row) => ['draft', 'rejected'].includes(row.status)).length, pending: claims.filter((row) => row.status === 'submitted').length, approved: claims.filter((row) => row.status === 'approved').length, paid: claims.filter((row) => row.status === 'paid').length }), [claims]);
-  const total = lines.reduce((sum, line) => sum + (Number(line.amount) || 0), 0);
+  const total = addDecimals(lines.map((line) => line.amount || 0));
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); setNotice(success); await load(true); }

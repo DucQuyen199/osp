@@ -3,6 +3,7 @@ import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
+import { addDecimals } from '../../lib/decimal.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import constructionEnglish from './construction.en.js';
 const t = (text) => uiTextWith(text, constructionEnglish);
@@ -64,7 +65,7 @@ export default function ConstructionWorkbenchPage() {
   const projectBoqs = useMemo(() => boqs.filter((row) => row.project === projectId).sort((a, b) => Number(b.revision) - Number(a.revision)), [boqs, projectId]);
   const projectSites = useMemo(() => sites.filter((row) => !row.project || row.project === projectId), [sites, projectId]);
   const projectSubcontracts = useMemo(() => subcontracts.filter((row) => row.project === projectId), [subcontracts, projectId]);
-  const committedValue = projectSubcontracts.filter((row) => ['signed', 'completed'].includes(row.status)).reduce((sum, row) => sum + Number(row.value || 0), 0);
+  const committedValue = addDecimals(projectSubcontracts.filter((row) => ['signed', 'completed'].includes(row.status)).map((row) => row.value));
   const currentBoq = projectBoqs.find((row) => row.status === 'approved');
   const billBySubcontract = useMemo(() => new Map(bills.filter((row) => row.source === 'subcontract').map((row) => [row.source_id, row])), [bills]);
   const billByClaim = useMemo(() => new Map(bills.filter((row) => row.source === 'progress_claim').map((row) => [row.source_id, row])), [bills]);

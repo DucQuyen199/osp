@@ -4,6 +4,7 @@ import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
+import { addDecimals } from '../../lib/decimal.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import servicesEnglish from './professional-services.en.js';
 const t = (text) => uiTextWith(text, servicesEnglish);
@@ -49,10 +50,10 @@ export default function ProfessionalServicesWorkbenchPage() {
   const caseNotes = useMemo(() => notes.filter((row) => row.case === caseId).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))), [notes, caseId]);
   const invoiceByTime = useMemo(() => new Map(invoices.filter((row) => row.source === 'time_entry').map((row) => [row.source_id, row])), [invoices]);
   const recorded = caseEntries.filter((row) => row.status === 'recorded');
-  const wip = recorded.reduce((sum, row) => sum + Number(row.amount || 0), 0);
-  const billedAmount = caseEntries.filter((row) => row.status === 'billed').reduce((sum, row) => sum + Number(row.amount || 0), 0);
-  const allWip = timeEntries.filter((row) => row.status === 'recorded').reduce((sum, row) => sum + Number(row.amount || 0), 0);
-  const allBilled = timeEntries.filter((row) => row.status === 'billed').reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const wip = addDecimals(recorded.map((row) => row.amount));
+  const billedAmount = addDecimals(caseEntries.filter((row) => row.status === 'billed').map((row) => row.amount));
+  const allWip = addDecimals(timeEntries.filter((row) => row.status === 'recorded').map((row) => row.amount));
+  const allBilled = addDecimals(timeEntries.filter((row) => row.status === 'billed').map((row) => row.amount));
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); setNotice(t(success)); await load(true); }

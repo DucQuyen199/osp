@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
+import { addDecimals } from '../../lib/decimal.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import charityEnglish from './charity.en.js';
 const t = (text) => uiTextWith(text, charityEnglish);
@@ -56,10 +57,10 @@ export default function CharityWorkbenchPage() {
   const programBeneficiaries = useMemo(() => beneficiaries.filter((row) => row.program === programId), [beneficiaries, programId]);
   const programDonations = useMemo(() => donations.filter((row) => row.program === programId), [donations, programId]);
   const programDisbursements = useMemo(() => disbursements.filter((row) => row.program === programId), [disbursements, programId]);
-  const received = programDonations.filter((row) => row.status === 'received').reduce((sum, row) => sum + Number(row.amount || 0), 0);
-  const committed = programDisbursements.filter((row) => ['approved','paid'].includes(row.status)).reduce((sum, row) => sum + Number(row.amount || 0), 0);
-  const paid = programDisbursements.filter((row) => row.status === 'paid').reduce((sum, row) => sum + Number(row.amount || 0), 0);
-  const budget = Number(selectedProgram?.budget || 0);
+  const received = addDecimals(programDonations.filter((row) => row.status === 'received').map((row) => row.amount));
+  const committed = addDecimals(programDisbursements.filter((row) => ['approved','paid'].includes(row.status)).map((row) => row.amount));
+  const paid = addDecimals(programDisbursements.filter((row) => row.status === 'paid').map((row) => row.amount));
+  const budget = selectedProgram?.budget || 0;
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); setNotice(t(success)); await load(true); }

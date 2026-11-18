@@ -20,6 +20,7 @@
     "test": "cargo test --manifest-path server/Cargo.toml",
     "test:container": "node tools/verify-container.mjs",
     "test:backup-crypto": "node --test tools/backup-crypto.test.mjs",
+    "test:decimal": "node --test tools/decimal.test.mjs",
     "e2e": "npm run build && node tests/e2e/ui.mjs",
     "lint": "cargo run --manifest-path server/Cargo.toml --bin catalog -- lint",
     "lint:translations": "node tools/check-ui-translations.mjs",
