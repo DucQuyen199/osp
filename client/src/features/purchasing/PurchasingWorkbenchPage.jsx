@@ -30,6 +30,13 @@ import {
   selectReturnableInspections,
 } from './domain/purchasingSelectors.js';
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
+const createOrderDraftLine = (line = {}) => ({
+  rowId: crypto.randomUUID(), product: line.product || '', uom: line.uom || '',
+  qty: String(line.qty ?? '1'), price: String(line.price ?? ''), tax: line.tax || '',
+});
+const createRequisitionDraftLine = (line = {}) => ({
+  rowId: crypto.randomUUID(), product: line.product || '', uom: line.uom || '', qty: String(line.qty ?? '1'),
+});
 export default function PurchasingWorkbenchPage() {
   useDocumentTitle(`${uiText('Mua hàng và nhận hàng')} · OSP Suite`);
   const workflowApproval = app.meta?.modules?.some((module) => module.id === 'workflow-approval') || false;
@@ -37,9 +44,9 @@ export default function PurchasingWorkbenchPage() {
   const [selectedId, setSelectedId] = useState('');
   const [editingId, setEditingId] = useState('');
   const [orderForm, setOrderForm] = useState({ supplier: '', warehouse: '', expected_date: '' });
-  const [lines, setLines] = useState([{ product: '', qty: '1', price: '', tax: '' }]);
+  const [lines, setLines] = useState(() => [createOrderDraftLine()]);
   const [requisitionForm, setRequisitionForm] = useState({ supplier: '', sourcing_method: 'direct', warehouse: '', requested_by: '', reason: '' });
-  const [requisitionLines, setRequisitionLines] = useState([{ product: '', uom: '', qty: '1' }]);
+  const [requisitionLines, setRequisitionLines] = useState(() => [createRequisitionDraftLine()]);
   const [editingRequisitionId, setEditingRequisitionId] = useState('');
   const [receiptOrderId, setReceiptOrderId] = useState('');
   const [receiptLines, setReceiptLines] = useState([]);
@@ -131,7 +138,7 @@ export default function PurchasingWorkbenchPage() {
     };
     const existing = editingId;
     await run(existing ? `${existing}:save` : 'order:create', () => api(existing ? dataPath('purchasing.purchase_order', existing) : dataPath('purchasing.purchase_order'), { method: existing ? 'PATCH' : 'POST', body: payload }), uiText(existing ? 'Đã cập nhật đơn mua nháp.' : 'Đã tạo đơn mua nháp; tổng tiền và thuế được tính lại trên máy chủ.'));
-    setEditingId(''); setLines([{ product: [...products.keys()][0] || '', qty: '1', price: '', tax: '' }]);
+    setEditingId(''); setLines([createOrderDraftLine({ product: [...products.keys()][0] || '' })]);
     if (!existing) setOrderForm((current) => ({ ...current, expected_date: '' }));
   }
   async function saveRequisition(event) {
@@ -146,13 +153,13 @@ export default function PurchasingWorkbenchPage() {
     };
     const existing = editingRequisitionId;
     await run(existing ? `${existing}:requisition-save` : 'requisition:create', () => api(existing ? dataPath('purchasing.purchase_requisition', existing) : dataPath('purchasing.purchase_requisition'), { method: existing ? 'PATCH' : 'POST', body: payload }), uiText(existing ? 'Đã cập nhật đề nghị mua nháp.' : 'Đã tạo đề nghị mua nháp.'));
-    setEditingRequisitionId(''); setRequisitionLines([{ product: [...products.keys()][0] || '', uom: products.get([...products.keys()][0])?.uom || '', qty: '1' }]);
+    setEditingRequisitionId(''); setRequisitionLines([createRequisitionDraftLine({ product: [...products.keys()][0] || '', uom: products.get([...products.keys()][0])?.uom || '' })]);
     setRequisitionForm((current) => ({ ...current, requested_by: '', reason: '' }));
   }
   function editRequisition(row) {
     setEditingRequisitionId(row.id);
     setRequisitionForm({ supplier: row.supplier || '', sourcing_method: row.sourcing_method || 'direct', warehouse: row.warehouse || '', requested_by: row.requested_by || '', reason: row.reason || '' });
-    setRequisitionLines((row.lines || []).map((line) => ({ product: line.product || '', uom: line.uom || products.get(line.product)?.uom || '', qty: String(line.qty || 1) })));
+    setRequisitionLines((row.lines || []).map((line) => createRequisitionDraftLine({ product: line.product || '', uom: line.uom || products.get(line.product)?.uom || '', qty: String(line.qty || 1) })));
   }
   async function requisitionAction(row, verb) {
     const messages = { submitted: uiText('Đã gửi đề nghị mua đi duyệt.'), approved: uiText('Đã duyệt đề nghị; hệ thống tạo đơn mua nháp để bổ sung báo giá và trình duyệt riêng.'), rejected: uiText('Đề nghị mua đã bị từ chối.') };
@@ -161,7 +168,7 @@ export default function PurchasingWorkbenchPage() {
   function editOrder(row) {
     setEditingId(row.id); setSelectedId(row.id);
     setOrderForm({ supplier: row.supplier || '', warehouse: row.warehouse || '', expected_date: row.expected_date || '' });
-    setLines((row.lines || []).map((line) => ({ product: line.product || '', uom: line.uom || products.get(line.product)?.uom || '', qty: String(line.qty || 1), price: String(line.price ?? ''), tax: line.tax || '' })));
+    setLines((row.lines || []).map((line) => createOrderDraftLine({ product: line.product || '', uom: line.uom || products.get(line.product)?.uom || '', qty: String(line.qty || 1), price: String(line.price ?? ''), tax: line.tax || '' })));
   }
   async function submitOrder(row) {
     await run(`${row.id}:submitted`, () => action('purchasing.purchase_order', row, 'submitted'), uiText('Đã gửi đơn mua đi phê duyệt.'));
@@ -275,7 +282,7 @@ export default function PurchasingWorkbenchPage() {
     const messages = { submitted: uiText('Đã gửi phiếu trả nhà cung cấp để phê duyệt.'), approved: uiText('Đã duyệt phiếu trả nhà cung cấp.'), rejected: uiText('Đã từ chối phiếu trả.'), dispatched: uiText('Đã xuất hàng trả lại nhà cung cấp.'), cancelled: uiText('Đã hủy phiếu trả nhà cung cấp.') };
     await run(`${row.id}:${verb}`, () => action('purchasing.purchase_return', row, verb), messages[verb] || uiText('Đã cập nhật phiếu trả nhà cung cấp.'));
   }
-  const addLine = () => { const product = [...products.values()].find((row) => row.active !== false); setLines((current) => [...current, { product: product?.id || '', uom: product?.uom || '', qty: '1', price: '', tax: '' }]); };
+  const addLine = () => { const product = [...products.values()].find((row) => row.active !== false); setLines((current) => [...current, createOrderDraftLine({ product: product?.id || '', uom: product?.uom || '' })]); };
   const updateLine = (index, field, value) => setLines((current) => current.map((line, i) => i === index ? { ...line, [field]: value, ...(field === 'product' ? { uom: products.get(value)?.uom || '' } : {}) } : line));
   const updateRequisitionProduct = (index, product) => setRequisitionLines((current) => current.map((line, i) => i === index ? { ...line, product, uom: products.get(product)?.uom || '' } : line));
   const updateRequisitionLine = (index, field, value) => setRequisitionLines((current) => current.map((line, i) => i === index ? { ...line, [field]: value } : line));
@@ -300,11 +307,11 @@ export default function PurchasingWorkbenchPage() {
         busy={busy}
         onSubmit={saveRequisition}
         onFormChange={(field, value) => setRequisitionForm((current) => ({ ...current, [field]: value, ...(field === 'sourcing_method' && value === 'competitive' ? { supplier: '' } : {}) }))}
-        onAddLine={() => setRequisitionLines((current) => [...current, { product: [...products.keys()][0] || '', uom: products.get([...products.keys()][0])?.uom || '', qty: '1' }])}
+        onAddLine={() => setRequisitionLines((current) => [...current, createRequisitionDraftLine({ product: [...products.keys()][0] || '', uom: products.get([...products.keys()][0])?.uom || '' })])}
         onProductChange={updateRequisitionProduct}
         onLineChange={updateRequisitionLine}
         onRemoveLine={removeRequisitionLine}
-        onExitEdit={() => { setEditingRequisitionId(''); setRequisitionLines([{ product: [...products.keys()][0] || '', uom: products.get([...products.keys()][0])?.uom || '', qty: '1' }]); }}
+        onExitEdit={() => { setEditingRequisitionId(''); setRequisitionLines([createRequisitionDraftLine({ product: [...products.keys()][0] || '', uom: products.get([...products.keys()][0])?.uom || '' })]); }}
         label={recordLabel}
         t={uiText}
       />}
@@ -327,7 +334,7 @@ export default function PurchasingWorkbenchPage() {
       onAddLine={addLine}
       onLineChange={updateLine}
       onRemoveLine={(index) => setLines((current) => current.filter((_, i) => i !== index))}
-      onExitEdit={() => { setEditingId(''); setLines([{ product: [...products.keys()][0] || '', qty: '1', price: '', tax: '' }]); }}
+      onExitEdit={() => { setEditingId(''); setLines([createOrderDraftLine({ product: [...products.keys()][0] || '' })]); }}
       lineValue={lineValue}
       formatMoney={fmtMoney}
       label={recordLabel}

@@ -1,12 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
-import { api, dataPath, tenantPath } from '../../lib/api.js';
+import { api, dataPath } from '../../lib/api.js';
 import { fmtAgo, fmtDateTime, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
-import { can, loadRefs, recordLabel } from '../../lib/state.js';
+import { can, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import restaurantEnglish from './restaurant.en.js';
+import { RESTAURANT_KITCHEN_PAGE_SIZE, useRestaurantKitchenBoardData } from './hooks/useRestaurantKitchenBoardData.js';
 const t = (text) => uiTextWith(text, restaurantEnglish);
-const PAGE_SIZE = 50;
 const STATIONS = [
       ['all', 'Tất cả trạm'],
   ['kitchen', 'Bếp'],
@@ -15,41 +15,10 @@ const STATIONS = [
 export default function RestaurantKitchenBoardPage() {
   useDocumentTitle(`${t('Màn hình bếp')} · OSP Suite`);
   const [station, setStation] = useState('all');
-  const [items, setItems] = useState([]);
-  const [counts, setCounts] = useState({ queued: 0, preparing: 0, ready: 0 });
-  const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
-  const [products, setProducts] = useState(new Map());
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const { items, counts, total, hasMore, products, error, loading, lastUpdated, setError, load } = useRestaurantKitchenBoardData(station, offset);
   const [busy, setBusy] = useState('');
-  const [lastUpdated, setLastUpdated] = useState(null);
   const [printingTicketId, setPrintingTicketId] = useState('');
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) { setError(''); setLoading(true); }
-    try {
-      const params = new URLSearchParams({ station, limit: String(PAGE_SIZE), offset: String(offset) });
-      const [result, refs] = await Promise.all([
-        api(tenantPath(`/reports/restaurant/kitchen-board?${params}`)),
-        products.size ? Promise.resolve(products) : loadRefs('master-data.product'),
-      ]);
-      setItems(result.items || []);
-      setCounts(result.counts || { queued: 0, preparing: 0, ready: 0 });
-      setTotal(Number(result.itemCount || 0));
-      setHasMore(Boolean(result.hasMore));
-      setProducts(refs);
-      setLastUpdated(new Date().toISOString());
-    } catch (reason) {
-      setError(reason.message || t('Không tải được phiếu bếp.'));
-    } finally {
-      if (!quiet) setLoading(false);
-    }
-  }, [station, products, offset]);
-  useEffect(() => { load();
-    const timer = window.setInterval(() => load(true), 15000);
-    return () => window.clearInterval(timer);
-  }, [load]);
   const grouped = useMemo(() => ({
     queued: items.filter((item) => item.status === 'queued'),
     preparing: items.filter((item) => item.status === 'preparing'),
@@ -114,8 +83,8 @@ export default function RestaurantKitchenBoardPage() {
     <nav className="row wrap" aria-label={t('Phân trang phiếu bếp')}>
       <span className="small muted" aria-live="polite">{t('Đang hiển thị {from}–{to} trên {total} phiếu').replace('{from}', String(total ? offset + 1 : 0)).replace('{to}', String(Math.min(offset + items.length, total))).replace('{total}', String(total))}{loading ? ` · ${t('Đang tải…')}` : ''}</span>
       <span className="grow" />
-      <button className="btn btn-secondary btn-sm" type="button" disabled={loading || offset === 0} onClick={() => setOffset((current) => Math.max(0, current - PAGE_SIZE))}>{t('Trang trước')}</button>
-      <button className="btn btn-secondary btn-sm" type="button" disabled={loading || !hasMore} onClick={() => setOffset((current) => current + PAGE_SIZE)}>{t('Trang sau')}</button>
+      <button className="btn btn-secondary btn-sm" type="button" disabled={loading || offset === 0} onClick={() => setOffset((current) => Math.max(0, current - RESTAURANT_KITCHEN_PAGE_SIZE))}>{t('Trang trước')}</button>
+      <button className="btn btn-secondary btn-sm" type="button" disabled={loading || !hasMore} onClick={() => setOffset((current) => current + RESTAURANT_KITCHEN_PAGE_SIZE)}>{t('Trang sau')}</button>
     </nav>
     {total > 0 && <p className="small muted">{t('Order chỉ được chuyển sang phục vụ khi tất cả phiếu bếp và quầy pha chế đã sẵn sàng.')}</p>}
   </div>;

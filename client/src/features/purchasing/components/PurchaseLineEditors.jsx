@@ -4,7 +4,7 @@ import { fmtMoney, uiText } from '../../../lib/i18n.js';
 export function RequisitionLinesEditor({ lines, products, unitsFor, onProductChange, onChange, onRemove }) {
   const activeProducts = [...products.values()].filter((row) => row.active !== false);
 
-  return lines.map((line, index) => <div className="row wrap u-legacy-43a97fe494" key={index} >
+  return lines.map((line, index) => <div className="row wrap u-legacy-43a97fe494" key={line.rowId} >
     <select className="select" required aria-label={`${uiText('Sản phẩm đề nghị dòng')} ${index + 1}`} value={line.product} onChange={(event) => onProductChange(index, event.target.value)}>
       <option value="">{uiText('Chọn hàng hóa')}</option>
       {activeProducts.map((row) => <option key={row.id} value={row.id}>{row.name}{row.sku ? ` · ${row.sku}` : ''}</option>)}
@@ -22,7 +22,7 @@ export function RequisitionLinesEditor({ lines, products, unitsFor, onProductCha
 export function PurchaseOrderLinesEditor({ lines, products, unitsFor, taxes, taxById, onUpdate, onRemove, lineValue }) {
   const activeProducts = [...products.values()].filter((row) => row.active !== false);
 
-  return lines.map((line, index) => <div className="row wrap u-legacy-43a97fe494" key={index} >
+  return lines.map((line, index) => <div className="row wrap u-legacy-43a97fe494" key={line.rowId} >
     <select className="select" required aria-label={`${uiText('Sản phẩm đặt mua dòng')} ${index + 1}`} value={line.product} onChange={(event) => onUpdate(index, 'product', event.target.value)}>
       <option value="">{uiText('Chọn hàng')}</option>
       {activeProducts.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
