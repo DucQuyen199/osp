@@ -7,6 +7,7 @@ import { fmtDateTime, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadAllResponse } from '../../lib/state.js';
 import documentsEnglish from './documents.en.js';
 import DocumentListTable from './components/DocumentListTable.jsx';
+import DocumentDetailPanel from './components/DocumentDetailPanel.jsx';
 const t = (text) => uiTextWith(text, documentsEnglish);
 const emptyFolder = { name: '', parent: '' };
 const emptyDocument = { title: '', folder: '', tags: '', owner: '' };
@@ -152,12 +153,32 @@ export default function DocumentWorkbenchPage() {
     </div>}
     <section className="card card-pad"><div className="row wrap"><h2>{t('Kho tài liệu')}</h2><span className="grow"/><label className="field"><span className="label">{t('Thư mục')}</span><select className="select" value={folderFilter} onChange={(event) => setFolderFilter(event.target.value)}><option value="all">{t('Tất cả thư mục')}</option>{folderChoices}</select></label></div>
       {!can('document.document.read') ? <div className="empty">{t('Bạn chưa có quyền xem hồ sơ tài liệu.')}</div> : loading ? <div className="skeleton" data-h="row"/> : !visibleDocuments.length ? <div className="empty">{t('Chưa có tài liệu trong thư mục này.')}</div> : <div className="layout-split u-mt-10" ><DocumentListTable documents={visibleDocuments} selectedId={selectedId} onSelect={setSelectedId} folderName={folderName} fmtDateTime={fmtDateTime} t={t} />
-        {selected && <section className="card card-pad"><div className="row wrap"><div><h3>{selected.title}</h3><div className="small muted">{folderName(selected.folder)} · {t('Chủ sở hữu:')} {selected.owner || t('Chưa gán')} · v{selected.version || 1}</div></div><span className="grow"/><a className="btn btn-ghost btn-sm" href={`#/e/document/document/${selected.id}`}>{t('Chi tiết')}</a></div>{Array.isArray(selected.tags) && selected.tags.length > 0 && <div className="row wrap u-mt-8" >{selected.tags.map((tag) => <span className="chip neutral" key={tag}>{tag}</span>)}</div>}{selected.file_url && (internalFileUrl && currentAttachment ? <p className="u-mt-10"><button className="btn btn-secondary btn-sm" type="button" onClick={() => download(currentAttachment)}>{t('Tải phiên bản hiện tại')}</button></p> : !internalFileUrl ? <p className="u-mt-10"><a href={selected.file_url} target="_blank" rel="noreferrer">{t('Mở phiên bản hiện tại')}</a></p> : null)}
-          {can('document.document.update') && <form className="row wrap u-mt-10"  onSubmit={upload}><label className="field grow"><span className="label">{t('Tải lên tệp mới (tối đa 10 MB)')}</span><input className="input" type="file" required disabled={documentLocked} onChange={(event) => { const file = event.target.files?.[0] || null; setUploadFile(file); if (file && file.size > 10 * 1024 * 1024) setError(t('Tệp vượt quá giới hạn 10 MB.')); else setError(''); }}/></label><button className="btn btn-primary" disabled={Boolean(busy) || documentLocked || !uploadFile || uploadFile.size > 10 * 1024 * 1024}>{t('Lưu phiên bản mới')}</button></form>}{documentLocked && <p className="small muted">{t('Hồ sơ có yêu cầu ký đã hoàn tất; phiên bản đã được khóa để giữ nguyên bằng chứng ký.')}</p>}
-          <h3 className="u-mt-18">{t('Lịch sử phiên bản')}</h3>{!attachments.length ? <div className="empty">{t('Chưa có tệp đính kèm.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Phiên bản')}</th><th>{t('Tệp')}</th><th>{t('Kích thước / checksum')}</th><th/></tr></thead><tbody>{attachments.map((attachment) => <tr key={attachment.id}><td>v{attachment.documentVersion}{attachment.documentVersion === Number(selected.version || 1) && <span className="badge success u-ml-6" >{t('Hiện tại')}</span>}</td><td><strong>{attachment.fileName}</strong><div className="small muted">{fmtDateTime(attachment.createdAt)}</div></td><td>{bytesLabel(attachment.sizeBytes)}<div className="small muted" title={attachment.sha256}>{String(attachment.sha256).slice(0, 16)}…</div></td><td><button className="btn btn-secondary btn-sm" type="button" onClick={() => download(attachment)}>{t('Tải xuống')}</button></td></tr>)}</tbody></table></div>}
-          <div className="row wrap u-mt-18" ><h3>{t('Yêu cầu ký')}</h3><span className="grow"/><span className="badge plain">{selectedSignatures.length}</span></div>{selectedSignatures.length ? <div className="stack-sm u-mt-8" >{selectedSignatures.map((request) => { const signedAttachment = attachments.find((item) => item.documentVersion === Number(request.document_version)); return <article className="card card-pad" key={request.id}><div className="row wrap"><div><strong>{request.signer_name || request.signer_email}</strong><div className="small muted">{request.signer_email} · {t('yêu cầu v')}{request.document_version || '?'} · {t('· tạo ')}{fmtDateTime(request.createdAt)}</div>{signedAttachment && <button className="btn btn-ghost btn-sm u-mt-4" type="button"  onClick={() => download(signedAttachment)}>{t('Tải bản được yêu cầu ký')}</button>}</div><span className="grow"/><span className={`badge ${request.status === 'signed' ? 'success' : request.status === 'declined' ? 'danger' : 'warning'}`}>{t(statusLabel(request.status || 'pending'))}</span></div><div className="row wrap u-mt-8" >{request.status === 'pending' && can('document.signature_request.signed') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => signatureAction(request, 'signed')}>{t('Ghi nhận đã ký')}</button>}{request.status === 'pending' && can('document.signature_request.declined') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => signatureAction(request, 'declined')}>{t('Ghi nhận từ chối')}</button>}</div></article>; })}</div> : <div className="empty">{t('Chưa có yêu cầu ký cho tài liệu này.')}</div>}
-          {selected.file_url && can('document.signature_request.create') && <form className="form-grid u-mt-10"  onSubmit={createSignature}><label className="field"><span className="label">{t('Người ký')}</span><input className="input" maxLength="160" value={signatureForm.signer_name} onChange={(event) => setSignatureForm((form) => ({ ...form, signer_name: event.target.value }))}/></label><label className="field"><span className="label">{t('Email người ký *')}</span><input className="input" type="email" required maxLength="320" value={signatureForm.signer_email} onChange={(event) => setSignatureForm((form) => ({ ...form, signer_email: event.target.value }))}/></label><div className="row full"><span className="grow small muted">{t('Yêu cầu được lưu trong hồ sơ và theo dõi trạng thái ký.')}</span><button className="btn btn-secondary" disabled={Boolean(busy)}>{t('Tạo yêu cầu ký')}</button></div></form>}
-        </section>}
+        {selected && <DocumentDetailPanel
+          document={selected}
+          folderName={folderName}
+          currentAttachment={currentAttachment}
+          internalFileUrl={internalFileUrl}
+          attachments={attachments}
+          signatures={selectedSignatures}
+          documentLocked={documentLocked}
+          canUpdateDocument={can('document.document.update')}
+          canSign={can('document.signature_request.signed')}
+          canDecline={can('document.signature_request.declined')}
+          canCreateSignature={Boolean(selected.file_url) && can('document.signature_request.create')}
+          signatureForm={signatureForm}
+          uploadDisabled={Boolean(busy) || documentLocked || !uploadFile || uploadFile.size > 10 * 1024 * 1024}
+          busy={busy}
+          fmtDateTime={fmtDateTime}
+          statusLabel={statusLabel}
+          bytesLabel={bytesLabel}
+          onUpload={upload}
+          onUploadFileChange={(file) => { setUploadFile(file); if (file && file.size > 10 * 1024 * 1024) setError(t('Tệp vượt quá giới hạn 10 MB.')); else setError(''); }}
+          onDownload={download}
+          onSignatureFieldChange={(field, value) => setSignatureForm((form) => ({ ...form, [field]: value }))}
+          onCreateSignature={createSignature}
+          onSignatureAction={signatureAction}
+          t={t}
+        />}
       </div>}
     </section>
     {can('document.folder.read') && <section className="card card-pad"><div className="row wrap"><h2>{t('Thư mục')}</h2><span className="grow"/><span className="small muted">{folderFilter === 'all' ? t('Tất cả tài liệu') : folderName(folderFilter)}</span></div>{!folders.length ? <div className="empty">{t('Chưa có thư mục.')}</div> : <div className="stack-sm">{folders.map((folder) => { const depthClass = Math.min(depth(folder), 6); return <div className="row wrap u-list-row-divider" key={folder.id} ><span className={`document-folder-label depth-${depthClass}`}><strong>{folder.name}</strong>{folder.parent && <span className="small muted"> · {t('· trong ')}{folderName(folder.parent)}</span>}</span><span className="grow"/><button className="btn btn-ghost btn-sm" type="button" onClick={() => setFolderFilter(folder.id)}>{t('Mở')}</button>{can('document.folder.delete') && <button className="btn btn-ghost btn-sm" type="button" onClick={() => removeFolder(folder)}>{t('Xóa')}</button>}</div>; })}</div>}</section>}

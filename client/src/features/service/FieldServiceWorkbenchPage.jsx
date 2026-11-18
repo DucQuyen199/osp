@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
-import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDateTime as businessDateTime, localDateTimeToIso } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { can, recordLabel } from '../../lib/state.js';
 import { compareDecimals } from '../../lib/decimal.js';
 import fieldServiceEnglish from './field-service.en.js';
+import FieldServiceWorkOrderQueue from './components/FieldServiceWorkOrderQueue.jsx';
 import { fieldServiceLineTotal, fieldServiceStoredLineTotal, fieldServiceTotal } from './domain/fieldServiceTotals.js';
 import { useFieldServiceData } from './hooks/useFieldServiceData.js';
 const t = (text) => uiTextWith(text, fieldServiceEnglish);
@@ -114,6 +114,15 @@ export default function FieldServiceWorkbenchPage() {
     const employee = order?.technician_employee && employees.get(order.technician_employee);
     return employee ? recordLabel('hrm.employee', employee) : order?.technician || t('Chưa phân công');
   };
+  const orderRows = orders.map((order) => ({
+    id: order.id,
+    title: order.title,
+    customerLabel: parties.get(order.party) ? recordLabel('master-data.party', parties.get(order.party)) : t('Khách hàng'),
+    address: order.address,
+    scheduleLabel: order.scheduled_at ? fmtDateTime(order.scheduled_at) : t('Chưa xếp lịch'),
+    technicianLabel: assignedTechnician(order),
+    statusLabel: statusLabel(order.status),
+  }));
   return <div className="page">
     <div className="page-head"><div><h1>{t('Điều phối dịch vụ hiện trường')}</h1><p className="sub">{t('Tiếp nhận việc, chốt vật tư và giá theo danh mục, xếp lịch kỹ thuật viên, xuất kho và lập hóa đơn khi hoàn tất.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
@@ -135,7 +144,7 @@ export default function FieldServiceWorkbenchPage() {
     </form></section>}
     <div className="row wrap u-margin-18-0-10" ><h2>{t('Lệnh công việc')}</h2><span className="badge warning">{openCount} {t('đang xử lý')}</span></div>
     {loading ? <div className="skeleton" data-h="row" /> : !orders.length ? <div className="card card-pad empty">{t('Chưa có lệnh công việc.')}</div> : <div className="layout-split">
-      <section className="card card-pad"><div className="table-wrap"><table className="table"><thead><tr><th>{t('Công việc')}</th><th>{t('Lịch')}</th><th>{t('Kỹ thuật viên')}</th><th>{t('Trạng thái')}</th></tr></thead><tbody>{orders.map((order) => <tr {...selectableTableRowProps} key={order.id} aria-selected={selectedId === order.id} className={[selectedId === order.id ? 'selected' : '', 'u-pointer'].filter(Boolean).join(' ')} onClick={() => setSelectedId(order.id)} ><td><strong>{order.title}</strong><div className="small muted">{parties.get(order.party) ? recordLabel('master-data.party', parties.get(order.party)) : t('Khách hàng')}{order.address ? ` · ${order.address}` : ''}</div></td><td>{order.scheduled_at ? fmtDateTime(order.scheduled_at) : t('Chưa xếp lịch')}</td><td>{assignedTechnician(order)}</td><td>{statusLabel(order.status)}</td></tr>)}</tbody></table></div></section>
+      <FieldServiceWorkOrderQueue orders={orderRows} selectedId={selectedId} onSelect={setSelectedId} t={t} />
       {selected && <section className="card card-pad"><div className="row wrap"><div><h2>{selected.title}</h2><div className="small muted">{parties.get(selected.party) ? recordLabel('master-data.party', parties.get(selected.party)) : t('Khách hàng')} · {selected.address || t('Chưa có địa chỉ')}</div></div><span className="grow" /><span className="badge warning">{statusLabel(selected.status)}</span></div>
         {selectedTicket && <p className="small muted">{t('Ticket nguồn:')} {selectedTicket.subject || selectedTicket.id}</p>}
         {selected.status === 'open' && canManage ? <>
