@@ -4,11 +4,11 @@ import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { app, can, recordLabel } from '../../lib/state.js';
-import { recordHref } from '../../lib/routes.js';
 import hotelEnglish from './hotel.en.js';
 import ReservationCreateForm from './components/ReservationCreateForm.jsx';
 import ReservationDatesForm from './components/ReservationDatesForm.jsx';
 import ReservationListCards from './components/ReservationListCards.jsx';
+import SelectedReservationPanel from './components/SelectedReservationPanel.jsx';
 import { useHotelFrontDeskData } from './hooks/useHotelFrontDeskData.js';
 const t = (text) => uiTextWith(text, hotelEnglish);
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -183,22 +183,48 @@ export default function HotelFrontDeskPage() {
       <section className="hotel-reservation-detail">{selected ? <>
         {selected.status === 'booked' && can('hotel.reservation.update') && reservationEdit?.reservationId !== selected.id && <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => startReservationEdit(selected)}>{t('Chỉnh sửa đặt phòng')}</button>}
         {selected.status === 'booked' && can('hotel.reservation.update') && reservationEdit?.reservationId === selected.id && <ReservationDatesForm values={reservationEdit} capacity={roomTypes.get(selected.room_type)?.capacity} minCheckIn={today()} busy={busy === `${selected.id}:edit`} t={t} onChange={updateReservationEdit} onSubmit={saveReservationEdit} onCancel={() => setReservationEdit(null)} />}
-        <article className="card hotel-detail-card"><header className="hotel-detail-head"><div><h2>{recordLabel('master-data.party', parties.get(selected.party))}</h2><p className="small muted">{roomTypes.get(selected.room_type)?.name || t('Loại phòng')} · {selected.guest_count || 1} {t("khách")} · {selected.nights || '—'} {t("đêm")} · {fmtDate(selected.check_in)} {t("đến")} {fmtDate(selected.check_out)}</p></div><span className={`badge ${reservationStatus(selected.status)}`}>{statusLabel(selected.status)}</span></header>
-          <div className="hotel-folio-total"><span>{t("Phòng")} {selected.room ? rooms.get(selected.room)?.number || '' : t("chưa phân")} · {fmtMoney(selected.nightly_rate || 0)} / {t("đêm")}</span><strong>{fmtMoney(selected.total || 0)}</strong></div>
-          {selected.status === 'no_show' && selected.no_show_reason && <div className="alert warning" role="status">{t("Lý do khách vắng mặt:")} {selected.no_show_reason}</div>}
-          {selected.status === 'booked' && <div className="hotel-checkin-tools"><label className="field"><span className="label">{t('Phân phòng')}</span><select className="select" value={assignment} onChange={(event) => setAssignment(event.target.value)}><option value="">{availableRooms.length ? t('Chọn phòng không trùng lịch') : t('Không còn phòng theo lịch ngày này')}</option>{availableRooms.map((room) => <option key={room.id} value={room.id}>{room.number}{room.floor ? ` · ${t("Tầng")} ${room.floor}` : ''}{room.status !== 'vacant' ? ` · ${statusLabel(room.status)} ${t("hiện tại")}` : ''}</option>)}</select></label><button className="btn btn-secondary" type="button" disabled={Boolean(busy) || !assignment || assignment === selected.room || !can('hotel.reservation.update')} onClick={() => assignRoom(selected)}>{t('Lưu phòng')}</button></div>}
-          {selected.status === 'booked' && selected.check_in < today() && can('hotel.reservation.no_show') && can('hotel.reservation.update') && <div className="hotel-no-show-tools">{selectedCharges.length > 0 && <div className="alert warning" role="status">{t('Đặt phòng còn phí folio; cần xử lý folio trước khi ghi nhận khách vắng mặt.')}</div>}<label className="field"><span className="label">{t('Lý do khách vắng mặt *')}</span><textarea className="textarea" rows="2" maxLength="500" required value={noShowReason} onChange={(event) => setNoShowReasons((current) => ({ ...current, [selected.id]: event.target.value }))} placeholder={t("Ví dụ: khách không đến, không liên lạc được")} /></label>{selectedCharges.length === 0 && <button className="btn btn-secondary" type="button" disabled={Boolean(busy) || !noShowReason.trim()} onClick={() => transition(selected, 'no_show')}>{t('Ghi nhận khách vắng mặt')}</button>}</div>}
-          <footer className="row wrap hotel-detail-actions">{selected.status === 'booked' && can('hotel.reservation.checked_in') && <button className="btn btn-primary" type="button" disabled={Boolean(busy) || !selected.room} title={!selected.room ? t("Phân phòng trước khi nhận khách") : ''} onClick={() => transition(selected, 'checked_in')}>{t('Nhận phòng')}</button>}{selected.status === 'checked_in' && can('hotel.reservation.checked_out') && <button className="btn btn-primary" type="button" disabled={Boolean(busy)} onClick={() => transition(selected, 'checked_out')}>{t('Trả phòng · chốt folio')}</button>}{selected.status === 'booked' && can('hotel.reservation.cancelled') && <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => transition(selected, 'cancelled')}>{t('Hủy đặt phòng')}</button>}{selectedInvoice && can('accounting.invoice.read') && <a className="btn btn-secondary" href={recordHref('accounting.invoice', selectedInvoice.id)}>{t("Mở hóa đơn ·")} {statusLabel(selectedInvoice.status)}</a>}</footer>
-        </article>
-        {selected.status === 'checked_in' && can('hotel.reservation.update') && <form className="card hotel-detail-card" onSubmit={extendStay}>
-          <header className="hotel-detail-head"><div><h3>{t('Gia hạn lưu trú')}</h3><p className="small muted">{t('Chỉ kéo dài ngày trả. Khách, phòng và giá đã chốt được giữ nguyên.')}</p></div></header>
-          <label className="field"><span className="label">{t('Ngày trả mới')}</span><input className="input" type="date" min={nextDay(selected.check_out)} required value={extendedCheckout[selected.id] || ''} onChange={(event) => setExtendedCheckout((current) => ({ ...current, [selected.id]: event.target.value }))} /></label>
-          <div><button className="btn btn-primary" type="submit" disabled={Boolean(busy) || !extendedCheckout[selected.id] || extendedCheckout[selected.id] <= selected.check_out}>{busy === `${selected.id}:extend` ? t('Đang kiểm tra lịch phòng…') : t('Kiểm tra và gia hạn')}</button></div>
-        </form>}
-        <article className="card hotel-detail-card"><header className="hotel-detail-head"><div><h3>{t('Folio và phí phát sinh')}</h3><p className="small muted">{t('Các khoản ghi vào folio sẽ cộng vào hóa đơn khi trả phòng.')}</p></div><strong>{fmtMoney(selected.total || 0)}</strong></header>
-          {selectedCharges.length ? <div className="hotel-charge-list">{selectedCharges.map((charge) => <div className="hotel-charge-row" key={charge.id}><span>{charge.description}</span><strong>{fmtMoney(charge.amount)}</strong></div>)}</div> : <div className="small muted">{t('Chưa có phí phát sinh.')}</div>}
-          {['booked', 'checked_in'].includes(selected.status) && can('hotel.folio_charge.create') && <form className="hotel-charge-form" onSubmit={addCharge}><label className="field"><span className="label">{t('Mô tả khoản phí *')}</span><input className="input" required maxLength={500} value={chargeDescription} onChange={(event) => setChargeDescription(event.target.value)} placeholder={t("Ví dụ: minibar, giặt ủi")} /></label><label className="field"><span className="label">{t('Số tiền *')}</span><input className="input num" required type="number" min="0" step="any" value={chargeAmount} onChange={(event) => setChargeAmount(event.target.value)} /></label><button className="btn btn-secondary" type="submit" disabled={Boolean(busy)}>{busy === 'charge' ? t('Đang ghi…') : t('Ghi phí')}</button></form>}
-        </article>
+        <SelectedReservationPanel
+          reservation={selected}
+          guestLabel={recordLabel('master-data.party', parties.get(selected.party))}
+          roomTypeName={roomTypes.get(selected.room_type)?.name || t('Loại phòng')}
+          assignedRoomNumber={selected.room ? rooms.get(selected.room)?.number || '' : ''}
+          availableRooms={availableRooms}
+          assignment={assignment}
+          onAssignmentChange={setAssignment}
+          onAssignRoom={() => assignRoom(selected)}
+          canAssignRoom={can('hotel.reservation.update')}
+          showRoomAssignment={selected.status === 'booked'}
+          statusTone={reservationStatus(selected.status)}
+          statusLabel={statusLabel}
+          t={t}
+          fmtDate={fmtDate}
+          fmtMoney={fmtMoney}
+          noShowReason={noShowReason}
+          showNoShowTools={selected.status === 'booked' && selected.check_in < today() && can('hotel.reservation.no_show') && can('hotel.reservation.update')}
+          noShowHasCharges={selectedCharges.length > 0}
+          canRecordNoShow={selectedCharges.length === 0}
+          onNoShowReasonChange={(value) => setNoShowReasons((current) => ({ ...current, [selected.id]: value }))}
+          onNoShow={() => transition(selected, 'no_show')}
+          busy={busy}
+          canCheckIn={selected.status === 'booked' && can('hotel.reservation.checked_in')}
+          canCheckOut={selected.status === 'checked_in' && can('hotel.reservation.checked_out')}
+          canCancel={selected.status === 'booked' && can('hotel.reservation.cancelled')}
+          onTransition={(action) => transition(selected, action)}
+          invoice={selectedInvoice}
+          canOpenInvoice={can('accounting.invoice.read')}
+          selectedCharges={selectedCharges}
+          canAddCharge={['booked', 'checked_in'].includes(selected.status) && can('hotel.folio_charge.create')}
+          chargeDescription={chargeDescription}
+          chargeAmount={chargeAmount}
+          onChargeDescriptionChange={setChargeDescription}
+          onChargeAmountChange={setChargeAmount}
+          onAddCharge={addCharge}
+          extensionPanel={selected.status === 'checked_in' && can('hotel.reservation.update') && <form className="card hotel-detail-card" onSubmit={extendStay}>
+            <header className="hotel-detail-head"><div><h3>{t('Gia hạn lưu trú')}</h3><p className="small muted">{t('Chỉ kéo dài ngày trả. Khách, phòng và giá đã chốt được giữ nguyên.')}</p></div></header>
+            <label className="field"><span className="label">{t('Ngày trả mới')}</span><input className="input" type="date" min={nextDay(selected.check_out)} required value={extendedCheckout[selected.id] || ''} onChange={(event) => setExtendedCheckout((current) => ({ ...current, [selected.id]: event.target.value }))} /></label>
+            <div><button className="btn btn-primary" type="submit" disabled={Boolean(busy) || !extendedCheckout[selected.id] || extendedCheckout[selected.id] <= selected.check_out}>{busy === selected.id + ':extend' ? t('Đang kiểm tra lịch phòng…') : t('Kiểm tra và gia hạn')}</button></div>
+          </form>}
+        />
       </> : <div className="empty card-pad">{t('Chọn một đặt phòng để nhận/trả khách và xem folio.')}</div>}</section></div>
     </>}
   </div>;

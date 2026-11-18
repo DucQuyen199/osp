@@ -7,6 +7,7 @@ import { app, can, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import { addDecimals, compareDecimals, multiplyDecimals } from '../../lib/decimal.js';
 import QuotationComposer from './components/QuotationComposer.jsx';
+import QuotationRegister from './components/QuotationRegister.jsx';
 import { eligibleWholesaleReturnLines, estimateWholesaleSubtotal, remainingWholesaleShipmentLines, wholesalePrice } from './domain/wholesaleSelectors.js';
 import wholesaleEnglish from './wholesale.en.js';
 import { useWholesaleSalesData } from './hooks/useWholesaleSalesData.js';
@@ -140,6 +141,37 @@ export default function WholesaleSalesDeskPage() {
     } catch (reason) { setError(reason.message || t('Không cập nhật được quyết định phê duyệt.')); await load(true); }
     finally { setBusy(''); }
   };
+  const quotationCards = quotations.map((quote) => {
+    const order = orderForQuote(quote);
+    const isExpired = Boolean(expired(quote));
+    return {
+      id: quote.id,
+      customerName: recordLabel('master-data.party', parties.get(quote.party)),
+      meta: `${t('Báo giá')} ${String(quote.id).slice(0, 8)} · ${quote.valid_until ? `${t('hết hạn')} ${fmtDate(quote.valid_until)}` : t('không đặt ngày hết hạn')}`,
+      badgeClass: isExpired ? 'danger' : quote.status === 'accepted' ? 'success' : 'warning',
+      badgeText: isExpired && quote.status === 'sent' ? t('Quá hạn') : statusLabel(quote.status),
+      expired: isExpired,
+      lines: (quote.lines || []).map((line, index) => ({
+        key: `${line.product}:${index}`,
+        description: `${products.get(line.product)?.name || t('Mặt hàng')} × ${line.qty} ${line.uom_name || units.get(line.uom)?.name || ''}`,
+        total: fmtMoney(line.line_total ?? multiplyDecimals([line.qty || 0, line.price || 0])),
+      })),
+      total: fmtMoney(quote.total || 0),
+      href: recordHref('sales.quotation', quote.id),
+      order: order ? { href: recordHref('sales.sales_order', order.id), idShort: String(order.id).slice(0, 8) } : null,
+      actions: {
+        busy: Boolean(busy),
+        send: quote.status === 'draft' && can('sales.quotation.sent'),
+        accept: quote.status === 'sent' && !isExpired && can('sales.quotation.accepted'),
+        reject: quote.status === 'sent' && !isExpired && can('sales.quotation.rejected'),
+        expire: quote.status === 'sent' && isExpired && can('sales.quotation.expired'),
+        onSend: () => transition('sales.quotation', quote, 'sent'),
+        onAccept: () => transition('sales.quotation', quote, 'accepted'),
+        onReject: () => transition('sales.quotation', quote, 'rejected'),
+        onExpire: () => transition('sales.quotation', quote, 'expired'),
+      },
+    };
+  });
   return <div className="page wholesale-sales-page">
     <header className="page-head"><div><h1>{t('Bán hàng, báo giá và giao hàng')}</h1><p className="muted">{t('Lập báo giá theo khách hàng, chuyển báo giá được chấp nhận thành đơn, kiểm soát tín dụng và theo dõi giao hàng.')}</p></div><button className="btn" onClick={() => load()} disabled={loading}>{t('Làm mới')}</button></header>
     {error && <div className="alert error" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
@@ -155,23 +187,7 @@ export default function WholesaleSalesDeskPage() {
       onQuantityChange={setQuantity} onSubmit={createQuote} getUnitsFor={unitsFor} getPrice={getPrice}
       recordLabel={recordLabel} formatMoney={fmtMoney} t={t}
     />}
-    <section className="wholesale-section"><header><h2>{t('Báo giá')}</h2><span className="badge plain">{quotations.length}</span></header>
-      <div className="wholesale-documents">{quotations.map((quote) => {
-        const customer = parties.get(quote.party); const order = orderForQuote(quote);
-        return <article className="card wholesale-document" key={quote.id}>
-          <header><div><strong>{recordLabel('master-data.party', customer)}</strong><div className="small muted">{t('Báo giá')} {String(quote.id).slice(0, 8)} · {quote.valid_until ? `${t('hết hạn')} ${fmtDate(quote.valid_until)}` : t('không đặt ngày hết hạn')}</div></div><span className={`badge ${expired(quote) ? 'danger' : quote.status === 'accepted' ? 'success' : 'warning'}`}>{expired(quote) && quote.status === 'sent' ? t('Quá hạn') : statusLabel(quote.status)}</span></header>
-          <ul>{(quote.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{products.get(line.product)?.name || t('Mặt hàng')} × {line.qty} {line.uom_name || units.get(line.uom)?.name || ''}</span><strong className="num">{fmtMoney(line.line_total ?? multiplyDecimals([line.qty || 0, line.price || 0]))}</strong></li>)}</ul>
-          <div className="wholesale-total"><span>{t('Tổng gồm thuế')}</span><strong className="num">{fmtMoney(quote.total || 0)}</strong></div>
-          <footer>{quote.status === 'draft' && can('sales.quotation.sent') && <button className="btn" disabled={!!busy || expired(quote)} onClick={() => transition('sales.quotation', quote, 'sent')}>{t('Gửi báo giá')}</button>}
-            {quote.status === 'sent' && !expired(quote) && can('sales.quotation.accepted') && <button className="btn btn-primary" disabled={!!busy} onClick={() => transition('sales.quotation', quote, 'accepted')}>{t('Khách duyệt')}</button>}
-            {quote.status === 'sent' && !expired(quote) && can('sales.quotation.rejected') && <button className="btn" disabled={!!busy} onClick={() => transition('sales.quotation', quote, 'rejected')}>{t('Khách từ chối')}</button>}
-            {quote.status === 'sent' && expired(quote) && can('sales.quotation.expired') && <button className="btn" disabled={!!busy} onClick={() => transition('sales.quotation', quote, 'expired')}>{t('Đóng báo giá quá hạn')}</button>}
-            <a className="btn" href={recordHref('sales.quotation', quote.id)}>{t('Chi tiết báo giá')}</a>
-            {order && <a className="btn" href={recordHref('sales.sales_order', order.id)}>{t('Mở đơn bán')} {String(order.id).slice(0, 8)}</a>}
-          </footer>
-        </article>;
-      })}{!quotations.length && <div className="card-pad muted">{t('Chưa có báo giá.')}</div>}</div>
-    </section>
+    <QuotationRegister quotations={quotationCards} t={t} />
     <section className="wholesale-section"><header><h2>{t('Đơn bán và giao hàng')}</h2><a href="#/reports/logistics/delivery-board">{t('Mở bảng điều phối')}</a></header>
       <div className="wholesale-documents">{orders.map((order) => {
         const shipmentsForOrder = shipmentForOrder(order); const invoice = invoiceForOrder(order);

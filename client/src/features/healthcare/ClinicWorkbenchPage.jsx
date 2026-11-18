@@ -9,6 +9,7 @@ import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import clinicEnglish from './clinic.en.js';
 import EncounterPrescriptionsPanel from './components/EncounterPrescriptionsPanel.jsx';
 import PatientEncounterSummary from './components/PatientEncounterSummary.jsx';
+import EncounterLabResultsPanel from './components/EncounterLabResultsPanel.jsx';
 const t = (text) => uiTextWith(text, clinicEnglish);
 const newPrescriptionItem = () => ({ rowId: crypto.randomUUID(), product: '', qty: 1, dosage: '', uom: '' });
 export default function ClinicWorkbenchPage() {
@@ -231,8 +232,7 @@ export default function ClinicWorkbenchPage() {
           onRemoveItem={(index) => setRxItems((current) => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : current)}
           onSubmit={createPrescription} recordLabel={recordLabel} statusLabel={statusLabel} t={t}
         />
-        <article className="card clinic-record"><h3>{t("Xét nghiệm")}</h3>{encounterLabs.map((lab) => <div className="clinic-linked-record" key={lab.id}><div className="grow"><strong>{lab.test} · {statusLabel(lab.status)}</strong>{lab.status === 'ordered' ? <textarea className="textarea clinic-result" aria-label={`${t('Kết quả')}: ${lab.test}`} placeholder={t('Nhập kết quả xét nghiệm')} value={testResult[lab.id] ?? lab.result ?? ''} onChange={(event) => setTestResult((current) => ({ ...current, [lab.id]: event.target.value }))} /> : <div className="small muted">{lab.result}</div>}</div>{lab.status === 'ordered' && <button className="btn btn-primary btn-sm" type="button" disabled={busy || !can('clinic.lab_order.update') || !can('clinic.lab_order.resulted')} onClick={() => completeLab(lab)}>{t("Xác nhận kết quả")}</button>}</div>)}
-        </article>
+        <EncounterLabResultsPanel labs={encounterLabs} results={testResult} busy={busy} canUpdateResults={can('clinic.lab_order.update') && can('clinic.lab_order.resulted')} statusLabel={statusLabel} onResultChange={(labId, value) => setTestResult((current) => ({ ...current, [labId]: value }))} onCompleteLab={completeLab} t={t} />
       </> : <div className="empty card-pad">{t("Chọn lượt khám trong hàng đợi để xem hồ sơ và xử lý.")}</div>}</section></div>
       <section className="card clinic-lab-queue"><header className="clinic-section-head"><h2>{t("Chỉ định xét nghiệm đang chờ")}</h2><span className="badge plain">{labOrders.filter((lab) => lab.status === 'ordered').length}</span></header><form className="clinic-lab-form" onSubmit={createLabOrder}><label className="field"><span className="label">{t("Lượt khám đang mở")}</span><select className="select" required value={testEncounterId || (selected?.status === 'open' ? selected.id : '')} onChange={(event) => setTestEncounterId(event.target.value)}><option value="">{t("Chọn lượt khám")}</option>{openEncounters.map((item) => { const p = patients.find((record) => record.id === item.patient); return <option key={item.id} value={item.id}>{recordLabel('master-data.party', p && parties.get(p.party))} · {fmtDateTime(item.created_at)}</option>; })}</select></label><label className="field"><span className="label">{t("Xét nghiệm")}</span><input className="input" required value={testName} onChange={(event) => setTestName(event.target.value)} /></label><button className="btn btn-secondary" type="submit" disabled={busy || !can('clinic.lab_order.create')}>{t("Tạo chỉ định")}</button></form></section>
     </>}
