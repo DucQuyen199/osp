@@ -11,7 +11,8 @@ use std::{env, time::Duration};
 use uuid::Uuid;
 
 const BATCH_SIZE: i64 = 10;
-const LEASE_SECONDS: i64 = 180;
+const MAX_PROVIDER_TIMEOUT_SECONDS: i64 = 120;
+const LEASE_MARGIN_SECONDS: i64 = 60;
 const DEFAULT_PROVIDER_CONCURRENCY: usize = 2;
 const MAX_PROVIDER_CONCURRENCY: usize = 16;
 const MAX_AUTOMATIC_ATTEMPTS: i64 = 8;
@@ -62,7 +63,7 @@ pub async fn run_once_with_provider(kernel: &Kernel, provider: &dyn EInvoiceProv
         if tenant.suspended || !tenant.has_module("einvoice") {
             continue;
         }
-        let jobs = claim(kernel, &tenant, BATCH_SIZE).await?;
+        let jobs = claim(kernel, &tenant, BATCH_SIZE, lease_seconds(concurrency)).await?;
         processed += jobs.len();
         stream::iter(jobs)
             .for_each_concurrent(concurrency, |job| {
@@ -95,6 +96,11 @@ fn provider_concurrency() -> R<usize> {
                 ),
             )
         })
+}
+
+fn lease_seconds(concurrency: usize) -> i64 {
+    let waves = (BATCH_SIZE as usize).div_ceil(concurrency.max(1));
+    waves as i64 * MAX_PROVIDER_TIMEOUT_SECONDS + LEASE_MARGIN_SECONDS
 }
 
 fn configured_provider() -> R<Option<HttpEInvoiceProvider>> {
@@ -132,7 +138,7 @@ fn configured_provider() -> R<Option<HttpEInvoiceProvider>> {
     )?))
 }
 
-async fn claim(kernel: &Kernel, tenant: &Tenant, limit: i64) -> R<Vec<Job>> {
+async fn claim(kernel: &Kernel, tenant: &Tenant, limit: i64, lease_seconds: i64) -> R<Vec<Job>> {
     let mut conn = kernel.pool.get().await?;
     let tx = Tx::begin(&mut conn, &tenant.id, true).await?;
     let lease_token = Uuid::new_v4().to_string();
@@ -148,7 +154,7 @@ async fn claim(kernel: &Kernel, tenant: &Tenant, limit: i64) -> R<Vec<Job>> {
              SET attempts = COALESCE(e.attempts, 0) + 1, lease_until = now() + ($3::bigint * interval '1 second'), lease_token = $4, updated_at = now() \
              FROM ready WHERE e.tenant_id = $1 AND e.id = ready.id \
              RETURNING e.id, e.operation, e.request_payload, e.provider_reference, e.cancellation_reason, e.attempts::bigint",
-            &[&tenant.id, &limit, &LEASE_SECONDS, &lease_token],
+            &[&tenant.id, &limit, &lease_seconds, &lease_token],
         )
         .await?;
     tx.commit().await?;
