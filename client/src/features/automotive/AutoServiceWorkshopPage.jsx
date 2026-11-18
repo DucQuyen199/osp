@@ -5,6 +5,7 @@ import { fmtDateTime, fmtMoney, fmtNumber, statusLabel, uiTextWith } from '../..
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import autoServiceEnglish from './auto-service.en.js';
+import { repairQuoteLineTotal, storedRepairLineTotal } from './domain/repairQuoteTotals.js';
 import RepairQuoteEditor from './components/RepairQuoteEditor.jsx';
 const t = (text) => uiTextWith(text, autoServiceEnglish);
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -215,7 +216,7 @@ export default function AutoServiceWorkshopPage() {
         {draftLines.map((line, index) => { const product = products.get(line.product); return <div className="workshop-line" key={index}>
           <select className="select" required value={line.product} onChange={(event) => updateLine(index, 'product', event.target.value)}><option value="">{t('Chọn phụ tùng / dịch vụ')}</option>{productChoices.map((item) => <option key={item.id} value={item.id}>{item.name} · {fmtMoney(item.price || 0)}</option>)}</select>{unitsFor(line.product).length > 0 && <select className="select" aria-label={t('Unit')} value={line.uom || products.get(line.product)?.uom || ''} onChange={(event) => updateLine(index, 'uom', event.target.value)}>{unitsFor(line.product).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` (${unit.ratio} × ${t('base')})` : ` (${t('base')})`}</option>)}</select>}
           <input className="input" type="number" min="0.001" step="any" required aria-label={t('Số lượng')} value={line.qty} onChange={(event) => updateLine(index, 'qty', event.target.value)} />
-          <strong className="num">{fmtMoney((Number(product?.price) || 0) * unitRatio(line) * (Number(line.qty) || 0))}</strong>
+          <strong className="num">{fmtMoney(repairQuoteLineTotal(product?.price, unitRatio(line), line.qty))}</strong>
           <button type="button" className="btn btn-danger" aria-label={t('Xóa dòng')} onClick={() => setDraftLines((current) => current.filter((_, i) => i !== index))}>×</button>
         </div>; })}
       </div>
@@ -237,7 +238,7 @@ export default function AutoServiceWorkshopPage() {
         {selected.status === 'quote_declined' && selected.declined_reason && <div className="alert">{t('Khách từ chối báo giá:')} {selected.declined_reason}</div>}
         {selected.status === 'intake' && can('auto-service.repair_order.update') && quoteDraft?.repairOrderId !== selected.id && <button type="button" className="btn" disabled={Boolean(busy)} onClick={() => startQuoteEdit(selected)}>{t('Điều chỉnh báo giá')}</button>}
         {selected.status === 'intake' && can('auto-service.repair_order.update') && quoteDraft?.repairOrderId === selected.id && <RepairQuoteEditor draft={quoteDraft} products={products} productChoices={productChoices} warehouses={warehouses} unitsFor={unitsFor} unitRatio={unitRatio} fmtMoney={fmtMoney} t={t} busy={busy === `${selected.id}:quote`} onDraftChange={updateQuoteDraft} onLineChange={updateQuoteLine} onAddLine={addQuoteLine} onRemoveLine={removeQuoteLine} onSubmit={saveQuoteEdit} onCancel={() => setQuoteDraft(null)} />}
-        <h3>{t('Báo giá')}</h3><ul className="workshop-estimate">{(selected.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{line.product_name || products.get(line.product)?.name || t('Sản phẩm')} × {line.qty} {line.uom_name || units.get(line.uom)?.name || ''}</span><strong className="num">{fmtMoney((Number(line.qty) || 0) * (Number(line.price) || 0))}</strong></li>)}</ul>
+        <h3>{t('Báo giá')}</h3><ul className="workshop-estimate">{(selected.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{line.product_name || products.get(line.product)?.name || t('Sản phẩm')} × {line.qty} {line.uom_name || units.get(line.uom)?.name || ''}</span><strong className="num">{fmtMoney(storedRepairLineTotal(line))}</strong></li>)}</ul>
         <div className="workshop-total"><span>{t('Tổng cộng')}</span><strong className="num">{fmtMoney(selected.total || 0)}</strong></div>
         {selectedInvoice && <a className="btn" href={recordHref('accounting.invoice', selectedInvoice.id)}>{t('Mở hóa đơn')} {String(selectedInvoice.id).slice(0, 8)}</a>}
         <div className="workshop-actions">

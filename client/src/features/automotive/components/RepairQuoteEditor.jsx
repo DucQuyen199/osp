@@ -1,4 +1,5 @@
 import React from 'react';
+import { repairQuoteLineTotal } from '../domain/repairQuoteTotals.js';
 
 export default function RepairQuoteEditor({
   draft,
@@ -35,7 +36,7 @@ export default function RepairQuoteEditor({
           <select className="select" required value={line.product} aria-label={`${t('Phụ tùng / dịch vụ')} ${index + 1}`} onChange={(event) => onLineChange(index, 'product', event.target.value)}><option value="">{t('Chọn phụ tùng / dịch vụ')}</option>{productChoices.map((item) => <option key={item.id} value={item.id}>{item.name} · {fmtMoney(item.price || 0)}</option>)}</select>
           {unitsFor(line.product).length > 0 && <select className="select" aria-label={`${t('Đơn vị tính')} ${index + 1}`} value={line.uom || products.get(line.product)?.uom || ''} onChange={(event) => onLineChange(index, 'uom', event.target.value)}>{unitsFor(line.product).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` (${unit.ratio} × ${t('base')})` : ` (${t('base')})`}</option>)}</select>}
           <input className="input" type="number" min="0.001" step="any" required aria-label={`${t('Số lượng')} ${index + 1}`} value={line.qty} onChange={(event) => onLineChange(index, 'qty', event.target.value)} />
-          <strong className="num">{fmtMoney((Number(product?.price) || 0) * unitRatio(line) * (Number(line.qty) || 0))}</strong>
+          <strong className="num">{fmtMoney(repairQuoteLineTotal(product?.price, unitRatio(line), line.qty))}</strong>
           <button type="button" className="btn btn-danger" aria-label={`${t('Xóa dòng')} ${index + 1}`} disabled={draft.lines.length === 1} onClick={() => onRemoveLine(index)}>×</button>
         </div>;
       })}
