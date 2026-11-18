@@ -4,6 +4,8 @@ import { uiText } from '../../../lib/i18n.js';
 export default function StockCountLinesEditor({
   lines,
   matchingProducts,
+  totalProductMatches,
+  onShowMoreProducts,
   products,
   units,
   lots,
@@ -26,6 +28,10 @@ export default function StockCountLinesEditor({
         placeholder={uiText('Tìm SKU hoặc sản phẩm')} aria-label={uiText('Tìm sản phẩm')} />
       <button className="btn btn-secondary btn-sm" type="button" onClick={onAddLine}>{uiText('Thêm dòng')}</button>
     </div>
+    {totalProductMatches > matchingProducts.length && <div className="row wrap small muted" role="status">
+      <span>{uiText('Đang hiển thị {shown} / {total} sản phẩm phù hợp.').replace('{shown}', String(matchingProducts.length)).replace('{total}', String(totalProductMatches))}</span>
+      <button className="btn btn-ghost btn-sm" type="button" onClick={onShowMoreProducts}>{uiText('Tải thêm sản phẩm')}</button>
+    </div>}
     <div className="table-wrap"><table className="table">
       <thead><tr><th>{uiText('Sản phẩm')}</th><th>{uiText('Lô')}</th><th>{uiText('Vị trí')}</th><th>{uiText('Số lượng thực tế (đơn vị gốc)')}</th><th scope="col">{uiText('Thao tác')}</th></tr></thead>
       <tbody>{lines.map((line, index) => {

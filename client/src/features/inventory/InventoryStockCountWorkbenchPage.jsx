@@ -40,6 +40,7 @@ export default function InventoryStockCountWorkbenchPage() {
   const [note, setNote] = useState('');
   const [lines, setLines] = useState([blankLine()]);
   const [productSearch, setProductSearch] = useState('');
+  const [productSuggestionLimit, setProductSuggestionLimit] = useState(100);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -73,19 +74,20 @@ export default function InventoryStockCountWorkbenchPage() {
     const product = products.get(productId);
     return units.get(product?.uom)?.name || (product?.uom ? uiText('đơn vị gốc') : uiText('chưa đặt đơn vị'));
   };
-  const matchingProducts = useMemo(() => productRows.filter((row) => {
+  const matchingProductRows = useMemo(() => productRows.filter((row) => {
     const search = productSearch.trim().toLocaleLowerCase();
     return !search || `${row.sku || ''} ${row.name || ''}`.toLocaleLowerCase().includes(search);
-  }).slice(0, 100), [productRows, productSearch]);
+  }), [productRows, productSearch]);
+  const matchingProducts = useMemo(() => matchingProductRows.slice(0, productSuggestionLimit), [matchingProductRows, productSuggestionLimit]);
   const approvalFor = (row) => approvalRequests.find((request) => request.entity === 'inventory.stock_count' && request.record_id === row.id);
 
   function startNew() {
-    setSelectedId(''); setWarehouse(''); setReason('cycle_count'); setNote(''); setLines([blankLine()]); setProductSearch(''); setError(''); setNotice('');
+    setSelectedId(''); setWarehouse(''); setReason('cycle_count'); setNote(''); setLines([blankLine()]); setProductSearch(''); setProductSuggestionLimit(100); setError(''); setNotice('');
   }
   function openCount(row) {
     setSelectedId(row.id); setWarehouse(row.warehouse || ''); setReason(row.reason || 'cycle_count'); setNote(row.note || '');
     setLines((row.adjustment_lines || []).map((line) => ({ rowId: crypto.randomUUID(), product: line.product || '', lot: line.lot || '', location: line.location || '', counted_qty: line.counted_qty == null ? '' : String(line.counted_qty), expected_qty: line.expected_qty, variance_qty: line.variance_qty })));
-    setProductSearch(''); setError(''); setNotice('');
+    setProductSearch(''); setProductSuggestionLimit(100); setError(''); setNotice('');
   }
   function updateLine(rowId, field, value) {
     setLines((current) => current.map((line) => line.rowId === rowId ? { ...line, [field]: value, ...(field === 'product' ? { lot: '' } : {}) } : line));
@@ -157,7 +159,7 @@ export default function InventoryStockCountWorkbenchPage() {
             <label className="field"><span className="label">{uiText('Loại kiểm kê')} *</span><select className="select" value={reason} onChange={(e) => setReason(e.target.value)}><option value="cycle_count">{uiText('Kiểm kê định kỳ')}</option><option value="correction">{uiText('Điều chỉnh sai lệch')}</option><option value="damage">{uiText('Hư hỏng / mất mát')}</option><option value="opening_balance">{uiText('Số dư đầu kỳ')}</option></select></label>
             <label className="field full"><span className="label">{uiText('Ghi chú')}</span><input className="input" maxLength="500" value={note} onChange={(e) => setNote(e.target.value)} placeholder={uiText('Phạm vi, khu vực hoặc lý do kiểm kê')}/></label>
           </div>
-          <StockCountLinesEditor lines={lines} matchingProducts={matchingProducts} products={products} units={units} lots={lots} locations={locations} warehouse={warehouse} productSearch={productSearch} onProductSearchChange={setProductSearch} onAddLine={addLine} onUpdateLine={updateLine} onRemoveLine={removeLine} unitForProduct={unitForProduct} />
+          <StockCountLinesEditor lines={lines} matchingProducts={matchingProducts} totalProductMatches={matchingProductRows.length} onShowMoreProducts={() => setProductSuggestionLimit((limit) => limit + 100)} products={products} units={units} lots={lots} locations={locations} warehouse={warehouse} productSearch={productSearch} onProductSearchChange={(value) => { setProductSearch(value); setProductSuggestionLimit(100); }} onAddLine={addLine} onUpdateLine={updateLine} onRemoveLine={removeLine} unitForProduct={unitForProduct} />
           <div className="row wrap u-legacy-0ee7f66ad9" ><span className="small muted">{uiText('Số tồn sổ được giữ kín trong lúc đếm để giảm sai lệch do thiên kiến. Backend sẽ chụp tồn kho và tính chênh lệch khi gửi duyệt.')}</span><span className="grow"/><button className="btn btn-secondary" type="submit" disabled={Boolean(busy) || !can('inventory.stock_count.create') || (selected && !can('inventory.stock_count.update'))}>{uiText('Lưu nháp')}</button><button className="btn btn-primary" type="button" disabled={Boolean(busy) || !can('inventory.stock_count.submitted') || (selected && !can('inventory.stock_count.update'))} onClick={saveAndSubmit}>{busy === 'submit' ? uiText('Đang chốt số đếm…') : uiText('Lưu và gửi duyệt')}</button></div>
         </form>}
 
