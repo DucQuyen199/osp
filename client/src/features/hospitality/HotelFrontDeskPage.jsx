@@ -1,13 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
-import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { app, can, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import hotelEnglish from './hotel.en.js';
 import ReservationCreateForm from './components/ReservationCreateForm.jsx';
 import ReservationDatesForm from './components/ReservationDatesForm.jsx';
+import { useHotelFrontDeskData } from './hooks/useHotelFrontDeskData.js';
 const t = (text) => uiTextWith(text, hotelEnglish);
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const today = localDate;
@@ -20,12 +21,8 @@ const nextDay = (value) => {
 };
 export default function HotelFrontDeskPage() {
   useDocumentTitle(`${t('Lễ tân khách sạn')} · OSP Suite`);
-  const [reservations, setReservations] = useState([]);
-  const [parties, setParties] = useState(new Map());
-  const [rooms, setRooms] = useState(new Map());
-  const [roomTypes, setRoomTypes] = useState(new Map());
-  const [charges, setCharges] = useState([]);
-  const [invoices, setInvoices] = useState([]);
+  const accountingEnabled = app.meta?.modules?.some((module) => module.id === 'accounting') || false;
+  const { reservations, parties, rooms, roomTypes, charges, invoices, loading, error, setError, load: loadData } = useHotelFrontDeskData(accountingEnabled);
   const [selectedId, setSelectedId] = useState('');
   const [noShowReasons, setNoShowReasons] = useState({});
   const [filter, setFilter] = useState('all');
@@ -40,29 +37,14 @@ export default function HotelFrontDeskPage() {
   const [extendedCheckout, setExtendedCheckout] = useState({});
   const [reservationEdit, setReservationEdit] = useState(null);
   const [busy, setBusy] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const load = useCallback(async (preserveNotice = false) => {
-    setLoading(true); setError(''); if (!preserveNotice) setNotice('');
-    try {
-      const accountingEnabled = app.meta?.modules?.some((module) => module.id === 'accounting') && can('accounting.invoice.read');
-      const [reservationResponse, partyMap, roomMap, roomTypeMap, chargeResponse, invoiceResponse] = await Promise.all([
-        can('hotel.reservation.read') ? loadAllResponse('hotel.reservation') : Promise.resolve({ items: [] }),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('hotel.room.read') ? loadRefs('hotel.room') : Promise.resolve(new Map()),
-        can('hotel.room_type.read') ? loadRefs('hotel.room_type') : Promise.resolve(new Map()),
-        can('hotel.folio_charge.read') ? loadAllResponse('hotel.folio_charge') : Promise.resolve({ items: [] }),
-        accountingEnabled ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
-      ]);
-      const next = itemsOf(reservationResponse).sort((a, b) => String(a.check_in || '').localeCompare(String(b.check_in || '')) || String(a.created_at || '').localeCompare(String(b.created_at || '')));
-      setReservations(next); setParties(partyMap); setRooms(roomMap); setRoomTypes(roomTypeMap);
-      setCharges(itemsOf(chargeResponse)); setInvoices(itemsOf(invoiceResponse));
-      setSelectedId((current) => next.some((item) => item.id === current) ? current : next.find((item) => item.check_in === today() && ['booked', 'checked_in'].includes(item.status))?.id || next[0]?.id || '');
-    } catch (reason) { setError(t(reason.message || 'Không tải được dữ liệu lễ tân.')); }
-    finally { setLoading(false); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
+  const load = async (preserveNotice = false) => {
+    if (!preserveNotice) setNotice('');
+    await loadData();
+  };
+  useEffect(() => {
+    setSelectedId((current) => reservations.some((item) => item.id === current) ? current : reservations.find((item) => item.check_in === today() && ['booked', 'checked_in'].includes(item.status))?.id || reservations[0]?.id || '');
+  }, [reservations]);
   const selected = reservations.find((item) => item.id === selectedId) || null;
   const noShowReason = selected ? noShowReasons[selected.id] ?? selected.no_show_reason ?? '' : '';
   const selectedCharges = useMemo(() => charges.filter((item) => item.reservation === selectedId), [charges, selectedId]);
