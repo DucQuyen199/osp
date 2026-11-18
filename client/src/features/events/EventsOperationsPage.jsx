@@ -1,20 +1,18 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDateTime, localDateTimeToIso } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
-import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { can, recordLabel } from '../../lib/state.js';
 import eventsEnglish from './events.en.js';
+import { useEventsOperationsData } from './hooks/useEventsOperationsData.js';
 const t = (text) => uiTextWith(text, eventsEnglish);
 const inMinutes = (minutes) => localDateTime(new Date(Date.now() + minutes * 60000));
 const paymentMethods = [['cash', 'Tiền mặt'], ['card', 'Thẻ'], ['transfer', 'Chuyển khoản'], ['ewallet', 'Ví điện tử'], ['bank', 'Ngân hàng']];
 const price = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 2 });
 export default function EventsOperationsPage() {
   useDocumentTitle(`${t('Quản lý sự kiện và quầy vé')} · OSP Suite`);
-  const [events, setEvents] = useState([]);
-  const [tickets, setTickets] = useState([]);
-  const [parties, setParties] = useState(new Map());
-  const [taxes, setTaxes] = useState(new Map());
+  const { events, tickets, parties, taxes, loading, error, setError, load } = useEventsOperationsData();
   const [selectedEventId, setSelectedEventId] = useState('');
   const [scanCode, setScanCode] = useState('');
   const [ticketMethods, setTicketMethods] = useState({});
@@ -22,29 +20,10 @@ export default function EventsOperationsPage() {
   const [eventForm, setEventForm] = useState({ name: '', venue: '', starts_at: inMinutes(60 * 24), capacity: '100', reservation_minutes: '15', ticket_price: '', ticket_tax: '' });
   const [ticketForm, setTicketForm] = useState({ party: '' });
   const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [clockNow, setClockNow] = useState(() => Date.now());
-  const load = useCallback(async () => {
-    setLoading(true); setError('');
-    try {
-      const [eventRes, ticketRes, partyMap, taxMap] = await Promise.all([
-        can('events.event.read') ? loadAllResponse('events.event') : Promise.resolve({ items: [] }),
-        can('events.ticket.read') ? loadAllResponse('events.ticket') : Promise.resolve({ items: [] }),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('master-data.tax.read') ? loadRefs('master-data.tax') : Promise.resolve(new Map()),
-      ]);
-      const eventItems = eventRes.items || [];
-      setEvents(eventItems.sort((a, b) => String(a.starts_at || '').localeCompare(String(b.starts_at || ''))));
-      setTickets((ticketRes.items || []).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))));
-      setParties(partyMap); setTaxes(taxMap);
-      setSelectedEventId((current) => current && eventItems.some((item) => item.id === current) ? current : eventItems.find((item) => item.status === 'published')?.id || eventItems[0]?.id || '');
-      setTicketForm((current) => ({ ...current, party: current.party || [...partyMap.keys()][0] || '' }));
-    } catch (reason) { setError(t(reason.message || 'Không tải được danh sách sự kiện và vé.')); }
-    finally { setLoading(false); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { setSelectedEventId((current) => current && events.some((item) => item.id === current) ? current : events.find((item) => item.status === 'published')?.id || events[0]?.id || ''); }, [events]);
+  useEffect(() => { setTicketForm((current) => ({ ...current, party: current.party || [...parties.keys()][0] || '' })); }, [parties]);
   useEffect(() => {
     const timer = window.setInterval(() => setClockNow(Date.now()), 30000);
     return () => window.clearInterval(timer);
