@@ -110,7 +110,7 @@ export default function FinanceOperationsPage() {
   async function createClaim(event) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
-      await api(dataPath('insurance.claim'), { method: 'POST', body: { ...claimForm, amount: Number(claimForm.amount), status: 'submitted' } });
+      await api(dataPath('insurance.claim'), { method: 'POST', body: { ...claimForm, amount: String(claimForm.amount), status: 'submitted' } });
       setClaimForm((x) => ({ ...x, number: '', amount: '', description: '' })); setNotice(uiText("Đã tiếp nhận hồ sơ bồi thường để thẩm định.")); await load();
     } catch (reason) { setError(reason.message || uiText("Không thể tiếp nhận hồ sơ bồi thường.")); }
     finally { setBusy(false); }

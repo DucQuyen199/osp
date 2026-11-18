@@ -70,7 +70,7 @@ export default function RealEstateWorkbenchPage() {
   }
   async function createProperty(event) {
     event.preventDefault();
-    await run('property', () => api(dataPath('real-estate.property'), { method: 'POST', body: { ...propertyForm, area: propertyForm.area ? Number(propertyForm.area) : undefined, price: propertyForm.price ? Number(propertyForm.price) : undefined } }), 'Đã thêm bất động sản vào giỏ hàng.');
+    await run('property', () => api(dataPath('real-estate.property'), { method: 'POST', body: { ...propertyForm, area: propertyForm.area ? Number(propertyForm.area) : undefined, price: propertyForm.price ? String(propertyForm.price) : undefined } }), 'Đã thêm bất động sản vào giỏ hàng.');
     setPropertyForm({ title: '', kind: 'apartment', address: '', area: '', price: '' });
   }
   async function createViewing(event) {
@@ -83,7 +83,7 @@ export default function RealEstateWorkbenchPage() {
   async function createReservation(event) {
     event.preventDefault();
     await run('reservation', async () => {
-      const row = await api(dataPath('real-estate.reservation'), { method: 'POST', body: { ...reservationForm, property: selectedProperty, agreed_price: Number(reservationForm.agreed_price), status: 'draft' } });
+      const row = await api(dataPath('real-estate.reservation'), { method: 'POST', body: { ...reservationForm, property: selectedProperty, agreed_price: String(reservationForm.agreed_price), status: 'draft' } });
       await action('real-estate.reservation', row, 'reserved');
     }, 'Đã xác nhận giữ chỗ; bất động sản đã chuyển trạng thái giữ chỗ.');
     setReservationForm((current) => ({ ...current, number: '', agreed_price: '', notes: '' }));

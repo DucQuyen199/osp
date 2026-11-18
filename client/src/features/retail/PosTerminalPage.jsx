@@ -267,7 +267,7 @@ export default function PosTerminalPage() {
     setBusy(true); setError(''); setNotice('');
     try {
       const movement = await api(dataPath('pos.cash_movement'), { method: 'POST', body: {
-        session: activeSession.id, direction: cashDirection, amount: Number(cashAmount),
+        session: activeSession.id, direction: cashDirection, amount: String(cashAmount),
         offset_account: cashAccount, reason: cashReason.trim(),
       } });
       await api(dataPath('pos.cash_movement', movement.id, 'posted'), { method: 'POST' });

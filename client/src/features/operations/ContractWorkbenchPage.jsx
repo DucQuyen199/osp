@@ -78,7 +78,7 @@ export default function ContractWorkbenchPage() {
         title: contractForm.title.trim(), party: contractForm.party,
         ...(contractForm.start_date ? { start_date: contractForm.start_date } : {}),
         ...(contractForm.end_date ? { end_date: contractForm.end_date } : {}),
-        ...(contractForm.value !== '' ? { value: Number(contractForm.value) } : {}),
+        ...(contractForm.value !== '' ? { value: String(contractForm.value) } : {}),
         ...(contractForm.terms.trim() ? { terms: contractForm.terms.trim() } : {}),
       };
       const created = await api(dataPath('contract.contract'), { method: 'POST', body });

@@ -71,7 +71,7 @@ export default function EducationWorkbenchPage() {
     try {
       const body = {
         student: selectedFeeEnrollment?.student || feeForm.student,
-        ...(feeForm.enrollment ? { enrollment: feeForm.enrollment, period: feeForm.period.trim() } : { amount: Number(feeForm.amount) }),
+        ...(feeForm.enrollment ? { enrollment: feeForm.enrollment, period: feeForm.period.trim() } : { amount: String(feeForm.amount) }),
         ...(feeForm.due_date ? { due_date: feeForm.due_date } : {}),
         ...(feeForm.note.trim() ? { note: feeForm.note.trim() } : {}),
       };

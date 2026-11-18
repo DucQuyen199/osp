@@ -53,7 +53,7 @@ export default function AssetWorkbenchPage() {
     event.preventDefault();
     if (compareDecimals(form.salvage_value || 0, form.cost || 0) > 0) { setError(uiText('Giá trị thu hồi không thể lớn hơn nguyên giá.')); return; }
     if (form.acquisition_method === 'opening_balance' && compareDecimals(form.opening_accumulated_depreciation || 0, subtractDecimals(form.cost || 0, form.salvage_value || 0)) > 0) { setError(uiText('Hao mòn lũy kế đầu kỳ không thể vượt quá nguyên giá sau khi trừ giá trị thu hồi.')); return; }
-    const payload = { name: form.name.trim(), code: form.code.trim(), in_service_date: form.in_service_date, cost: Number(form.cost), salvage_value: Number(form.salvage_value || 0), useful_life_months: Number(form.useful_life_months), depreciation_method: form.depreciation_method, acquisition_method: form.acquisition_method, location: form.location.trim() || undefined, category: form.category.trim() || undefined };
+    const payload = { name: form.name.trim(), code: form.code.trim(), in_service_date: form.in_service_date, cost: String(form.cost), salvage_value: String(form.salvage_value || 0), useful_life_months: Number(form.useful_life_months), depreciation_method: form.depreciation_method, acquisition_method: form.acquisition_method, location: form.location.trim() || undefined, category: form.category.trim() || undefined };
     if (form.purchase_date) payload.purchase_date = form.purchase_date;
     if (form.depreciation_method === 'declining_balance') payload.declining_balance_factor = Number(form.declining_balance_factor || 2);
     if (form.acquisition_method === 'opening_balance') payload.opening_accumulated_depreciation = Number(form.opening_accumulated_depreciation || 0);

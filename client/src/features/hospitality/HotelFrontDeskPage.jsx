@@ -123,7 +123,7 @@ export default function HotelFrontDeskPage() {
     event.preventDefault(); if (!selected) return;
     setBusy('charge'); setError(''); setNotice('');
     try {
-      await api(dataPath('hotel.folio_charge'), { method: 'POST', body: { reservation: selected.id, description: chargeDescription.trim(), amount: Number(chargeAmount) } });
+      await api(dataPath('hotel.folio_charge'), { method: 'POST', body: { reservation: selected.id, description: chargeDescription.trim(), amount: String(chargeAmount) } });
       setChargeDescription(''); setChargeAmount(''); await load(true); setNotice(t('Đã ghi phí phát sinh vào folio.'));
     } catch (reason) { setError(t(reason.message || 'Không ghi được khoản phí. Chỉ thêm phí trước khi trả phòng.')); }
     finally { setBusy(''); }

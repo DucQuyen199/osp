@@ -246,7 +246,7 @@ export default function PurchasingWorkbenchPage() {
       purchase_order: selected.id, inspection: returnInspection.id,
       warehouse: returnInspection.warehouse || selected.warehouse,
       reason: returnForm.reason.trim(),
-      lines: [{ product: returnInspection.product, uom: sourceLine?.uom || undefined, qty, price: Number(invoiceLine?.price ?? sourceLine?.price ?? returnInspection.unit_cost ?? 0), tax: invoiceLine?.tax ?? sourceLine?.tax ?? null, tax_rate: Number(invoiceLine?.tax_rate ?? sourceLine?.tax_rate ?? 0), po_tax: sourceLine?.tax ?? null, po_tax_rate: Number(sourceLine?.tax_rate || 0), lot: returnInspection.lot || undefined }],
+      lines: [{ product: returnInspection.product, uom: sourceLine?.uom || undefined, qty, price: String(invoiceLine?.price ?? sourceLine?.price ?? returnInspection.unit_cost ?? 0), tax: invoiceLine?.tax ?? sourceLine?.tax ?? null, tax_rate: String(invoiceLine?.tax_rate ?? sourceLine?.tax_rate ?? 0), po_tax: sourceLine?.tax ?? null, po_tax_rate: String(sourceLine?.tax_rate || 0), lot: returnInspection.lot || undefined }],
       ...(returnForm.supplier_invoice ? { supplier_invoice: returnForm.supplier_invoice } : {}),
     };
     await run('return:create', () => api(dataPath('purchasing.purchase_return'), { method: 'POST', body: payload }), uiText('Đã tạo phiếu trả nhà cung cấp từ lượng không đạt trong kiểm tra chất lượng.'));
@@ -265,7 +265,7 @@ export default function PurchasingWorkbenchPage() {
       purchase_order: selected.id,
       warehouse: selected.warehouse,
       reason: generalReturnForm.reason.trim(),
-      lines: [{ product: generalReturnLine.product, uom: generalReturnLine.uom || undefined, qty, price: Number(invoiceLine?.price ?? generalReturnLine.price), tax: invoiceLine?.tax ?? generalReturnLine.tax ?? null, tax_rate: Number(invoiceLine?.tax_rate ?? generalReturnLine.tax_rate ?? 0), po_tax: generalReturnLine.po_tax ?? generalReturnLine.tax ?? null, po_tax_rate: Number(generalReturnLine.po_tax_rate ?? generalReturnLine.tax_rate ?? 0), lot: generalReturnLine.lot || undefined }],
+      lines: [{ product: generalReturnLine.product, uom: generalReturnLine.uom || undefined, qty, price: String(invoiceLine?.price ?? generalReturnLine.price), tax: invoiceLine?.tax ?? generalReturnLine.tax ?? null, tax_rate: String(invoiceLine?.tax_rate ?? generalReturnLine.tax_rate ?? 0), po_tax: generalReturnLine.po_tax ?? generalReturnLine.tax ?? null, po_tax_rate: String(generalReturnLine.po_tax_rate ?? generalReturnLine.tax_rate ?? 0), lot: generalReturnLine.lot || undefined }],
       ...(generalReturnForm.supplier_invoice ? { supplier_invoice: generalReturnForm.supplier_invoice } : {}),
     };
     await run('return:general:create', () => api(dataPath('purchasing.purchase_return'), { method: 'POST', body: payload }), uiText('Đã tạo phiếu trả hàng từ số lượng đã nhận.'));

@@ -78,7 +78,7 @@ export default function CharityWorkbenchPage() {
   }
   async function createDonation(event) {
     event.preventDefault();
-    await run('donation', () => api(dataPath('charity.donation'), { method: 'POST', body: { ...donationForm, program: programId || undefined, amount: Number(donationForm.amount), status: 'pledged' } }), 'Đã ghi nhận cam kết ủng hộ. Khi tiền về, xác nhận đã nhận để ghi thu kế toán.');
+    await run('donation', () => api(dataPath('charity.donation'), { method: 'POST', body: { ...donationForm, program: programId || undefined, amount: String(donationForm.amount), status: 'pledged' } }), 'Đã ghi nhận cam kết ủng hộ. Khi tiền về, xác nhận đã nhận để ghi thu kế toán.');
     setDonationForm((current) => ({ ...current, amount: '', note: '' }));
   }
   async function receiveDonation(row) {
@@ -86,7 +86,7 @@ export default function CharityWorkbenchPage() {
   }
   async function createDisbursement(event) {
     event.preventDefault();
-    await run('disbursement', () => api(dataPath('charity.disbursement'), { method: 'POST', body: { ...disbursementForm, program: programId, amount: Number(disbursementForm.amount), status: 'requested' } }), 'Đã gửi đề nghị chi để bộ phận tài chính xét duyệt.');
+    await run('disbursement', () => api(dataPath('charity.disbursement'), { method: 'POST', body: { ...disbursementForm, program: programId, amount: String(disbursementForm.amount), status: 'requested' } }), 'Đã gửi đề nghị chi để bộ phận tài chính xét duyệt.');
     setDisbursementForm((current) => ({ ...current, amount: '', purpose: '' }));
   }
   async function changeDisbursement(row, verb) {

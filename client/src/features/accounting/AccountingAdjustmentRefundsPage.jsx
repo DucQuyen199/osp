@@ -67,7 +67,7 @@ export default function AccountingAdjustmentRefundsPage() {
     setRequestIds(pendingRequests);
     try { sessionStorage.setItem(storageKey, JSON.stringify(pendingRequests)); } catch { /* still safe for retries within this session */ }
     try {
-      const payment = await api(tenantPath('/accounting/adjustment-refunds'), { method: 'POST', body: { kind: active.kind, adjustmentId: active.id, amount: Number(form.amount), method: form.method, paymentDate: form.paymentDate, requestId } });
+      const payment = await api(tenantPath('/accounting/adjustment-refunds'), { method: 'POST', body: { kind: active.kind, adjustmentId: active.id, amount: String(form.amount), method: form.method, paymentDate: form.paymentDate, requestId } });
       setNotice(uiText('Đã ghi nhận payment hoàn tiền{payment} và tạo bút toán kế toán.').replace('{payment}', payment?.id ? ` ${String(payment.id).slice(0, 8)}` : ''));
       setRequestIds((current) => { const next = { ...current }; delete next[active.id]; try { sessionStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* optional retry storage */ } return next; });
       setForm((current) => ({ ...current, amount: '' }));

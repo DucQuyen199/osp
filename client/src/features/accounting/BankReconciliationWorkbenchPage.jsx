@@ -61,7 +61,7 @@ export default function BankReconciliationWorkbenchPage() {
     event.preventDefault();
     await run('statement:create', async () => {
       const created = await api(dataPath('accounting.bank_statement'), { method: 'POST', body: {
-        ...statementForm, opening_balance: Number(statementForm.opening_balance), closing_balance: Number(statementForm.closing_balance),
+        ...statementForm, opening_balance: String(statementForm.opening_balance), closing_balance: String(statementForm.closing_balance),
       } });
       setStatementId(created.id);
       setStatementForm((form) => ({ ...form, statement_number: '', opening_balance: '', closing_balance: '' }));
@@ -82,7 +82,7 @@ export default function BankReconciliationWorkbenchPage() {
     event.preventDefault(); if (!selected) return;
     await run(`${selected.id}:line:create`, async () => {
       await api(dataPath('accounting.bank_statement_line'), { method: 'POST', body: {
-        statement: selected.id, ...lineForm, amount: Number(lineForm.amount), reference: lineForm.reference.trim() || undefined, description: lineForm.description.trim() || undefined,
+        statement: selected.id, ...lineForm, amount: String(lineForm.amount), reference: lineForm.reference.trim() || undefined, description: lineForm.description.trim() || undefined,
       } });
       setLineForm((form) => ({ ...form, reference: '', description: '', amount: '' }));
     }, t('Đã thêm giao dịch vào sao kê.'));

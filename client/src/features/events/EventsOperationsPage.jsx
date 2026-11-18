@@ -60,7 +60,7 @@ export default function EventsOperationsPage() {
       const { ticket_tax, ...fields } = eventForm;
       const startsAt = localDateTimeToIso(eventForm.starts_at);
       if (!startsAt) throw new Error('Giờ bắt đầu không hợp lệ trong múi giờ kinh doanh.');
-      await api(dataPath('events.event'), { method: 'POST', body: { ...fields, ...(ticket_tax ? { ticket_tax } : {}), starts_at: startsAt, capacity: Number(eventForm.capacity), reservation_minutes: Number(eventForm.reservation_minutes), ticket_price: Number(eventForm.ticket_price), status: 'draft' } });
+      await api(dataPath('events.event'), { method: 'POST', body: { ...fields, ...(ticket_tax ? { ticket_tax } : {}), starts_at: startsAt, capacity: Number(eventForm.capacity), reservation_minutes: Number(eventForm.reservation_minutes), ticket_price: String(eventForm.ticket_price), status: 'draft' } });
       setEventForm((current) => ({ ...current, name: '', venue: '', ticket_price: '' })); setNotice(t('Đã tạo sự kiện nháp. Kiểm tra thông tin rồi công bố để mở bán vé.')); await load();
     } catch (reason) { setError(t(reason.message || 'Không thể tạo sự kiện.')); }
     finally { setBusy(false); }

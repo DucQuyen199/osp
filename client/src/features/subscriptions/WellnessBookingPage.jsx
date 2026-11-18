@@ -95,7 +95,7 @@ export default function WellnessBookingPage({ healthcare = false }) {
   }
   async function createService(event) {
     event.preventDefault();
-    await run('service', () => api(dataPath('booking.service'), { method: 'POST', body: { ...serviceForm, duration_min: Number(serviceForm.duration_min), price: Number(serviceForm.price) } }), 'Đã thêm dịch vụ và giá niêm yết.');
+    await run('service', () => api(dataPath('booking.service'), { method: 'POST', body: { ...serviceForm, duration_min: Number(serviceForm.duration_min), price: String(serviceForm.price) } }), 'Đã thêm dịch vụ và giá niêm yết.');
     setServiceForm({ name: '', duration_min: '', price: '' });
   }
   async function change(row, verb) {
