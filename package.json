@@ -22,6 +22,7 @@
     "test:backup-crypto": "node --test tools/backup-crypto.test.mjs",
     "test:decimal": "node --test tools/decimal.test.mjs",
     "test:accounting-refunds": "node --test tools/adjustment-refunds.test.mjs",
+    "test:bank-reconciliation": "node --test tools/bank-reconciliation.test.mjs",
     "e2e": "npm run build && node tests/e2e/ui.mjs",
     "lint": "cargo run --manifest-path server/Cargo.toml --bin catalog -- lint",
     "lint:translations": "node tools/check-ui-translations.mjs",
