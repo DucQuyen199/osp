@@ -1,19 +1,16 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, statusLabel, uiTextWith } from '../../lib/i18n.js';
-import { app, can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
+import { app, can, recordLabel } from '../../lib/state.js';
 import helpdeskEnglish from './helpdesk.en.js';
+import { useHelpdeskWorkbenchData } from './hooks/useHelpdeskWorkbenchData.js';
 const t = (text) => uiTextWith(text, helpdeskEnglish);
 const emptyTicket = { subject: '', party: '', priority: 'normal', channel: 'email', sla_policy: '', description: '', assignee: '', assignee_employee: '' };
 export default function HelpdeskWorkbenchPage() {
   useDocumentTitle(`${t('Hộp thư hỗ trợ')} · OSP Suite`);
-  const [tickets, setTickets] = useState([]);
-  const [messages, setMessages] = useState([]);
-  const [parties, setParties] = useState(new Map());
-  const [policies, setPolicies] = useState(new Map());
-  const [employees, setEmployees] = useState(new Map());
+  const { tickets, messages, parties, policies, employees, loading, error, setError, load } = useHelpdeskWorkbenchData();
   const [selectedId, setSelectedId] = useState('');
   const [ticketForm, setTicketForm] = useState(emptyTicket);
   const [messageForm, setMessageForm] = useState({ direction: 'outbound', author: app.user?.name || '', body: '' });
@@ -22,27 +19,9 @@ export default function HelpdeskWorkbenchPage() {
   const [resolution, setResolution] = useState('');
   const [filter, setFilter] = useState('active');
   const [busy, setBusy] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const [ticketRes, messageRes, partyMap, policyMap, employeeMap] = await Promise.all([
-        can('helpdesk.ticket.read') ? loadAllResponse('helpdesk.ticket') : Promise.resolve({ items: [] }),
-        can('helpdesk.message.read') ? loadAllResponse('helpdesk.message') : Promise.resolve({ items: [] }),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('helpdesk.sla_policy.read') ? loadRefs('helpdesk.sla_policy') : Promise.resolve(new Map()),
-        can('hrm.employee.read') ? loadRefs('hrm.employee') : Promise.resolve(new Map()),
-      ]);
-      const ticketRows = (ticketRes.items || []).sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')));
-      setTickets(ticketRows); setMessages(messageRes.items || []); setParties(partyMap); setPolicies(policyMap); setEmployees(employeeMap);
-      setSelectedId((current) => ticketRows.some((ticket) => ticket.id === current) ? current : ticketRows[0]?.id || '');
-      setTicketForm((current) => ({ ...current, party: current.party || [...partyMap.keys()][0] || '', sla_policy: current.sla_policy || [...policyMap.keys()][0] || '' }));
-    } catch (reason) { setError(t(reason.message || 'Không thể tải hộp thư hỗ trợ.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { setSelectedId((current) => current && tickets.some((ticket) => ticket.id === current) ? current : tickets[0]?.id || ''); }, [tickets]);
+  useEffect(() => { setTicketForm((current) => ({ ...current, party: current.party || [...parties.keys()][0] || '', sla_policy: current.sla_policy || [...policies.keys()][0] || '' })); }, [parties, policies]);
   const selected = tickets.find((ticket) => ticket.id === selectedId);
   const thread = useMemo(() => messages.filter((message) => message.ticket === selectedId).sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || ''))), [messages, selectedId]);
   const visibleTickets = tickets.filter((ticket) => filter === 'all' || (filter === 'active' ? ['open', 'in_progress'].includes(ticket.status) : ticket.status === filter));

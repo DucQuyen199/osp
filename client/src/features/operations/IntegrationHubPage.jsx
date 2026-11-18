@@ -1,36 +1,20 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtDateTime, uiTextWith } from '../../lib/i18n.js';
-import { app, can, loadAllResponse } from '../../lib/state.js';
+import { app, can } from '../../lib/state.js';
 import integrationEnglish from './integration.en.js';
+import { useIntegrationHubData } from './hooks/useIntegrationHubData.js';
 const t = (text) => uiTextWith(text, integrationEnglish);
-const items = (value) => Array.isArray(value?.items) ? value.items : [];
 const eventExamples = ['sales.sales_order.confirmed', 'inventory.stock_move.created'];
 export default function IntegrationHubPage() {
   useDocumentTitle(`${t('Cổng tích hợp')} · OSP Suite`);
-  const [connectors, setConnectors] = useState([]);
-  const [webhooks, setWebhooks] = useState([]);
+  const { connectors, webhooks, loading, error, setError, load } = useIntegrationHubData();
   const [connectorForm, setConnectorForm] = useState({ name: '', kind: '', config: '{\n  "adapter": "http_event_sink",\n  "url": "https://api.example.com/osp/events",\n  "events": ["sales.*"],\n  "headers": {},\n  "secret": ""\n}' });
   const [webhookForm, setWebhookForm] = useState({ url: '', events: '', secret: '' });
   const [eventSearch, setEventSearch] = useState('');
   const [busy, setBusy] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const [connectorRes, webhookRes] = await Promise.all([
-        can('integration-hub.connector.read') ? loadAllResponse('integration-hub.connector') : Promise.resolve({ items: [] }),
-        can('integration-hub.webhook.read') ? loadAllResponse('integration-hub.webhook') : Promise.resolve({ items: [] }),
-      ]);
-      setConnectors(items(connectorRes).sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi')));
-      setWebhooks(items(webhookRes).sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))));
-    } catch (reason) { setError(t(reason.message || 'Không tải được cấu hình tích hợp.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
   const availableEvents = app.meta?.events || [];
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
