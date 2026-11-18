@@ -9,6 +9,7 @@ import { compareDecimals } from '../../lib/decimal.js';
 import { isDeliveredShort, isDeliveredWithinLimit, sameDeliveryLine } from './domain/deliveryQuantities.js';
 import logisticsEnglish from './logistics.en.js';
 import DeliveryProofFields from './components/DeliveryProofFields.jsx';
+import DeliveryShipmentDetails from './components/DeliveryShipmentDetails.jsx';
 const t = (text) => uiTextWith(text, logisticsEnglish);
 const PAGE_SIZE = 100;
 const LANES = [
@@ -139,31 +140,43 @@ export default function LogisticsDeliveryBoardPage() {
       setBusy('');
     }
   };
-  const renderShipment = (shipment) => <article className="card delivery-card" key={shipment.id}>
-    <header className="card-head">
-      <div>
-        {can('logistics.shipment.read') ? <a href={recordHref('logistics.shipment', shipment.id)}><strong>{shipment.carrier || t('Vận đơn')}{shipment.trackingNumber ? ` · ${shipment.trackingNumber}` : ''}</strong></a> : <strong>{shipment.carrier || t('Vận đơn')}{shipment.trackingNumber ? ` · ${shipment.trackingNumber}` : ''}</strong>}
-        <div className="small muted">{shipment.party || t('Khách chưa xác định')} · {fmtAgo(shipment.createdAt)}</div>
-      </div>
-      <span className={`badge ${shipment.status === 'failed' ? 'danger' : shipment.status === 'dispatched' || shipment.status === 'partial' ? 'warning' : 'plain'}`}>{shipment.status === 'partial' ? t('Giao thiếu · cần giao bù') : statusLabel(shipment.status)}</span>
-    </header>
-    <div className="delivery-route"><span>{shipment.origin || t('Kho')}</span><span aria-hidden="true">→</span><strong>{shipment.destination || t('Chưa khai báo điểm giao')}</strong></div>
-    {shipment.status === 'partial' && <div className="alert warning delivery-alert">
-      <strong>{t('Lý do giao thiếu:')}</strong> {shipment.shortDeliveryReason || t('Chưa ghi lý do')}
-      <div className="small u-mt-6" ><strong>{t('Đã nhận thực tế:')}</strong> {(shipment.deliveredLines || []).map((line, index) => {
-        const sourceLine = (shipment.lines || []).find((item) => sameDeliveryLine(item, line));
-        return <span key={`${line.product}-${index}`}> {sourceLine?.productName || line.name || line.product} {fmtNumber(line.qty || 0, { maximumFractionDigits: 6 })} {line.uom_name || ''}{index < shipment.deliveredLines.length - 1 ? ' ·' : ''}</span>;
-      })}</div>
-      <div className="small"><strong>{t('Còn giao bù:')}</strong> {(shipment.remainingLines || []).map((line, index) => <span key={`${line.product}-${index}`}> {(shipment.lines || []).find((item) => sameDeliveryLine(item, line))?.productName || line.name || line.product} {fmtNumber(line.qty || 0, { maximumFractionDigits: 6 })} {line.uom_name || ''}{index < shipment.remainingLines.length - 1 ? ' ·' : ''}</span>)}</div>
-    </div>}
-    <div className="delivery-meta small muted">
-      <span>{shipment.driver || t('Chưa phân công tài xế')}</span>
-      <span>{shipment.vehicle || t('Chưa phân công xe')}</span>
-      {shipment.weight != null && <span>{fmtNumber(String(shipment.weight), { maximumFractionDigits: 3 })} kg</span>}
-    </div>
-    {shipment.failureReason && <div className="alert danger delivery-alert">{shipment.failureReason}</div>}
-    {shipment.lastTrackingEvent && <div className="small delivery-tracking"><strong>{statusLabel(shipment.lastTrackingEvent)}</strong>{shipment.lastTrackingLocation && ` · ${shipment.lastTrackingLocation}`}{shipment.lastTrackingAt && ` · ${fmtDateTime(shipment.lastTrackingAt)}`}</div>}
-    {shipment.status === 'dispatched' && can('logistics.shipment.delivered') && <DeliveryProofFields
+  const renderShipment = (shipment) => {
+    const shipmentTitle = `${shipment.carrier || t('Vận đơn')}${shipment.trackingNumber ? ` · ${shipment.trackingNumber}` : ''}`;
+    const deliveredLines = (shipment.deliveredLines || []).map((line, index) => {
+      const sourceLine = (shipment.lines || []).find((item) => sameDeliveryLine(item, line));
+      return {
+        key: `${line.product}-${index}`,
+        label: `${sourceLine?.productName || line.name || line.product} ${fmtNumber(line.qty || 0, { maximumFractionDigits: 6 })} ${line.uom_name || ''}`,
+      };
+    });
+    const remainingLines = (shipment.remainingLines || []).map((line, index) => ({
+      key: `${line.product}-${index}`,
+      label: `${(shipment.lines || []).find((item) => sameDeliveryLine(item, line))?.productName || line.name || line.product} ${fmtNumber(line.qty || 0, { maximumFractionDigits: 6 })} ${line.uom_name || ''}`,
+    }));
+    return <article className="card delivery-card" key={shipment.id}>
+      <DeliveryShipmentDetails
+        title={shipmentTitle}
+        shipmentHref={can('logistics.shipment.read') ? recordHref('logistics.shipment', shipment.id) : ''}
+        partyLabel={shipment.party || t('Khách chưa xác định')}
+        ageLabel={fmtAgo(shipment.createdAt)}
+        badgeClass={shipment.status === 'failed' ? 'danger' : shipment.status === 'dispatched' || shipment.status === 'partial' ? 'warning' : 'plain'}
+        badgeLabel={shipment.status === 'partial' ? t('Giao thiếu · cần giao bù') : statusLabel(shipment.status)}
+        originLabel={shipment.origin || t('Kho')}
+        destinationLabel={shipment.destination || t('Chưa khai báo điểm giao')}
+        isPartial={shipment.status === 'partial'}
+        shortDeliveryReason={shipment.shortDeliveryReason}
+        deliveredLines={deliveredLines}
+        remainingLines={remainingLines}
+        driverLabel={shipment.driver || t('Chưa phân công tài xế')}
+        vehicleLabel={shipment.vehicle || t('Chưa phân công xe')}
+        weightLabel={shipment.weight != null ? `${fmtNumber(String(shipment.weight), { maximumFractionDigits: 3 })} kg` : ''}
+        failureReason={shipment.failureReason}
+        trackingStatus={shipment.lastTrackingEvent ? statusLabel(shipment.lastTrackingEvent) : ''}
+        trackingLocation={shipment.lastTrackingLocation}
+        trackingAt={shipment.lastTrackingAt ? fmtDateTime(shipment.lastTrackingAt) : ''}
+        t={t}
+      />
+      {shipment.status === 'dispatched' && can('logistics.shipment.delivered') && <DeliveryProofFields
       shipment={shipment} proof={deliveryProof[shipment.id] || {}}
       hasShortDelivery={(shipment.lines || []).some((line, index) => isDeliveredShort(deliveryProof[shipment.id]?.deliveredQuantities?.[index] ?? line.qty ?? 0, line.qty || 0))}
       t={t}
@@ -180,7 +193,8 @@ export default function LogisticsDeliveryBoardPage() {
       {(shipment.status === 'failed' || shipment.status === 'partial') && can('logistics.shipment.create') && <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => redeliver(shipment)}>{busy === `${shipment.id}:redeliver` ? t('Đang tạo…') : t(shipment.status === 'partial' ? 'Tạo vận đơn giao bù' : 'Tạo vận đơn giao lại')}</button>}
       {shipment.status === 'failed' && can('logistics.shipment.read') && <a className="btn btn-secondary" href={recordHref('logistics.shipment', shipment.id)}>{t('Xem lịch sử')}</a>}
     </footer>
-  </article>;
+    </article>;
+  };
   return <div className="page">
     <div className="page-head"><div><h1>{t('Điều phối giao hàng')}</h1><p className="sub">{t('Theo dõi vận đơn cần xử lý, chuyến đang giao và giao thất bại. Xác nhận giao thành công sẽ chạy luồng xuất kho và cập nhật tiến độ đơn bán.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading} onClick={() => load()}>{loading ? t('Đang tải…') : t('Làm mới')}</button></div>
     <div className="row wrap delivery-summary"><span className="badge plain">{t('Chờ xuất phát')}: {counts.created}</span><span className="badge warning">{t('Đang giao')}: {counts.dispatched}</span><span className="badge danger">{t('Giao thất bại')}: {counts.failed}</span><span className="badge warning">{t('Giao thiếu')}: {counts.partial}</span>{lastUpdated && <span className="small muted">{t('Cập nhật lúc')} {fmtDateTime(lastUpdated)}</span>}</div>

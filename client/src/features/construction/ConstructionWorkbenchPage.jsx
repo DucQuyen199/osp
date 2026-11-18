@@ -9,6 +9,7 @@ import { can, loadRefs, loadIndependentData, recordLabel, loadAllResponse } from
 import { boqLineValue, boqTotal } from './domain/boqTotals.js';
 import constructionEnglish from './construction.en.js';
 import ConstructionSiteDiaryPanel from './components/ConstructionSiteDiaryPanel.jsx';
+import ProgressClaimsPanel from './components/ProgressClaimsPanel.jsx';
 const t = (text) => uiTextWith(text, constructionEnglish);
 const today = localDate;
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -83,6 +84,19 @@ export default function ConstructionWorkbenchPage() {
   const billBySubcontract = useMemo(() => new Map(bills.filter((row) => row.source === 'subcontract').map((row) => [row.source_id, row])), [bills]);
   const billByClaim = useMemo(() => new Map(bills.filter((row) => row.source === 'progress_claim').map((row) => [row.source_id, row])), [bills]);
   const projectClaims = useMemo(() => claims.filter((row) => projectSubcontracts.some((contract) => contract.id === row.subcontract)), [claims, projectSubcontracts]);
+  const claimableContracts = projectSubcontracts.filter((row) => ['signed', 'completed'].includes(row.status)).map((row) => ({
+    ...row,
+    vendorLabel: parties.has(row.vendor) ? recordLabel('master-data.party', parties.get(row.vendor)) : t('Nhà thầu'),
+  }));
+  const claimRows = [...projectClaims].sort((a, b) => String(b.period).localeCompare(String(a.period))).map((row) => {
+    const contract = subcontracts.find((item) => item.id === row.subcontract);
+    return {
+      row,
+      vendorLabel: parties.has(row.vendor) ? recordLabel('master-data.party', parties.get(row.vendor)) : '—',
+      scopeLabel: contract?.scope || '',
+      bill: billByClaim.get(row.id),
+    };
+  });
   const revisionSource = boqs.find((row) => row.id === boqForm.supersedes);
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
@@ -162,11 +176,22 @@ export default function ConstructionWorkbenchPage() {
         <p className="muted">{t("Ký hợp đồng ghi nhận cam kết chi phí và kiểm tra ngân sách. Hóa đơn phải trả được lập riêng khi có khối lượng nghiệm thu hoặc hồ sơ thanh toán.")}</p>
         <div className="table-wrap u-mt-14" ><table className="table"><thead><tr><th>{t("Nhà thầu")}</th><th>{t("Phạm vi")}</th><th>{t("Giá trị")}</th><th>{t("Trạng thái")}</th><th>{t("Thao tác / chứng từ")}</th></tr></thead><tbody>{projectSubcontracts.map((row) => <tr key={row.id}><td>{parties.has(row.vendor) ? recordLabel('master-data.party', parties.get(row.vendor)) : '—'}</td><td>{row.scope || '—'}</td><td>{fmtMoney(row.value)}</td><td>{statusLabel(row.status)}</td><td>{row.status === 'draft' && can('construction.subcontract.signed') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy) || selectedProject?.status !== 'active'} onClick={() => transition('construction.subcontract', row, 'signed', 'Đã ký thầu phụ và ghi nhận cam kết chi phí trong hạn mức ngân sách.')}>{t("Ký hợp đồng")}</button>}{row.status === 'signed' && can('construction.subcontract.completed') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => transition('construction.subcontract', row, 'completed', 'Đã xác nhận hoàn thành phạm vi thầu phụ.')}>{t("Hoàn thành")}</button>}{billBySubcontract.has(row.id) && <a className="btn btn-ghost btn-sm u-ml-6"  href={`#/e/accounting/bill/${billBySubcontract.get(row.id).id}`}>{t("Mở hóa đơn phải trả")}</a>}</td></tr>)}</tbody></table></div>
       </section>
-      <section className="card card-pad u-mt-16" ><h2>{t("Nghiệm thu và thanh toán theo đợt")}</h2>
-        <p className="muted">{t("Mỗi hồ sơ được duyệt sẽ tạo một hóa đơn phải trả theo giá trị nghiệm thu. Máy chủ khóa hợp đồng và chặn lũy kế vượt giá trị hợp đồng.")}</p>
-        {can('construction.progress_claim.create') && <form className="form-grid" onSubmit={createClaim}><label className="field"><span className="label">{t("Hợp đồng thầu phụ *")}</span><select className="select" required value={claimForm.subcontract} onChange={(e) => setClaimForm({ ...claimForm, subcontract: e.target.value })}><option value="">{t("Chọn hợp đồng đã ký")}</option>{projectSubcontracts.filter((row) => ['signed','completed'].includes(row.status)).map((row) => <option key={row.id} value={row.id}>{parties.has(row.vendor) ? recordLabel('master-data.party', parties.get(row.vendor)) : t('Nhà thầu')} · {fmtMoney(row.value)}</option>)}</select></label><label className="field"><span className="label">{t("Ngày nghiệm thu *")}</span><input className="input" type="date" required max={today()} value={claimForm.period} onChange={(e) => setClaimForm({ ...claimForm, period: e.target.value })}/></label><label className="field"><span className="label">{t("Giá trị đề nghị thanh toán *")}</span><input className="input" type="number" required min="0.01" step="any" value={claimForm.amount} onChange={(e) => setClaimForm({ ...claimForm, amount: e.target.value })}/></label><label className="field"><span className="label">{t("Ghi chú / số biên bản")}</span><input className="input" value={claimForm.notes} onChange={(e) => setClaimForm({ ...claimForm, notes: e.target.value })}/></label><div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy) || !claimForm.subcontract}>{t("Lập hồ sơ nháp")}</button></div></form>}
-        <div className="table-wrap u-mt-14" ><table className="table"><thead><tr><th>{t("Ngày")}</th><th>{t("Nhà thầu / hợp đồng")}</th><th>{t("Hồ sơ")}</th><th>{t("Giá trị")}</th><th>{t("Trạng thái")}</th><th>{t("Thao tác")}</th></tr></thead><tbody>{projectClaims.sort((a,b) => String(b.period).localeCompare(String(a.period))).map((row) => { const contract = subcontracts.find((item) => item.id === row.subcontract); const bill = billByClaim.get(row.id); return <tr key={row.id}><td>{fmtDate(row.period)}</td><td>{parties.has(row.vendor) ? recordLabel('master-data.party', parties.get(row.vendor)) : '—'}<div className="muted">{contract?.scope || t('Thầu phụ')}</div></td><td>{row.notes || '—'}</td><td>{fmtMoney(row.amount)}</td><td>{statusLabel(row.status)}</td><td>{row.status === 'draft' && can('construction.progress_claim.approved') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => transition('construction.progress_claim', row, 'approved', 'Đã duyệt nghiệm thu và tạo hóa đơn phải trả theo giá trị đợt.')}>{t("Duyệt và lập hóa đơn")}</button>}{bill && <a className="btn btn-ghost btn-sm u-ml-6"  href={`#/e/accounting/bill/${bill.id}`}>{t("Mở hóa đơn")}</a>}</td></tr>; })}</tbody></table></div>
-      </section>
+      <ProgressClaimsPanel
+        claimForm={claimForm}
+        claimableContracts={claimableContracts}
+        claimRows={claimRows}
+        canCreate={can('construction.progress_claim.create')}
+        canApprove={can('construction.progress_claim.approved')}
+        busy={busy}
+        today={today()}
+        onFieldChange={(field, value) => setClaimForm((current) => ({ ...current, [field]: value }))}
+        onCreateClaim={createClaim}
+        onApproveClaim={(row) => transition('construction.progress_claim', row, 'approved', 'Đã duyệt nghiệm thu và tạo hóa đơn phải trả theo giá trị đợt.')}
+        t={t}
+        fmtDate={fmtDate}
+        fmtMoney={fmtMoney}
+        statusLabel={statusLabel}
+      />
     </>}
   </div>;
 }
