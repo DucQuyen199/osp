@@ -4,7 +4,7 @@ import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, fmtNumber, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { addDecimals, subtractDecimals } from '../../lib/decimal.js';
-import { app, can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
+import { app, can, loadAllResponse, loadRefs, loadIndependentData, recordLabel } from '../../lib/state.js';
 import projectEnglish from './project.en.js';
 const t = (text) => uiTextWith(text, projectEnglish);
 const emptyProject = { name: '', party: '', budget: '' };
@@ -32,19 +32,24 @@ export default function ProjectWorkbenchPage() {
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
-      const [projectRes, taskRes, dependencyRes, timesheetRes, partyMap, employeeMap] = await Promise.all([
-        can('project.project.read') ? loadAllResponse('project.project') : Promise.resolve({ items: [] }),
-        can('project.task.read') ? loadAllResponse('project.task') : Promise.resolve({ items: [] }),
-        can('project.task_dependency.read') ? loadAllResponse('project.task_dependency') : Promise.resolve({ items: [] }),
-        can('project.timesheet.read') ? loadAllResponse('project.timesheet') : Promise.resolve({ items: [] }),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('hrm.employee.read') ? loadRefs('hrm.employee') : Promise.resolve(new Map()),
-      ]);
-      const projectRows = projectRes.items || [];
-      setProjects(projectRows); setTasks(taskRes.items || []); setDependencies(dependencyRes.items || []); setTimesheets(timesheetRes.items || []); setParties(partyMap);
-      setEmployees(employeeMap);
+      const { data, errors } = await loadIndependentData({
+        projects: can('project.project.read') ? loadAllResponse('project.project') : Promise.resolve({ items: [] }),
+        tasks: can('project.task.read') ? loadAllResponse('project.task') : Promise.resolve({ items: [] }),
+        dependencies: can('project.task_dependency.read') ? loadAllResponse('project.task_dependency') : Promise.resolve({ items: [] }),
+        timesheets: can('project.timesheet.read') ? loadAllResponse('project.timesheet') : Promise.resolve({ items: [] }),
+        parties: can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
+        employees: can('hrm.employee.read') ? loadRefs('hrm.employee') : Promise.resolve(new Map()),
+      }, {
+        projects: { items: [] }, tasks: { items: [] }, dependencies: { items: [] },
+        timesheets: { items: [] }, parties: new Map(), employees: new Map(),
+      });
+      const projectRows = data.projects.items || [];
+      const partyMap = data.parties;
+      setProjects(projectRows); setTasks(data.tasks.items || []); setDependencies(data.dependencies.items || []); setTimesheets(data.timesheets.items || []); setParties(partyMap);
+      setEmployees(data.employees);
       setProjectId((current) => projectRows.some((project) => project.id === current) ? current : projectRows[0]?.id || '');
       setProjectForm((current) => ({ ...current, party: current.party || [...partyMap.keys()][0] || '' }));
+      if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được dữ liệu dự án.')).join(' · '));
     } catch (reason) { setError(reason.message || t("Không tải được dữ liệu dự án.")); }
     finally { if (!quiet) setLoading(false); }
   }, []);
