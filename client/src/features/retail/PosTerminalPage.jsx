@@ -94,7 +94,7 @@ export default function PosTerminalPage() {
     try {
       const created = await api(dataPath('pos.pos_session'), { method: 'POST', body: {
         warehouse: warehouseId, branch: branchId || undefined,
-        cashier: app.user?.name || app.user?.email || t('Thu ngân'), opening_cash: Number(openingCash || 0),
+        cashier: app.user?.name || app.user?.email || t('Thu ngân'), opening_cash: String(openingCash || '0').trim(),
       } });
       await load(true);
       setSessionId(created.id);
@@ -306,7 +306,7 @@ export default function PosTerminalPage() {
     if (!activeSession) return;
     setBusy(true); setError(''); setNotice('');
     try {
-      const closed = await api(dataPath('pos.pos_session', activeSession.id, 'closed'), { method: 'POST', body: { closing_cash: Number(closingCash) } });
+      const closed = await api(dataPath('pos.pos_session', activeSession.id, 'closed'), { method: 'POST', body: { closing_cash: String(closingCash).trim() } });
       setNotice(`${t('Đã chốt ca. Tiền kỳ vọng')} ${fmtMoney(closed.expected_cash)}; ${t('chênh lệch')} ${fmtMoney(closed.cash_difference)}.`);
       setClosingCash(''); await load(true);
     } catch (reason) { setError(t(reason.message || 'Không chốt được ca. Hãy xử lý hết đơn chờ và phiếu thu chi nháp trước.')); }

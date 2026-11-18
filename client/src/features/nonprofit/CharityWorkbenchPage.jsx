@@ -43,7 +43,7 @@ export default function CharityWorkbenchPage() {
   }
   async function createProgram(event) {
     event.preventDefault();
-    await run('program', () => api(dataPath('charity.program'), { method: 'POST', body: { name: programForm.name.trim(), budget: programForm.budget === '' ? undefined : Number(programForm.budget) } }), 'Đã tạo chương trình và ngân sách mục tiêu.');
+    await run('program', () => api(dataPath('charity.program'), { method: 'POST', body: { name: programForm.name.trim(), budget: programForm.budget.trim() || undefined } }), 'Đã tạo chương trình và ngân sách mục tiêu.');
     setProgramForm({ name: '', budget: '' });
   }
   async function createBeneficiary(event) {

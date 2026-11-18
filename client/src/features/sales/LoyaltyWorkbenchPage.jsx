@@ -4,6 +4,7 @@ import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtNumber, uiTextWith } from '../../lib/i18n.js';
+import { addDecimals, compareDecimals } from '../../lib/decimal.js';
 import { can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
 import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import loyaltyEnglish from './loyalty.en.js';
@@ -13,6 +14,8 @@ const tiers = ['bronze', 'silver', 'gold', 'platinum'];
 const tierLabels = { bronze: 'Đồng', silver: 'Bạc', gold: 'Vàng', platinum: 'Bạch kim' };
 const sourceLabels = { pos_order: 'Đơn POS', sales_order: 'Đơn bán hàng', pos_order_refund: 'Hoàn POS', sales_return: 'Trả hàng' };
 const points = (value) => fmtNumber(String(value || 0), { maximumFractionDigits: 2 });
+const isNegative = (value) => { try { return compareDecimals(value || 0, '0') < 0; } catch { return false; } };
+const isPositive = (value) => { try { return compareDecimals(value || 0, '0') > 0; } catch { return false; } };
 export default function LoyaltyWorkbenchPage() {
   useDocumentTitle(`${t('Khách hàng thân thiết')} · OSP Suite`);
   const [members, setMembers] = useState([]);
@@ -49,7 +52,7 @@ export default function LoyaltyWorkbenchPage() {
   useEffect(() => { load(); }, [load]);
   const selected = members.find((row) => row.id === selectedId);
   const ledger = useMemo(() => transactions.filter((row) => row.party === selected?.party), [transactions, selected]);
-  const totalPoints = members.reduce((sum, member) => sum + Number(member.points || 0), 0);
+  const totalPoints = addDecimals(members.map((member) => member.points || 0));
   const partyName = (id) => parties.has(id) ? recordLabel('master-data.party', parties.get(id)) : t('Khách hàng');
   async function run(key, operation, message) {
     setBusy(key); setError(''); setNotice('');
@@ -70,8 +73,10 @@ export default function LoyaltyWorkbenchPage() {
   }
   async function createVoucher(event) {
     event.preventDefault();
-    const value = Number(voucherForm.value);
-    if (!Number.isFinite(value) || value <= 0 || (voucherForm.kind === 'percent' && value >= 100)) { setError(t('Giá trị voucher không hợp lệ.')); return; }
+    const value = String(voucherForm.value ?? '').trim().replace(/^([+-]?)\./, (_, sign) => `${sign}0.`);
+    let validValue = false;
+    try { validValue = compareDecimals(value, '0') > 0 && (voucherForm.kind !== 'percent' || compareDecimals(value, '100') < 0); } catch { /* Invalid decimal input is reported below. */ }
+    if (!validValue) { setError(t('Giá trị voucher không hợp lệ.')); return; }
     const body = { code: voucherForm.code.trim().toUpperCase(), ...(voucherForm.kind === 'percent' ? { percent: value } : { amount: value }), ...(voucherForm.valid_until ? { valid_until: voucherForm.valid_until } : {}) };
     await run('voucher:create', async () => {
       await api(dataPath('loyalty.voucher'), { method: 'POST', body });
@@ -86,7 +91,7 @@ export default function LoyaltyWorkbenchPage() {
     {can('loyalty.voucher.create') && <section className="card card-pad"><h2>{t('Phát hành voucher')}</h2><form className="form-grid" onSubmit={createVoucher}><label className="field"><span className="label">{t('Mã voucher *')}</span><input className="input" required maxLength="80" value={voucherForm.code} onChange={(event) => setVoucherForm({ ...voucherForm, code: event.target.value.toUpperCase() })}/></label><label className="field"><span className="label">{t('Hình thức giảm')}</span><select className="select" value={voucherForm.kind} onChange={(event) => setVoucherForm({ ...voucherForm, kind: event.target.value, value: '' })}><option value="percent">{t('Phần trăm')}</option><option value="amount">{t('Số tiền')}</option></select></label><label className="field"><span className="label">{t('Giá trị')} {voucherForm.kind === 'percent' ? '(%)' : '(VND)'} *</span><input className="input" type="number" required min="0.0001" max={voucherForm.kind === 'percent' ? 100 : undefined} step="any" value={voucherForm.value} onChange={(event) => setVoucherForm({ ...voucherForm, value: event.target.value })}/></label><label className="field"><span className="label">{t('Hạn dùng')}</span><input className="input" type="date" min={localDate()} value={voucherForm.valid_until} onChange={(event) => setVoucherForm({ ...voucherForm, valid_until: event.target.value })}/></label><div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy)}>{t('Phát hành')}</button></div></form></section>}
     {!can('loyalty.member.read') ? <div className="empty">{t('Bạn chưa có quyền xem thành viên.')}</div> : loading ? <div className="skeleton" data-h="row"/> : !members.length ? <div className="empty">{t('Chưa có thành viên nào.')}</div> : <div className="layout-split"><section className="card table-wrap"><table className="table"><thead><tr><th>{t('Khách hàng')}</th><th>{t('Hạng')}</th><th className="right">{t('Điểm')}</th></tr></thead><tbody>{members.map((member) => <tr {...selectableTableRowProps} key={member.id} aria-selected={selectedId === member.id} className={[selectedId === member.id ? 'selected' : '', 'u-pointer'].filter(Boolean).join(' ')} onClick={() => setSelectedId(member.id)} ><td>{partyName(member.party)}</td><td>{t(tierLabels[member.tier] || 'Đồng')}</td><td className="right"><strong>{points(member.points)}</strong></td></tr>)}</tbody></table></section>
       {selected && <section className="card card-pad"><div className="row wrap"><div><h2>{partyName(selected.party)}</h2><span className="small muted">{t('Đăng ký ')}{fmtDateTime(selected.createdAt)}</span></div><span className="grow"/><span className="badge success">{points(selected.points)} {t('điểm')}</span></div>{can('loyalty.member.update') && <label className="field u-mt-12" ><span className="label">{t('Hạng thành viên')}</span><select className="select" value={selected.tier || 'bronze'} disabled={Boolean(busy)} onChange={(event) => changeTier(event.target.value)}>{tiers.map((tier) => <option key={tier} value={tier}>{t(tierLabels[tier])}</option>)}</select></label>}
-        <h3 className="u-mt-18">{t('Sổ điểm')}</h3>{!can('loyalty.point_txn.read') ? <div className="empty">{t('Bạn chưa có quyền xem lịch sử điểm.')}</div> : !ledger.length ? <div className="empty">{t('Chưa có giao dịch điểm. Điểm được phát sinh khi đơn hàng hoàn tất.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Thời gian')}</th><th>{t('Nguồn')}</th><th>{t('Mã chứng từ')}</th><th className="right">{t('Điểm')}</th></tr></thead><tbody>{ledger.map((row) => <tr key={row.id}><td>{fmtDateTime(row.createdAt)}</td><td>{t(sourceLabels[row.source] || row.source)}</td><td className="mono small">{String(row.source_id || '').slice(0, 8)}</td><td className="right"><strong className={Number(row.points) < 0 ? 'danger-text' : ''}>{Number(row.points) > 0 ? '+' : ''}{points(row.points)}</strong></td></tr>)}</tbody></table></div>}
+        <h3 className="u-mt-18">{t('Sổ điểm')}</h3>{!can('loyalty.point_txn.read') ? <div className="empty">{t('Bạn chưa có quyền xem lịch sử điểm.')}</div> : !ledger.length ? <div className="empty">{t('Chưa có giao dịch điểm. Điểm được phát sinh khi đơn hàng hoàn tất.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Thời gian')}</th><th>{t('Nguồn')}</th><th>{t('Mã chứng từ')}</th><th className="right">{t('Điểm')}</th></tr></thead><tbody>{ledger.map((row) => <tr key={row.id}><td>{fmtDateTime(row.createdAt)}</td><td>{t(sourceLabels[row.source] || row.source)}</td><td className="mono small">{String(row.source_id || '').slice(0, 8)}</td><td className="right"><strong className={isNegative(row.points) ? 'danger-text' : ''}>{isPositive(row.points) ? '+' : ''}{points(row.points)}</strong></td></tr>)}</tbody></table></div>}
         <p className="small muted u-mt-12" >{t('Số dư và giao dịch điểm chỉ cập nhật từ sự kiện bán hàng, hoàn tiền hoặc trả hàng; nhân viên không thể sửa sổ điểm thủ công.')}</p>
       </section>}</div>}
     {can('loyalty.voucher.read') && <section className="card card-pad"><h2>{t('Voucher đã phát hành')}</h2>{!vouchers.length ? <div className="empty">{t('Chưa có voucher.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Mã')}</th><th>{t('Mức giảm')}</th><th>{t('Hạn dùng')}</th><th>{t('Trạng thái')}</th><th>{t('Đơn sử dụng')}</th></tr></thead><tbody>{vouchers.map((voucher) => <tr key={voucher.id}><td><strong className="mono">{voucher.code}</strong></td><td>{voucher.percent != null ? `${voucher.percent}%` : `−${fmtNumber(String(voucher.amount || 0))} ₫`}</td><td>{voucher.valid_until || t('Không hết hạn')}</td><td><span className={`badge ${voucher.used ? 'plain' : 'success'}`}>{t(voucher.used ? 'Đã sử dụng' : 'Còn hiệu lực')}</span></td><td>{voucher.redeemed_source && voucher.redeemed_order ? <a href={`#/e/${voucher.redeemed_source === 'pos_order' ? 'pos' : 'sales'}/${voucher.redeemed_source}/${voucher.redeemed_order}`}>{String(voucher.redeemed_order).slice(0, 8)}</a> : '—'}</td></tr>)}</tbody></table></div>}<p className="small muted">{t('Mỗi mã dùng một lần cho một đơn POS hoặc đơn bán hàng; giảm giá được phân bổ trước thuế theo từng dòng.')}</p></section>}
