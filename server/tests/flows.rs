@@ -771,6 +771,26 @@ async fn run(k: Arc<Kernel>, url: String, defs: PathBuf) {
                 .iter()
                 .any(|e| !e["causationId"].is_null())
         );
+        let root_page = k.event_log_page(&t.t, 1, 0, true).await.unwrap();
+        assert_eq!(root_page["pageSize"], 1);
+        assert!(root_page["total"].as_i64().unwrap() >= 1);
+        assert_eq!(root_page["items"].as_array().unwrap().len(), 1);
+        assert_eq!(root_page["items"][0]["depth"], 0);
+        let complete_page = k.event_log_page(&t.t, 1, 0, false).await.unwrap();
+        assert!(complete_page["total"].as_i64().unwrap() > root_page["total"].as_i64().unwrap());
+        let (event_page_status, event_page) = t
+            .api(
+                "GET",
+                "/events/page?limit=1&offset=0&rootsOnly=true",
+                json!(null),
+            )
+            .await;
+        assert_eq!(event_page_status, 200, "{event_page}");
+        assert_eq!(event_page["items"].as_array().unwrap().len(), 1);
+        let (invalid_filter_status, _) = t
+            .api("GET", "/events/page?rootsOnly=yes", json!(null))
+            .await;
+        assert_eq!(invalid_filter_status, 422);
         step!("CRM → đơn bán → hóa đơn → HĐĐT → thu tiền");
     }
 

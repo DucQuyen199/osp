@@ -90,6 +90,7 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 - Settings failure and webhook queues use a shared controlled pager; status totals and API pages keep retry and dismissal actions reachable across the full tenant history.
 - The audit settings workbench loads 50 tenant audit entries per API page, filters by actor/action/target, and uses the shared settings pager. The API returns available actions and a snapshot-consistent filtered total, so older immutable events remain reachable without loading the full history into the browser.
 - The communication workbench pages reminders at 25 rows and delivery logs at 50 rows through the tenant entity API; status summary cards use server totals and remain correct when operators browse older pages.
+- The cross-module event stream loads 50 newest-first events per page; the root-only toggle is applied before counting and paging so it never hides matching older roots behind child events.
 
 ## Styling layers
 

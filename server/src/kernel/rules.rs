@@ -373,6 +373,37 @@ impl Kernel {
         Ok(Value::Array(rows))
     }
 
+    pub async fn event_log_page(
+        &self,
+        t: &Tenant,
+        limit: i64,
+        offset: i64,
+        roots_only: bool,
+    ) -> R<Value> {
+        let page_size = limit.clamp(1, 100);
+        let offset = offset.max(0).min(i64::MAX - page_size);
+        let mut conn = self.pool.get().await?;
+        let tx = Tx::begin_snapshot(&mut conn, &t.id).await?;
+        let total: i64 = tx
+            .query_one_row(
+                "SELECT count(*) FROM osp_events WHERE tenant_id = $1 AND (NOT $2 OR depth = 0)",
+                &[&t.id, &roots_only],
+            )
+            .await?
+            .get(0);
+        let items = tx
+            .query_json(
+                "SELECT jsonb_build_object('id', id, 'type', type, 'at', at, 'depth', depth, 'recordId', record_id, 'causationId', causation_id, 'handled', handled) \
+                 FROM osp_events WHERE tenant_id = $1 AND (NOT $2 OR depth = 0) ORDER BY at DESC, depth DESC, seq DESC LIMIT $3 OFFSET $4",
+                &[&t.id, &roots_only, &page_size, &offset],
+            )
+            .await?;
+        let has_more = offset + (items.len() as i64) < total;
+        Ok(
+            json!({ "items": items, "total": total, "pageSize": page_size, "offset": offset, "hasMore": has_more }),
+        )
+    }
+
     pub async fn audit_log(&self, actor: &Actor, t: &Tenant, limit: i64) -> R<Value> {
         self.authorize(t, actor, "tenant.audit")?;
         let mut conn = self.pool.get().await?;

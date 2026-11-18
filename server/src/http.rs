@@ -355,6 +355,23 @@ fn query_text(query: &[(String, String)], name: &str, max_chars: usize) -> R<Opt
     Ok(Some(value.to_owned()))
 }
 
+fn query_bool(query: &[(String, String)], name: &str, default: bool) -> R<bool> {
+    match query
+        .iter()
+        .find(|(key, _)| key == name)
+        .map(|(_, value)| value.as_str())
+    {
+        None => Ok(default),
+        Some("true") => Ok(true),
+        Some("false") => Ok(false),
+        Some(_) => Err(ApiError::new(
+            422,
+            "INVALID_QUERY",
+            format!("{name} must be true or false"),
+        )),
+    }
+}
+
 fn reply_to_response(r: Reply) -> Response {
     match r {
         Reply::Json(status, v) => {
@@ -1794,6 +1811,17 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
             );
         }
         (&Method::GET, ["events"]) => return json_ok(k.event_log(&t, qnum("limit", 100)).await?),
+        (&Method::GET, ["events", "page"]) => {
+            return json_ok(
+                k.event_log_page(
+                    &t,
+                    qnum("limit", 50),
+                    qnum("offset", 0),
+                    query_bool(&query, "rootsOnly", false)?,
+                )
+                .await?,
+            );
+        }
         (&Method::POST, ["webhooks", id, "test"]) => {
             return json_ok(
                 crate::modules::integration_hub::test_webhook(k, &actor, &t, id).await?,
