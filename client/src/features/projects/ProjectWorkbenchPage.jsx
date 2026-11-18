@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, fmtNumber, statusLabel, uiTextWith } from '../../lib/i18n.js';
@@ -29,7 +30,9 @@ export default function ProjectWorkbenchPage() {
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const latestRequest = useLatestRequest();
   const load = useCallback(async (quiet = false) => {
+    const isLatest = latestRequest();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const { data, errors } = await loadIndependentData({
@@ -45,14 +48,16 @@ export default function ProjectWorkbenchPage() {
       });
       const projectRows = data.projects.items || [];
       const partyMap = data.parties;
-      setProjects(projectRows); setTasks(data.tasks.items || []); setDependencies(data.dependencies.items || []); setTimesheets(data.timesheets.items || []); setParties(partyMap);
-      setEmployees(data.employees);
-      setProjectId((current) => projectRows.some((project) => project.id === current) ? current : projectRows[0]?.id || '');
-      setProjectForm((current) => ({ ...current, party: current.party || [...partyMap.keys()][0] || '' }));
-      if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được dữ liệu dự án.')).join(' · '));
-    } catch (reason) { setError(reason.message || t("Không tải được dữ liệu dự án.")); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
+      if (isLatest()) {
+        setProjects(projectRows); setTasks(data.tasks.items || []); setDependencies(data.dependencies.items || []); setTimesheets(data.timesheets.items || []); setParties(partyMap);
+        setEmployees(data.employees);
+        setProjectId((current) => projectRows.some((project) => project.id === current) ? current : projectRows[0]?.id || '');
+        setProjectForm((current) => ({ ...current, party: current.party || [...partyMap.keys()][0] || '' }));
+        if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được dữ liệu dự án.')).join(' · '));
+      }
+    } catch (reason) { if (isLatest()) setError(reason.message || t("Không tải được dữ liệu dự án.")); }
+    finally { if (isLatest()) setLoading(false); }
+  }, [latestRequest]);
   useEffect(() => { load(); }, [load]);
   const selectedProject = projects.find((project) => project.id === projectId);
   const projectTasks = useMemo(() => tasks.filter((task) => task.project === projectId).sort((a, b) => String(a.due || '9999').localeCompare(String(b.due || '9999')) || String(a.title).localeCompare(String(b.title), 'vi')), [tasks, projectId]);

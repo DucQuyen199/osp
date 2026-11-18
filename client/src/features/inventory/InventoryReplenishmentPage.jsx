@@ -1,4 +1,5 @@
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { fmtNumber, uiText } from '../../lib/i18n.js';
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, tenantPath } from '../../lib/api.js';
@@ -12,18 +13,23 @@ export default function InventoryReplenishmentPage() {
   const [loading, setLoading] = useState(false);
   const [creatingWarehouse, setCreatingWarehouse] = useState('');
   const [notice, setNotice] = useState(null);
+  const latestRequest = useLatestRequest();
   const load = useCallback(async () => {
+    const isLatest = latestRequest();
     setLoading(true);
     setError('');
     try {
-      setReport(await api(tenantPath('/reports/inventory/replenishment')));
+      const nextReport = await api(tenantPath('/reports/inventory/replenishment'));
+      if (isLatest()) setReport(nextReport);
     } catch (reason) {
-      setReport(null);
-      setError(reason.message || uiText('Không tải được đề xuất bổ sung tồn kho.'));
+      if (isLatest()) {
+        setReport(null);
+        setError(reason.message || uiText('Không tải được đề xuất bổ sung tồn kho.'));
+      }
     } finally {
-      setLoading(false);
+      if (isLatest()) setLoading(false);
     }
-  }, []);
+  }, [latestRequest]);
   useEffect(() => { load(); }, [load]);
   const createRequisition = async (warehouseId) => {
     setCreatingWarehouse(warehouseId);

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath, session } from '../../lib/api.js';
 import { confirmDialog } from '../../lib/feedback.js';
@@ -29,7 +30,10 @@ export default function DocumentWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const latestLoad = useLatestRequest();
+  const latestAttachmentLoad = useLatestRequest();
   const load = useCallback(async (quiet = false) => {
+    const isLatest = latestLoad();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [folderRes, documentRes, signatureRes] = await Promise.all([
@@ -39,13 +43,15 @@ export default function DocumentWorkbenchPage() {
       ]);
       const folderRows = rows(folderRes).sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi'));
       const documentRows = rows(documentRes).sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')));
-      setFolders(folderRows); setDocuments(documentRows); setSignatures(rows(signatureRes));
-      setSelectedId((id) => documentRows.some((row) => row.id === id) ? id : documentRows.find((row) => folderFilter === 'all' || row.folder === folderFilter)?.id || '');
-      setDocumentForm((form) => ({ ...form, folder: form.folder || folderFilter !== 'all' && folderFilter || '', owner: form.owner || app.user?.name || '' }));
-      setFolderForm((form) => ({ ...form, parent: form.parent || (folderFilter !== 'all' ? folderFilter : '') }));
-    } catch (reason) { setError(t(reason.message || 'Không tải được thư viện tài liệu.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, [folderFilter]);
+      if (isLatest()) {
+        setFolders(folderRows); setDocuments(documentRows); setSignatures(rows(signatureRes));
+        setSelectedId((id) => documentRows.some((row) => row.id === id) ? id : documentRows.find((row) => folderFilter === 'all' || row.folder === folderFilter)?.id || '');
+        setDocumentForm((form) => ({ ...form, folder: form.folder || folderFilter !== 'all' && folderFilter || '', owner: form.owner || app.user?.name || '' }));
+        setFolderForm((form) => ({ ...form, parent: form.parent || (folderFilter !== 'all' ? folderFilter : '') }));
+      }
+    } catch (reason) { if (isLatest()) setError(t(reason.message || 'Không tải được thư viện tài liệu.')); }
+    finally { if (isLatest()) setLoading(false); }
+  }, [folderFilter, latestLoad]);
   useEffect(() => { load(); }, [load]);
   const folderById = useMemo(() => new Map(folders.map((row) => [row.id, row])), [folders]);
   const selected = documents.find((row) => row.id === selectedId);
@@ -58,10 +64,13 @@ export default function DocumentWorkbenchPage() {
     if (!visibleDocuments.some((row) => row.id === selectedId)) setSelectedId(visibleDocuments[0]?.id || '');
   }, [visibleDocuments, selectedId]);
   const loadAttachments = useCallback(async (documentId) => {
-    if (!documentId || !can('document.document.read')) { setAttachments([]); return; }
-    try { setAttachments(rows(await api(attachmentBase(documentId)))); }
-    catch (reason) { setError(t(reason.message || 'Không tải được lịch sử phiên bản tệp.')); }
-  }, []);
+    const isLatest = latestAttachmentLoad();
+    if (!documentId || !can('document.document.read')) { if (isLatest()) setAttachments([]); return; }
+    try {
+      const nextAttachments = rows(await api(attachmentBase(documentId)));
+      if (isLatest()) setAttachments(nextAttachments);
+    } catch (reason) { if (isLatest()) setError(t(reason.message || 'Không tải được lịch sử phiên bản tệp.')); }
+  }, [latestAttachmentLoad]);
   useEffect(() => { loadAttachments(selectedId); }, [loadAttachments, selectedId]);
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');

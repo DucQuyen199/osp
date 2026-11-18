@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { fmtMoney, fmtNumber, uiText } from '../../lib/i18n.js';
 import { can, loadRefs } from '../../lib/state.js';
@@ -11,6 +12,7 @@ export default function InventoryLocationStockPage() {
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const latestRequest = useLatestRequest();
   useEffect(() => {
     let active = true;
     if (!can('inventory.warehouse.read')) {
@@ -23,19 +25,23 @@ export default function InventoryLocationStockPage() {
     return () => { active = false; };
   }, []);
   const load = useCallback(async () => {
+    const isLatest = latestRequest();
     setLoading(true);
     setError('');
     try {
       const params = new URLSearchParams();
       if (warehouse) params.set('warehouse', warehouse);
-      setReport(await api(`${tenantPath('/reports/inventory/location-stock')}?${params}`));
+      const nextReport = await api(`${tenantPath('/reports/inventory/location-stock')}?${params}`);
+      if (isLatest()) setReport(nextReport);
     } catch (reason) {
-      setReport(null);
-      setError(reason.message || uiText('Không tải được tồn theo vị trí.'));
+      if (isLatest()) {
+        setReport(null);
+        setError(reason.message || uiText('Không tải được tồn theo vị trí.'));
+      }
     } finally {
-      setLoading(false);
+      if (isLatest()) setLoading(false);
     }
-  }, [warehouse]);
+  }, [warehouse, latestRequest]);
   useEffect(() => { load(); }, [load]);
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Tồn kho theo vị trí')}</h1><p className="sub">{uiText('Số lượng và giá trị được tổng hợp từ phiếu kho theo từng bin.')}</p></div></div>

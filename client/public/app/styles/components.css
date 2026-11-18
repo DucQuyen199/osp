@@ -131,7 +131,7 @@ a.stat:hover { text-decoration: none; border-color: var(--accent); }
 .empty p { max-width: 28rem; }
 .skeleton { background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-hover) 50%, var(--surface-2) 75%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: var(--r-sm); min-height: 1rem; }
 @keyframes shimmer { to { background-position: -200% 0; } }
-@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } .btn.loading::after { animation-duration: 2s; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } .btn.loading::after { animation: none; } }
 
 /* ───── Dialog & Drawer (dùng <dialog> gốc: tự bẫy focus, Esc để đóng) ───── */
 dialog::backdrop { background: var(--overlay); }

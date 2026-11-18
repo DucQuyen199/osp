@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtMoney, fmtNumber, uiText } from '../../lib/i18n.js';
 import { compareDecimals } from '../../lib/decimal.js';
@@ -20,6 +21,7 @@ export default function InventoryQualityHoldsPage() {
   const [busy, setBusy] = useState('');
   const [notes, setNotes] = useState({});
   const [releaseDrafts, setReleaseDrafts] = useState({});
+  const latestRequest = useLatestRequest();
   useEffect(() => {
     let active = true;
     if (!can('inventory.warehouse.read')) {
@@ -32,19 +34,23 @@ export default function InventoryQualityHoldsPage() {
     return () => { active = false; };
   }, []);
   const load = useCallback(async () => {
+    const isLatest = latestRequest();
     setLoading(true);
     setError('');
     try {
       const params = new URLSearchParams({ status });
       if (warehouse) params.set('warehouse', warehouse);
-      setReport(await api(`${tenantPath('/reports/inventory/quality-holds')}?${params}`));
+      const nextReport = await api(`${tenantPath('/reports/inventory/quality-holds')}?${params}`);
+      if (isLatest()) setReport(nextReport);
     } catch (reason) {
-      setReport(null);
-      setError(reason.message || uiText('Không tải được hàng tồn đang giữ QC.'));
+      if (isLatest()) {
+        setReport(null);
+        setError(reason.message || uiText('Không tải được hàng tồn đang giữ QC.'));
+      }
     } finally {
-      setLoading(false);
+      if (isLatest()) setLoading(false);
     }
-  }, [status, warehouse]);
+  }, [status, warehouse, latestRequest]);
   useEffect(() => { load(); }, [load]);
   const decide = async (item, action) => {
     setBusy(`${item.inspectionId}:${action}`); setError('');

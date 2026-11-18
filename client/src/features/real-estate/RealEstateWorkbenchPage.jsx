@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate, localDateTimeToIso } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
@@ -28,7 +29,9 @@ export default function RealEstateWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const latestRequest = useLatestRequest();
   const load = useCallback(async (quiet = false) => {
+    const isLatest = latestRequest();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const { data, errors } = await loadIndependentData({
@@ -44,16 +47,18 @@ export default function RealEstateWorkbenchPage() {
         rentCycles: { items: [] }, parties: new Map(), invoices: { items: [] },
       });
       const propertyRows = itemsOf(data.properties);
-      setProperties(propertyRows); setReservations(itemsOf(data.reservations)); setViewings(itemsOf(data.viewings));
-      setLeases(itemsOf(data.leases)); setRentCycles(itemsOf(data.rentCycles)); setInvoices(itemsOf(data.invoices)); setParties(data.parties);
-      setSelectedProperty((current) => propertyRows.some((row) => row.id === current) ? current : propertyRows[0]?.id || '');
-      setViewingForm((current) => ({ ...current, property: current.property || propertyRows.find((row) => row.status === 'available')?.id || '' }));
-      setReservationForm((current) => ({ ...current, property: current.property || propertyRows.find((row) => row.status === 'available')?.id || '', party: current.party || [...data.parties.keys()][0] || '' }));
-      setLeaseForm((current) => ({ ...current, property: current.property || propertyRows.find((row) => ['available', 'reserved'].includes(row.status))?.id || '', tenant: current.tenant || [...data.parties.keys()][0] || '' }));
-      if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được dữ liệu bất động sản.')).join(' · '));
-    } catch (reason) { setError(t(reason.message || 'Không tải được dữ liệu bất động sản.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
+      if (isLatest()) {
+        setProperties(propertyRows); setReservations(itemsOf(data.reservations)); setViewings(itemsOf(data.viewings));
+        setLeases(itemsOf(data.leases)); setRentCycles(itemsOf(data.rentCycles)); setInvoices(itemsOf(data.invoices)); setParties(data.parties);
+        setSelectedProperty((current) => propertyRows.some((row) => row.id === current) ? current : propertyRows[0]?.id || '');
+        setViewingForm((current) => ({ ...current, property: current.property || propertyRows.find((row) => row.status === 'available')?.id || '' }));
+        setReservationForm((current) => ({ ...current, property: current.property || propertyRows.find((row) => row.status === 'available')?.id || '', party: current.party || [...data.parties.keys()][0] || '' }));
+        setLeaseForm((current) => ({ ...current, property: current.property || propertyRows.find((row) => ['available', 'reserved'].includes(row.status))?.id || '', tenant: current.tenant || [...data.parties.keys()][0] || '' }));
+        if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được dữ liệu bất động sản.')).join(' · '));
+      }
+    } catch (reason) { if (isLatest()) setError(t(reason.message || 'Không tải được dữ liệu bất động sản.')); }
+    finally { if (isLatest()) setLoading(false); }
+  }, [latestRequest]);
   useEffect(() => { load(); }, [load]);
   const propertyById = useMemo(() => new Map(properties.map((row) => [row.id, row])), [properties]);
   const selected = propertyById.get(selectedProperty);

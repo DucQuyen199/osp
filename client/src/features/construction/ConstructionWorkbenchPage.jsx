@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
@@ -33,7 +34,9 @@ export default function ConstructionWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const latestRequest = useLatestRequest();
   const load = useCallback(async (quiet = false) => {
+    const isLatest = latestRequest();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const emptyResponse = () => ({ items: [] });
@@ -54,18 +57,20 @@ export default function ConstructionWorkbenchPage() {
       const projectRows = itemsOf(projectRes);
       const siteRows = itemsOf(siteRes);
       const boqRows = itemsOf(boqRes);
-      setProjects(projectRows); setSites(siteRows); setDiaries(itemsOf(diaryRes)); setBoqs(boqRows);
-      setSubcontracts(itemsOf(subcontractRes)); setClaims(itemsOf(claimRes)); setBills(itemsOf(billRes)); setParties(partyMap);
-      setProjectId((current) => projectRows.some((row) => row.id === current) ? current : projectRows[0]?.id || '');
-      setSiteForm((current) => ({ ...current, project: current.project || projectRows.find((row) => ['planned', 'active'].includes(row.status))?.id || '' }));
-      setDiaryForm((current) => ({ ...current, site: current.site || siteRows.find((site) => site.project === projectRows[0]?.id)?.id || siteRows.find((site) => !site.project)?.id || '' }));
-      setBoqForm((current) => ({ ...current, project: current.project || projectRows.find((row) => ['planned', 'active'].includes(row.status))?.id || '' }));
-      setSubcontractForm((current) => ({ ...current, project: current.project || projectRows.find((row) => row.status === 'active')?.id || '', vendor: current.vendor || [...partyMap.keys()][0] || '' }));
-      setClaimForm((current) => ({ ...current, subcontract: current.subcontract || itemsOf(subcontractRes).find((row) => row.status === 'signed')?.id || '' }));
-      if (errors.length) setError(errors[0]?.message || t('Một số dữ liệu công trường không tải được.'));
-    } catch (reason) { setError(t(reason.message || 'Không tải được dữ liệu công trường.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
+      if (isLatest()) {
+        setProjects(projectRows); setSites(siteRows); setDiaries(itemsOf(diaryRes)); setBoqs(boqRows);
+        setSubcontracts(itemsOf(subcontractRes)); setClaims(itemsOf(claimRes)); setBills(itemsOf(billRes)); setParties(partyMap);
+        setProjectId((current) => projectRows.some((row) => row.id === current) ? current : projectRows[0]?.id || '');
+        setSiteForm((current) => ({ ...current, project: current.project || projectRows.find((row) => ['planned', 'active'].includes(row.status))?.id || '' }));
+        setDiaryForm((current) => ({ ...current, site: current.site || siteRows.find((site) => site.project === projectRows[0]?.id)?.id || siteRows.find((site) => !site.project)?.id || '' }));
+        setBoqForm((current) => ({ ...current, project: current.project || projectRows.find((row) => ['planned', 'active'].includes(row.status))?.id || '' }));
+        setSubcontractForm((current) => ({ ...current, project: current.project || projectRows.find((row) => row.status === 'active')?.id || '', vendor: current.vendor || [...partyMap.keys()][0] || '' }));
+        setClaimForm((current) => ({ ...current, subcontract: current.subcontract || itemsOf(subcontractRes).find((row) => row.status === 'signed')?.id || '' }));
+        if (errors.length) setError(errors[0]?.message || t('Một số dữ liệu công trường không tải được.'));
+      }
+    } catch (reason) { if (isLatest()) setError(t(reason.message || 'Không tải được dữ liệu công trường.')); }
+    finally { if (isLatest()) setLoading(false); }
+  }, [latestRequest]);
   useEffect(() => { load(); }, [load]);
   const selectedProject = projects.find((row) => row.id === projectId);
   const projectBoqs = useMemo(() => boqs.filter((row) => row.project === projectId).sort((a, b) => Number(b.revision) - Number(a.revision)), [boqs, projectId]);
