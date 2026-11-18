@@ -281,7 +281,7 @@ export default function PurchasingWorkbenchPage() {
   const updateRequisitionLine = (index, field, value) => setRequisitionLines((current) => current.map((line, i) => i === index ? { ...line, [field]: value } : line));
   const removeRequisitionLine = (index) => setRequisitionLines((current) => current.filter((_, i) => i !== index));
   const canReceive = (row) => ['approved','partially_received'].includes(row.status) && can('purchasing.purchase_receipt.create');
-  const orderLinesTotal = Number(addDecimals(lines.map((line) => lineValue(line, taxById))));
+  const orderLinesTotal = addDecimals(lines.map((line) => lineValue(line, taxById)));
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Mua hàng và nhận hàng')}</h1><p className="sub">{uiText('Lập đơn mua, gửi duyệt, nhận đủ hoặc từng phần vào kho và theo dõi hóa đơn nhà cung cấp.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{uiText('Làm mới')}</button></div>
     {can('purchasing.rfq.read') && <div className="row u-legacy-41bc5191db" ><a className="btn btn-secondary btn-sm" href="#/sourcing">{uiText('RFQ và so sánh báo giá')}</a></div>}

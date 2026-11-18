@@ -70,9 +70,9 @@ export default function AccountingSettlementWorkbenchPage() {
   async function createDraft(event) {
     event.preventDefault();
     if (!form.party || !selectedCurrency || !selectedAllocations.length || compareDecimals(total, 0) <= 0) return;
-    const allocationRows = selectedAllocations.map((doc) => ({ [form.direction === 'receipt' ? 'invoice' : 'bill']: doc.id, amount: Number(roundDecimal(allocations[doc.id], 2)) }));
+    const allocationRows = selectedAllocations.map((doc) => ({ [form.direction === 'receipt' ? 'invoice' : 'bill']: doc.id, amount: roundDecimal(allocations[doc.id], 2) }));
     await run('create', async () => {
-      await api(dataPath('accounting.settlement_batch'), { method: 'POST', body: { ...form, currency: selectedCurrency, amount: Number(roundDecimal(total, 2)), allocations: allocationRows } });
+      await api(dataPath('accounting.settlement_batch'), { method: 'POST', body: { ...form, currency: selectedCurrency, amount: roundDecimal(total, 2), allocations: allocationRows } });
       setAllocations({});
     }, uiText('Đã lưu phiếu nháp. Gửi duyệt khi thông tin và phân bổ đã chính xác.'));
   }

@@ -6,7 +6,12 @@ use std::str::FromStr;
 pub const MONEY_SCALE: u32 = 4;
 
 pub fn decimal(value: &Value) -> Option<Decimal> {
-    decimal_str(&value.to_string())
+    match value {
+        // Accept decimal strings so browser clients can preserve financial precision
+        // beyond IEEE-754 when composing JSON payloads.
+        Value::String(value) => decimal_str(value),
+        _ => decimal_str(&value.to_string()),
+    }
 }
 
 pub fn decimal_str(value: &str) -> Option<Decimal> {
