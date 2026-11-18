@@ -19,6 +19,7 @@ const fmtTime = (value) => value ? localTime(new Date(value)) : '--';
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
 const MAX_ROTATION_DAYS = 3653;
 const MAX_GENERATED_SCHEDULE_ROWS = 40_000;
+const WORKFLOW_TABLE_PAGE_SIZE = 25;
 const rotationDayLimit = (employeeCount) => Math.min(MAX_ROTATION_DAYS, Math.floor(MAX_GENERATED_SCHEDULE_ROWS / Math.max(employeeCount, 1)));
 const nowIso = () => new Date().toISOString();
 const nextLocalDate = (date) => addCalendarDays(date, 1);
@@ -52,6 +53,9 @@ export default function HrmOperationsPage() {
   const [salaryRevisions, setSalaryRevisions] = useState([]);
   const [allocations, setAllocations] = useState([]);
   const [approvalRequests, setApprovalRequests] = useState([]);
+  const [leavePage, setLeavePage] = useState(0);
+  const [employeePage, setEmployeePage] = useState(0);
+  const [revisionPage, setRevisionPage] = useState(0);
   const [attendanceDate, setAttendanceDate] = useState(localDate());
   const [punchEmployee, setPunchEmployee] = useState('');
   const [employeeForm, setEmployeeForm] = useState({ name: '', code: '', department: '', position: '', email: '', phone: '', hire_date: localDate(), base_salary: '', customSchedule: false, work_weekdays: [1, 2, 3, 4, 5], standard_hours_per_day: '8' });
@@ -77,11 +81,11 @@ export default function HrmOperationsPage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [employeeRes, leaveRes, attendanceRes, revisionRes, allocationRes, scheduleRes, patternRes, templateRes, departmentMap, positionMap, requestRes] = await Promise.all([
-        can('hrm.employee.read') ? api(`${dataPath('hrm.employee')}?limit=2000`) : Promise.resolve({ items: [] }),
-        can('hrm.leave_request.read') ? api(`${dataPath('hrm.leave_request')}?limit=2000`) : Promise.resolve({ items: [] }),
-        can('hrm.attendance.read') ? api(`${dataPath('hrm.attendance')}?limit=3000`) : Promise.resolve({ items: [] }),
+        can('hrm.employee.read') ? listAllRows('hrm.employee') : Promise.resolve({ items: [] }),
+        can('hrm.leave_request.read') ? listAllRows('hrm.leave_request') : Promise.resolve({ items: [] }),
+        can('hrm.attendance.read') ? listAllRows('hrm.attendance', { date: attendanceDate }) : Promise.resolve({ items: [] }),
         can('hrm.salary_revision.read') ? loadAllResponse('hrm.salary_revision') : Promise.resolve({ items: [] }),
-        can('hrm.leave_allocation.read') ? api(`${dataPath('hrm.leave_allocation')}?limit=2000`) : Promise.resolve({ items: [] }),
+        can('hrm.leave_allocation.read') ? listAllRows('hrm.leave_allocation') : Promise.resolve({ items: [] }),
         can('hrm.work_schedule_entry.read') ? listAllRows('hrm.work_schedule_entry', { work_date__gte: scheduleMonthStart, work_date__lt: scheduleMonthEnd, sort: 'work_date' }) : Promise.resolve({ items: [] }),
         can('hrm.work_schedule_pattern.read') ? loadAllResponse('hrm.work_schedule_pattern') : Promise.resolve({ items: [] }),
         can('hrm.work_schedule_template.read') ? loadAllResponse('hrm.work_schedule_template') : Promise.resolve({ items: [] }),
@@ -92,7 +96,7 @@ export default function HrmOperationsPage() {
       const employeeRows = itemsOf(employeeRes).sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi'));
       setEmployees(employeeRows); setEmployeeMap(new Map(employeeRows.map((row) => [row.id, row])));
       setLeaveRequests(itemsOf(leaveRes).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))));
-      setAttendance(itemsOf(attendanceRes).filter((row) => row.date === attendanceDate).sort((a, b) => String(a.check_in || '').localeCompare(String(b.check_in || ''))));
+      setAttendance(itemsOf(attendanceRes).sort((a, b) => String(a.check_in || '').localeCompare(String(b.check_in || ''))));
       setSalaryRevisions(itemsOf(revisionRes).sort((a, b) => String(b.effective_from || '').localeCompare(String(a.effective_from || ''))));
       setAllocations(itemsOf(allocationRes)); setDepartments(departmentMap); setPositions(positionMap); setApprovalRequests(itemsOf(requestRes));
       setScheduleEntries(itemsOf(scheduleRes).sort((a, b) => String(a.work_date || '').localeCompare(String(b.work_date || ''))));
@@ -358,6 +362,7 @@ export default function HrmOperationsPage() {
     <div className="layout-split u-legacy-92c18f6bda" >
       <LeaveRequestsTable
         loading={loading} leaveRequests={leaveRequests} employeeMap={employeeMap}
+        page={leavePage} pageSize={WORKFLOW_TABLE_PAGE_SIZE} onPageChange={setLeavePage}
         workflowApproval={workflowApproval} approvalFor={approvalFor} can={can} busy={busy}
         onDecision={leaveDecision}
         onSubmitAgain={(row) => run(`${row.id}:submitted`, () => action('hrm.leave_request', row, 'submitted'), uiText('Đã gửi lại đơn nghỉ phép.'))}
@@ -365,12 +370,14 @@ export default function HrmOperationsPage() {
       />
       <EmployeeDirectoryTable
         loading={loading} employees={employees} departments={departments} positions={positions}
+        page={employeePage} pageSize={WORKFLOW_TABLE_PAGE_SIZE} onPageChange={setEmployeePage}
         can={can} busy={busy} onTerminate={terminateEmployee} recordLabel={recordLabel}
         formatDate={fmtDate} statusLabel={statusLabel} t={uiText}
       />
     </div>
     <SalaryRevisionsTable
       salaryRevisions={salaryRevisions} employeeMap={employeeMap} can={can} busy={busy}
+      page={revisionPage} pageSize={WORKFLOW_TABLE_PAGE_SIZE} onPageChange={setRevisionPage}
       onDecision={revisionDecision}
       onSubmitAgain={(row) => run(`${row.id}:submitted`, () => action('hrm.salary_revision', row, 'submitted'), uiText('Đã gửi lại đề nghị điều chỉnh.'))}
       statusLabel={statusLabel} formatDate={fmtDate} formatMoney={fmtMoney} t={uiText}

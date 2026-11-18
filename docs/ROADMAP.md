@@ -103,3 +103,5 @@ Các module CRM/Marketing, bán hàng, mua hàng, loyalty, logistics, field serv
 - Mỗi phiếu lương lưu lại bộ ngày trong tuần và giờ chuẩn đã dùng để tính, giúp kiểm toán lịch áp dụng sau khi hồ sơ nhân sự thay đổi.
 
 - Lịch nhân sự hỗ trợ ngoại lệ theo ngày và mẫu ca luân phiên; mỗi đợt hỗ trợ tối đa 10 năm và 40.000 dòng lịch cho đội tối đa 50 nhân viên. Số ngày tối đa được tính theo kích thước đội, cho phép đội nhỏ áp dụng lịch trên 2 năm mà vẫn giữ trần tài nguyên. Lịch được sinh theo ngày với múi giờ IANA và khóa các kỳ payroll liên quan; thời điểm lưu trong hệ thống được hiển thị, nhập và lưu theo múi giờ kinh doanh của tenant (bao gồm lịch ca, chấm công, lịch hẹn, sự kiện, buổi học, nhắc gửi và biểu mẫu dữ liệu chung), kể cả khi thiết bị người dùng ở múi giờ khác. Giờ không tồn tại khi chuyển sang giờ mùa hè bị từ chối; giờ lặp khi kết thúc giờ mùa hè chọn lần xuất hiện sớm hơn. Thư viện mẫu ca có tên hỗ trợ lưu và dùng lại chu kỳ cho nhiều đội.
+
+- HRM phân trang các bảng đơn nghỉ, hồ sơ nhân viên và điều chỉnh lương; dữ liệu nhân viên, nghỉ phép, chấm công và hạn mức nghỉ được tải qua nhiều trang API thay vì dừng ở một giới hạn cố định.
