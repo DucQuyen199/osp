@@ -6,7 +6,7 @@ import { fmtDateTime, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.
 import { can, recordLabel } from '../../lib/state.js';
 import eventsEnglish from './events.en.js';
 import { useEventsOperationsData } from './hooks/useEventsOperationsData.js';
-import EventTicketsTable from './components/EventTicketsTable.jsx';
+import EventTicketRegister from './components/EventTicketRegister.jsx';
 const t = (text) => uiTextWith(text, eventsEnglish);
 const inMinutes = (minutes) => localDateTime(new Date(Date.now() + minutes * 60000));
 const paymentMethods = [['cash', 'Tiền mặt'], ['card', 'Thẻ'], ['transfer', 'Chuyển khoản'], ['ewallet', 'Ví điện tử'], ['bank', 'Ngân hàng']];
@@ -116,11 +116,35 @@ export default function EventsOperationsPage() {
       <div className="row full"><span className="grow" /><button className="btn btn-primary" disabled={busy || loading}>{t('Lưu sự kiện nháp')}</button></div>
     </form></section>}
     <section className="card card-pad u-mt-20" ><div className="row wrap"><h2>{t('Sự kiện')}</h2><span className="grow" /><select className="select" aria-label={t("Chọn sự kiện")} value={selectedEventId} onChange={(e) => setSelectedEventId(e.target.value)}><option value="">{t('Chọn sự kiện')}</option>{events.map((event) => <option key={event.id} value={event.id}>{event.name} · {statusLabel(event.status)}</option>)}</select></div>
-      {!selectedEvent ? <div className="empty">{t('Chưa có sự kiện.')}</div> : <><div className="row wrap u-margin-12-0" ><div><strong>{selectedEvent.name}</strong><div className="small muted">{selectedEvent.venue || t('Chưa có địa điểm')} · {fmtDateTime(selectedEvent.starts_at)} · Vé {price(selectedEvent.ticket_price)} · Còn {remaining}/{selectedEvent.capacity}</div></div><span className="grow" />{selectedEvent.status === 'draft' && can('events.event.published') && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => transitionEvent(selectedEvent, 'published')}>{t('Công bố')}</button>}{selectedEvent.status === 'published' && can('events.event.closed') && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => transitionEvent(selectedEvent, 'closed')}>{t('Đóng bán vé')}</button>}</div>
+      {!selectedEvent ? <div className="empty">{t('Chưa có sự kiện.')}</div> : <><EventTicketRegister
+        eventName={selectedEvent.name}
+        venueLabel={selectedEvent.venue || t('Chưa có địa điểm')}
+        startsAtLabel={fmtDateTime(selectedEvent.starts_at)}
+        ticketPriceLabel={price(selectedEvent.ticket_price)}
+        remaining={remaining}
+        capacity={selectedEvent.capacity}
+        showPublish={selectedEvent.status === 'draft' && can('events.event.published')}
+        showClose={selectedEvent.status === 'published' && can('events.event.closed')}
+        busy={busy}
+        tickets={ticketRows}
+        partyName={(id) => parties.has(id) ? recordLabel('master-data.party', parties.get(id)) : ''}
+        paymentMethods={paymentMethods}
+        ticketMethods={ticketMethods}
+        refundReasons={refundReasons}
+        permissions={{ sell: can('events.ticket.sold'), update: can('events.ticket.update'), cancel: can('events.ticket.cancelled'), checkIn: can('events.ticket.checked_in'), refund: can('events.ticket.refunded') }}
+        fmtDateTime={fmtDateTime}
+        statusLabel={statusLabel}
+        price={price}
+        t={t}
+        onPublish={() => transitionEvent(selectedEvent, 'published')}
+        onClose={() => transitionEvent(selectedEvent, 'closed')}
+        onMethodChange={(ticket, value) => setTicketMethods((current) => ({ ...current, [ticket.id]: value }))}
+        onRefundReasonChange={(ticket, value) => setRefundReasons((current) => ({ ...current, [ticket.id]: value }))}
+        onTicketAction={ticketAction}
+      >
         {selectedEvent.status === 'published' && can('events.ticket.create') && <form className="row wrap u-mb-16" onSubmit={reserveTicket} ><select className="select" required value={ticketForm.party} onChange={(e) => setTicketForm((x) => ({ ...x, party: e.target.value }))}><option value="">{t('Chọn người tham dự')}</option>{[...parties.values()].filter((party) => party.active !== false).map((party) => <option key={party.id} value={party.id}>{recordLabel('master-data.party', party)}</option>)}</select><button className="btn btn-primary" disabled={busy || loading || !remaining || !ticketForm.party}>{t('Giữ chỗ')}</button></form>}
         {can('events.ticket.checked_in') && <form className="row wrap u-margin-12-0" onSubmit={scanTicket} ><label className="field"><span className="label">{t('Quét mã vé để check-in')}</span><input className="input" autoComplete="off" autoFocus aria-label={t("Quét hoặc nhập mã vé")} placeholder={t("Quét mã vé rồi nhấn Enter")} value={scanCode} onChange={(event) => setScanCode(event.target.value)} /></label><button className="btn btn-primary" disabled={busy || !scanCode.trim()}>{t('Check-in')}</button></form>}
-        {!eventTickets.length ? <div className="empty">{t('Chưa có vé cho sự kiện này.')}</div> : <EventTicketsTable tickets={ticketRows} partyName={(id) => parties.has(id) ? recordLabel('master-data.party', parties.get(id)) : ''} paymentMethods={paymentMethods} ticketMethods={ticketMethods} refundReasons={refundReasons} busy={busy} permissions={{ sell: can('events.ticket.sold'), update: can('events.ticket.update'), cancel: can('events.ticket.cancelled'), checkIn: can('events.ticket.checked_in'), refund: can('events.ticket.refunded') }} fmtDateTime={fmtDateTime} statusLabel={statusLabel} price={price} t={t} onMethodChange={(ticket, value) => setTicketMethods((current) => ({ ...current, [ticket.id]: value }))} onRefundReasonChange={(ticket, value) => setRefundReasons((current) => ({ ...current, [ticket.id]: value }))} onAction={ticketAction} />}
-        <p className="small muted">{t('Bán vé ghi nhận thanh toán và thuế. Check-in chỉ mở từ 2 giờ trước đến 24 giờ sau giờ bắt đầu; vé đã check-in không thể hoàn.')}</p>
+      </EventTicketRegister>
       </>}
     </section>
   </div>;
