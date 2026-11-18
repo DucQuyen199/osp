@@ -1245,6 +1245,14 @@ pub fn build(reg: &Registry) -> Value {
         } }),
     );
     paths.insert(
+        "/api/t/{tenantId}/events/record/{recordId}".into(),
+        json!({ "get": {
+            "tags": ["tenant operations"], "summary": "Complete event lineage for a tenant record", "security": sec,
+            "parameters": [tid, { "name": "recordId", "in": "path", "required": true, "schema": { "type": "string" } }],
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Chronological root events for this record and every causally descended event in the same tenant", "content": { "application/json": { "schema": { "type": "array", "items": { "type": "object" } } } } })), ("403".to_string(), err("Record lineage is tenant-scoped"))]))
+        } }),
+    );
+    paths.insert(
         "/api/t/{tenantId}/events/page".into(),
         json!({ "get": {
             "tags": ["tenant operations"], "summary": "Paginated cross-module event timeline", "security": sec,

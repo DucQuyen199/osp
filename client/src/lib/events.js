@@ -12,6 +12,7 @@ export function eventTitle(type) {
 }
 
 export const fetchEvents = (limit = 1000) => api(tenantPath(`/events?limit=${limit}`));
+export const fetchRecordEvents = (recordId) => api(tenantPath(`/events/record/${encodeURIComponent(recordId)}`));
 
 export function descendants(events, rootIds) {
   const ids = new Set(rootIds);

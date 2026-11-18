@@ -1822,6 +1822,9 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                 .await?,
             );
         }
+        (&Method::GET, ["events", "record", record_id]) => {
+            return json_ok(k.event_log_for_record(&t, record_id).await?);
+        }
         (&Method::POST, ["webhooks", id, "test"]) => {
             return json_ok(
                 crate::modules::integration_hub::test_webhook(k, &actor, &t, id).await?,

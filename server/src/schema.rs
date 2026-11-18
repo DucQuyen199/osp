@@ -176,6 +176,7 @@ CREATE TABLE IF NOT EXISTS osp_events (
 );
 CREATE INDEX IF NOT EXISTS osp_events_tenant ON osp_events (tenant_id, seq DESC);
 CREATE INDEX IF NOT EXISTS osp_events_record_type ON osp_events (tenant_id, record_id, type, at);
+CREATE INDEX IF NOT EXISTS osp_events_causation ON osp_events (tenant_id, causation_id, seq) WHERE causation_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS osp_audit (
   seq bigserial PRIMARY KEY,

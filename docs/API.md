@@ -155,6 +155,7 @@ curl -X POST $BASE/api/t/$T/data/sales/sales_order/bulk/confirmed \
 | `GET /api/t/:tid/reports/budget/variance?period=` | `budget.budget.read` | So sánh ngân sách đã duyệt với sổ cái; kỳ lọc dùng `YYYY` hoặc `YYYY-MM`. Khi bỏ kỳ, response có `periodSummaries` để giữ tổng năm và tháng tách riêng; các trường tổng ở cấp response là `null`. |
 | `GET /api/t/:tid/events?limit=` | đăng nhập | Nhật ký sự kiện (≤ 1000): `type`, `at`, `depth`, `recordId`, `causationId`, `handled[]` (module, `ok`/`skipped`/`error`, `detail`) |
 | `GET /api/t/:tid/events/page?limit=&offset=&rootsOnly=` | đăng nhập | Trang dòng sự kiện mới nhất và tổng số theo bộ lọc trong cùng snapshot; `limit` tối đa 100, `rootsOnly` chỉ lấy sự kiện gốc. |
+| `GET /api/t/:tid/events/record/:recordId` | đăng nhập | Toàn bộ sự kiện gốc của bản ghi cùng mọi sự kiện dẫn xuất theo `causationId`, chỉ trong tenant hiện tại. |
 | `GET /api/t/:tid/audit?limit=` | `tenant.audit` | Nhật ký kiểm toán tương thích cũ: ai, làm gì, trên bản ghi nào; tối đa 1.000 dòng gần nhất. |
 | `GET /api/t/:tid/audit/page?limit=&offset=&userId=&action=&target=` | `tenant.audit` | Một trang nhật ký kiểm toán và tổng số sau lọc trong cùng snapshot; lọc chính xác theo người/hành động, tìm chứa theo mã đối tượng; trả danh mục hành động. `limit` tối đa 100. |
 

@@ -404,6 +404,26 @@ impl Kernel {
         )
     }
 
+    pub async fn event_log_for_record(&self, t: &Tenant, record_id: &str) -> R<Value> {
+        let mut conn = self.pool.get().await?;
+        let tx = Tx::begin_snapshot(&mut conn, &t.id).await?;
+        let rows = tx
+            .query_json(
+                "WITH RECURSIVE event_tree AS ( \
+                   SELECT seq, id, type, at, depth, record_id, causation_id, handled \
+                   FROM osp_events WHERE tenant_id = $1 AND record_id = $2 \
+                   UNION \
+                   SELECT child.seq, child.id, child.type, child.at, child.depth, child.record_id, child.causation_id, child.handled \
+                   FROM osp_events child JOIN event_tree parent ON child.tenant_id = $1 AND child.causation_id = parent.id \
+                 ) \
+                 SELECT jsonb_build_object('id', id, 'type', type, 'at', at, 'depth', depth, 'recordId', record_id, 'causationId', causation_id, 'handled', handled) \
+                 FROM event_tree ORDER BY at, depth, seq",
+                &[&t.id, &record_id],
+            )
+            .await?;
+        Ok(Value::Array(rows))
+    }
+
     pub async fn audit_log(&self, actor: &Actor, t: &Tenant, limit: i64) -> R<Value> {
         self.authorize(t, actor, "tenant.audit")?;
         let mut conn = self.pool.get().await?;

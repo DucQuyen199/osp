@@ -791,6 +791,30 @@ async fn run(k: Arc<Kernel>, url: String, defs: PathBuf) {
             .api("GET", "/events/page?rootsOnly=yes", json!(null))
             .await;
         assert_eq!(invalid_filter_status, 422);
+        let lineage_root = events["items"]
+            .as_array()
+            .unwrap_or(events.as_array().unwrap())
+            .iter()
+            .find(|event| event["depth"] == 0 && event["recordId"].as_str().is_some())
+            .unwrap()
+            .clone();
+        let record_id = lineage_root["recordId"].as_str().unwrap();
+        let record_lineage = k.event_log_for_record(&t.t, record_id).await.unwrap();
+        assert!(
+            record_lineage
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|event| event["id"] == lineage_root["id"])
+        );
+        let (lineage_status, lineage_response) = t
+            .api("GET", &format!("/events/record/{record_id}"), json!(null))
+            .await;
+        assert_eq!(lineage_status, 200, "{lineage_response}");
+        assert_eq!(
+            lineage_response.as_array().unwrap().len(),
+            record_lineage.as_array().unwrap().len()
+        );
         step!("CRM → đơn bán → hóa đơn → HĐĐT → thu tiền");
     }
 

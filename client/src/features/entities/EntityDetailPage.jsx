@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { confirmDialog, textDialog, toast } from '../../lib/feedback.js';
-import { descendants, eventTitle, fetchEvents, moduleName } from '../../lib/events.js';
+import { descendants, eventTitle, fetchRecordEvents, moduleName } from '../../lib/events.js';
 import {
   actionLabel, fmtAgo, fmtDate, fmtDateTime, fmtMoney, fmtNumber, fmtTime, statusLabel, tone, uiText,
 } from '../../lib/i18n.js';
@@ -105,7 +105,7 @@ export default function EntityDetailPage({ qname, id }) {
   useEffect(() => {
     if (tab !== 'flow') return;
     let active = true;
-    fetchEvents(1000).then((all) => {
+    fetchRecordEvents(id).then((all) => {
       if (!active) return;
       const roots = all.filter((event) => event.recordId === id).map((event) => event.id);
       setEvents(descendants(all, roots));
@@ -150,7 +150,7 @@ export default function EntityDetailPage({ qname, id }) {
       await api(dataPath(qname, id, action), { method: 'POST', ...(body ? { body } : {}) });
       invalidateRefs(qname);
       entityChanged(qname);
-      const all = await fetchEvents(1000).catch(() => []);
+      const all = await fetchRecordEvents(id).catch(() => []);
       const roots = all.filter((event) => event.recordId === id && event.type === `${qname}.${action}`).slice(-1).map((event) => event.id);
       const chain = descendants(all, roots).filter((event) => !roots.includes(event.id));
       toast(chain.length
