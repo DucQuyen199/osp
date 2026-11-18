@@ -14,7 +14,7 @@ function VarianceStats({ summary }) {
     <div className="card stat"><span className="stat-label">{uiText('Doanh thu kế hoạch')}</span><strong className="stat-value num">{fmtMoney(summary.revenuePlannedTotal)}</strong></div>
     <div className="card stat"><span className="stat-label">{uiText('Doanh thu thực tế')}</span><strong className="stat-value num">{fmtMoney(summary.revenueActualTotal)}</strong></div>
     <div className="card stat"><span className="stat-label">{uiText('Chênh lệch doanh thu')}</span><strong className="stat-value num">{fmtMoney(summary.revenueVarianceTotal)}</strong></div>
-    <div className="card stat"><span className="stat-label">{uiText('Dòng bất lợi')}</span><strong className="stat-value num">{fmtNumber(Number(summary.unfavorableLines || summary.overBudgetLines || 0))}</strong></div>
+    <div className="card stat"><span className="stat-label">{uiText('Dòng bất lợi')}</span><strong className="stat-value num">{fmtNumber(String(summary.unfavorableLines || summary.overBudgetLines || 0))}</strong></div>
   </div>;
 }
 export default function BudgetVariancePage() {

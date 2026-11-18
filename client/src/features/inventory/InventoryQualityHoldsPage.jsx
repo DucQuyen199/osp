@@ -93,7 +93,7 @@ export default function InventoryQualityHoldsPage() {
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
     {loading && !report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : report && <div className="stack">
       <div className="stats">
-        <div className="card stat"><span className="stat-label">{uiText('Phiếu kiểm tra còn giữ hàng')}</span><strong className="stat-value num">{fmtNumber(Number(report.itemCount || 0))}</strong></div>
+        <div className="card stat"><span className="stat-label">{uiText('Phiếu kiểm tra còn giữ hàng')}</span><strong className="stat-value num">{fmtNumber(String(report.itemCount || 0))}</strong></div>
         <div className="card stat"><span className="stat-label">{uiText('Số lượng đang giữ theo đơn vị gốc')}</span><strong className="stat-value num">{report.heldQtyByUnit?.length ? report.heldQtyByUnit.map((row) => `${quantity(row.qty)} ${row.unit}`).join(' · ') : '0'}</strong></div>
         <div className="card stat"><span className="stat-label">{uiText('Giá trị đang giữ')}</span><strong className="stat-value num">{fmtMoney(report.heldValue)}</strong></div>
       </div>

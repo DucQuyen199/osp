@@ -120,9 +120,16 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
             Some("approved" | "in_progress")
         )
         && patch.as_object().is_some_and(|fields| {
-            ["lines", "warehouse", "complaint", "odometer_reading"]
-                .iter()
-                .any(|field| fields.contains_key(*field))
+            [
+                "vehicle",
+                "party",
+                "lines",
+                "warehouse",
+                "complaint",
+                "odometer_reading",
+            ]
+            .iter()
+            .any(|field| fields.contains_key(*field))
         })
     {
         return vec![

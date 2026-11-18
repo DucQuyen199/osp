@@ -1,5 +1,6 @@
 import React from 'react';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../../lib/i18n.js';
+import { absDecimal, compareDecimals } from '../../../lib/decimal.js';
 
 export default function SupplierInvoicesPanel({
   invoices, bills, approvalByInvoice, currencies, baseCurrencyCode, workflowApproval, busy,
@@ -12,12 +13,12 @@ export default function SupplierInvoicesPanel({
     {invoices.map((invoice) => {
       const bill = bills.find((row) => row.supplier_invoice_id === invoice.id);
       const approval = approvalByInvoice.get(invoice.id);
-      const variance = Number(invoice.price_variance || 0);
+      const variance = String(invoice.price_variance ?? 0);
       const invoiceCurrencyCode = currencies.get(invoice.currency)?.code || baseCurrencyCode;
       const adjustmentSummary = (invoice.adjustments || []).map((item) => `${uiText(item.kind === 'discount' ? 'Chiết khấu' : 'Phí')}: ${item.description} ${fmtMoney(item.amount, invoiceCurrencyCode)}`).join(' · ');
       return <div className="row wrap u-list-row-divider" key={invoice.id}>
         <div className="grow"><strong>{invoice.invoice_number}</strong>
-          <div className="small muted">{fmtDate(invoice.issue_date)} · {fmtMoney(invoice.total, invoiceCurrencyCode)}{invoiceCurrencyCode !== baseCurrencyCode && invoice.base_total != null ? ` (${fmtMoney(invoice.base_total, baseCurrencyCode)})` : ''} · {statusLabel(invoice.status)}{Math.abs(variance) > 0.000001 ? <> · {uiText('Chênh lệch ròng sau quy đổi:')} {fmtMoney(variance, baseCurrencyCode)}</> : null}</div>
+          <div className="small muted">{fmtDate(invoice.issue_date)} · {fmtMoney(invoice.total, invoiceCurrencyCode)}{invoiceCurrencyCode !== baseCurrencyCode && invoice.base_total != null ? ` (${fmtMoney(invoice.base_total, baseCurrencyCode)})` : ''} · {statusLabel(invoice.status)}{compareDecimals(absDecimal(variance), '0.000001') > 0 ? <> · {uiText('Chênh lệch ròng sau quy đổi:')} {fmtMoney(variance, baseCurrencyCode)}</> : null}</div>
           {adjustmentSummary && <div className="small muted">{adjustmentSummary}</div>}
           {invoice.status === 'submitted' && approval && <div className="small"><a href={`#/e/workflow-approval/approval_request/${approval.id}`}>{uiText('Mở yêu cầu duyệt ·')} {statusLabel(approval.status)}</a></div>}
         </div>

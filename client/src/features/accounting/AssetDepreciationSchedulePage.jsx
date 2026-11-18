@@ -47,13 +47,13 @@ export default function AssetDepreciationSchedulePage() {
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
     {loading && !report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : report && <div className="stack">
       <div className="stats">
-        <div className="card stat"><span className="stat-label">{uiText('Tài sản đang hoạt động')}</span><strong className="stat-value num">{fmtNumber(Number(report.assetCount || 0))}</strong></div>
+        <div className="card stat"><span className="stat-label">{uiText('Tài sản đang hoạt động')}</span><strong className="stat-value num">{fmtNumber(String(report.assetCount || 0))}</strong></div>
         <div className="card stat"><span className="stat-label">{uiText('Kỳ dự báo')}</span><strong className="stat-value">{report.from} – {report.to}</strong></div>
         <div className="card stat"><span className="stat-label">{uiText('Tổng khấu hao dự kiến')}</span><strong className="stat-value num">{fmtMoney(report.totalProjected)}</strong></div>
       </div>
       <div className="alert info" role="status">{uiText('Dự báo được tính từ hao mòn đã ghi sổ tại {date}. Kỳ đã có phiếu nháp được đánh dấu; báo cáo không tạo phiếu khấu hao hoặc bút toán.').replace('{date}', report.asOf)}</div>
       <section className="card report-section">
-        <div className="card-head"><h2>{uiText('Chi tiết theo kỳ')}</h2><span className="faint">{uiText('{count} dòng').replace('{count}', fmtNumber(Number(report.scheduleRows || 0)))}</span></div>
+        <div className="card-head"><h2>{uiText('Chi tiết theo kỳ')}</h2><span className="faint">{uiText('{count} dòng').replace('{count}', fmtNumber(String(report.scheduleRows || 0)))}</span></div>
         {rows.length ? <div className="table-wrap"><table className="table">
           <thead><tr><th scope="col">{uiText('Mã tài sản')}</th><th scope="col">{uiText('Tài sản')}</th><th scope="col">{uiText('Kỳ')}</th><th scope="col">{uiText('Phiếu')}</th><th scope="col" className="right">{uiText('Khấu hao kỳ')}</th><th scope="col" className="right">{uiText('Hao mòn lũy kế dự kiến')}</th><th scope="col" className="right">{uiText('Giá trị còn lại')}</th></tr></thead>
           <tbody>{rows.map((row) => <tr key={`${row.assetId}:${row.period}`}>

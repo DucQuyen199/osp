@@ -32,8 +32,8 @@ function TaxDocumentTable({ rows }) {
         <td>{document.counterparty || '—'}</td>
         <td className="mono">{document.taxCode || '—'}</td>
         <td><details><summary>{lines.length} dòng</summary><div className="table-wrap"><table className="table"><caption className="sr-only">{["Hàng hóa / dịch vụ", "Thuế", "Cơ sở tính thuế", "Tiền thuế"].map(uiText).join(' · ')}</caption><thead><tr><th scope="col">{uiText("Hàng hóa / dịch vụ")}</th><th scope="col">{uiText("Thuế")}</th><th scope="col" className="right">{uiText("Cơ sở tính thuế")}</th><th scope="col" className="right">{uiText("Tiền thuế")}</th></tr></thead><tbody>{lines.map((line, index) => {
-          const tax = Number(line.base_tax_amount) || 0;
-          const base = Number(line.base_net_amount) || 0;
+          const tax = String(line.base_tax_amount ?? 0);
+          const base = String(line.base_net_amount ?? 0);
           const name = line.product_name || line.name || line.description || line.product || uiText('Dòng chứng từ');
           const rate = line.tax_rate == null ? (line.tax_name || uiText('Chưa phân loại')) : `${line.tax_name || uiText('Thuế')} · ${line.tax_rate}%`;
           return <tr key={`${document.id}:line:${index}`}><td>{name}</td><td>{rate}</td><td className="right money">{fmtMoney(base)}</td><td className="right money">{fmtMoney(tax)}</td></tr>;

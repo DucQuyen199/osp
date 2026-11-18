@@ -29,7 +29,7 @@ export default function InventoryLotTraceabilityPage({ lotId }) {
       <div className="stats">
         <div className="card stat"><span className="stat-label">{uiText('Còn trong kho')}</span><strong className="stat-value num">{quantity(report.quantity)}{report.lot.unit ? ` ${report.lot.unit}` : ''}</strong></div>
         <div className="card stat"><span className="stat-label">{uiText('Giá trị còn lại')}</span><strong className="stat-value money">{fmtMoney(report.value)}</strong></div>
-        <div className="card stat"><span className="stat-label">{uiText('Biến động')}</span><strong className="stat-value num">{fmtNumber(Number(report.movementCountTotal))}</strong></div>
+        <div className="card stat"><span className="stat-label">{uiText('Biến động')}</span><strong className="stat-value num">{fmtNumber(String(report.movementCountTotal))}</strong></div>
       </div>
       <section className="card report-section"><div className="card-head"><h2>{uiText('Số dư theo kho')}</h2></div>
         {!report.balances.length ? <div className="empty"><p>{uiText('Lô chưa có số dư tồn kho.')}</p></div> : <div className="table-wrap"><table className="table">

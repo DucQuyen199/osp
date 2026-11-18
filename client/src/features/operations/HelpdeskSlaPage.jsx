@@ -56,9 +56,9 @@ export default function HelpdeskSlaPage() {
     {!report && !error && <div className="card-pad"><div className="skeleton" data-h="row" /></div>}
     {report && <div className="stack">
       <div className="stats">
-        {stats.map(([label, value]) => <div className="card stat" key={label}><span className="stat-label">{label}</span><strong className="stat-value num">{fmtNumber(Number(value || 0))}</strong></div>)}
-        <div className="card stat"><span className="stat-label">{t('Ticket chưa gán SLA')}</span><strong className="stat-value num">{fmtNumber(Number(report.responseUnassigned || 0))}</strong></div>
-        <div className="card stat"><span className="stat-label">{t('Tổng ticket')}</span><strong className="stat-value num">{fmtNumber(Number(report.totalTickets || 0))}</strong></div>
+        {stats.map(([label, value]) => <div className="card stat" key={label}><span className="stat-label">{label}</span><strong className="stat-value num">{fmtNumber(String(value || 0))}</strong></div>)}
+        <div className="card stat"><span className="stat-label">{t('Ticket chưa gán SLA')}</span><strong className="stat-value num">{fmtNumber(String(report.responseUnassigned || 0))}</strong></div>
+        <div className="card stat"><span className="stat-label">{t('Tổng ticket')}</span><strong className="stat-value num">{fmtNumber(String(report.totalTickets || 0))}</strong></div>
       </div>
       {!report.tickets?.length && report.totalTickets === 0 ? <div className="empty"><h3>{t('Chưa có ticket')}</h3><p>{t('Tạo ticket và gắn chính sách SLA để theo dõi thời hạn phản hồi, giải quyết.')}</p></div> : !report.tickets?.length ? <div className="empty">{t('Không có ticket ở trang này.')}</div> : <div className="card table-wrap"><table className="table">
         <thead><tr><th scope="col">{t('Ticket')}</th><th scope="col">{t('Trạng thái')}</th><th scope="col">{t('Tạo lúc')}</th><th scope="col">{t('Phản hồi đầu')}</th><th scope="col">{t('Hạn phản hồi')}</th><th scope="col">{t('SLA phản hồi')}</th><th scope="col">{t('Hạn giải quyết')}</th><th scope="col">{t('SLA giải quyết')}</th></tr></thead>

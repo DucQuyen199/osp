@@ -362,7 +362,7 @@ export default function ManufacturingWipPage() {
     </section>
     {report && <div className="stack">
       <div className="stats">
-        <div className="card stat"><span className="stat-label">{t("Lệnh có số dư WIP")}</span><strong className="stat-value num">{fmtNumber(Number(report.orderCount || 0))}</strong></div>
+        <div className="card stat"><span className="stat-label">{t("Lệnh có số dư WIP")}</span><strong className="stat-value num">{fmtNumber(String(report.orderCount || 0))}</strong></div>
         <div className="card stat"><span className="stat-label">{t("Tổng giá trị WIP")}</span><strong className="stat-value num">{fmtMoney(report.totalWipValue)}</strong></div>
         {report.ledgerComparisonAvailable && <div className="card stat"><span className="stat-label">{t("Số dư TK 154 trên sổ cái")}</span><strong className="stat-value num">{fmtMoney(report.ledgerWipBalance)}</strong></div>}
         {report.ledgerComparisonAvailable && <div className="card stat"><span className="stat-label">{t("Chênh lệch WIP - TK 154")}</span><strong className="stat-value num">{fmtMoney(report.wipVariance)}</strong><span className={`badge ${report.reconciled ? 'success' : 'danger'}`}>{report.reconciled ? t("Khớp") : t("Cần đối chiếu")}</span></div>}
