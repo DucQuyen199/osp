@@ -8,13 +8,25 @@ use uuid::Uuid;
 
 #[derive(Hash, PartialEq, Eq)]
 enum PriceBucket {
-    Cents(Decimal, Option<String>),
+    Cents(Decimal, Option<String>, Decimal, Option<String>, Decimal),
 }
 
-fn price_bucket(price: Decimal, unit: Option<String>) -> PriceBucket {
+fn line_discount_pct(line: &Value) -> Decimal {
+    line.get("effective_discount_pct")
+        .and_then(money::decimal)
+        .or_else(|| line.get("discount_pct").and_then(money::decimal))
+        .unwrap_or(Decimal::ZERO)
+}
+
+fn price_bucket(line: &Value, price: Decimal, unit: Option<String>) -> PriceBucket {
     PriceBucket::Cents(
         price.round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero),
         unit,
+        line_discount_pct(line),
+        line.get("tax").and_then(Value::as_str).map(str::to_owned),
+        line.get("tax_rate")
+            .and_then(money::decimal)
+            .unwrap_or(Decimal::ZERO),
     )
 }
 
@@ -70,6 +82,7 @@ fn quantities(lines: &Value) -> R<HashMap<(String, PriceBucket), Decimal>> {
         let key = (
             product.to_string(),
             price_bucket(
+                line,
                 price,
                 line.get("uom").and_then(Value::as_str).map(str::to_owned),
             ),

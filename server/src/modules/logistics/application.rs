@@ -10,6 +10,23 @@ use rust_decimal::Decimal;
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
+fn line_discount_pct(line: &Value) -> Decimal {
+    line.get("effective_discount_pct")
+        .and_then(money::decimal)
+        .or_else(|| line.get("discount_pct").and_then(money::decimal))
+        .unwrap_or(Decimal::ZERO)
+}
+
+fn line_tax_id(line: &Value) -> Option<&str> {
+    line.get("tax").and_then(Value::as_str)
+}
+
+fn line_tax_rate(line: &Value) -> Decimal {
+    line.get("tax_rate")
+        .and_then(money::decimal)
+        .unwrap_or(Decimal::ZERO)
+}
+
 pub async fn handle_source_event(
     kernel: &Kernel,
     tx: &Tx<'_>,
@@ -256,9 +273,9 @@ pub async fn prepare_shipment(
                 index + 1
             )]);
         }
-        let Some(mut line) = ordered_lines
+        let candidates: Vec<&Value> = ordered_lines
             .iter()
-            .find(|line| {
+            .filter(|line| {
                 line.get("product").and_then(Value::as_str) == Some(product)
                     && requested
                         .get("uom")
@@ -271,13 +288,40 @@ pub async fn prepare_shipment(
                             money::within_tolerance(ordered_price, price, Decimal::new(5, 3))
                         })
             })
-            .cloned()
-        else {
+            .filter(|line| {
+                requested
+                    .get("discount_pct")
+                    .or_else(|| requested.get("effective_discount_pct"))
+                    .is_none_or(|discount| {
+                        money::decimal(discount)
+                            .is_some_and(|discount| line_discount_pct(line) == discount)
+                    })
+                    && requested
+                        .get("tax")
+                        .is_none_or(|tax| tax.as_str() == line_tax_id(line))
+                    && requested.get("tax_rate").is_none_or(|rate| {
+                        money::decimal(rate).is_some_and(|rate| line_tax_rate(line) == rate)
+                    })
+            })
+            .collect();
+        let Some(first) = candidates.first() else {
             return Ok(vec![format!(
                 "Dòng vận đơn {} không khớp mặt hàng/đơn giá trong đơn bán",
                 index + 1
             )]);
         };
+        let fiscal_terms_differ = candidates.iter().skip(1).any(|line| {
+            line_discount_pct(line) != line_discount_pct(first)
+                || line_tax_id(line) != line_tax_id(first)
+                || line_tax_rate(line) != line_tax_rate(first)
+        });
+        if fiscal_terms_differ {
+            return Ok(vec![format!(
+                "Dòng vận đơn {} khớp nhiều dòng đơn bán có chiết khấu/thuế khác nhau; cần truyền rõ điều kiện tài chính",
+                index + 1
+            )]);
+        }
+        let mut line = (*first).clone();
         if let Some(line) = line.as_object_mut() {
             line.insert(
                 "qty".into(),
