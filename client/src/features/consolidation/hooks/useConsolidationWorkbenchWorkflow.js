@@ -11,6 +11,7 @@ export function useConsolidationWorkbenchWorkflow({ groups, currencies, load, t 
   const [acceptForm, setAcceptForm] = useState({ ownerTenantId: '', memberId: '', inviteToken: '' });
   const [inviteResult, setInviteResult] = useState(null);
   const [grantUserId, setGrantUserId] = useState('');
+  const [grantReportType, setGrantReportType] = useState('trial_balance');
   const [reportGroup, setReportGroup] = useState('');
   const [reportFrom, setReportFrom] = useState('');
   const [reportTo, setReportTo] = useState('');
@@ -82,7 +83,7 @@ export function useConsolidationWorkbenchWorkflow({ groups, currencies, load, t 
   }
   async function createReportGrant(event) {
     event.preventDefault();
-    const result = await run('grant', () => api(tenantPath(`/consolidation/groups/${encodeURIComponent(reportGroup)}/report-grants`), { method: 'POST', body: { userId: grantUserId.trim(), reportType: 'trial_balance' } }), t('Đã cấp quyền xem bảng cân đối phát sinh.'));
+    const result = await run('grant', () => api(tenantPath(`/consolidation/groups/${encodeURIComponent(reportGroup)}/report-grants`), { method: 'POST', body: { userId: grantUserId.trim(), reportType: grantReportType } }), t('Đã cấp quyền xem báo cáo.'));
     if (result) setGrantUserId('');
   }
   async function revokeReportGrant(grant) {
@@ -161,7 +162,7 @@ export function useConsolidationWorkbenchWorkflow({ groups, currencies, load, t 
 
   return {
     groupForm, setGroupForm, inviteForm, setInviteForm, acceptForm, setAcceptForm, inviteResult,
-    grantUserId, setGrantUserId, reportGroup, reportFrom, reportTo, report, ratePolicyDays, setRatePolicyDays,
+    grantUserId, setGrantUserId, grantReportType, setGrantReportType, reportGroup, reportFrom, reportTo, report, ratePolicyDays, setRatePolicyDays,
     reportSnapshots, eliminationForm, selectedSnapshotId, busy, error, notice,
     createGroup, selectReportGroup, changeReportPeriod, saveRatePolicy, invite, accept, revokeMember, revokeShare,
     createReportGrant, revokeReportGrant, loadReport, saveReportSnapshot, openReportSnapshot,

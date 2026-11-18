@@ -2,13 +2,14 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **51 module**, **208 loại dữ liệu**, **948 sự kiện**.
+Tổng: **51 module**, **209 loại dữ liệu**, **951 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
 | [`master-data`](#master-data) — Dữ liệu gốc | Lõi | — |
 | [`hrm`](#hrm) — Nhân sự | Nhân sự | `master-data` |
-| [`accounting`](#accounting) — Kế toán | Tài chính | `master-data`, `hrm` |
+| [`integration-hub`](#integration-hub) — Cổng tích hợp | Nền tảng dùng chung | — |
+| [`accounting`](#accounting) — Kế toán | Tài chính | `master-data`, `hrm`, `integration-hub` |
 | [`inventory`](#inventory) — Kho | Chuỗi cung ứng | `master-data` |
 | [`agriculture`](#agriculture) — Nông nghiệp | Module chuyên ngành | `master-data`, `inventory` |
 | [`asset`](#asset) — Tài sản cố định | Tài chính | `master-data`, `accounting` |
@@ -35,7 +36,6 @@ Tổng: **51 module**, **208 loại dữ liệu**, **948 sự kiện**.
 | [`field-service`](#field-service) — Dịch vụ hiện trường | Bán hàng & khách hàng | `master-data`, `inventory`, `accounting`, `helpdesk`, `hrm` |
 | [`hotel`](#hotel) — Khách sạn / Lưu trú | Module chuyên ngành | `master-data`, `accounting` |
 | [`insurance`](#insurance) — Bảo hiểm | Module chuyên ngành | `master-data`, `accounting` |
-| [`integration-hub`](#integration-hub) — Cổng tích hợp | Nền tảng dùng chung | — |
 | [`lending`](#lending) — Cho vay / Tài chính vi mô | Module chuyên ngành | `master-data`, `accounting` |
 | [`lms`](#lms) — Đào tạo (LMS) | Nhân sự | `master-data` |
 | [`logistics`](#logistics) — Vận tải & giao hàng | Chuỗi cung ứng | `master-data`, `inventory` |
@@ -257,6 +257,7 @@ Tổng: **51 module**, **208 loại dữ liệu**, **948 sự kiện**.
 | `settlement_batch` Phiếu thu/chi phân bổ công nợ | `draft` → **approved** (submitted→approved), **cancelled** (draft/rejected→cancelled), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 | `journal_entry` Bút toán | `draft` → **posted** (draft/submitted→posted), **rejected** (submitted→rejected), **reversed** (posted→reversed), **submitted** (draft/rejected→submitted) |
 | `bank_statement` Sao kê ngân hàng | `draft` → **cancelled** (draft→cancelled), **reconciled** (draft→reconciled) |
+| `bank_feed_schedule` Lịch đồng bộ sao kê ngân hàng | — |
 | `bank_statement_line` Dòng sao kê ngân hàng | `unmatched` → **ignored** (unmatched→ignored), **matched** (unmatched→matched) |
 
 ### asset
@@ -394,6 +395,15 @@ Tổng: **51 module**, **208 loại dữ liệu**, **948 sự kiện**.
 
 ## Nền tảng dùng chung
 
+### integration-hub
+**Cổng tích hợp** — Kết nối bên ngoài: connector (ngân hàng, vận chuyển, HĐĐT, Zalo...), webhook, API key.
+
+| Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
+|---|---|
+| `connector` Connector | — |
+| `webhook` Webhook | — |
+| `api_key` API key | — |
+
 ### communication
 **Truyền thông & thông báo** — Kênh (email/SMS/Zalo/push/webhook), mẫu tin, nhật ký gửi. Tự ghi thông báo cho các sự kiện chính.
 
@@ -422,15 +432,6 @@ Tổng: **51 module**, **208 loại dữ liệu**, **948 sự kiện**.
 | `folder` Thư mục | — |
 | `document` Tài liệu | — |
 | `signature_request` Yêu cầu ký | `pending` → **declined** (pending→declined), **signed** (pending→signed) |
-
-### integration-hub
-**Cổng tích hợp** — Kết nối bên ngoài: connector (ngân hàng, vận chuyển, HĐĐT, Zalo...), webhook, API key.
-
-| Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
-|---|---|
-| `connector` Connector | — |
-| `webhook` Webhook | — |
-| `api_key` API key | — |
 
 ### workflow-approval
 **Phê duyệt** — Luồng duyệt dùng chung. Đơn mua, đề nghị chi phí... tự sinh yêu cầu duyệt khi module này được bật; duyệt xong tự chuyển trạng thái chứng từ gốc.

@@ -2,13 +2,13 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { localMonth } from '../../lib/dates.js';
-import { api, dataPath } from '../../lib/api.js';
 import { statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { estimateUtilityCharge } from './domain/utilityEstimate.js';
 import { can, loadRefs, recordLabel, loadAllResponse, loadIndependentData } from '../../lib/state.js';
 import utilitiesEnglish from './utilities.en.js';
 import TariffTiersEditor from './components/TariffTiersEditor.jsx';
 import UtilityReadingsRegister from './components/UtilityReadingsRegister.jsx';
+import { useUtilitiesWorkflow } from './hooks/useUtilitiesWorkflow.js';
 const t = (text) => uiTextWith(text, utilitiesEnglish);
 const currentPeriod = localMonth;
 const MAX_TARIFF_TIERS = 20;
@@ -34,10 +34,8 @@ export default function UtilitiesWorkbenchPage() {
   const [tariffTiersDraft, setTariffTiersDraft] = useState([]);
   const [period, setPeriod] = useState(currentPeriod());
   const [readingValue, setReadingValue] = useState('');
-  const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const latestRequest = useLatestRequest();
   const load = useCallback(async () => {
     const isLatest = latestRequest();
@@ -78,57 +76,12 @@ export default function UtilitiesWorkbenchPage() {
   const invoiceByBill = new Map(invoices.filter((item) => item.source === 'utility_bill').map((item) => [item.source_id, item]));
   const isPeriodDuplicate = meterReadings.some((item) => item.period === period);
   const isPeriodBackdated = Boolean(latest && period < latest.period);
-  async function createReading(event) {
-    event.preventDefault(); setBusy(true); setError(''); setNotice('');
-    try {
-      await api(dataPath('utilities.meter_reading'), { method: 'POST', body: { meter: selectedMeter, period, reading: String(readingValue) } });
-      setNotice(t("Đã ghi nhận chỉ số; mức tiêu thụ và tiền được tính theo dữ liệu công tơ.")); setReadingValue(''); await load();
-    } catch (reason) { setError(reason.message || t("Không thể ghi chỉ số.")); }
-    finally { setBusy(false); }
-  }
-  async function createMeter(event) {
-    event.preventDefault(); setBusy(true); setError(''); setNotice('');
-    try {
-      const created = await api(dataPath('utilities.meter'), { method: 'POST', body: {
-        party: meterForm.party, code: meterForm.code.trim(), kind: meterForm.kind, rate: String(meterForm.rate),
-        fixed_charge: String(meterForm.fixed_charge || 0),
-        tariff_tiers: meterForm.tariff_tiers.map(serializeTariffTier),
-        ...(meterForm.opening_reading !== '' ? { opening_reading: String(meterForm.opening_reading) } : {}),
-        ...(meterForm.address.trim() ? { address: meterForm.address.trim() } : {}),
-      } });
-      setMeterForm((current) => ({ ...current, code: '', rate: '', fixed_charge: '0', tariff_tiers: [], opening_reading: '', address: '' }));
-      await load(); setSelectedMeter(created.id); setNotice(t("Đã tạo công-tơ/thuê bao với biểu giá ban đầu."));
-    } catch (reason) { setError(reason.message || t("Không thể tạo công-tơ/thuê bao.")); }
-    finally { setBusy(false); }
-  }
-  async function updateRate(event) {
-    event.preventDefault(); if (!meter || rateDraft === '' || fixedChargeDraft === '') return;
-    setBusy(true); setError(''); setNotice('');
-    try {
-      await api(dataPath('utilities.meter', meter.id), { method: 'PATCH', body: {
-        rate: String(rateDraft), fixed_charge: String(fixedChargeDraft || 0),
-        tariff_tiers: tariffTiersDraft.map(serializeTariffTier),
-      } });
-      setNotice(t("Đã cập nhật đơn giá. Giá mới áp dụng cho lần ghi chỉ số tiếp theo; các kỳ đã ghi giữ nguyên đơn giá lịch sử.")); await load();
-    } catch (reason) { setError(reason.message || t("Không thể cập nhật đơn giá.")); }
-    finally { setBusy(false); }
-  }
-  async function createBill(reading) {
-    setBusy(true); setError(''); setNotice('');
-    try {
-      await api(dataPath('utilities.utility_bill'), { method: 'POST', body: { meter_reading: reading.id, status: 'draft' } });
-      setNotice(`${t('Đã lập hóa đơn nháp cho kỳ')} ${reading.period}.`); await load();
-    } catch (reason) { setError(reason.message || t("Không thể lập hóa đơn.")); }
-    finally { setBusy(false); }
-  }
-  async function transition(bill, action) {
-    setBusy(true); setError(''); setNotice('');
-    try {
-      await api(dataPath('utilities.utility_bill', bill.id, action), { method: 'POST' });
-      setNotice(action === 'issued' ? t('Đã phát hành hóa đơn và tạo hóa đơn phải thu kế toán.') : t('Đã cập nhật trạng thái đã thanh toán.')); await load();
-    } catch (reason) { setError(reason.message || t("Không thể cập nhật hóa đơn.")); }
-    finally { setBusy(false); }
-  }
+  const workflow = useUtilitiesWorkflow({
+    load, meter, selectedMeter, setSelectedMeter, period, readingValue, setReadingValue,
+    meterForm, setMeterForm, rateDraft, fixedChargeDraft, tariffTiersDraft,
+    setError, serializeTariffTier, t,
+  });
+  const { busy, notice, createReading, createMeter, updateRate, createBill, transition } = workflow;
   const canReadBills = can('utilities.utility_bill.read');
   const readingRows = meterReadings.map((item) => {
     const bill = billByReading.get(item.id);

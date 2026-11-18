@@ -10,6 +10,7 @@ mod plaid_feed;
 mod salt_edge_feed;
 mod schedule_worker;
 mod sepay_feed;
+mod webhook;
 
 pub use import::{
     complete_plaid_link, complete_salt_edge_link, create_plaid_link_token,
@@ -20,3 +21,4 @@ pub use import::{
 };
 
 pub use schedule_worker::run_scheduled_bank_feeds_once;
+pub use webhook::receive_bank_feed_webhook;

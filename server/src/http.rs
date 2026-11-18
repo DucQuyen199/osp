@@ -557,7 +557,10 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
         ));
     }
     let seg = |i: usize| segs.get(i).map(|x| x.as_str());
-    let limit = if method == Method::POST && seg(1) == Some("hooks") && seg(2) == Some("carrier") {
+    let limit = if method == Method::POST
+        && seg(1) == Some("hooks")
+        && matches!(seg(2), Some("carrier" | "bank-feed"))
+    {
         65_536
     } else if method == Method::POST && seg(3) == Some("documents") && seg(5) == Some("attachments")
     {
@@ -599,6 +602,48 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     &tenant,
                     connector_id,
                     signature,
+                    &bytes,
+                )
+                .await?,
+            );
+        }
+        (&Method::POST, Some("hooks"), Some("bank-feed")) => {
+            if segs.len() != 5 {
+                return Err(ApiError::not_found("Bank feed webhook not found"));
+            }
+            if !parts
+                .headers
+                .get(header::CONTENT_TYPE)
+                .and_then(|value| value.to_str().ok())
+                .is_some_and(|value| {
+                    value
+                        .split(';')
+                        .next()
+                        .is_some_and(|value| value.trim().eq_ignore_ascii_case("application/json"))
+                })
+            {
+                return Err(ApiError::new(
+                    415,
+                    "UNSUPPORTED_MEDIA_TYPE",
+                    "Bank feed webhooks require application/json",
+                ));
+            }
+            let tenant = k.tenant(seg(3).unwrap_or_default()).await?;
+            let connector_id = seg(4).unwrap_or_default();
+            let header = |name: &str| {
+                parts
+                    .headers
+                    .get(name)
+                    .and_then(|value| value.to_str().ok())
+            };
+            return json_ok(
+                crate::modules::accounting::receive_bank_feed_webhook(
+                    k,
+                    &tenant,
+                    connector_id,
+                    header("secure-token"),
+                    header("x-sepay-signature"),
+                    header("x-sepay-timestamp"),
                     &bytes,
                 )
                 .await?,
@@ -931,6 +976,21 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                 .map(|(_, value)| value.as_str());
             return json_ok(
                 k.consolidated_trial_balance(&actor, &t, group_id, from, to)
+                    .await?,
+            );
+        }
+        (
+            &Method::POST,
+            [
+                "consolidation",
+                "groups",
+                group_id,
+                "intercompany-match-preview",
+            ],
+        ) => {
+            let body = json_obj(&bytes)?;
+            return json_ok(
+                k.preview_intercompany_matches(&actor, &t, group_id, &Value::Object(body))
                     .await?,
             );
         }

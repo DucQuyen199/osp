@@ -2,6 +2,7 @@
 mod application;
 mod domain;
 mod grants;
+mod matching;
 mod persistence;
 mod reports;
 mod snapshots;

@@ -267,6 +267,28 @@ Create an enabled `salt_edge_bank_feed` connector with `app_id` and `secret` fro
 
 Salt Edge must approve/activate the project and enable access to the desired providers; provider coverage and country availability depend on that project. `return_to` is the browser completion mechanism. Configure the separate Salt Edge Dashboard callback URLs only if the deployment also needs Salt Edge's asynchronous connection update notifications; OSP does not expose callback webhook endpoints for these notifications yet.
 
+### Intercompany matching preview
+
+`POST /api/t/:tid/consolidation/groups/:groupId/intercompany-match-preview` requires the `consolidation.company_group.read` and `accounting.journal_entry.read` permissions plus a separate active `intercompany_match_preview` report grant for the caller. The group must exist; every named source/counterparty must be the owner tenant or an active group member. For members, the endpoint rechecks existing reciprocal group-sharing consent in that member's own RLS-scoped transaction; this consent does **not** grant document-sharing access. Supply 1–500 caller-provided, unverified snapshots with `tenantId`, `counterpartyTenantId`, `documentType` (`sales_invoice` or `purchase_bill`), UUID `documentId`, `reference`, `issueDate`, `currency`, and positive decimal `outstandingAmount`; `counterpartyReference` is optional. Suggestions require reciprocal entity pairing and same currency. Candidates with a matching counterparty reference are shown even when dates differ; amount-only candidates must be within 31 days. Suggestions flag reference and amount agreement. This preview does not read or verify source invoices or their fields, save suggestions, or post ledger entries. Treat the output as review aids only; trusted document matching requires a separate document-sharing consent and server-verified source export, neither of which is implemented.
+
+Example request:
+
+```json
+{
+  "documents": [
+    { "tenantId": "owner-tenant", "counterpartyTenantId": "member-tenant", "documentType": "sales_invoice", "documentId": "9d86ef08-8da3-4a65-aa4f-0ff039f517a1", "reference": "INV-120", "counterpartyReference": "BILL-7", "issueDate": "2026-10-01", "currency": "VND", "outstandingAmount": "1500000" },
+    { "tenantId": "member-tenant", "counterpartyTenantId": "owner-tenant", "documentType": "purchase_bill", "documentId": "7243c7d2-2643-43f3-b502-157f89598088", "reference": "BILL-7", "counterpartyReference": "INV-120", "issueDate": "2026-10-02", "currency": "VND", "outstandingAmount": "1500000" }
+  ]
+}
+```
+
 Bank feed schedules use the generic entity API at `/api/t/:tid/data/accounting/bank_feed_schedule`: `GET` requires `accounting.bank_feed_schedule.read`, `POST` requires `.create`, `PATCH /:id` requires `.update`, and `DELETE /:id` requires `.delete`. Create/update body fields are `{ statement, connector, interval_minutes, enabled }`; interval is constrained to 15–1440 minutes, statement periods are capped at 90 days, one schedule is allowed per statement, and the server requires a tenant-owned draft statement plus an enabled Casso/SePay/Plaid/Salt Edge bank-feed connector. `last_attempt_at`, `last_success_at`, and `last_error` are system-owned status fields. Schedules use the regular `OSP_JOBS_INTERVAL_SEC` worker tick, with a 5-schedule-per-tenant batch cap per tick.
 
 SePay eInvoice API v1 uses `einvoiceProvider: "sepay"` for new issuance requests. Configure the server-side credentials and tenant account/template/series map described in [Deployment](DEPLOYMENT.md#sepay-einvoice-api-v1). Each tenant must map explicitly; missing invoice buyer, currency, date, item description, price, or tax rate data fails before the provider call.
+
+
+### Bank-feed webhooks (Casso legacy / SePay)
+
+`POST /api/hooks/bank-feed/{tenantId}/{connectorId}` is public and accepts JSON up to 64 KiB. Configure the enabled connector with `webhook_secret_env` pointing to a server environment variable named `OSP_BANK_WEBHOOK_SECRET_<UPPERCASE_NAME>`. The secret value must be 32–512 bytes and stays in runtime configuration. For SePay, also set `webhook_account_number`, configure the provider webhook to use HMAC-SHA256 and JSON, and send `X-SePay-Timestamp` and `X-SePay-Signature: sha256=<hex>`; the server verifies HMAC over `{timestamp}.{raw_body}` and rejects timestamps outside ±5 minutes. For Casso legacy webhook, set `webhook_account_id` to the Casso `bank_sub_acc_id` and send the configured secret in `secure-token`; each transaction's signed amount, date, account id, and stable Casso id are validated. The provider account identifier must match a unique tenant ledger account in group 112, and exactly one draft statement must cover each transaction date. The endpoint returns `{"success":true}` after an idempotent import; duplicate deliveries are acknowledged. Imports append unmatched lines to draft statements only and never post journal entries. Casso Webhook V2 is not accepted: its documented payload omits transaction direction and Casso subaccount id, which are required for safe debit/credit and ledger mapping. Use the legacy secure-token webhook or existing Casso pull sync until Casso documents those fields.
+
+Official provider contracts: [SePay webhook integration](https://docs.sepay.vn/tich-hop-webhooks.html), [SePay HMAC verification](https://developer.sepay.vn/vi/sepay-webhooks/xac-thuc), [Casso legacy webhook setup and payload](https://developer.casso.vn/webhook/thiet-lap-webhook-thu-cong), [Casso webhook V2 payload](https://developer.casso.vn/webhook/gia-lap-giao-dich-den).

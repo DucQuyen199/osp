@@ -705,7 +705,7 @@ pub fn build(reg: &Registry) -> Value {
             "parameters": [tid, { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
             "requestBody": { "required": true, "content": { "application/json": { "schema": {
                 "type": "object", "required": ["userId", "reportType"], "additionalProperties": false,
-                "properties": { "userId": { "type": "string" }, "reportType": { "type": "string", "enum": ["trial_balance"] } }
+                "properties": { "userId": { "type": "string" }, "reportType": { "type": "string", "enum": ["trial_balance", "intercompany_match_preview"] } }
             } } } },
             "responses": with_common(Map::from_iter([("201".to_string(), json!({ "description": "User-specific report grant created and audited" })), ("404".to_string(), err("Group or active tenant user not found")), ("409".to_string(), err("An active grant already exists"))]))
         } }),
@@ -726,6 +726,20 @@ pub fn build(reg: &Registry) -> Value {
                 { "name": "from", "in": "query", "schema": { "type": "string", "format": "date" } },
                 { "name": "to", "in": "query", "schema": { "type": "string", "format": "date" } }],
             "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Member trial balances and account-code totals in the group reporting currency; requires reciprocal consent, an available effective rate, and compliance with the group's maximum rate age" })), ("409".to_string(), err("Member consent, currency rate policy, rate freshness, or accounting data is unavailable"))]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/consolidation/groups/{groupId}/intercompany-match-preview".into(),
+        json!({ "post": {
+            "tags": ["consolidation"], "summary": "Preview intercompany invoice and bill matching suggestions from caller-supplied snapshots", "security": sec,
+            "parameters": [tid, { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                "type": "object", "required": ["documents"], "additionalProperties": false,
+                "properties": { "documents": { "type": "array", "minItems": 1, "maxItems": 500, "items": { "type": "object", "required": ["tenantId", "counterpartyTenantId", "documentType", "documentId", "reference", "issueDate", "currency", "outstandingAmount"], "properties": {
+                    "tenantId": { "type": "string" }, "counterpartyTenantId": { "type": "string" }, "documentType": { "type": "string", "enum": ["sales_invoice", "purchase_bill"] }, "documentId": { "type": "string", "format": "uuid" }, "reference": { "type": "string", "maxLength": 200 }, "counterpartyReference": { "type": "string", "maxLength": 200 }, "issueDate": { "type": "string", "format": "date" }, "currency": { "type": "string", "pattern": "^[A-Za-z]{3}$" }, "outstandingAmount": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" }
+                } } } }
+            } } } },
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Read-only matching candidates; caller-provided snapshots are unverified, not persisted, and never posted" })), ("403".to_string(), err("An active intercompany_match_preview report grant is required")), ("409".to_string(), err("A group member is unavailable or consent was revoked")), ("422".to_string(), err("Snapshot payload is invalid or exceeds its size limit"))]))
         } }),
     );
     paths.insert(
@@ -1408,6 +1422,32 @@ pub fn build(reg: &Registry) -> Value {
                 ("409".to_string(), err("Tracking number is ambiguous, shipment is not dispatched, or event ID was reused with different data")),
                 ("413".to_string(), err("Webhook body exceeds 64 KiB")),
                 ("422".to_string(), err("Invalid carrier event fields"))
+            ])
+        } }),
+    );
+    paths.insert(
+        "/api/hooks/bank-feed/{tenantId}/{connectorId}".into(),
+        json!({ "post": {
+            "tags": ["accounting", "integration-hub"], "summary": "Receive an authenticated Casso or SePay bank transaction",
+            "description": "Public endpoint. SePay uses HMAC-SHA256 over timestamp + exact raw JSON body and rejects timestamps outside ±5 minutes. Casso legacy uses the connector runtime secure-token and stable transaction ID; Casso Webhook V2 is not accepted because its documented payload lacks transaction direction and Casso subaccount ID. The server maps the provider account to a unique tenant ledger account in group 112 and a covering draft statement, imports unmatched lines idempotently, and never posts a journal entry.",
+            "security": [],
+            "parameters": [
+                { "name": "tenantId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+                { "name": "connectorId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+                { "name": "secure-token", "in": "header", "required": false, "schema": { "type": "string" } },
+                { "name": "X-SePay-Timestamp", "in": "header", "required": false, "schema": { "type": "string" } },
+                { "name": "X-SePay-Signature", "in": "header", "required": false, "schema": { "type": "string" } }
+            ],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "description": "Casso legacy envelope or SePay transaction payload" } } } },
+            "responses": Map::from_iter([
+                ("200".to_string(), json!({ "description": "Transaction imported into a covering draft bank statement, or an exact duplicate acknowledged. Response body contains success and duplicate booleans." })),
+                ("401".to_string(), err("Missing/invalid secret or signature; SePay timestamp is stale")),
+                ("403".to_string(), err("Provider account does not match the connector mapping")),
+                ("404".to_string(), err("Tenant-scoped connector or covering draft statement not found")),
+                ("409".to_string(), err("More than one draft statement covers the transaction date")),
+                ("413".to_string(), err("Webhook body exceeds 64 KiB or Casso batch exceeds 100 rows")),
+                ("422".to_string(), err("Invalid provider payload or unsupported transaction direction")),
+                ("503".to_string(), err("Connector webhook secret/account mapping is not configured"))
             ])
         } }),
     );

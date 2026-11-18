@@ -72,7 +72,7 @@
       "fields": [
         { "name": "group", "type": "ref", "required": true, "ref": "consolidation.company_group" },
         { "name": "user_id", "type": "string", "required": true },
-        { "name": "report_type", "type": "enum", "required": true, "options": ["trial_balance"] },
+        { "name": "report_type", "type": "enum", "required": true, "options": ["trial_balance", "intercompany_match_preview"] },
         { "name": "status", "type": "enum", "required": false, "options": ["active", "revoked"] }
       ],
       "states": {

@@ -20,10 +20,10 @@ impl Kernel {
         self.authorize(owner, actor, "tenant.admin")?;
         self.ent(owner, "consolidation.company_group")?;
         let grant_entity = self.ent(owner, "consolidation.report_grant")?;
-        if report_type != TRIAL_BALANCE {
+        if !matches!(report_type, TRIAL_BALANCE | "intercompany_match_preview") {
             return Err(ApiError::validation(
                 "consolidation.report_grant",
-                vec!["Only the trial-balance report is available for grants".into()],
+                vec!["The requested consolidated report type is not available for grants".into()],
             ));
         }
         let group_id = uuid(group_id, "Company group")?;

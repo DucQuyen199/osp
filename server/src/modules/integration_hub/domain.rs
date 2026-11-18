@@ -106,12 +106,24 @@ fn validate_connector(document: &Value) -> Vec<String> {
             if enabled {
                 match config.get("adapter").and_then(Value::as_str) {
                     Some("http_event_sink") => validate_http_event_sink(config, &mut errors),
-                    Some("casso_bank_feed") => validate_casso_bank_feed(config, &mut errors),
-                    Some("sepay_bank_feed") => validate_sepay_bank_feed(config, &mut errors),
-                    Some("plaid_bank_feed") => validate_plaid_bank_feed(config, &mut errors),
-                    Some("salt_edge_bank_feed") => {
+                    Some("casso_bank_feed") if kind == "bank_feed" => {
+                        validate_casso_bank_feed(config, &mut errors)
+                    }
+                    Some("sepay_bank_feed") if kind == "bank_feed" => {
+                        validate_sepay_bank_feed(config, &mut errors)
+                    }
+                    Some("plaid_bank_feed") if kind == "bank_feed" => {
+                        validate_plaid_bank_feed(config, &mut errors)
+                    }
+                    Some("salt_edge_bank_feed") if kind == "bank_feed" => {
                         validate_salt_edge_bank_feed(config, &mut errors)
                     }
+                    Some(
+                        "casso_bank_feed"
+                        | "sepay_bank_feed"
+                        | "plaid_bank_feed"
+                        | "salt_edge_bank_feed",
+                    ) => errors.push("Bank feed adapter requires connector kind bank_feed".into()),
                     Some("carrier_tracking_webhook") if kind == "carrier" => {
                         validate_carrier_tracking_webhook(config, &mut errors)
                     }
@@ -165,6 +177,7 @@ fn validate_casso_bank_feed(config: &Value, errors: &mut Vec<String>) {
             if (16..=512).contains(&value.len()) && !value.chars().any(char::is_control) => {}
         _ => errors.push("Casso bank feed requires an app_secret of 16 to 512 characters".into()),
     }
+    validate_bank_feed_webhook(config, "webhook_account_id", errors);
 }
 
 fn validate_sepay_bank_feed(config: &Value, errors: &mut Vec<String>) {
@@ -182,6 +195,32 @@ fn validate_sepay_bank_feed(config: &Value, errors: &mut Vec<String>) {
         Some("sandbox" | "production")
     ) {
         errors.push("SePay environment must be sandbox or production".into());
+    }
+    validate_bank_feed_webhook(config, "webhook_account_number", errors);
+}
+
+fn validate_bank_feed_webhook(config: &Value, account_field: &str, errors: &mut Vec<String>) {
+    let secret_env = config.get("webhook_secret_env").and_then(Value::as_str);
+    let account = config.get(account_field).and_then(Value::as_str);
+    if secret_env.is_none() && account.is_none() {
+        return;
+    }
+    if !secret_env.is_some_and(|name| {
+        name.strip_prefix("OSP_BANK_WEBHOOK_SECRET_")
+            .is_some_and(|suffix| !suffix.is_empty())
+            && name.len() <= 80
+            && name
+                .bytes()
+                .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'_')
+    }) {
+        errors.push("Bank webhook secret must reference OSP_BANK_WEBHOOK_SECRET_<UPPERCASE_NAME> in the server environment".into());
+    }
+    if !account.is_some_and(|value| {
+        !value.trim().is_empty() && value.len() <= 128 && !value.chars().any(char::is_control)
+    }) {
+        errors.push(format!(
+            "Bank webhook connector requires a valid {account_field}"
+        ));
     }
 }
 
