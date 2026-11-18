@@ -4,3 +4,4 @@ mod domain;
 mod grants;
 mod persistence;
 mod reports;
+mod snapshots;

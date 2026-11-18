@@ -343,6 +343,69 @@ async fn company_group_consent(kernel: &Arc<Kernel>) {
     assert_eq!(source_expense["reportingClosingDebit"], 250000.0);
     assert_eq!(report["reconciliation"]["difference"], 0.0);
     assert_eq!(report["reconciliation"]["withinCentTolerance"], true);
+    let (snapshot_status, snapshot) = owner
+        .api(
+            "POST",
+            &format!(
+                "/consolidation/groups/{}/trial-balance/snapshots",
+                id(&group)
+            ),
+            json!({}),
+        )
+        .await;
+    assert_eq!(snapshot_status, 201);
+    let snapshot_id = snapshot["snapshotId"].as_str().unwrap();
+    assert_eq!(snapshot["report"]["companies"], report["companies"]);
+    assert_eq!(snapshot["report"]["accounts"], report["accounts"]);
+    let (saved_reports_status, saved_reports) = owner
+        .api(
+            "GET",
+            &format!(
+                "/consolidation/groups/{}/trial-balance/snapshots",
+                id(&group)
+            ),
+            json!({}),
+        )
+        .await;
+    assert_eq!(saved_reports_status, 200);
+    assert_eq!(saved_reports["items"].as_array().unwrap().len(), 1);
+    assert_eq!(saved_reports["items"][0]["id"], snapshot_id);
+    let (opened_snapshot_status, opened_snapshot) = owner
+        .api(
+            "GET",
+            &format!("/consolidation/trial-balance/snapshots/{snapshot_id}"),
+            json!({}),
+        )
+        .await;
+    assert_eq!(opened_snapshot_status, 200);
+    assert_eq!(opened_snapshot["report"], snapshot["report"]);
+    assert!(
+        owner
+            .k
+            .update(
+                &owner.a,
+                &owner.t,
+                "consolidation.report_snapshot",
+                snapshot_id,
+                o(json!({ "reporting_currency": "USD" })),
+            )
+            .await
+            .is_err(),
+        "generic updates must not change an immutable report snapshot"
+    );
+    assert!(
+        owner
+            .k
+            .remove(
+                &owner.a,
+                &owner.t,
+                "consolidation.report_snapshot",
+                snapshot_id,
+            )
+            .await
+            .is_err(),
+        "generic deletes must not remove an immutable report snapshot"
+    );
     kernel
         .remove(
             &member.a,
@@ -400,6 +463,14 @@ async fn company_group_consent(kernel: &Arc<Kernel>) {
             .await
             .is_err()
     );
+    let (revoked_snapshot_status, _) = owner
+        .api(
+            "GET",
+            &format!("/consolidation/trial-balance/snapshots/{snapshot_id}"),
+            json!({}),
+        )
+        .await;
+    assert_eq!(revoked_snapshot_status, 404);
     kernel
         .grant_consolidated_report(
             &owner.a,

@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **50 module**, **202 loại dữ liệu**, **921 sự kiện**.
+Tổng: **51 module**, **207 loại dữ liệu**, **942 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -20,6 +20,7 @@ Tổng: **50 module**, **202 loại dữ liệu**, **921 sự kiện**.
 | [`case-management`](#case-management) — Quản lý hồ sơ vụ việc | Module chuyên ngành | `master-data`, `accounting` |
 | [`charity`](#charity) — Từ thiện / Phi lợi nhuận | Module chuyên ngành | `master-data`, `accounting` |
 | [`clinic`](#clinic) — Phòng khám / Y tế | Module chuyên ngành | `master-data`, `inventory`, `accounting`, `booking` |
+| [`consolidation`](#consolidation) — Đa công ty | Tài chính | `accounting`, `master-data` |
 | [`project`](#project) — Quản lý dự án | Vận hành | `master-data`, `hrm` |
 | [`construction`](#construction) — Xây dựng | Module chuyên ngành | `project`, `accounting` |
 | [`contract`](#contract) — Hợp đồng | Vận hành | `master-data` |
@@ -254,7 +255,7 @@ Tổng: **50 module**, **202 loại dữ liệu**, **921 sự kiện**.
 | `debit_note` Điều chỉnh giảm công nợ phải trả | `draft` → **posted** (draft→posted) |
 | `payment` Thanh toán | — |
 | `settlement_batch` Phiếu thu/chi phân bổ công nợ | `draft` → **approved** (submitted→approved), **cancelled** (draft/rejected→cancelled), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
-| `journal_entry` Bút toán | `draft` → **posted** (draft→posted), **reversed** (posted→reversed) |
+| `journal_entry` Bút toán | `draft` → **posted** (draft/submitted→posted), **rejected** (submitted→rejected), **reversed** (posted→reversed), **submitted** (draft/rejected→submitted) |
 | `bank_statement` Sao kê ngân hàng | `draft` → **cancelled** (draft→cancelled), **reconciled** (draft→reconciled) |
 | `bank_statement_line` Dòng sao kê ngân hàng | `unmatched` → **ignored** (unmatched→ignored), **matched** (unmatched→matched) |
 
@@ -273,6 +274,17 @@ Tổng: **50 module**, **202 loại dữ liệu**, **921 sự kiện**.
 |---|---|
 | `budget` Ngân sách | `draft` → **approved** (draft→approved), **closed** (approved→closed), **superseded** (approved/closed→superseded) |
 | `budget_line` Dòng ngân sách | — |
+
+### consolidation
+**Đa công ty** — Nhóm pháp nhân có sự đồng ý chia sẻ và cấu hình tiền tệ báo cáo hợp nhất.
+
+| Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
+|---|---|
+| `company_group` Nhóm công ty | — |
+| `member` Công ty thành viên | `invited` → **accepted** (invited→active), **revoked** (invited/active→revoked) |
+| `shared_company` Đơn vị đã chia sẻ | `active` → **revoked** (active→revoked) |
+| `report_grant` Quyền xem báo cáo tập đoàn | `active` → **revoked** (active→revoked) |
+| `report_snapshot` Báo cáo hợp nhất đã lưu | — |
 
 ### einvoice
 **Hóa đơn điện tử** — Tạo yêu cầu phát hành khi hóa đơn kế toán ghi sổ; worker Rust phát hành hoặc hủy qua provider HTTPS đã cấu hình và lưu kết quả trong PostgreSQL.
@@ -420,7 +432,7 @@ Tổng: **50 module**, **202 loại dữ liệu**, **921 sự kiện**.
 | `api_key` API key | — |
 
 ### workflow-approval
-**Phê duyệt** — Luồng duyệt dùng chung. Đơn mua, đề nghị chi phí và bút toán thủ công tự sinh yêu cầu duyệt khi module này được bật; duyệt xong tự chuyển trạng thái chứng từ gốc. Bút toán thủ công phải có quy tắc duyệt áp dụng theo tổng bên Nợ, chỉ người khác người gửi mới được duyệt; sau khi bị từ chối, người lập có thể sửa và gửi lại. Bút toán do nghiệp vụ khác tự sinh tiếp tục theo luồng ghi sổ của nghiệp vụ đó.
+**Phê duyệt** — Luồng duyệt dùng chung. Đơn mua, đề nghị chi phí... tự sinh yêu cầu duyệt khi module này được bật; duyệt xong tự chuyển trạng thái chứng từ gốc.
 
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|

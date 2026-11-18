@@ -81,6 +81,24 @@
       },
       "computed": {},
       "constraints": []
+    },
+    {
+      "name": "report_snapshot",
+      "label": "Báo cáo hợp nhất đã lưu",
+      "systemManaged": true,
+      "fields": [
+        { "name": "group", "type": "ref", "required": true, "ref": "consolidation.company_group" },
+        { "name": "report_type", "type": "enum", "required": true, "options": ["trial_balance"] },
+        { "name": "requested_by", "type": "string", "required": true },
+        { "name": "from_date", "type": "date", "required": false },
+        { "name": "to_date", "type": "date", "required": true },
+        { "name": "reporting_currency", "type": "string", "required": true },
+        { "name": "snapshot_at", "type": "datetime", "required": true },
+        { "name": "payload", "type": "json", "required": true }
+      ],
+      "states": null,
+      "computed": {},
+      "constraints": []
     }
   ]
 }

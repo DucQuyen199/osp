@@ -871,6 +871,46 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     .await?,
             );
         }
+        (
+            &Method::GET,
+            [
+                "consolidation",
+                "groups",
+                group_id,
+                "trial-balance",
+                "snapshots",
+            ],
+        ) => {
+            return json_ok(
+                k.list_consolidated_trial_balance_snapshots(&actor, &t, group_id)
+                    .await?,
+            );
+        }
+        (
+            &Method::POST,
+            [
+                "consolidation",
+                "groups",
+                group_id,
+                "trial-balance",
+                "snapshots",
+            ],
+        ) => {
+            let body = json_obj(&bytes)?;
+            let from = body.get("from").and_then(Value::as_str);
+            let to = body.get("to").and_then(Value::as_str);
+            return Ok(Reply::Json(
+                201,
+                k.create_consolidated_trial_balance_snapshot(&actor, &t, group_id, from, to)
+                    .await?,
+            ));
+        }
+        (&Method::GET, ["consolidation", "trial-balance", "snapshots", snapshot_id]) => {
+            return json_ok(
+                k.read_consolidated_trial_balance_snapshot(&actor, &t, snapshot_id)
+                    .await?,
+            );
+        }
         (&Method::POST, ["consolidation", "groups", group_id, "report-grants"]) => {
             let body = json_obj(&bytes)?;
             return Ok(Reply::Json(

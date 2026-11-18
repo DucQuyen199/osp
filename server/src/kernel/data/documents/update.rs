@@ -20,10 +20,11 @@ impl Kernel {
                 "consolidation.member"
                     | "consolidation.shared_company"
                     | "consolidation.report_grant"
+                    | "consolidation.report_snapshot"
             )
         {
             return Err(ApiError::forbidden(
-                "Company membership records can only be changed through the consent endpoints",
+                "This company-group record can only be changed through its dedicated workflow endpoint",
             ));
         }
         if qname.starts_with("loyalty.") {

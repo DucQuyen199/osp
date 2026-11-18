@@ -729,6 +729,33 @@ pub fn build(reg: &Registry) -> Value {
         } }),
     );
     paths.insert(
+        "/api/t/{tenantId}/consolidation/groups/{groupId}/trial-balance/snapshots".into(),
+        json!({
+            "get": {
+                "tags": ["consolidation"], "summary": "List saved group trial-balance snapshots", "security": sec,
+                "parameters": [tid, { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+                "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Up to 50 saved reports; the caller must still have an active group report grant" }))]))
+            },
+            "post": {
+                "tags": ["consolidation"], "summary": "Save an immutable consent-verified group trial-balance snapshot", "security": sec,
+                "parameters": [tid, { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+                "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                    "type": "object", "additionalProperties": false,
+                    "properties": { "from": { "type": "string", "format": "date" }, "to": { "type": "string", "format": "date" } }
+                } } } },
+                "responses": with_common(Map::from_iter([("201".to_string(), json!({ "description": "Immutable translated report saved and audited" })), ("409".to_string(), err("Member consent, currency rate, or accounting data is unavailable"))]))
+            }
+        }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/consolidation/trial-balance/snapshots/{snapshotId}".into(),
+        json!({ "get": {
+            "tags": ["consolidation"], "summary": "Read a saved immutable group trial-balance snapshot", "security": sec,
+            "parameters": [tid, { "name": "snapshotId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Saved report payload; active report grant required at read time" })), ("404".to_string(), err("Snapshot not found or caller has no active report grant"))]))
+        } }),
+    );
+    paths.insert(
         "/api/t/{tenantId}/consolidation/groups/{groupId}/invites".into(),
         json!({ "post": {
             "tags": ["consolidation"], "summary": "Invite another tenant to a company group", "security": sec,

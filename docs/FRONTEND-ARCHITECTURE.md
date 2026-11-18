@@ -32,6 +32,8 @@ Wrap every user-visible literal with `uiText()` or the feature-local translator,
 Run `npm run lint:translations` while changing a screen or dictionary. The check verifies that literal `uiText()` and feature `t()` calls resolve through the shared or feature-local English dictionary, and catches raw Vietnamese JSX text, accessible text attributes, and static page titles. It is part of `npm run check`.
 
 ### Feature-local workflow components
+- The consolidation workbench owns report snapshot permissions, API actions and grant rechecks; its saved report history renders snapshot metadata and opens immutable payloads through the feature API.
+
 
 - Keep route-level loading, permission checks, and business actions in the feature page or a feature hook.
 - Split a long workflow view into focused components under `features/<domain>/components/`. Pass controlled values and callbacks so child components render and edit the state owned by the workflow.

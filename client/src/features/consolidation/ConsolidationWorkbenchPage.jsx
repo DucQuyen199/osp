@@ -29,6 +29,8 @@ export default function ConsolidationWorkbenchPage() {
   const [reportFrom, setReportFrom] = useState('');
   const [reportTo, setReportTo] = useState('');
   const [report, setReport] = useState(null);
+  const [reportSnapshots, setReportSnapshots] = useState([]);
+  const [selectedSnapshotId, setSelectedSnapshotId] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -90,6 +92,19 @@ export default function ConsolidationWorkbenchPage() {
   async function revokeReportGrant(grant) {
     await run(`grant:${grant.id}`, () => api(tenantPath(`/consolidation/report-grants/${encodeURIComponent(grant.id)}/revoke`), { method: 'POST' }), t('Đã thu hồi quyền xem báo cáo.'));
   }
+  const refreshReportSnapshots = useCallback(async (groupId = reportGroup) => {
+    if (!groupId) { setReportSnapshots([]); return; }
+    const result = await api(tenantPath(`/consolidation/groups/${encodeURIComponent(groupId)}/trial-balance/snapshots`));
+    setReportSnapshots(itemsOf(result));
+  }, [reportGroup]);
+  useEffect(() => {
+    if (!reportGroup || !can('consolidation.company_group.read') || !can('accounting.journal_entry.read')) { setReportSnapshots([]); return undefined; }
+    let current = true;
+    api(tenantPath(`/consolidation/groups/${encodeURIComponent(reportGroup)}/trial-balance/snapshots`))
+      .then((result) => { if (current) setReportSnapshots(itemsOf(result)); })
+      .catch(() => { if (current) setReportSnapshots([]); });
+    return () => { current = false; };
+  }, [reportGroup]);
   async function loadReport(event) {
     event.preventDefault(); setBusy('report'); setError(''); setReport(null);
     try {
@@ -97,7 +112,30 @@ export default function ConsolidationWorkbenchPage() {
       if (reportFrom) params.set('from', reportFrom);
       if (reportTo) params.set('to', reportTo);
       setReport(await api(tenantPath(`/consolidation/groups/${encodeURIComponent(reportGroup)}/trial-balance?${params}`)));
+      setSelectedSnapshotId('');
     } catch (reason) { setError(reason.message || t('Không tải được báo cáo hợp nhất.')); }
+    finally { setBusy(''); }
+  }
+  async function saveReportSnapshot() {
+    setBusy('snapshot'); setError(''); setNotice('');
+    try {
+      const result = await api(tenantPath(`/consolidation/groups/${encodeURIComponent(reportGroup)}/trial-balance/snapshots`), {
+        method: 'POST', body: { ...(reportFrom ? { from: reportFrom } : {}), ...(reportTo ? { to: reportTo } : {}) },
+      });
+      setReport(result.report); setSelectedSnapshotId(result.snapshotId);
+      await refreshReportSnapshots(reportGroup);
+      setNotice(t('Đã lưu ảnh chụp báo cáo bất biến.'));
+    } catch (reason) { setError(reason.message || t('Không lưu được ảnh chụp báo cáo.')); }
+    finally { setBusy(''); }
+  }
+  async function openReportSnapshot(snapshot) {
+    setBusy(`snapshot:${snapshot.id}`); setError(''); setNotice('');
+    try {
+      const result = await api(tenantPath(`/consolidation/trial-balance/snapshots/${encodeURIComponent(snapshot.id)}`));
+      setReport(result.report); setSelectedSnapshotId(result.snapshotId);
+      setReportFrom(result.from || ''); setReportTo(result.to || '');
+      setNotice(`${t('Đang xem ảnh chụp ngày')} ${new Date(result.snapshotAt).toLocaleString()}`);
+    } catch (reason) { setError(reason.message || t('Không mở được ảnh chụp báo cáo.')); }
     finally { setBusy(''); }
   }
 
@@ -133,7 +171,10 @@ export default function ConsolidationWorkbenchPage() {
       <label className="field"><span className="label">{t('Từ ngày')}</span><input className="input" type="date" value={reportFrom} onChange={(event) => setReportFrom(event.target.value)}/></label>
       <label className="field"><span className="label">{t('Đến ngày')}</span><input className="input" type="date" value={reportTo} onChange={(event) => setReportTo(event.target.value)}/></label>
       <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || loading || !reportGroup}>{t('Xem báo cáo')}</button></div>
-    </form>{report && <><div className="row"><strong>{t('Tiền tệ báo cáo')}: {report.reportingCurrency}</strong><span className="grow"/><span className="faint">{report.companies?.length || 0} {t('tenant')}</span></div><p className="faint">{t('Cơ sở quy đổi')}: {report.rateBasis} · {t('Phương pháp')}: {report.consolidationMethod}</p><div className="table-wrap"><table className="table"><thead><tr><th>{t('Mã tài khoản')}</th><th>{t('Tài khoản')}</th><th>{t('Dư nợ đầu kỳ')}</th><th>{t('Dư có đầu kỳ')}</th><th>{t('Phát sinh nợ')}</th><th>{t('Phát sinh có')}</th><th>{t('Dư nợ cuối kỳ')}</th><th>{t('Dư có cuối kỳ')}</th></tr></thead><tbody>{report.accounts?.map((account) => <tr key={`${account.code}:${account.kind}`}><td>{account.code}</td><td>{account.name}</td><td className="num">{Number(account.openingDebit || 0).toLocaleString()}</td><td className="num">{Number(account.openingCredit || 0).toLocaleString()}</td><td className="num">{Number(account.periodDebit || 0).toLocaleString()}</td><td className="num">{Number(account.periodCredit || 0).toLocaleString()}</td><td className="num">{Number(account.closingDebit || 0).toLocaleString()}</td><td className="num">{Number(account.closingCredit || 0).toLocaleString()}</td></tr>)}</tbody></table></div></>}</section>}
+        </form>
+    {reportSnapshots.length > 0 && <section className="snapshot-list" aria-labelledby="report-snapshots-heading"><h3 id="report-snapshots-heading">{t('Lịch sử báo cáo đã lưu')}</h3><ul>{reportSnapshots.map((snapshot) => <li key={snapshot.id}><span>{new Date(snapshot.snapshotAt).toLocaleString()} · {snapshot.from || t('Từ đầu kỳ')} – {snapshot.to} · {snapshot.reportingCurrency}</span><button className="btn btn-secondary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => openReportSnapshot(snapshot)}>{t('Mở báo cáo đã lưu')}</button></li>)}</ul></section>}
+    {report && <div className="row"><span className="faint">{selectedSnapshotId ? t('Đang xem ảnh chụp đã lưu') : t('Báo cáo trực tiếp')}</span><span className="grow"/><button className="btn btn-secondary" type="button" disabled={Boolean(busy) || loading} onClick={saveReportSnapshot}>{busy === 'snapshot' ? t('Đang lưu') : t('Lưu ảnh chụp')}</button></div>}
+    {report && <><div className="row"><strong>{t('Tiền tệ báo cáo')}: {report.reportingCurrency}</strong><span className="grow"/><span className="faint">{report.companies?.length || 0} {t('tenant')}</span></div><p className="faint">{t('Cơ sở quy đổi')}: {report.rateBasis} · {t('Phương pháp')}: {report.consolidationMethod}</p><div className="table-wrap"><table className="table"><thead><tr><th>{t('Mã tài khoản')}</th><th>{t('Tài khoản')}</th><th>{t('Dư nợ đầu kỳ')}</th><th>{t('Dư có đầu kỳ')}</th><th>{t('Phát sinh nợ')}</th><th>{t('Phát sinh có')}</th><th>{t('Dư nợ cuối kỳ')}</th><th>{t('Dư có cuối kỳ')}</th></tr></thead><tbody>{report.accounts?.map((account) => <tr key={`${account.code}:${account.kind}`}><td>{account.code}</td><td>{account.name}</td><td className="num">{Number(account.openingDebit || 0).toLocaleString()}</td><td className="num">{Number(account.openingCredit || 0).toLocaleString()}</td><td className="num">{Number(account.periodDebit || 0).toLocaleString()}</td><td className="num">{Number(account.periodCredit || 0).toLocaleString()}</td><td className="num">{Number(account.closingDebit || 0).toLocaleString()}</td><td className="num">{Number(account.closingCredit || 0).toLocaleString()}</td></tr>)}</tbody></table></div></>}</section>}
     <section className="card card-pad"><h2>{t('Thành viên nhóm công ty')}</h2>{loading ? <div className="skeleton" data-h="row"/> : !members.length ? <div className="empty">{t('Chưa có tenant thành viên.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Tenant')}</th><th>{t('Nhóm')}</th><th>{t('Trạng thái')}</th>{canManage && <th>{t('Thao tác')}</th>}</tr></thead><tbody>{members.map((member) => <tr key={member.id}><td>{member.member_name}<div className="faint">{member.member_tenant_id}</div></td><td>{groups.find((group) => group.id === member.group)?.name || member.group}</td><td><span className={`badge ${member.status === 'active' ? 'success' : member.status === 'revoked' ? '' : 'warning'}`}>{t(member.status || 'invited')}</span></td>{canManage && <td>{member.status !== 'revoked' && <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => revokeMember(member)}>{t('Thu hồi')}</button>}</td>}</tr>)}</tbody></table></div>}</section>
     <section className="card card-pad"><h2>{t('Tenant đã chấp thuận chia sẻ với đơn vị này')}</h2>{loading ? <div className="skeleton" data-h="row"/> : !shares.length ? <div className="empty">{t('Chưa có consent chia sẻ nào.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Tenant chủ dữ liệu')}</th><th>{t('Trạng thái')}</th>{canManage && <th>{t('Thao tác')}</th>}</tr></thead><tbody>{shares.map((share) => <tr key={share.id}><td>{share.owner_name}<div className="faint">{share.owner_tenant_id}</div></td><td><span className={`badge ${share.status === 'active' ? 'success' : ''}`}>{t(share.status || 'active')}</span></td>{canManage && <td>{share.status === 'active' && <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => revokeShare(share)}>{t('Thu hồi consent')}</button>}</td>}</tr>)}</tbody></table></div>}</section>
     {report?.companies?.map((company) => <details className="card card-pad" key={company.tenantId}><summary><strong>{company.name}</strong> · {t('Số gốc')} {company.localCurrency} · {t('Tỷ giá')} {Number(company.conversionRate).toLocaleString()} {t('ngày hiệu lực')} {company.rateEffectiveDate}</summary><div className="table-wrap"><table className="table"><thead><tr><th>{t('Mã tài khoản')}</th><th>{t('Tài khoản')}</th><th>{t('Dư nợ gốc')}</th><th>{t('Dư có gốc')}</th><th>{t('Dư nợ quy đổi')}</th><th>{t('Dư có quy đổi')}</th></tr></thead><tbody>{company.accounts?.map((account) => <tr key={`${account.code}:${account.kind}`}><td>{account.code}</td><td>{account.name}</td><td className="num">{Number(account.closingDebit || 0).toLocaleString()}</td><td className="num">{Number(account.closingCredit || 0).toLocaleString()}</td><td className="num">{Number(account.reportingClosingDebit || 0).toLocaleString()}</td><td className="num">{Number(account.reportingClosingCredit || 0).toLocaleString()}</td></tr>)}</tbody></table></div></details>)}
