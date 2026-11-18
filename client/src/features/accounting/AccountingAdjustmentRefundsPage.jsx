@@ -1,46 +1,24 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath, session, tenantPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { compareDecimals } from '../../lib/decimal.js';
 import { calculateAdjustmentRefundable } from './domain/adjustmentRefunds.js';
-import { can, loadAll, loadRefs, recordLabel } from '../../lib/state.js';
+import { can, recordLabel } from '../../lib/state.js';
 import { listHref, recordHref } from '../../lib/routes.js';
+import { useAdjustmentRefundData } from './hooks/useAdjustmentRefundData.js';
 const today = localDate;
 const storageKey = `osp.adjustment-refund-requests:${session.current()?.tenantId || 'tenant'}`;
 const readRequests = () => { try { return JSON.parse(sessionStorage.getItem(storageKey) || '{}'); } catch { return {}; } };
 export default function AccountingAdjustmentRefundsPage() {
   useDocumentTitle(`${uiText('Hoàn tiền và thu tiền hoàn')} · OSP Suite`);
-  const [notes, setNotes] = useState({ credit: [], debit: [] });
-  const [invoices, setInvoices] = useState([]);
-  const [bills, setBills] = useState([]);
-  const [payments, setPayments] = useState([]);
-  const [parties, setParties] = useState(new Map());
+  const { notes, invoices, bills, payments, parties, loading, error, setError, load } = useAdjustmentRefundData();
   const [selected, setSelected] = useState('');
   const [form, setForm] = useState({ amount: '', method: 'bank', paymentDate: today() });
   const [requestIds, setRequestIds] = useState(readRequests);
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const load = useCallback(async () => {
-    setLoading(true); setError('');
-    try {
-      const [creditRows, debitRows, invoiceRows, billRows, paymentRows, partyMap] = await Promise.all([
-        can('accounting.credit_note.read') ? loadAll('accounting.credit_note') : Promise.resolve([]),
-        can('accounting.debit_note.read') ? loadAll('accounting.debit_note') : Promise.resolve([]),
-        can('accounting.invoice.read') ? loadAll('accounting.invoice') : Promise.resolve([]),
-        can('accounting.bill.read') ? loadAll('accounting.bill') : Promise.resolve([]),
-        can('accounting.payment.read') ? loadAll('accounting.payment') : Promise.resolve([]),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-      ]);
-      setNotes({ credit: creditRows.filter((row) => row.status === 'posted'), debit: debitRows.filter((row) => row.status === 'posted') });
-      setInvoices(invoiceRows); setBills(billRows); setPayments(paymentRows); setParties(partyMap || new Map());
-    } catch (e) { setError(e.message || uiText('Không tải được danh sách phiếu điều chỉnh.')); }
-    finally { setLoading(false); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
   const docs = useMemo(() => ({ invoice: new Map(invoices.map((row) => [row.id, row])), bill: new Map(bills.map((row) => [row.id, row])) }), [invoices, bills]);
   const rows = useMemo(() => [
     ...notes.credit.map((note) => ({ ...note, kind: 'credit_note', title: 'Hoàn tiền khách hàng', sourceDoc: docs.invoice.get(note.invoice), docKind: 'invoice', party: docs.invoice.get(note.invoice)?.party, refundRef: 'refund_credit_note', docRef: 'invoice' })),
