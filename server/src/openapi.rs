@@ -1156,6 +1156,78 @@ pub fn build(reg: &Registry) -> Value {
         } }),
     );
     paths.insert(
+        "/api/t/{tenantId}/connectors/{connectorId}/salt-edge/connect".into(),
+        json!({ "post": {
+            "tags": ["integration-hub"], "summary": "Create a Salt Edge Connect URL", "security": sec,
+            "parameters": [tid, { "name": "connectorId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["returnTo"], "properties": { "returnTo": { "type": "string", "format": "uri", "maxLength": 2048 } } } } } },
+            "responses": with_common(Map::from_iter([
+                ("200".to_string(), json!({ "description": "Salt Edge Connect URL; customer is provisioned server-side and return URL is pinned to OSP_PUBLIC_URL origin" })),
+                ("409".to_string(), err("Connector is already linked or changed while preparing the connection")),
+                ("422".to_string(), err("Invalid Salt Edge credentials or return URL")),
+                ("502".to_string(), err("Salt Edge Connect API is unavailable"))
+            ]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/connectors/{connectorId}/salt-edge/complete".into(),
+        json!({ "post": {
+            "tags": ["integration-hub"], "summary": "Verify and complete a Salt Edge bank connection", "security": sec,
+            "parameters": [tid, { "name": "connectorId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["connectionId"], "properties": { "connectionId": { "type": "string", "pattern": "^[0-9]{1,32}$" } } } } } },
+            "responses": with_common(Map::from_iter([
+                ("200".to_string(), json!({ "description": "Connection is fetched from Salt Edge and stored only after remote customer_id matches the tenant connector" })),
+                ("403".to_string(), err("Salt Edge connection belongs to a different customer")),
+                ("409".to_string(), err("Connector already has another linked connection")),
+                ("502".to_string(), err("Salt Edge connection could not be verified"))
+            ]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/connectors/{connectorId}/salt-edge/accounts".into(),
+        json!({ "get": {
+            "tags": ["integration-hub"], "summary": "List Salt Edge account IDs for ledger mapping", "security": sec,
+            "parameters": [tid, { "name": "connectorId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "responses": with_common(Map::from_iter([
+                ("200".to_string(), json!({ "description": "Names, account natures, currencies and Salt Edge account IDs; account numbers and IBANs are omitted" })),
+                ("403".to_string(), err("Salt Edge connection or account belongs to a different customer")),
+                ("422".to_string(), err("Connector is not linked to Salt Edge")),
+                ("502".to_string(), err("Salt Edge account API is unavailable"))
+            ]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/connectors/{connectorId}/salt-edge/disconnect".into(),
+        json!({ "post": {
+            "tags": ["integration-hub"], "summary": "Remove Salt Edge connection and clear its ID", "security": sec,
+            "parameters": [tid, { "name": "connectorId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "responses": with_common(Map::from_iter([
+                ("200".to_string(), json!({ "description": "Remote connection removed after customer ownership verification" })),
+                ("422".to_string(), err("Connector is not linked to Salt Edge")),
+                ("502".to_string(), err("Salt Edge connection removal failed"))
+            ]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/accounting/bank-statements/{statementId}/sync-salt-edge".into(),
+        json!({ "post": {
+            "tags": ["accounting", "integration-hub"], "summary": "Sync Salt Edge transactions into a bank statement", "security": sec,
+            "parameters": [tid, { "name": "statementId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["connectorId"], "properties": {
+                "connectorId": { "type": "string", "format": "uuid", "description": "Enabled tenant-scoped Salt Edge connector" },
+                "fromDate": { "type": "string", "format": "date" },
+                "toDate": { "type": "string", "format": "date" }
+            } } } } },
+            "responses": with_common(Map::from_iter([
+                ("200".to_string(), json!({ "description": "Posted, non-duplicated transactions imported idempotently after checking connection, account ownership, and ledger account mapping" })),
+                ("409".to_string(), err("Only draft statements accept imported rows")),
+                ("422".to_string(), err("Invalid connector, date range, account mapping, or provider response")),
+                ("429".to_string(), err("Salt Edge API rate limit reached")),
+                ("502".to_string(), err("Salt Edge transaction API is unavailable"))
+            ]))
+        } }),
+    );
+    paths.insert(
         "/api/t/{tenantId}/accounting/bank-statements/{statementId}/import".into(),
         json!({ "post": {
             "tags": ["accounting"], "summary": "Import bank statement CSV", "security": sec,
@@ -1308,6 +1380,35 @@ pub fn build(reg: &Registry) -> Value {
             "tags": ["logistics"], "summary": "Open shipment dispatch and delivery board", "security": sec,
             "parameters": [tid, { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 200, "default": 100 } }, { "name": "offset", "in": "query", "schema": { "type": "integer", "minimum": 0, "default": 0 } }],
             "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "A page of tenant-scoped failed, short-delivered, created and dispatched shipments ordered by operational priority and age, with full queue counts and paging metadata" })), ("403".to_string(), err("Requires logistics.shipment.read")), ("404".to_string(), err("Logistics module is not enabled"))]))
+        } }),
+    );
+    paths.insert(
+        "/api/hooks/carrier/{tenantId}/{connectorId}".into(),
+        json!({ "post": {
+            "tags": ["logistics", "integration-hub"], "summary": "Receive a signed carrier tracking event",
+            "description": "Public endpoint authenticated with X-OSP-Signature: sha256=<hex HMAC-SHA256 of the exact raw JSON body>. The enabled tenant carrier connector stores a secret_env reference (OSP_CARRIER_WEBHOOK_SECRET_<UPPERCASE_NAME>); the runtime environment must supply a 16–256 byte secret. Event ingestion is idempotent by carrier event ID and tracking history is immutable. This endpoint accepts tracking only; booking and label APIs require vendor-specific adapters.",
+            "parameters": [
+                { "name": "tenantId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+                { "name": "connectorId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+                { "name": "X-OSP-Signature", "in": "header", "required": true, "schema": { "type": "string" } }
+            ],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["event_id", "tracking_number", "status", "description", "occurred_at"], "properties": {
+                "event_id": { "type": "string", "maxLength": 200 },
+                "tracking_number": { "type": "string", "maxLength": 128 },
+                "status": { "type": "string", "enum": ["picked_up", "in_transit", "out_for_delivery", "delivery_attempted", "delivered", "exception"] },
+                "description": { "type": "string", "maxLength": 1000 },
+                "location": { "type": "string", "maxLength": 240 },
+                "occurred_at": { "type": "string", "format": "date-time" }
+            } } } } },
+            "responses": Map::from_iter([
+                ("200".to_string(), json!({ "description": "Event accepted or exact replay acknowledged" })),
+                ("400".to_string(), err("Invalid signed carrier event JSON")),
+                ("401".to_string(), err("Missing or invalid HMAC signature")),
+                ("404".to_string(), err("Tenant connector or matching shipment not found")),
+                ("409".to_string(), err("Tracking number is ambiguous, shipment is not dispatched, or event ID was reused with different data")),
+                ("413".to_string(), err("Webhook body exceeds 64 KiB")),
+                ("422".to_string(), err("Invalid carrier event fields"))
+            ])
         } }),
     );
     paths.insert(

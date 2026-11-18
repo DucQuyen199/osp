@@ -212,3 +212,31 @@ pub fn spawn_einvoice_worker_with_provider(
         }
     });
 }
+
+/// Run the e-invoice worker with a registry of compiled vendor adapters.
+/// This is the extension point for deployments that need different providers
+/// for different tenants; the registry stores no tenant credentials itself.
+pub fn spawn_einvoice_worker_with_registry(
+    k: Arc<kernel::Kernel>,
+    registry: modules::einvoice::EInvoiceProviderRegistry,
+    every_secs: u64,
+) {
+    if every_secs == 0 {
+        return;
+    }
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(Duration::from_secs(every_secs));
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        tick.tick().await;
+        loop {
+            tick.tick().await;
+            match modules::einvoice::run_once_with_registry(&k, &registry).await {
+                Ok(n) if n > 0 => {
+                    tracing::info!(processed = n, "e-invoice registry jobs processed")
+                }
+                Ok(_) => {}
+                Err(error) => tracing::warn!(error = %error, "e-invoice registry worker failed"),
+            }
+        }
+    });
+}

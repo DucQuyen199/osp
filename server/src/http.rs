@@ -557,20 +557,22 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
         ));
     }
     let seg = |i: usize| segs.get(i).map(|x| x.as_str());
-    let limit =
-        if method == Method::POST && seg(3) == Some("documents") && seg(5) == Some("attachments") {
-            crate::modules::document::MAX_ATTACHMENT_BYTES
-        } else if seg(6) == Some("import-casso") {
-            1_000_000
-        } else if seg(6) == Some("import-camt053") {
-            5_000_000
-        } else if seg(6) == Some("import-ofx") {
-            5_000_000
-        } else if seg(6) == Some("import") || seg(4) == Some("import") || seg(3) == Some("import") {
-            5_000_000
-        } else {
-            1_000_000
-        };
+    let limit = if method == Method::POST && seg(1) == Some("hooks") && seg(2) == Some("carrier") {
+        65_536
+    } else if method == Method::POST && seg(3) == Some("documents") && seg(5) == Some("attachments")
+    {
+        crate::modules::document::MAX_ATTACHMENT_BYTES
+    } else if seg(6) == Some("import-casso") {
+        1_000_000
+    } else if seg(6) == Some("import-camt053") {
+        5_000_000
+    } else if seg(6) == Some("import-ofx") {
+        5_000_000
+    } else if seg(6) == Some("import") || seg(4) == Some("import") || seg(3) == Some("import") {
+        5_000_000
+    } else {
+        1_000_000
+    };
     let bytes = axum::body::to_bytes(body, limit).await.map_err(|_| {
         ApiError::new(
             413,
@@ -581,6 +583,27 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
 
     // ───── Công khai ─────
     match (&method, seg(1), seg(2)) {
+        (&Method::POST, Some("hooks"), Some("carrier")) => {
+            if segs.len() != 5 {
+                return Err(ApiError::not_found("Carrier webhook not found"));
+            }
+            let tenant = k.tenant(seg(3).unwrap_or_default()).await?;
+            let connector_id = seg(4).unwrap_or_default();
+            let signature = parts
+                .headers
+                .get("x-osp-signature")
+                .and_then(|value| value.to_str().ok());
+            return json_ok(
+                crate::modules::logistics::receive_tracking_webhook(
+                    k,
+                    &tenant,
+                    connector_id,
+                    signature,
+                    &bytes,
+                )
+                .await?,
+            );
+        }
         (&Method::GET, Some("health"), None) => {
             let n: i64 = k
                 .pool
@@ -1341,6 +1364,96 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     to_date,
                 )
                 .await?,
+            );
+        }
+        (
+            &Method::POST,
+            [
+                "accounting",
+                "bank-statements",
+                statement_id,
+                "sync-salt-edge",
+            ],
+        ) => {
+            let payload = parse_json(&bytes)?;
+            let connector_id = payload
+                .get("connectorId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    ApiError::validation(
+                        "accounting.bank_statement",
+                        vec!["connectorId is required".into()],
+                    )
+                })?;
+            let from_date = payload.get("fromDate").and_then(Value::as_str);
+            let to_date = payload.get("toDate").and_then(Value::as_str);
+            return json_ok(
+                crate::modules::accounting::sync_statement_salt_edge(
+                    k,
+                    &actor,
+                    &t,
+                    statement_id,
+                    connector_id,
+                    from_date,
+                    to_date,
+                )
+                .await?,
+            );
+        }
+        (&Method::POST, ["connectors", connector_id, "salt-edge", "connect"]) => {
+            let payload = parse_json(&bytes)?;
+            let return_to = payload
+                .get("returnTo")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    ApiError::validation(
+                        "integration-hub.connector",
+                        vec!["returnTo is required".into()],
+                    )
+                })?;
+            return json_ok(
+                crate::modules::accounting::create_salt_edge_connect_url(
+                    k,
+                    &actor,
+                    &t,
+                    connector_id,
+                    return_to,
+                )
+                .await?,
+            );
+        }
+        (&Method::POST, ["connectors", connector_id, "salt-edge", "complete"]) => {
+            let payload = parse_json(&bytes)?;
+            let connection_id = payload
+                .get("connectionId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    ApiError::validation(
+                        "integration-hub.connector",
+                        vec!["connectionId is required".into()],
+                    )
+                })?;
+            return json_ok(
+                crate::modules::accounting::complete_salt_edge_link(
+                    k,
+                    &actor,
+                    &t,
+                    connector_id,
+                    connection_id,
+                )
+                .await?,
+            );
+        }
+        (&Method::GET, ["connectors", connector_id, "salt-edge", "accounts"]) => {
+            return json_ok(
+                crate::modules::accounting::list_salt_edge_accounts(k, &actor, &t, connector_id)
+                    .await?,
+            );
+        }
+        (&Method::POST, ["connectors", connector_id, "salt-edge", "disconnect"]) => {
+            return json_ok(
+                crate::modules::accounting::disconnect_salt_edge(k, &actor, &t, connector_id)
+                    .await?,
             );
         }
         (&Method::POST, ["connectors", connector_id, "plaid", "link-token"]) => {

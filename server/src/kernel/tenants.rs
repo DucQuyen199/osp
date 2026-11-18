@@ -426,6 +426,26 @@ impl Kernel {
                 {
                     obj.insert(key.clone(), value.clone());
                 }
+                "einvoiceProvider" if value.is_null() => {
+                    obj.remove(key);
+                }
+                "einvoiceProvider"
+                    if value.as_str().is_some_and(|code| {
+                        let code = code.trim();
+                        !code.is_empty()
+                            && code.len() <= 64
+                            && code
+                                .bytes()
+                                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+                    }) =>
+                {
+                    let code = value
+                        .as_str()
+                        .unwrap_or_default()
+                        .trim()
+                        .to_ascii_lowercase();
+                    obj.insert(key.clone(), Value::String(code));
+                }
                 _ => {
                     return Err(ApiError::new(
                         422,
@@ -458,6 +478,13 @@ impl Kernel {
                 404,
                 "MODULE_DISABLED",
                 "Module budget chưa được bật cho doanh nghiệp này",
+            ));
+        }
+        if changes.contains_key("einvoiceProvider") && !t.has_module("einvoice") {
+            return Err(ApiError::new(
+                404,
+                "MODULE_DISABLED",
+                "Module einvoice chưa được bật cho doanh nghiệp này",
             ));
         }
         let previous_method = tx

@@ -6,6 +6,7 @@
 use crate::error::R;
 use futures::future::BoxFuture;
 use serde_json::Value;
+use std::{collections::BTreeMap, sync::Arc};
 
 mod http;
 pub use http::{HttpEInvoiceProvider, HttpEInvoiceProviderConfig};
@@ -41,4 +42,71 @@ pub trait EInvoiceProvider: Send + Sync {
         provider_reference: &'a str,
         reason: &'a str,
     ) -> BoxFuture<'a, R<CancellationResult>>;
+}
+
+/// Explicit registry of available adapters. Provider credentials stay inside
+/// provider instances or external secret managers; a tenant stores only the
+/// adapter code used when an issuance request is queued.
+#[derive(Clone, Default)]
+pub struct EInvoiceProviderRegistry {
+    providers: BTreeMap<String, Arc<dyn EInvoiceProvider>>,
+    default_code: Option<String>,
+}
+
+impl EInvoiceProviderRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn register(&mut self, provider: Arc<dyn EInvoiceProvider>) -> R<()> {
+        let code = provider.code().trim().to_ascii_lowercase();
+        if code.is_empty()
+            || code.len() > 64
+            || !code
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+        {
+            return Err(crate::error::ApiError::new(
+                500,
+                "EINVOICE_CONFIG",
+                "E-invoice adapter codes must use lowercase letters, digits, or hyphens",
+            ));
+        }
+        if self.providers.contains_key(&code) {
+            return Err(crate::error::ApiError::new(
+                500,
+                "EINVOICE_CONFIG",
+                format!("E-invoice adapter '{code}' is registered more than once"),
+            ));
+        }
+        self.providers.insert(code, provider);
+        Ok(())
+    }
+
+    pub fn set_default(&mut self, code: &str) -> R<()> {
+        let code = code.trim().to_ascii_lowercase();
+        if !self.providers.contains_key(&code) {
+            return Err(crate::error::ApiError::new(
+                500,
+                "EINVOICE_CONFIG",
+                format!("Default e-invoice adapter '{code}' is not registered"),
+            ));
+        }
+        self.default_code = Some(code);
+        Ok(())
+    }
+
+    pub fn default_code(&self) -> Option<&str> {
+        self.default_code.as_deref()
+    }
+
+    pub fn get(&self, code: &str) -> Option<&dyn EInvoiceProvider> {
+        self.providers
+            .get(&code.trim().to_ascii_lowercase())
+            .map(Arc::as_ref)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.providers.is_empty()
+    }
 }

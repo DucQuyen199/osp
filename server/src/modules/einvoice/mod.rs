@@ -8,10 +8,10 @@ pub use application::handle_source_event;
 pub use domain::{prepare_action, validate_action, validate_remove, validate_update};
 pub use persistence::validate_persistence;
 pub use provider::{
-    CancellationResult, EInvoiceProvider, HttpEInvoiceProvider, HttpEInvoiceProviderConfig,
-    IssueResult,
+    CancellationResult, EInvoiceProvider, EInvoiceProviderRegistry, HttpEInvoiceProvider,
+    HttpEInvoiceProviderConfig, IssueResult,
 };
-pub use worker::{run_once, run_once_with_provider};
+pub use worker::{run_once, run_once_with_provider, run_once_with_registry};
 
 pub(crate) fn scheduled_jobs() -> Vec<crate::defs::JobSpec> {
     vec![

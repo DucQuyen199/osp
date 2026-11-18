@@ -48,6 +48,13 @@ pub async fn handle_source_event(
     let mut data = Map::new();
     data.insert("invoice".into(), Value::String(invoice.to_string()));
     data.insert("request_payload".into(), document.clone());
+    if let Some(provider) = tenant
+        .setting_str("einvoiceProvider")
+        .map(str::trim)
+        .filter(|provider| !provider.is_empty())
+    {
+        data.insert("provider".into(), Value::String(provider.to_owned()));
+    }
     data.insert("attempts".into(), Value::Number(0.into()));
     data.insert("operation".into(), Value::String("issue".into()));
     let entity = kernel.ent(tenant, "einvoice.einvoice")?;

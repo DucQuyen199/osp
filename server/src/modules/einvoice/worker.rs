@@ -1,5 +1,7 @@
 //! Durable tenant-scoped issuance and cancellation worker.
-use super::{EInvoiceProvider, HttpEInvoiceProvider, HttpEInvoiceProviderConfig};
+use super::{
+    EInvoiceProvider, EInvoiceProviderRegistry, HttpEInvoiceProvider, HttpEInvoiceProviderConfig,
+};
 use crate::{
     db::Tx,
     error::{ApiError, R},
@@ -7,7 +9,7 @@ use crate::{
 };
 use futures::{StreamExt, stream};
 use serde_json::{Map, Value};
-use std::{env, time::Duration};
+use std::{env, sync::Arc, time::Duration};
 use uuid::Uuid;
 
 const BATCH_SIZE: i64 = 10;
@@ -25,20 +27,50 @@ struct Job {
     request_payload: Value,
     provider_reference: Option<String>,
     cancellation_reason: Option<String>,
+    provider_code: Option<String>,
     attempts: i64,
 }
 
 /// Process one bounded batch from every tenant with e-invoice enabled.
 /// Without OSP_EINVOICE_ENDPOINT the queue remains untouched.
 pub async fn run_once(kernel: &Kernel) -> R<usize> {
-    let Some(provider) = configured_provider()? else {
+    let Some(registry) = configured_provider_registry()? else {
         return Ok(0);
     };
-    run_once_with_provider(kernel, &provider).await
+    run_once_with_registry(kernel, &registry).await
 }
 
 /// Process a bounded batch using an injected vendor adapter.
 pub async fn run_once_with_provider(kernel: &Kernel, provider: &dyn EInvoiceProvider) -> R<usize> {
+    let resolve = |_tenant: &Tenant, _job: &Job| Some(provider);
+    run_once_resolved(kernel, &resolve).await
+}
+
+/// Process queued requests using registered adapters. A request's saved
+/// provider code takes precedence, followed by the tenant's configured code,
+/// then the registry default.
+pub async fn run_once_with_registry(
+    kernel: &Kernel,
+    registry: &EInvoiceProviderRegistry,
+) -> R<usize> {
+    if registry.is_empty() {
+        return Ok(0);
+    }
+    let resolve = |tenant: &Tenant, job: &Job| {
+        let code = job
+            .provider_code
+            .as_deref()
+            .or(tenant.setting_str("einvoiceProvider"))
+            .or(registry.default_code())?;
+        registry.get(code)
+    };
+    run_once_resolved(kernel, &resolve).await
+}
+
+async fn run_once_resolved<'a>(
+    kernel: &Kernel,
+    resolve: &'a (dyn Fn(&Tenant, &Job) -> Option<&'a dyn EInvoiceProvider> + Sync),
+) -> R<usize> {
     let concurrency = provider_concurrency()?;
     let tenant_ids: Vec<String> = {
         let conn = kernel.pool.get().await?;
@@ -69,6 +101,12 @@ pub async fn run_once_with_provider(kernel: &Kernel, provider: &dyn EInvoiceProv
             .for_each_concurrent(concurrency, |job| {
                 let tenant = tenant.clone();
                 async move {
+                    let Some(provider) = resolve(&tenant, &job) else {
+                        if let Err(error) = fail_unconfigured_provider(kernel, &tenant, &job).await {
+                            tracing::error!(einvoice_id = %job.id, tenant_id = %job.tenant_id, error = %error, "e-invoice adapter resolution failed");
+                        }
+                        return;
+                    };
                     if let Err(error) = process(kernel, &tenant, provider, &job).await {
                         tracing::error!(einvoice_id = %job.id, tenant_id = %job.tenant_id, error = %error, "e-invoice job failed");
                     }
@@ -103,7 +141,7 @@ fn lease_seconds(concurrency: usize) -> i64 {
     waves as i64 * MAX_PROVIDER_TIMEOUT_SECONDS + LEASE_MARGIN_SECONDS
 }
 
-fn configured_provider() -> R<Option<HttpEInvoiceProvider>> {
+fn configured_provider_registry() -> R<Option<EInvoiceProviderRegistry>> {
     let Ok(endpoint) = env::var("OSP_EINVOICE_ENDPOINT") else {
         return Ok(None);
     };
@@ -125,17 +163,19 @@ fn configured_provider() -> R<Option<HttpEInvoiceProvider>> {
             })?,
         Err(_) => 30,
     };
-    Ok(Some(HttpEInvoiceProvider::new(
-        HttpEInvoiceProviderConfig {
-            code: env::var("OSP_EINVOICE_PROVIDER")
-                .ok()
-                .filter(|value| !value.trim().is_empty())
-                .unwrap_or_else(|| "rest".into()),
-            endpoint: endpoint.to_owned(),
-            bearer_token: env::var("OSP_EINVOICE_TOKEN").ok(),
-            timeout: Duration::from_secs(timeout),
-        },
-    )?))
+    let provider = Arc::new(HttpEInvoiceProvider::new(HttpEInvoiceProviderConfig {
+        code: env::var("OSP_EINVOICE_PROVIDER")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_else(|| "rest".into()),
+        endpoint: endpoint.to_owned(),
+        bearer_token: env::var("OSP_EINVOICE_TOKEN").ok(),
+        timeout: Duration::from_secs(timeout),
+    })?);
+    let mut registry = EInvoiceProviderRegistry::new();
+    registry.register(provider.clone())?;
+    registry.set_default(provider.code())?;
+    Ok(Some(registry))
 }
 
 async fn claim(kernel: &Kernel, tenant: &Tenant, limit: i64, lease_seconds: i64) -> R<Vec<Job>> {
@@ -153,7 +193,7 @@ async fn claim(kernel: &Kernel, tenant: &Tenant, limit: i64, lease_seconds: i64)
              UPDATE einvoice__einvoice e \
              SET attempts = COALESCE(e.attempts, 0) + 1, lease_until = now() + ($3::bigint * interval '1 second'), lease_token = $4, updated_at = now() \
              FROM ready WHERE e.tenant_id = $1 AND e.id = ready.id \
-             RETURNING e.id, e.operation, e.request_payload, e.provider_reference, e.cancellation_reason, e.attempts::bigint",
+             RETURNING e.id, e.operation, e.request_payload, e.provider_reference, e.cancellation_reason, e.provider, e.attempts::bigint",
             &[&tenant.id, &limit, &lease_seconds, &lease_token],
         )
         .await?;
@@ -170,7 +210,8 @@ async fn claim(kernel: &Kernel, tenant: &Tenant, limit: i64, lease_seconds: i64)
             request_payload: row.get::<_, Option<Value>>(2).unwrap_or(Value::Null),
             provider_reference: row.get(3),
             cancellation_reason: row.get(4),
-            attempts: row.get(5),
+            provider_code: row.get(5),
+            attempts: row.get(6),
         })
         .collect())
 }
@@ -254,6 +295,25 @@ async fn process(
             finish(kernel, tenant, job, "failed", patch).await
         }
     }
+}
+
+async fn fail_unconfigured_provider(kernel: &Kernel, tenant: &Tenant, job: &Job) -> R<()> {
+    let code = job
+        .provider_code
+        .as_deref()
+        .or(tenant.setting_str("einvoiceProvider"))
+        .unwrap_or("<default>");
+    let mut patch = Map::new();
+    patch.insert(
+        "provider_error".into(),
+        Value::String(format!(
+            "EINVOICE_CONFIG: e-invoice adapter '{code}' is not registered"
+        )),
+    );
+    patch.insert("retry_at".into(), Value::Null);
+    patch.insert("lease_until".into(), Value::Null);
+    patch.insert("lease_token".into(), Value::Null);
+    finish(kernel, tenant, job, "failed", patch).await
 }
 
 fn is_transient_provider_error(error: &ApiError) -> bool {

@@ -56,6 +56,20 @@ const integrationEnglish = {
   'Disconnect bank': 'Disconnect bank',
   'Plaid bank disconnected.': 'Plaid bank disconnected.',
   'Could not disconnect Plaid.': 'Could not disconnect Plaid.',
+  'Salt Edge bank linked. Set its account ID as bank_account_id on the matching ledger account.': 'Salt Edge bank linked. Set its account ID as bank_account_id on the matching ledger account.',
+  'Could not complete Salt Edge bank connection.': 'Could not complete Salt Edge bank connection.',
+  'Could not start Salt Edge bank connection.': 'Could not start Salt Edge bank connection.',
+  'Could not load Salt Edge accounts.': 'Could not load Salt Edge accounts.',
+  'Disconnect Salt Edge': 'Disconnect Salt Edge',
+  'Remove the linked bank connection from Salt Edge?': 'Remove the linked bank connection from Salt Edge?',
+  'Salt Edge bank disconnected.': 'Salt Edge bank disconnected.',
+  'Could not disconnect Salt Edge.': 'Could not disconnect Salt Edge.',
+  'Salt Edge international bank feed': 'Salt Edge international bank feed',
+  'Carrier tracking webhook': 'Carrier tracking webhook',
+  'Salt Edge Account Information API v6: nhập App ID và Secret từ Salt Edge Dashboard. Secret được che khi đọc lại. OSP_PUBLIC_URL phải là HTTPS và cùng origin với URL trả về; cấu hình callback URLs trên Salt Edge Dashboard nếu cần nhận cập nhật nền. Kết nối ngân hàng rồi điền account ID vào bank_account_id trên tài khoản sổ cái. Ngân hàng hiển thị tùy theo quốc gia và quyền truy cập dự án Salt Edge.': 'Salt Edge Account Information API v6: enter the App ID and Secret from the Salt Edge Dashboard. The secret is masked when read back. OSP_PUBLIC_URL must use HTTPS and share the return URL origin; configure callback URLs in the Salt Edge Dashboard for background updates. Connect a bank, then set its account ID as bank_account_id on the ledger account. Available banks depend on country and project access.',
+  'Chỉ nhận cập nhật tracking. Đặt secret 16–256 byte trong biến môi trường máy chủ có tên OSP_CARRIER_WEBHOOK_SECRET_... rồi lưu tên biến vào secret_env; không nhập secret thật vào JSON. Hãng phải gửi X-OSP-Signature: sha256=<HMAC-SHA256 của body JSON gốc>.': 'Receives tracking updates only. Store a 16–256 byte secret in a server environment variable named OSP_CARRIER_WEBHOOK_SECRET_... and save the variable name in secret_env; do not enter the secret in JSON. The carrier must send X-OSP-Signature: sha256=<HMAC-SHA256 of the raw JSON body>.',
+  'Salt Edge accounts': 'Salt Edge accounts',
+  'Salt Edge returned no accounts.': 'Salt Edge returned no accounts.',
 };
 
 export default integrationEnglish;

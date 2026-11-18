@@ -70,6 +70,25 @@ Tenant admin có thể gọi `POST /api/t/{tenantId}/auth/mfa/users/{userId}/res
 
 ## 3. Dữ liệu nghiệp vụ
 
+### Webhook tracking hãng vận chuyển
+
+`POST /api/hooks/carrier/{tenantId}/{connectorId}` là endpoint công khai cho nhà cung cấp gửi cập nhật tracking; không dùng API token. Connector phải thuộc đúng tenant, đang bật và được cấu hình adapter `carrier_tracking_webhook`. Máy chủ chỉ nhận body JSON tối đa 64 KiB và yêu cầu header `X-OSP-Signature: sha256=<hex>` là HMAC-SHA256 của **chính xác các byte body được gửi**. Connector chỉ lưu tên biến môi trường `secret_env` (tiền tố bắt buộc `OSP_CARRIER_WEBHOOK_SECRET_`); secret thật phải được cấu hình trong môi trường runtime của máy chủ, dài 16–256 byte và không được trả qua API. Ví dụ: connector dùng `secret_env: "OSP_CARRIER_WEBHOOK_SECRET_VNPOST"` thì đặt secret ở biến môi trường cùng tên. Dùng HTTPS và một biến bí mật riêng cho từng tenant/connector.
+
+```json
+{
+  "event_id": "mã sự kiện duy nhất của hãng",
+  "tracking_number": "VN123456789",
+  "status": "in_transit",
+  "description": "Đang trung chuyển",
+  "location": "Hà Nội",
+  "occurred_at": "2026-11-18T09:30:00Z"
+}
+```
+
+`location` có thể bỏ qua. `status` nhận `picked_up`, `in_transit`, `out_for_delivery`, `delivery_attempted`, `delivered` hoặc `exception`. Thời gian phải là RFC 3339 và không được vượt quá hiện tại hơn 5 phút. Máy chủ tìm vận đơn trong tenant theo tên hãng được cấu hình và mã tracking; không khớp trả `404`, khớp nhiều vận đơn trả `409`. Vận đơn phải được xuất phát trước khi nhận tracking.
+
+Mã `event_id` được chống lặp trong phạm vi vận đơn: gửi lại cùng dữ liệu trả `{ "accepted": true, "duplicate": true }`; dùng lại mã với dữ liệu khác trả `409 CARRIER_EVENT_ID_CONFLICT`. Sự kiện mới được ghi bằng giao dịch tenant-scoped. Sự kiện `delivered` cũng chạy quy trình hoàn tất vận đơn hiện có, gồm xuất kho và cập nhật tiến độ đơn bán. API này nhận tracking; đặt dịch vụ, mua vận đơn và in nhãn cần adapter/API riêng theo tài liệu của hãng.
+
 Đường dẫn: `/api/t/{tenantId}/data/{module}/{entity}`. Token phải thuộc tenant, nếu không `403 WRONG_TENANT`.
 
 | Phương thức | Đường dẫn | Quyền cần | Ghi chú |
@@ -173,7 +192,7 @@ curl -X POST $BASE/api/t/$T/data/sales/sales_order/bulk/confirmed \
 | `GET /tokens` · `POST /tokens` · `DELETE /tokens/:id` | Quản lý API token. `POST` nhận `{userId?, label?, ttlDays?}` |
 | `POST /modules/enable` `{ids[]}` · `POST /modules/disable` `{id}` | Bật (kéo theo phụ thuộc) / tắt module. Tắt không xóa dữ liệu; `409 HAS_DEPENDENTS` nếu module khác còn cần |
 | `POST /custom-fields` | `{entity, field}` — thêm trường mở rộng cho riêng tenant. `field` dạng `"ngay_sinh:date"`, `"xep_hang:enum:A\|B"`… |
-| `PATCH /settings` | Cập nhật cài đặt tenant. `{ "allowNegativeStock": false }` bật/tắt xuất âm; `{ "inventoryCostMethod": "fifo" }` hoặc `"moving_average"` chọn giá vốn. `{ "enforceBudgetControl": true }` yêu cầu ngân sách đã duyệt và chặn ghi sổ chi phí vượt kế hoạch (cần bật module `budget`). Phương pháp giá vốn khóa sau phiếu kho/tồn đầu kỳ đầu tiên; FIFO yêu cầu chặn tồn âm. |
+| `PATCH /settings` | Cập nhật cài đặt tenant. `{ "allowNegativeStock": false }` bật/tắt xuất âm; `{ "inventoryCostMethod": "fifo" }` hoặc `"moving_average"` chọn giá vốn. `{ "enforceBudgetControl": true }` yêu cầu ngân sách đã duyệt và chặn ghi sổ chi phí vượt kế hoạch (cần bật module `budget`). `{ "einvoiceProvider": "rest" }` chọn adapter hóa đơn đã đăng ký cho yêu cầu mới (cần bật module `einvoice`); gửi `null` để dùng adapter mặc định. Chỉ lưu mã adapter, không lưu thông tin xác thực. Phương pháp giá vốn khóa sau phiếu kho/tồn đầu kỳ đầu tiên; FIFO yêu cầu chặn tồn âm. |
 | `GET /outbox?status=dead` | Xem tối đa 200 webhook/connector delivery theo trạng thái: `pending`, `processing`, `retry`, `delivered`, `dead`, `cancelled`; mỗi dòng có `destinationKind` và `destinationId` |
 | `POST /outbox/:id/retry` · `POST /outbox/:id/dismiss` | Retry hoặc chuyển dead-letter sang cancelled |
 | `POST /webhooks/:id/test` · `POST /connectors/:id/test` | Gửi một payload thử có ký; trả về mã HTTP nhận được, yêu cầu `tenant.admin` |
@@ -233,3 +252,17 @@ Giới hạn tốc độ: `/api` 600 yêu cầu/phút/IP (cấu hình được).
 | `POST /api/t/:tid/connectors/:id/plaid/exchange` | `integration-hub.connector.read`, `integration-hub.connector.update` | Exchanges the one-time `{ "publicToken": "..." }`; the returned access token is stored only on the server and redacted from connector reads. |
 | `GET /api/t/:tid/connectors/:id/plaid/accounts` | `integration-hub.connector.read` | Lists account names, masks, types, currencies, and Plaid account IDs. Map the ID to `bank_account_id` on the corresponding ledger account. |
 | `POST /api/t/:tid/connectors/:id/plaid/disconnect` | `integration-hub.connector.read`, `integration-hub.connector.update` | Revokes the Plaid Item and removes its server-side access token, including for a disabled connector. |
+
+### Salt Edge bank connector endpoints (Account Information API v6)
+
+Create an enabled `salt_edge_bank_feed` connector with `app_id` and `secret` from Salt Edge. The secret is redacted from connector reads. Set `OSP_PUBLIC_URL` to the application's HTTPS origin before starting a connection. Salt Edge Connect returns the user to the requested same-origin app URL with `connection_id`; OSP verifies the remote connection's `customer_id` against the connector's stored Salt Edge customer before saving it.
+
+| Endpoint | Permission | Behavior |
+|---|---|---|
+| `POST /api/t/:tid/connectors/:id/salt-edge/connect` | `integration-hub.connector.read`, `integration-hub.connector.update` | Provisions a Salt Edge customer if needed, then returns a Connect URL for a 90-day accounts/transactions consent. Request body: `{ "returnTo": "https://app.example.com/#/settings/integrations?salt_edge_connector=<connector UUID>" }`; origin must match HTTPS `OSP_PUBLIC_URL`. |
+| `POST /api/t/:tid/connectors/:id/salt-edge/complete` | `integration-hub.connector.read`, `integration-hub.connector.update` | Verifies `{ "connectionId": "<Salt Edge ID>" }` with Salt Edge and stores it only when the returned customer belongs to this connector. |
+| `GET /api/t/:tid/connectors/:id/salt-edge/accounts` | `integration-hub.connector.read` | Lists account names, natures, currencies, and Salt Edge account IDs; account numbers and IBANs are omitted. Map the ID to `bank_account_id` on the corresponding ledger account. |
+| `POST /api/t/:tid/connectors/:id/salt-edge/disconnect` | `integration-hub.connector.read`, `integration-hub.connector.update` | Verifies ownership, removes the Salt Edge connection, and clears its ID from the connector. |
+| `POST /api/t/:tid/accounting/bank-statements/:id/sync-salt-edge` | `accounting.bank_statement_line.create`, `integration-hub.connector.read` | Fetches posted/non-duplicated transactions via v6 pagination, checks customer/connection/account ownership and ledger mapping, filters the statement date range, then imports Salt Edge transaction IDs idempotently. Sync is bounded at 20,000 rows/100 pages. |
+
+Salt Edge must approve/activate the project and enable access to the desired providers; provider coverage and country availability depend on that project. `return_to` is the browser completion mechanism. Configure the separate Salt Edge Dashboard callback URLs only if the deployment also needs Salt Edge's asynchronous connection update notifications; OSP does not expose callback webhook endpoints for these notifications yet.

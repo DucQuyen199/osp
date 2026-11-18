@@ -7,10 +7,13 @@ mod model;
 mod ofx;
 mod persistence;
 mod plaid_feed;
+mod salt_edge_feed;
 mod sepay_feed;
 
 pub use import::{
-    complete_plaid_link, create_plaid_link_token, disconnect_plaid, import_statement_camt053,
+    complete_plaid_link, complete_salt_edge_link, create_plaid_link_token,
+    create_salt_edge_connect_url, disconnect_plaid, disconnect_salt_edge, import_statement_camt053,
     import_statement_casso, import_statement_csv, import_statement_ofx, list_plaid_accounts,
-    sync_statement_casso, sync_statement_plaid, sync_statement_sepay,
+    list_salt_edge_accounts, sync_statement_casso, sync_statement_plaid, sync_statement_salt_edge,
+    sync_statement_sepay,
 };

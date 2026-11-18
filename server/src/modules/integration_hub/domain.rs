@@ -90,22 +90,66 @@ fn validate_connector(document: &Value) -> Vec<String> {
         .and_then(Value::as_bool)
         .unwrap_or(false);
     let config = document.get("config").filter(|value| !value.is_null());
+    let kind = document
+        .get("kind")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
     if let Some(config) = config {
         if !config.is_object() {
             errors.push("Connector configuration must be an object".into());
-        } else if enabled {
-            match config.get("adapter").and_then(Value::as_str) {
-                Some("http_event_sink") => validate_http_event_sink(config, &mut errors),
-                Some("casso_bank_feed") => validate_casso_bank_feed(config, &mut errors),
-                Some("sepay_bank_feed") => validate_sepay_bank_feed(config, &mut errors),
-                Some("plaid_bank_feed") => validate_plaid_bank_feed(config, &mut errors),
-                _ => errors.push("Enabled connector must use a supported adapter".into()),
+        } else {
+            if config.get("adapter").and_then(Value::as_str) == Some("carrier_tracking_webhook")
+                && config.get("secret").is_some()
+            {
+                errors.push("Carrier signing secrets must be supplied through a runtime environment variable, not connector config".into());
+            }
+            if enabled {
+                match config.get("adapter").and_then(Value::as_str) {
+                    Some("http_event_sink") => validate_http_event_sink(config, &mut errors),
+                    Some("casso_bank_feed") => validate_casso_bank_feed(config, &mut errors),
+                    Some("sepay_bank_feed") => validate_sepay_bank_feed(config, &mut errors),
+                    Some("plaid_bank_feed") => validate_plaid_bank_feed(config, &mut errors),
+                    Some("salt_edge_bank_feed") => {
+                        validate_salt_edge_bank_feed(config, &mut errors)
+                    }
+                    Some("carrier_tracking_webhook") if kind == "carrier" => {
+                        validate_carrier_tracking_webhook(config, &mut errors)
+                    }
+                    Some("carrier_tracking_webhook") => errors.push(
+                        "Carrier tracking webhook adapter requires connector kind carrier".into(),
+                    ),
+                    _ => errors.push("Enabled connector must use a supported adapter".into()),
+                }
             }
         }
     } else if enabled {
         errors.push("An enabled connector requires a supported adapter configuration".into());
     }
     errors
+}
+
+fn validate_carrier_tracking_webhook(config: &Value, errors: &mut Vec<String>) {
+    match config.get("carrier_name").and_then(Value::as_str) {
+        Some(value)
+            if !value.trim().is_empty()
+                && value.chars().count() <= 120
+                && !value.chars().any(char::is_control) => {}
+        _ => errors
+            .push("Carrier tracking webhook requires a carrier_name of 1 to 120 characters".into()),
+    }
+    match config.get("secret_env").and_then(Value::as_str) {
+        Some(name)
+            if name
+                .strip_prefix("OSP_CARRIER_WEBHOOK_SECRET_")
+                .is_some_and(|suffix| {
+                    !suffix.is_empty()
+                        && suffix.len() <= 64
+                        && suffix.bytes().all(|byte| {
+                            byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'_'
+                        })
+                }) => {}
+        _ => errors.push("Carrier tracking webhook requires secret_env named OSP_CARRIER_WEBHOOK_SECRET_<UPPERCASE_NAME>".into()),
+    }
 }
 
 fn validate_casso_bank_feed(config: &Value, errors: &mut Vec<String>) {
@@ -173,6 +217,23 @@ fn validate_plaid_bank_feed(config: &Value, errors: &mut Vec<String>) {
                         .is_some_and(|country| COUNTRIES.contains(&country))
                 }) => {}
         _ => errors.push("Plaid country_codes must contain 1 to 10 supported country codes".into()),
+    }
+}
+
+fn validate_salt_edge_bank_feed(config: &Value, errors: &mut Vec<String>) {
+    match config.get("app_id").and_then(Value::as_str) {
+        Some(value)
+            if !value.trim().is_empty()
+                && value.len() <= 256
+                && !value.chars().any(char::is_control) => {}
+        _ => errors.push("Salt Edge bank feed requires a valid app_id".into()),
+    }
+    match config.get("secret").and_then(Value::as_str) {
+        Some(value)
+            if (16..=512).contains(&value.len()) && !value.chars().any(char::is_control) => {}
+        _ => {
+            errors.push("Salt Edge bank feed requires an API secret of 16 to 512 characters".into())
+        }
     }
 }
 

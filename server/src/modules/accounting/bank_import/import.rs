@@ -6,6 +6,7 @@ use crate::{
 };
 use chrono::NaiveDate;
 use serde_json::{Value, json};
+use url::Url;
 use uuid::Uuid;
 
 pub async fn import_statement_csv(
@@ -163,6 +164,268 @@ pub async fn sync_statement_plaid(
         "plaid",
     )
     .await
+}
+
+pub async fn sync_statement_salt_edge(
+    kernel: &Kernel,
+    actor: &Actor,
+    tenant: &Tenant,
+    statement_id: &str,
+    connector_id: &str,
+    from_date: Option<&str>,
+    to_date: Option<&str>,
+) -> R<Value> {
+    sync_statement_feed(
+        kernel,
+        actor,
+        tenant,
+        statement_id,
+        connector_id,
+        from_date,
+        to_date,
+        "salt_edge_bank_feed",
+        "salt_edge",
+    )
+    .await
+}
+
+pub async fn create_salt_edge_connect_url(
+    kernel: &Kernel,
+    actor: &Actor,
+    tenant: &Tenant,
+    connector_id: &str,
+    return_to: &str,
+) -> R<Value> {
+    let connector_id = authorize_salt_edge_connector(kernel, actor, tenant, connector_id).await?;
+    kernel.authorize(tenant, actor, "integration-hub.connector.update")?;
+    validate_salt_edge_return_url(return_to)?;
+    let mut config = read_salt_edge_config(kernel, tenant, connector_id, true).await?;
+    if config
+        .get("connection_id")
+        .and_then(Value::as_str)
+        .is_some()
+    {
+        return Err(ApiError::new(
+            409,
+            "BANK_PROVIDER_ALREADY_LINKED",
+            "This Salt Edge connector is already linked",
+        ));
+    }
+    if config.get("customer_id").and_then(Value::as_str).is_none() {
+        let customer_identifier = format!("osp-{}-{}", tenant.id, connector_id);
+        let customer_id =
+            super::salt_edge_feed::create_customer(&config, &customer_identifier).await?;
+        let mut conn = kernel.pool.get().await?;
+        let tx = Tx::begin(&mut conn, &tenant.id, true).await?;
+        let updated = tx.execute(
+            "UPDATE integration_hub__connector SET config = jsonb_set(config, '{customer_id}', to_jsonb($3::text), true), updated_at = now() WHERE tenant_id = $1 AND id = $2 AND enabled = true AND config->>'adapter' = 'salt_edge_bank_feed' AND COALESCE(config->>'customer_id', '') = ''",
+            &[&tenant.id, &connector_id, &customer_id],
+        ).await?;
+        if updated != 1 {
+            return Err(ApiError::new(
+                409,
+                "CONNECTOR_CHANGED_DURING_LINK",
+                "The Salt Edge connector changed while preparing the connection; refresh and try again",
+            ));
+        }
+        kernel
+            .audit(
+                &tx,
+                tenant,
+                actor,
+                "integration-hub.connector.salt_edge_customer_created",
+                &connector_id.to_string(),
+                None,
+            )
+            .await?;
+        tx.commit().await?;
+        config["customer_id"] = json!(customer_id);
+    }
+    let to = chrono::Utc::now().date_naive();
+    let from = to - chrono::Duration::days(90);
+    let connect_url =
+        super::salt_edge_feed::create_connect_url(&config, return_to, from, to).await?;
+    Ok(json!({ "connectUrl": connect_url }))
+}
+
+pub async fn complete_salt_edge_link(
+    kernel: &Kernel,
+    actor: &Actor,
+    tenant: &Tenant,
+    connector_id: &str,
+    connection_id: &str,
+) -> R<Value> {
+    let connector_id = authorize_salt_edge_connector(kernel, actor, tenant, connector_id).await?;
+    kernel.authorize(tenant, actor, "integration-hub.connector.update")?;
+    if connection_id.trim().is_empty()
+        || connection_id.len() > 32
+        || !connection_id.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return Err(ApiError::validation(
+            "integration-hub.connector",
+            vec!["Salt Edge connection_id is invalid".into()],
+        ));
+    }
+    let config = read_salt_edge_config(kernel, tenant, connector_id, true).await?;
+    if let Some(existing) = config.get("connection_id").and_then(Value::as_str) {
+        if existing == connection_id {
+            return Ok(json!({ "connectionId": existing, "linked": true }));
+        }
+        return Err(ApiError::new(
+            409,
+            "BANK_PROVIDER_ALREADY_LINKED",
+            "This Salt Edge connector is already linked",
+        ));
+    }
+    super::salt_edge_feed::verify_connection(&config, connection_id).await?;
+    let mut conn = kernel.pool.get().await?;
+    let tx = Tx::begin(&mut conn, &tenant.id, true).await?;
+    let updated = tx.execute(
+        "UPDATE integration_hub__connector SET config = jsonb_set(config, '{connection_id}', to_jsonb($3::text), true), updated_at = now() WHERE tenant_id = $1 AND id = $2 AND enabled = true AND config->>'adapter' = 'salt_edge_bank_feed' AND COALESCE(config->>'connection_id', '') = ''",
+        &[&tenant.id, &connector_id, &connection_id],
+    ).await?;
+    if updated != 1 {
+        return Err(ApiError::new(
+            409,
+            "CONNECTOR_CHANGED_DURING_LINK",
+            "The Salt Edge connector changed while the bank was being linked; refresh and try again",
+        ));
+    }
+    kernel
+        .audit(
+            &tx,
+            tenant,
+            actor,
+            "integration-hub.connector.salt_edge_linked",
+            &connector_id.to_string(),
+            Some(format!("Salt Edge connection {connection_id} linked")),
+        )
+        .await?;
+    tx.commit().await?;
+    Ok(json!({ "connectionId": connection_id, "linked": true }))
+}
+
+pub async fn list_salt_edge_accounts(
+    kernel: &Kernel,
+    actor: &Actor,
+    tenant: &Tenant,
+    connector_id: &str,
+) -> R<Value> {
+    let connector_id = authorize_salt_edge_connector(kernel, actor, tenant, connector_id).await?;
+    let config = read_salt_edge_config(kernel, tenant, connector_id, true).await?;
+    super::salt_edge_feed::list_accounts(&config).await
+}
+
+pub async fn disconnect_salt_edge(
+    kernel: &Kernel,
+    actor: &Actor,
+    tenant: &Tenant,
+    connector_id: &str,
+) -> R<Value> {
+    let connector_id = authorize_salt_edge_connector(kernel, actor, tenant, connector_id).await?;
+    kernel.authorize(tenant, actor, "integration-hub.connector.update")?;
+    let config = read_salt_edge_config(kernel, tenant, connector_id, false).await?;
+    if config
+        .get("connection_id")
+        .and_then(Value::as_str)
+        .is_none()
+    {
+        return Ok(json!({ "disconnected": true }));
+    }
+    super::salt_edge_feed::remove_connection(&config).await?;
+    let mut conn = kernel.pool.get().await?;
+    let tx = Tx::begin(&mut conn, &tenant.id, true).await?;
+    let updated = tx.execute(
+        "UPDATE integration_hub__connector SET config = config - 'connection_id', updated_at = now() WHERE tenant_id = $1 AND id = $2 AND config->>'adapter' = 'salt_edge_bank_feed'",
+        &[&tenant.id, &connector_id],
+    ).await?;
+    if updated != 1 {
+        return Err(ApiError::new(
+            409,
+            "CONNECTOR_CHANGED_DURING_DISCONNECT",
+            "The Salt Edge connector changed while disconnecting; refresh to confirm its state",
+        ));
+    }
+    kernel
+        .audit(
+            &tx,
+            tenant,
+            actor,
+            "integration-hub.connector.salt_edge_disconnected",
+            &connector_id.to_string(),
+            None,
+        )
+        .await?;
+    tx.commit().await?;
+    Ok(json!({ "disconnected": true }))
+}
+
+async fn authorize_salt_edge_connector(
+    kernel: &Kernel,
+    actor: &Actor,
+    tenant: &Tenant,
+    connector_id: &str,
+) -> R<Uuid> {
+    kernel.ent(tenant, "integration-hub.connector")?;
+    kernel.authorize(tenant, actor, "integration-hub.connector.read")?;
+    Uuid::parse_str(connector_id).map_err(|_| {
+        ApiError::validation(
+            "integration-hub.connector",
+            vec!["Invalid connector id".into()],
+        )
+    })
+}
+
+async fn read_salt_edge_config(
+    kernel: &Kernel,
+    tenant: &Tenant,
+    connector_id: Uuid,
+    require_enabled: bool,
+) -> R<Value> {
+    let mut conn = kernel.pool.get().await?;
+    let tx = Tx::begin(&mut conn, &tenant.id, false).await?;
+    let row = tx.query_opt(
+        "SELECT config FROM integration_hub__connector WHERE tenant_id = $1 AND id = $2 AND ($3 = false OR enabled = true)",
+        &[&tenant.id, &connector_id, &require_enabled],
+    ).await?.ok_or_else(|| ApiError::not_found("Enabled Salt Edge connector not found for this tenant"))?;
+    let config: Option<Value> = row.get(0);
+    let config = config
+        .filter(|value| value.get("adapter").and_then(Value::as_str) == Some("salt_edge_bank_feed"))
+        .ok_or_else(|| {
+            ApiError::validation(
+                "integration-hub.connector",
+                vec!["Selected connector is not a Salt Edge bank feed".into()],
+            )
+        })?;
+    tx.commit().await?;
+    Ok(config)
+}
+
+fn validate_salt_edge_return_url(return_to: &str) -> R<()> {
+    let configured = std::env::var("OSP_PUBLIC_URL").unwrap_or_default();
+    let public = Url::parse(&configured).map_err(|_| {
+        ApiError::validation(
+            "integration-hub.connector",
+            vec!["Server must configure OSP_PUBLIC_URL before starting Salt Edge Connect".into()],
+        )
+    })?;
+    let candidate = Url::parse(return_to).map_err(|_| {
+        ApiError::validation(
+            "integration-hub.connector",
+            vec!["returnTo must be an absolute URL".into()],
+        )
+    })?;
+    let same_origin = public.scheme() == "https"
+        && candidate.scheme() == "https"
+        && public.host_str() == candidate.host_str()
+        && public.port_or_known_default() == candidate.port_or_known_default()
+        && candidate.username().is_empty()
+        && candidate.password().is_none()
+        && candidate.fragment().is_none();
+    if !same_origin || return_to.len() > 2048 {
+        return Err(ApiError::validation("integration-hub.connector", vec!["Salt Edge returnTo must use the HTTPS OSP_PUBLIC_URL origin and cannot contain credentials".into()]));
+    }
+    Ok(())
 }
 
 pub async fn create_plaid_link_token(
@@ -448,6 +711,7 @@ async fn sync_statement_feed(
     let parsed = match provider {
         "casso" => super::casso_feed::fetch(&config, from, to, &expected_account).await?,
         "sepay" => super::sepay_feed::fetch(&config, from, to, &expected_account).await?,
+        "salt_edge" => super::salt_edge_feed::fetch(&config, from, to, &expected_account).await?,
         _ => super::plaid_feed::fetch(&config, from, to, &expected_account).await?,
     };
     persistence::import_lines(
@@ -460,11 +724,13 @@ async fn sync_statement_feed(
         match provider {
             "casso" => "CASSO",
             "sepay" => "SEPAY",
+            "salt_edge" => "SALTEDGE",
             _ => "PLAID",
         },
         match provider {
             "casso" => "Casso transaction",
             "sepay" => "SePay transaction",
+            "salt_edge" => "Salt Edge transaction",
             _ => "Plaid transaction",
         },
     )
