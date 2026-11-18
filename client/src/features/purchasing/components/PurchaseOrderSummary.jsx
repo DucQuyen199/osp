@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../../lib/i18n.js';
 import { recordLabel } from '../../../lib/state.js';
+import { addDecimals, compareDecimals, multiplyDecimals } from '../../../lib/decimal.js';
 import { keyOf } from '../domain/purchasingSelectors.js';
 
 export default function PurchaseOrderSummary({
@@ -29,7 +30,7 @@ export default function PurchaseOrderSummary({
     const totals = new Map();
     receipts.filter((receipt) => receipt.status === 'received')
       .flatMap((receipt) => receipt.lines || [])
-      .forEach((line) => totals.set(keyOf(line), (totals.get(keyOf(line)) || 0) + Number(line.qty || 0)));
+      .forEach((line) => totals.set(keyOf(line), addDecimals([totals.get(keyOf(line)) || 0, line.qty || 0])));
     return totals;
   }, [receipts]);
 
@@ -51,9 +52,9 @@ export default function PurchaseOrderSummary({
           return <tr key={`${line.product}-${index}`}>
             <td>{products.get(line.product)?.name || uiText('Hàng hóa')}</td>
             <td>{line.qty} {unitName}</td>
-            <td>{receivedByLine.get(keyOf(line)) || 0} {unitName}</td>
+            <td>{receivedByLine.get(keyOf(line)) || '0'} {unitName}</td>
             <td>{fmtMoney(line.price)}</td>
-            <td>{fmtMoney(line.line_total || Number(line.qty || 0) * Number(line.price || 0))}</td>
+            <td>{fmtMoney(line.line_total ?? multiplyDecimals([line.qty || 0, line.price || 0]))}</td>
           </tr>;
         })}</tbody>
         <tfoot><tr><th colSpan="4">{uiText('Tổng có thuế')}</th><th>{fmtMoney(order.total || 0)}</th></tr></tfoot>
@@ -66,7 +67,7 @@ export default function PurchaseOrderSummary({
 
     <div className="row wrap u-legacy-0ee7f66ad9">
       {canEdit && <button className="btn btn-secondary btn-sm" type="button" disabled={Boolean(busy)} onClick={onEdit}>{uiText('Sửa nháp')}</button>}
-      {canSubmit && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy) || !(order.lines || []).length || Number(order.total) <= 0} onClick={onSubmit}>{uiText('Gửi duyệt')}</button>}
+      {canSubmit && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy) || !(order.lines || []).length || compareDecimals(order.total || 0, 0) <= 0} onClick={onSubmit}>{uiText('Gửi duyệt')}</button>}
       {canApprove && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={onApprove}>{uiText('Duyệt đơn')}</button>}
       {canCancel && <button className="btn btn-ghost btn-sm" type="button" disabled={Boolean(busy)} onClick={onCancel}>{uiText('Hủy đơn')}</button>}
       {canReceive && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={onReceive}>{uiText('Nhận hàng')}</button>}

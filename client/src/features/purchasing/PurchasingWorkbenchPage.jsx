@@ -127,7 +127,7 @@ export default function PurchasingWorkbenchPage() {
     const payload = {
       supplier: orderForm.supplier, warehouse: orderForm.warehouse,
       expected_date: orderForm.expected_date || undefined,
-      lines: lines.map((line) => ({ product: line.product, qty: Number(line.qty), price: Number(line.price), uom: line.uom || undefined, tax: line.tax || undefined })),
+      lines: lines.map((line) => ({ product: line.product, qty: String(line.qty), price: String(line.price || 0), uom: line.uom || undefined, tax: line.tax || undefined })),
     };
     const existing = editingId;
     await run(existing ? `${existing}:save` : 'order:create', () => api(existing ? dataPath('purchasing.purchase_order', existing) : dataPath('purchasing.purchase_order'), { method: existing ? 'PATCH' : 'POST', body: payload }), uiText(existing ? 'Đã cập nhật đơn mua nháp.' : 'Đã tạo đơn mua nháp; tổng tiền và thuế được tính lại trên máy chủ.'));
@@ -142,7 +142,7 @@ export default function PurchasingWorkbenchPage() {
       warehouse: requisitionForm.warehouse,
       requested_by: requisitionForm.requested_by.trim() || undefined,
       reason: requisitionForm.reason.trim() || undefined,
-      lines: requisitionLines.map((line) => ({ product: line.product, uom: line.uom || undefined, qty: Number(line.qty) })),
+      lines: requisitionLines.map((line) => ({ product: line.product, uom: line.uom || undefined, qty: String(line.qty) })),
     };
     const existing = editingRequisitionId;
     await run(existing ? `${existing}:requisition-save` : 'requisition:create', () => api(existing ? dataPath('purchasing.purchase_requisition', existing) : dataPath('purchasing.purchase_requisition'), { method: existing ? 'PATCH' : 'POST', body: payload }), uiText(existing ? 'Đã cập nhật đề nghị mua nháp.' : 'Đã tạo đề nghị mua nháp.'));
@@ -181,7 +181,7 @@ export default function PurchasingWorkbenchPage() {
     event.preventDefault();
     const order = orders.find((row) => row.id === receiptOrderId);
     if (!order) return;
-    const receiptItems = receiptLines.filter((line) => Number(line.received ?? line.qty) > 0).map((line) => ({ product: line.product, uom: line.uom || undefined, qty: Number(line.received ?? line.qty), price: Number(line.price), ...(line.lot_code?.trim() ? { lot_code: line.lot_code.trim() } : {}), ...(line.expiry ? { expiry: line.expiry } : {}) }));
+    const receiptItems = receiptLines.filter((line) => compareDecimals(line.received ?? line.qty, 0) > 0).map((line) => ({ product: line.product, uom: line.uom || undefined, qty: String(line.received ?? line.qty), price: String(line.price || 0), ...(line.lot_code?.trim() ? { lot_code: line.lot_code.trim() } : {}), ...(line.expiry ? { expiry: line.expiry } : {}) }));
     if (!receiptItems.length) { setError(uiText('Nhập số lượng nhận lớn hơn 0 cho ít nhất một dòng.')); return; }
     await run(`${order.id}:receipt`, async () => {
       const receipt = await api(dataPath('purchasing.purchase_receipt'), { method: 'POST', body: { purchase_order: order.id, warehouse: order.warehouse, lines: receiptItems, note: receiptNote.trim() || undefined } });

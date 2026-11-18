@@ -1,6 +1,7 @@
 import React from 'react';
 import { fmtDateTime, fmtMoney, statusLabel } from '../../../lib/i18n.js';
 import { recordHref } from '../../../lib/routes.js';
+import { multiplyDecimals } from '../../../lib/decimal.js';
 
 export default function WebOrderCard({
   order,
@@ -19,7 +20,7 @@ export default function WebOrderCard({
 }) {
   return <article className="card ecommerce-order">
       <header className="card-head"><div><strong>{partyName}</strong><div className="small muted">{storefrontName || t('Gian hàng')} · {t((order.channel || 'web') === 'web' ? 'Website' : order.channel === 'app' ? 'Ứng dụng' : order.channel === 'marketplace' ? 'Sàn thương mại' : order.channel || '—')} · {fmtDateTime(order.created_at)}</div></div><span className={`badge ${order.status === 'placed' ? 'success' : order.status === 'cancelled' ? 'plain' : 'warning'}`}>{statusLabel(order.status)}</span></header>
-    <ul className="ecommerce-order-lines">{(order.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{products.get(line.product)?.name || t('Sản phẩm')} × {line.qty}</span><strong className="num">{fmtMoney(line.line_total ?? (Number(line.price || 0) * Number(line.qty || 0)), currencyCode)}</strong></li>)}</ul>
+    <ul className="ecommerce-order-lines">{(order.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{products.get(line.product)?.name || t('Sản phẩm')} × {line.qty}</span><strong className="num">{fmtMoney(line.line_total ?? multiplyDecimals([line.price || 0, line.qty || 0]), currencyCode)}</strong></li>)}</ul>
     <div className="ecommerce-order-total"><span>{t('Tổng đơn')}{currencyCode ? ` (${currencyCode})` : ''}</span><strong className="num">{fmtMoney(order.total || 0, currencyCode)}</strong></div>
     {order.shipping_address && <div className="small muted ecommerce-address">{t('Giao đến:')} {order.shipping_address}</div>}
     <footer className="row wrap ecommerce-order-footer">
