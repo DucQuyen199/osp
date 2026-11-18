@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { addCalendarDays, addCalendarMonths, localDate, localDateTimeToIso, localTime } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
-import { app, can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
+import { app, can, recordLabel } from '../../lib/state.js';
 import { listHref, recordHref } from '../../lib/routes.js';
 import AttendanceEntriesTable from './components/AttendanceEntriesTable.jsx';
 import WorkSchedulePatternForm from './components/WorkSchedulePatternForm.jsx';
@@ -14,7 +14,7 @@ import WorkScheduleEntriesPanel from './components/WorkScheduleEntriesPanel.jsx'
 import WorkSchedulePatternsTable from './components/WorkSchedulePatternsTable.jsx';
 import { EmployeeDirectoryTable, LeaveRequestsTable, SalaryRevisionsTable } from './components/HrmWorkflowTables.jsx';
 import EmployeeWeekScheduleTable from './components/EmployeeWeekScheduleTable.jsx';
-const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
+import { useHrmOperationsData } from './hooks/useHrmOperationsData.js';
 const fmtTime = (value) => value ? localTime(new Date(value)) : '--';
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
 const MAX_ROTATION_DAYS = 3653;
@@ -28,18 +28,7 @@ const nextMonthStart = (date) => addCalendarMonths(`${date.slice(0, 7)}-01`, 1);
 export default function HrmOperationsPage() {
   useDocumentTitle(`${uiText('Vận hành nhân sự')} · OSP Suite`);
   const weekdayOptions = [[1, uiText('T2')], [2, uiText('T3')], [3, uiText('T4')], [4, uiText('T5')], [5, uiText('T6')], [6, uiText('T7')], [7, uiText('CN')]];
-  const [employees, setEmployees] = useState([]);
-  const [employeeMap, setEmployeeMap] = useState(new Map());
-  const [departments, setDepartments] = useState(new Map());
-  const [positions, setPositions] = useState(new Map());
-  const [leaveRequests, setLeaveRequests] = useState([]);
-  const [attendance, setAttendance] = useState([]);
-  const [scheduleEntries, setScheduleEntries] = useState([]);
-  const [schedulePatterns, setSchedulePatterns] = useState([]);
-  const [scheduleTemplates, setScheduleTemplates] = useState([]);
-  const [salaryRevisions, setSalaryRevisions] = useState([]);
-  const [allocations, setAllocations] = useState([]);
-  const [approvalRequests, setApprovalRequests] = useState([]);
+  const [error, setError] = useState('');
   const [leavePage, setLeavePage] = useState(0);
   const [employeePage, setEmployeePage] = useState(0);
   const [revisionPage, setRevisionPage] = useState(0);
@@ -54,51 +43,23 @@ export default function HrmOperationsPage() {
   const [scheduleTemplateId, setScheduleTemplateId] = useState('');
   const [patternEmployeeFilter, setPatternEmployeeFilter] = useState('');
   const [busy, setBusy] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const workflowApproval = app.meta?.modules?.some((module) => module.id === 'workflow-approval') || false;
   const scheduleMonth = scheduleForm.work_date.slice(0, 7);
   const scheduleMonthStart = `${scheduleMonth}-01`;
   const scheduleMonthEnd = nextMonthStart(scheduleForm.work_date);
+  const { employees, employeeMap, departments, positions, leaveRequests, attendance, scheduleEntries, schedulePatterns, scheduleTemplates, salaryRevisions, allocations, approvalRequests, loading, error: dataError, load } = useHrmOperationsData(attendanceDate, scheduleMonthStart, scheduleMonthEnd, workflowApproval);
   const maxPatternEndDate = patternForm.start_date
     ? addLocalDays(patternForm.start_date, rotationDayLimit(patternForm.employees.length) - 1)
     : undefined;
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const [employeeRes, leaveRes, attendanceRes, revisionRes, allocationRes, scheduleRes, patternRes, templateRes, departmentMap, positionMap, requestRes] = await Promise.all([
-        can('hrm.employee.read') ? loadAllResponse('hrm.employee') : Promise.resolve({ items: [] }),
-        can('hrm.leave_request.read') ? loadAllResponse('hrm.leave_request') : Promise.resolve({ items: [] }),
-        can('hrm.attendance.read') ? loadAllResponse('hrm.attendance', { date: attendanceDate }) : Promise.resolve({ items: [] }),
-        can('hrm.salary_revision.read') ? loadAllResponse('hrm.salary_revision') : Promise.resolve({ items: [] }),
-        can('hrm.leave_allocation.read') ? loadAllResponse('hrm.leave_allocation') : Promise.resolve({ items: [] }),
-        can('hrm.work_schedule_entry.read') ? loadAllResponse('hrm.work_schedule_entry', { work_date__gte: scheduleMonthStart, work_date__lt: scheduleMonthEnd, sort: 'work_date' }) : Promise.resolve({ items: [] }),
-        can('hrm.work_schedule_pattern.read') ? loadAllResponse('hrm.work_schedule_pattern') : Promise.resolve({ items: [] }),
-        can('hrm.work_schedule_template.read') ? loadAllResponse('hrm.work_schedule_template') : Promise.resolve({ items: [] }),
-        can('hrm.department.read') ? loadRefs('hrm.department') : Promise.resolve(new Map()),
-        can('hrm.position.read') ? loadRefs('hrm.position') : Promise.resolve(new Map()),
-        workflowApproval && can('workflow-approval.approval_request.read') ? loadAllResponse('workflow-approval.approval_request') : Promise.resolve({ items: [] }),
-      ]);
-      const employeeRows = itemsOf(employeeRes).sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi'));
-      setEmployees(employeeRows); setEmployeeMap(new Map(employeeRows.map((row) => [row.id, row])));
-      setLeaveRequests(itemsOf(leaveRes).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))));
-      setAttendance(itemsOf(attendanceRes).sort((a, b) => String(a.check_in || '').localeCompare(String(b.check_in || ''))));
-      setSalaryRevisions(itemsOf(revisionRes).sort((a, b) => String(b.effective_from || '').localeCompare(String(a.effective_from || ''))));
-      setAllocations(itemsOf(allocationRes)); setDepartments(departmentMap); setPositions(positionMap); setApprovalRequests(itemsOf(requestRes));
-      setScheduleEntries(itemsOf(scheduleRes).sort((a, b) => String(a.work_date || '').localeCompare(String(b.work_date || ''))));
-      setSchedulePatterns(itemsOf(patternRes).sort((a, b) => String(b.start_date || '').localeCompare(String(a.start_date || ''))));
-      setScheduleTemplates(itemsOf(templateRes).sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi')));
-      const activeEmployee = employeeRows.find((row) => row.status === 'active');
-      setPunchEmployee((id) => employeeRows.some((row) => row.id === id && row.status === 'active') ? id : activeEmployee?.id || '');
-      setLeaveForm((form) => ({ ...form, employee: employeeRows.some((row) => row.id === form.employee && row.status === 'active') ? form.employee : activeEmployee?.id || '' }));
-      setRevisionForm((form) => ({ ...form, employee: employeeRows.some((row) => row.id === form.employee && row.status === 'active') ? form.employee : activeEmployee?.id || '' }));
-      setScheduleForm((form) => ({ ...form, employee: employeeRows.some((row) => row.id === form.employee && row.status === 'active') ? form.employee : activeEmployee?.id || '' }));
-      setPatternForm((form) => ({ ...form, employees: form.employees.filter((id) => employeeRows.some((row) => row.id === id && row.status === 'active')) }));
-    } catch (reason) { setError(reason.message || uiText('Không tải được dữ liệu nhân sự.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, [attendanceDate, scheduleMonthStart, scheduleMonthEnd, workflowApproval]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const activeEmployee = employees.find((row) => row.status === 'active');
+    setPunchEmployee((id) => employees.some((row) => row.id === id && row.status === 'active') ? id : activeEmployee?.id || '');
+    setLeaveForm((form) => ({ ...form, employee: employees.some((row) => row.id === form.employee && row.status === 'active') ? form.employee : activeEmployee?.id || '' }));
+    setRevisionForm((form) => ({ ...form, employee: employees.some((row) => row.id === form.employee && row.status === 'active') ? form.employee : activeEmployee?.id || '' }));
+    setScheduleForm((form) => ({ ...form, employee: employees.some((row) => row.id === form.employee && row.status === 'active') ? form.employee : activeEmployee?.id || '' }));
+    setPatternForm((form) => ({ ...form, employees: form.employees.filter((id) => employees.some((row) => row.id === id && row.status === 'active')) }));
+  }, [employees]);
   const activeEmployees = employees.filter((row) => row.status === 'active');
   const pendingLeaves = leaveRequests.filter((row) => row.status === 'submitted');
   const pendingRevisions = salaryRevisions.filter((row) => row.status === 'submitted');
@@ -268,7 +229,7 @@ export default function HrmOperationsPage() {
   ].filter(([permission]) => can(permission));
   return <div className="page">
     <div className="page-head"><div><h1>{uiText("Vận hành nhân sự")}</h1><p className="sub">{uiText("Quản lý hồ sơ, ghi nhận chấm công, duyệt nghỉ phép và điều chỉnh lương theo ngày hiệu lực.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{uiText("Làm mới")}</button></div>
-    {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
+    {(error || dataError) && <div className="alert danger" role="alert">{uiText(error || dataError)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
     <div className="stats u-legacy-bf4a218e05" ><div className="card stat"><span className="stat-label">{uiText("Nhân viên đang làm")}</span><strong className="stat-value">{activeEmployees.length}</strong></div><div className="card stat"><span className="stat-label">{uiText("Đơn nghỉ chờ duyệt")}</span><strong className="stat-value">{pendingLeaves.length}</strong></div><div className="card stat"><span className="stat-label">{uiText("Điều chỉnh lương chờ duyệt")}</span><strong className="stat-value">{pendingRevisions.length}</strong></div><div className="card stat"><span className="stat-label">{uiText("Thiếu giờ ra hôm nay")}</span><strong className="stat-value">{attendanceDate === localDate() ? incompleteAttendance : '—'}</strong></div></div>
     <section className="card card-pad"><h2>{uiText("Chấm công trong ngày")}</h2><div className="row wrap"><label className="field"><span className="label">{uiText("Ngày")}</span><input className="input" type="date" value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)}/></label><label className="field grow"><span className="label">{uiText("Nhân viên ghi nhận giờ vào")}</span><select className="select" value={punchEmployee} onChange={(event) => setPunchEmployee(event.target.value)}><option value="">{uiText("Chọn nhân viên")}</option>{activeEmployees.map((row) => <option key={row.id} value={row.id}>{recordLabel('hrm.employee', row)}</option>)}</select></label>{can('hrm.attendance.create') && <button className="btn btn-primary" type="button" disabled={Boolean(busy) || !punchEmployee || attendanceDate !== localDate() || Boolean(attendanceByEmployee.get(punchEmployee)?.check_in)} onClick={punchIn}>{uiText("Ghi giờ vào")}</button>}</div>
       {attendance.length > 0 && <AttendanceEntriesTable attendance={attendance} employees={employeeMap} busy={busy} canPunchOut={can('hrm.attendance.update') && attendanceDate === localDate()} onPunchOut={punchOut} />}
