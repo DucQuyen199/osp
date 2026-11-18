@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localMonth } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
@@ -33,7 +34,9 @@ export default function PayrollWorkbenchPage() {
   const [notice, setNotice] = useState('');
   const [reportYear, setReportYear] = useState(localMonth().slice(0, 4));
   const workflowApproval = app.meta?.modules?.some((module) => module.id === 'workflow-approval') || false;
+  const latestRequest = useLatestRequest();
   const load = useCallback(async (quiet = false) => {
+    const isLatest = latestRequest();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [runRes, slipRes, employeeMap, requestRes, taxDeductionRes, taxPolicyRes] = await Promise.all([
@@ -45,12 +48,14 @@ export default function PayrollWorkbenchPage() {
         can('payroll.tax_policy.read') ? loadAllResponse('payroll.tax_policy') : Promise.resolve({ items: [] }),
       ]);
       const runRows = itemsOf(runRes).sort((a, b) => String(b.period || '').localeCompare(String(a.period || '')) || String(b.created_at || '').localeCompare(String(a.created_at || '')));
-      setRuns(runRows); setPayslips(itemsOf(slipRes)); setEmployees(employeeMap); setApprovalRequests(itemsOf(requestRes));
-      setTaxDeductions(itemsOf(taxDeductionRes)); setTaxPolicies(itemsOf(taxPolicyRes));
-      setSelectedId((id) => runRows.some((row) => row.id === id) ? id : runRows[0]?.id || '');
-    } catch (reason) { setError(t(reason.message || 'Không tải được bảng lương.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, [workflowApproval]);
+      if (isLatest()) {
+        setRuns(runRows); setPayslips(itemsOf(slipRes)); setEmployees(employeeMap); setApprovalRequests(itemsOf(requestRes));
+        setTaxDeductions(itemsOf(taxDeductionRes)); setTaxPolicies(itemsOf(taxPolicyRes));
+        setSelectedId((id) => runRows.some((row) => row.id === id) ? id : runRows[0]?.id || '');
+      }
+    } catch (reason) { if (isLatest()) setError(t(reason.message || 'Không tải được bảng lương.')); }
+    finally { if (isLatest()) setLoading(false); }
+  }, [workflowApproval, latestRequest]);
   useEffect(() => { load(); }, [load]);
   const selected = runs.find((row) => row.id === selectedId);
   const runSlips = useMemo(() => payslips.filter((row) => row.run === selectedId).sort((a, b) => String(employees.get(a.employee)?.name || '').localeCompare(String(employees.get(b.employee)?.name || ''), 'vi')), [payslips, selectedId, employees]);

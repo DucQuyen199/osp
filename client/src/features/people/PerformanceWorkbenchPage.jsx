@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, statusLabel, uiTextWith } from '../../lib/i18n.js';
@@ -30,7 +31,9 @@ export default function PerformanceWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const latestRequest = useLatestRequest();
   const load = useCallback(async (quiet = false) => {
+    const isLatest = latestRequest();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [objectiveRes, keyResultRes, reviewRes, employeeMap] = await Promise.all([
@@ -41,14 +44,16 @@ export default function PerformanceWorkbenchPage() {
       ]);
       const objectiveRows = rows(objectiveRes).sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')));
       const reviewRows = rows(reviewRes).sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')));
-      setObjectives(objectiveRows); setKeyResults(rows(keyResultRes)); setReviews(reviewRows); setEmployees(employeeMap);
-      setSelectedObjectiveId((id) => objectiveRows.some((row) => row.id === id) ? id : objectiveRows[0]?.id || '');
-      setSelectedReviewId((id) => reviewRows.some((row) => row.id === id) ? id : reviewRows[0]?.id || '');
-      setObjectiveForm((form) => ({ ...form, owner: form.owner || [...employeeMap.keys()][0] || '' }));
-      setReviewForm((form) => ({ ...form, employee: form.employee || [...employeeMap.keys()][0] || '' }));
-    } catch (reason) { setError(reason.message || t('Không tải được dữ liệu đánh giá hiệu suất.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
+      if (isLatest()) {
+        setObjectives(objectiveRows); setKeyResults(rows(keyResultRes)); setReviews(reviewRows); setEmployees(employeeMap);
+        setSelectedObjectiveId((id) => objectiveRows.some((row) => row.id === id) ? id : objectiveRows[0]?.id || '');
+        setSelectedReviewId((id) => reviewRows.some((row) => row.id === id) ? id : reviewRows[0]?.id || '');
+        setObjectiveForm((form) => ({ ...form, owner: form.owner || [...employeeMap.keys()][0] || '' }));
+        setReviewForm((form) => ({ ...form, employee: form.employee || [...employeeMap.keys()][0] || '' }));
+      }
+    } catch (reason) { if (isLatest()) setError(reason.message || t('Không tải được dữ liệu đánh giá hiệu suất.')); }
+    finally { if (isLatest()) setLoading(false); }
+  }, [latestRequest]);
   useEffect(() => { load(); }, [load]);
   const selectedObjective = objectives.find((row) => row.id === selectedObjectiveId);
   const objectiveResults = useMemo(() => keyResults.filter((row) => row.objective === selectedObjectiveId), [keyResults, selectedObjectiveId]);

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { addCalendarDays, localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { confirmDialog } from '../../lib/feedback.js';
@@ -37,7 +38,9 @@ export default function ContractWorkbenchPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const workflowEnabled = app.meta?.modules?.some((module) => module.id === 'workflow-approval') || false;
+  const latestRequest = useLatestRequest();
   const load = useCallback(async (quiet = false) => {
+    const isLatest = latestRequest();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [contractRes, clauseRes, amendmentRes, partyMap, approvalRes] = await Promise.all([
@@ -48,12 +51,14 @@ export default function ContractWorkbenchPage() {
         workflowEnabled && can('workflow-approval.approval_request.read') ? loadAllResponse('workflow-approval.approval_request') : Promise.resolve({ items: [] }),
       ]);
       const contractRows = rows(contractRes).sort((a, b) => String(a.end_date || '9999-12-31').localeCompare(String(b.end_date || '9999-12-31')) || String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
-      setContracts(contractRows); setClauses(rows(clauseRes)); setAmendments(rows(amendmentRes)); setParties(partyMap); setApprovalRequests(rows(approvalRes));
-      setSelectedId((id) => contractRows.some((row) => row.id === id) ? id : contractRows[0]?.id || '');
-      setContractForm((form) => ({ ...form, party: form.party || [...partyMap.keys()][0] || '' }));
-    } catch (reason) { setError(reason.message || t("Không tải được sổ hợp đồng.")); }
-    finally { if (!quiet) setLoading(false); }
-  }, [workflowEnabled]);
+      if (isLatest()) {
+        setContracts(contractRows); setClauses(rows(clauseRes)); setAmendments(rows(amendmentRes)); setParties(partyMap); setApprovalRequests(rows(approvalRes));
+        setSelectedId((id) => contractRows.some((row) => row.id === id) ? id : contractRows[0]?.id || '');
+        setContractForm((form) => ({ ...form, party: form.party || [...partyMap.keys()][0] || '' }));
+      }
+    } catch (reason) { if (isLatest()) setError(reason.message || t("Không tải được sổ hợp đồng.")); }
+    finally { if (isLatest()) setLoading(false); }
+  }, [workflowEnabled, latestRequest]);
   useEffect(() => { load(); }, [load]);
   const selected = contracts.find((row) => row.id === selectedId);
   const selectedClauses = useMemo(() => clauses.filter((row) => row.contract === selectedId).sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'vi')), [clauses, selectedId]);

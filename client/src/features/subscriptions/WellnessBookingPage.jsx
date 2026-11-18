@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate as businessDate, localDateTime as businessDateTime, localDateTimeToIso } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
@@ -32,7 +33,9 @@ export default function WellnessBookingPage({ healthcare = false }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const latestRequest = useLatestRequest();
   const load = useCallback(async (quiet = false) => {
+    const isLatest = latestRequest();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [bookingRes, resourceRes, serviceRes, partyMap, invoiceRes, clinicPatientRes] = await Promise.all([
@@ -45,15 +48,17 @@ export default function WellnessBookingPage({ healthcare = false }) {
       ]);
       const rows = itemsOf(bookingRes).sort((a, b) => String(a.starts_at || '').localeCompare(String(b.starts_at || '')));
       const resourceRows = itemsOf(resourceRes); const serviceRows = itemsOf(serviceRes);
-      setBookings(rows); setResources(resourceRows); setServices(serviceRows); setParties(partyMap); setInvoices(itemsOf(invoiceRes));
-      setClinicPatients(itemsOf(clinicPatientRes));
-      setSelectedId((current) => rows.some((row) => row.id === current) ? current : rows[0]?.id || '');
-      const patientPartyIds = new Set(itemsOf(clinicPatientRes).map((patient) => patient.party).filter(Boolean));
-      const availableParties = healthcare ? [...patientPartyIds].filter((id) => partyMap.has(id)) : [...partyMap.keys()];
-      setForm((current) => ({ ...current, party: availableParties.includes(current.party) ? current.party : availableParties[0] || '', resource: current.resource || resourceRows[0]?.id || '', service: current.service || serviceRows[0]?.id || '' }));
-    } catch (reason) { setError(t(reason.message || 'Không tải được lịch hẹn.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
+      if (isLatest()) {
+        setBookings(rows); setResources(resourceRows); setServices(serviceRows); setParties(partyMap); setInvoices(itemsOf(invoiceRes));
+        setClinicPatients(itemsOf(clinicPatientRes));
+        setSelectedId((current) => rows.some((row) => row.id === current) ? current : rows[0]?.id || '');
+        const patientPartyIds = new Set(itemsOf(clinicPatientRes).map((patient) => patient.party).filter(Boolean));
+        const availableParties = healthcare ? [...patientPartyIds].filter((id) => partyMap.has(id)) : [...partyMap.keys()];
+        setForm((current) => ({ ...current, party: availableParties.includes(current.party) ? current.party : availableParties[0] || '', resource: current.resource || resourceRows[0]?.id || '', service: current.service || serviceRows[0]?.id || '' }));
+      }
+    } catch (reason) { if (isLatest()) setError(t(reason.message || 'Không tải được lịch hẹn.')); }
+    finally { if (isLatest()) setLoading(false); }
+  }, [healthcare, latestRequest]);
   useEffect(() => { load(); }, [load, healthcare]);
   const resourceById = useMemo(() => new Map(resources.map((row) => [row.id, row])), [resources]);
   const serviceById = useMemo(() => new Map(services.map((row) => [row.id, row])), [services]);

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
@@ -41,7 +42,9 @@ export default function ApprovalWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const latestRequest = useLatestRequest();
   const load = useCallback(async (quiet = false) => {
+    const isLatest = latestRequest();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const canListApprovers = [
@@ -55,12 +58,14 @@ export default function ApprovalWorkbenchPage() {
         canListApprovers ? api(tenantPath('/approvals/approvers')) : Promise.resolve([]),
       ]);
       const requestRowsSorted = requestRows(requestRes).sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')));
-      setRequests(requestRowsSorted); setRules(requestRows(ruleRes));
-      setApproverUsers(Array.isArray(userRows) ? userRows : []);
-      setSelectedId((id) => requestRowsSorted.some((row) => row.id === id) ? id : requestRowsSorted.find((row) => row.status === 'pending')?.id || requestRowsSorted[0]?.id || '');
-    } catch (reason) { setError(reason.message || t('Không tải được hàng chờ phê duyệt.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
+      if (isLatest()) {
+        setRequests(requestRowsSorted); setRules(requestRows(ruleRes));
+        setApproverUsers(Array.isArray(userRows) ? userRows : []);
+        setSelectedId((id) => requestRowsSorted.some((row) => row.id === id) ? id : requestRowsSorted.find((row) => row.status === 'pending')?.id || requestRowsSorted[0]?.id || '');
+      }
+    } catch (reason) { if (isLatest()) setError(reason.message || t('Không tải được hàng chờ phê duyệt.')); }
+    finally { if (isLatest()) setLoading(false); }
+  }, [latestRequest]);
   useEffect(() => { load(); }, [load]);
   const visibleRequests = useMemo(() => requests.filter((row) => requestFilter === 'all' || row.status === requestFilter), [requests, requestFilter]);
   const selected = visibleRequests.find((row) => row.id === selectedId) || requests.find((row) => row.id === selectedId);

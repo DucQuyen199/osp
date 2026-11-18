@@ -5,6 +5,7 @@ import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import loyaltyEnglish from './loyalty.en.js';
 const t = (text) => uiTextWith(text, loyaltyEnglish);
 const rows = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -25,7 +26,9 @@ export default function LoyaltyWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const beginRequest = useLatestRequest();
   const load = useCallback(async (quiet = false) => {
+    const isCurrent = beginRequest();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [memberRes, transactionRes, partyMap, voucherRes] = await Promise.all([
@@ -34,14 +37,15 @@ export default function LoyaltyWorkbenchPage() {
         can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
         can('loyalty.voucher.read') ? loadAllResponse('loyalty.voucher') : Promise.resolve({ items: [] }),
       ]);
+      if (!isCurrent()) return;
       const memberRows = rows(memberRes).sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
       setMembers(memberRows); setTransactions(rows(transactionRes).sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))); setParties(partyMap);
       setVouchers(rows(voucherRes).sort((a, b) => String(a.valid_until || '').localeCompare(String(b.valid_until || ''))));
       setSelectedId((id) => memberRows.some((row) => row.id === id) ? id : memberRows[0]?.id || '');
       setForm((current) => ({ ...current, party: current.party || [...partyMap.keys()][0] || '' }));
-    } catch (reason) { setError(t(reason.message || 'Không tải được chương trình thành viên.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
+    } catch (reason) { if (isCurrent()) setError(t(reason.message || 'Không tải được chương trình thành viên.')); }
+    finally { if (isCurrent()) setLoading(false); }
+  }, [beginRequest]);
   useEffect(() => { load(); }, [load]);
   const selected = members.find((row) => row.id === selectedId);
   const ledger = useMemo(() => transactions.filter((row) => row.party === selected?.party), [transactions, selected]);

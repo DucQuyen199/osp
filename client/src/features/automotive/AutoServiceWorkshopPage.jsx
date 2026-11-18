@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, fmtNumber, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse, loadIndependentData } from '../../lib/state.js';
@@ -37,7 +38,9 @@ export default function AutoServiceWorkshopPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const latestRequest = useLatestRequest();
   const load = useCallback(async (quiet = false) => {
+    const isLatest = latestRequest();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const showInvoices = app.meta?.modules?.some((module) => module.id === 'accounting') && can('accounting.invoice.read');
@@ -55,14 +58,16 @@ export default function AutoServiceWorkshopPage() {
       });
       const nextVehicles = itemsOf(data.vehicles).sort((a, b) => String(a.plate || '').localeCompare(String(b.plate || '')));
       const nextOrders = itemsOf(data.orders).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
-      setVehicles(nextVehicles); setOrders(nextOrders); setParties(data.parties); setProducts(data.products); setUnits(data.units); setWarehouses(data.warehouses);
-      setInvoices(itemsOf(data.invoices));
-      setSelectedId((current) => nextOrders.some((item) => item.id === current) ? current : nextOrders[0]?.id || '');
-      setVehicleId((current) => nextVehicles.some((item) => item.id === current) ? current : nextVehicles[0]?.id || '');
-      if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được dữ liệu xưởng sửa chữa.')).join(' · '));
-    } catch (reason) { setError(reason.message || t('Không tải được dữ liệu xưởng sửa chữa.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
+      if (isLatest()) {
+        setVehicles(nextVehicles); setOrders(nextOrders); setParties(data.parties); setProducts(data.products); setUnits(data.units); setWarehouses(data.warehouses);
+        setInvoices(itemsOf(data.invoices));
+        setSelectedId((current) => nextOrders.some((item) => item.id === current) ? current : nextOrders[0]?.id || '');
+        setVehicleId((current) => nextVehicles.some((item) => item.id === current) ? current : nextVehicles[0]?.id || '');
+        if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được dữ liệu xưởng sửa chữa.')).join(' · '));
+      }
+    } catch (reason) { if (isLatest()) setError(reason.message || t('Không tải được dữ liệu xưởng sửa chữa.')); }
+    finally { if (isLatest()) setLoading(false); }
+  }, [latestRequest]);
   useEffect(() => { load(); }, [load]);
   const selected = orders.find((item) => item.id === selectedId) || null;
   const canCreateVehicle = can('auto-service.vehicle.create');

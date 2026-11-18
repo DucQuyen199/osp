@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { fmtMoney, fmtNumber, uiText } from '../../lib/i18n.js';
 export default function AssetDepreciationSchedulePage() {
@@ -8,19 +9,24 @@ export default function AssetDepreciationSchedulePage() {
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const latestRequest = useLatestRequest();
   const load = useCallback(async () => {
+    const isLatest = latestRequest();
     setLoading(true);
     setError('');
     try {
       const params = new URLSearchParams({ months });
-      setReport(await api(`${tenantPath('/reports/asset/depreciation-schedule')}?${params}`));
+      const nextReport = await api(`${tenantPath('/reports/asset/depreciation-schedule')}?${params}`);
+      if (isLatest()) setReport(nextReport);
     } catch (reason) {
-      setReport(null);
-      setError(reason.message || uiText('Không tải được lịch khấu hao tài sản.'));
+      if (isLatest()) {
+        setReport(null);
+        setError(reason.message || uiText('Không tải được lịch khấu hao tài sản.'));
+      }
     } finally {
-      setLoading(false);
+      if (isLatest()) setLoading(false);
     }
-  }, [months]);
+  }, [months, latestRequest]);
   useEffect(() => { load(); }, [load]);
   const rows = (report?.assets || []).flatMap((asset) => (asset.schedule || []).map((period) => ({
     assetId: asset.assetId,

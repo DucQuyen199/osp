@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { localDateTime, localDateTimeToIso } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, statusLabel, uiTextWith } from '../../lib/i18n.js';
@@ -35,7 +36,9 @@ export default function CommunicationWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const latestRequest = useLatestRequest();
   const load = useCallback(async (quiet = false) => {
+    const isLatest = latestRequest();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [reminderRes, messageRes, partyMap, reminderPendingRes, messageCountPairs] = await Promise.all([
@@ -51,15 +54,17 @@ export default function CommunicationWorkbenchPage() {
       const messageRows = rows(messageRes);
       const nextReminderTotal = Number(reminderRes.total || 0);
       const nextMessageTotal = Number(messageRes.total || 0);
-      if (reminderPage > 0 && reminderPage * REMINDER_PAGE_SIZE >= nextReminderTotal) setReminderPage(Math.max(0, Math.ceil(nextReminderTotal / REMINDER_PAGE_SIZE) - 1));
-      if (messagePage > 0 && messagePage * MESSAGE_PAGE_SIZE >= nextMessageTotal) setMessagePage(Math.max(0, Math.ceil(nextMessageTotal / MESSAGE_PAGE_SIZE) - 1));
-      setReminders(reminderRows); setReminderTotal(nextReminderTotal); setMessages(messageRows); setMessageTotal(nextMessageTotal); setParties(partyMap);
-      setPendingReminderCount(Number(reminderPendingRes?.total || 0));
-      setMessageCounts(Object.fromEntries(messageCountPairs.map(([status, response]) => [status, Number(response.total || 0)])));
-      setForm((current) => ({ ...current, party: current.party && partyMap.has(current.party) ? current.party : [...partyMap.keys()][0] || '' }));
-    } catch (reason) { setError(t(reason.message || 'Không tải được lịch và nhật ký gửi.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, [filter, messagePage, reminderPage]);
+      if (isLatest()) {
+        if (reminderPage > 0 && reminderPage * REMINDER_PAGE_SIZE >= nextReminderTotal) setReminderPage(Math.max(0, Math.ceil(nextReminderTotal / REMINDER_PAGE_SIZE) - 1));
+        if (messagePage > 0 && messagePage * MESSAGE_PAGE_SIZE >= nextMessageTotal) setMessagePage(Math.max(0, Math.ceil(nextMessageTotal / MESSAGE_PAGE_SIZE) - 1));
+        setReminders(reminderRows); setReminderTotal(nextReminderTotal); setMessages(messageRows); setMessageTotal(nextMessageTotal); setParties(partyMap);
+        setPendingReminderCount(Number(reminderPendingRes?.total || 0));
+        setMessageCounts(Object.fromEntries(messageCountPairs.map(([status, response]) => [status, Number(response.total || 0)])));
+        setForm((current) => ({ ...current, party: current.party && partyMap.has(current.party) ? current.party : [...partyMap.keys()][0] || '' }));
+      }
+    } catch (reason) { if (isLatest()) setError(t(reason.message || 'Không tải được lịch và nhật ký gửi.')); }
+    finally { if (isLatest()) setLoading(false); }
+  }, [filter, messagePage, reminderPage, latestRequest]);
   useEffect(() => { load(); }, [load]);
   const deliveryCounts = messageCounts;
   async function run(key, operation, message) {

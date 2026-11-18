@@ -5,6 +5,7 @@ import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { compareDecimals } from '../../lib/decimal.js';
 import { app, can, loadAll, loadIndependentData, loadRefs, recordLabel } from '../../lib/state.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import clinicEnglish from './clinic.en.js';
 import EncounterPrescriptionsPanel from './components/EncounterPrescriptionsPanel.jsx';
 const t = (text) => uiTextWith(text, clinicEnglish);
@@ -37,7 +38,9 @@ export default function ClinicWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const beginRequest = useLatestRequest();
   const load = useCallback(async (preserveNotice = false) => {
+    const isCurrent = beginRequest();
     setLoading(true); setError(''); if (!preserveNotice) setNotice('');
     try {
       const { data, errors } = await loadIndependentData({
@@ -53,15 +56,16 @@ export default function ClinicWorkbenchPage() {
         patients: [], parties: new Map(), encounters: [], prescriptions: [], labOrders: [],
         products: new Map(), units: new Map(), warehouses: new Map(),
       });
+      if (!isCurrent()) return;
       const encounterItems = data.encounters.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
       setPatients(data.patients); setParties(data.parties); setEncounters(encounterItems);
       setPrescriptions(data.prescriptions); setLabOrders(data.labOrders);
       setProducts(data.products); setUnits(data.units); setWarehouses(data.warehouses);
       setSelectedId((current) => encounterItems.some((item) => item.id === current) ? current : encounterItems.find((item) => item.status === 'open')?.id || encounterItems[0]?.id || '');
       if (errors.length) setError(errors.map((reason) => reason?.message || t("Không tải được một phần dữ liệu phòng khám.")).join(' · '));
-    } catch (reason) { setError(reason.message || t("Không tải được dữ liệu phòng khám.")); }
-    finally { setLoading(false); }
-  }, []);
+    } catch (reason) { if (isCurrent()) setError(reason.message || t("Không tải được dữ liệu phòng khám.")); }
+    finally { if (isCurrent()) setLoading(false); }
+  }, [beginRequest]);
   useEffect(() => { load(); }, [load]);
   const selected = encounters.find((item) => item.id === selectedId) || null;
   const availablePatientParties = useMemo(() => {

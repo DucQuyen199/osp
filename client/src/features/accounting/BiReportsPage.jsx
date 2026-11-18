@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadAllResponse } from '../../lib/state.js';
@@ -53,7 +54,9 @@ export default function BiReportsPage({ route }) {
   const [kpiReportId, setKpiReportId] = useState('');
   const [kpiTarget, setKpiTarget] = useState('');
   const [kpiFormula, setKpiFormula] = useState('');
+  const latestRequest = useLatestRequest();
   const load = useCallback(async () => {
+    const isLatest = latestRequest();
     setLoading(true);
     setError('');
     try {
@@ -62,13 +65,15 @@ export default function BiReportsPage({ route }) {
         can('bi.report.read') ? loadAllResponse('bi.report') : Promise.resolve({ items: [] }),
         can('bi.kpi.read') ? loadAllResponse('bi.kpi') : Promise.resolve({ items: [] }),
       ]);
-      setDashboards(asItems(dashboardList));
-      setReports(asItems(reportList));
-      setKpis(asItems(kpiList));
+      if (isLatest()) {
+        setDashboards(asItems(dashboardList));
+        setReports(asItems(reportList));
+        setKpis(asItems(kpiList));
+      }
     } catch (reason) {
-      setError(t(reason.message || 'Không tải được danh mục báo cáo BI.'));
-    } finally { setLoading(false); }
-  }, []);
+      if (isLatest()) setError(t(reason.message || 'Không tải được danh mục báo cáo BI.'));
+    } finally { if (isLatest()) setLoading(false); }
+  }, [latestRequest]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
     let active = true;
@@ -81,7 +86,10 @@ export default function BiReportsPage({ route }) {
       api(dataPath('bi.report', route.id)).then(async (value) => {
         if (!active) return;
         setReport(value);
-        if (value.query) setResult(await api(tenantPath(`/reports/bi/${encodeURIComponent(route.id)}`)));
+        if (value.query) {
+          const nextResult = await api(tenantPath(`/reports/bi/${encodeURIComponent(route.id)}`));
+          if (active) setResult(nextResult);
+        }
       }).catch((reason) => { if (active) setError(t(reason.message || 'Không tải được báo cáo.')); });
       if (can('bi.report.read')) {
         api(tenantPath(`/reports/bi/${encodeURIComponent(route.id)}/runs`))

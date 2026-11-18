@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { can, isAdmin, loadAll } from '../../lib/state.js';
 import { uiTextWith } from '../../lib/i18n.js';
@@ -37,8 +38,10 @@ export default function ConsolidationWorkbenchPage() {
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const latestRequest = useLatestRequest();
 
   const load = useCallback(async (quiet = false) => {
+    const isLatest = latestRequest();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [groupRows, memberRows, shareRows, grantRows, currencyRows, userRows, eliminationRows, accountRows] = await Promise.all([
@@ -51,15 +54,17 @@ export default function ConsolidationWorkbenchPage() {
         can('consolidation.elimination_journal.read') ? loadAll('consolidation.elimination_journal') : Promise.resolve([]),
         can('accounting.account.read') ? loadAll('accounting.account') : Promise.resolve([]),
       ]);
-      setGroups(groupRows); setMembers(memberRows); setShares(shareRows); setGrants(grantRows); setCurrencies(currencyRows); setUsers(Array.isArray(userRows) ? userRows : []); setEliminationJournals(eliminationRows); setAccounts(accountRows);
-      setInviteForm((form) => ({ ...form, groupId: groupRows.some((row) => row.id === form.groupId) ? form.groupId : groupRows[0]?.id || '' }));
-      setReportGroup((id) => groupRows.some((row) => row.id === id) ? id : groupRows[0]?.id || '');
-      const currentGroup = groupRows.find((row) => row.id === reportGroup) || groupRows[0];
-      setRatePolicyDays(String(currentGroup?.max_rate_age_days ?? '30'));
-      setGroupForm((form) => ({ ...form, reporting_currency: currencies.some((row) => row.id === form.reporting_currency) ? form.reporting_currency : currencyRows[0]?.id || '' }));
-    } catch (reason) { setError(reason.message || t('Không tải được dữ liệu tập đoàn.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, [reportGroup]);
+      if (isLatest()) {
+        setGroups(groupRows); setMembers(memberRows); setShares(shareRows); setGrants(grantRows); setCurrencies(currencyRows); setUsers(Array.isArray(userRows) ? userRows : []); setEliminationJournals(eliminationRows); setAccounts(accountRows);
+        setInviteForm((form) => ({ ...form, groupId: groupRows.some((row) => row.id === form.groupId) ? form.groupId : groupRows[0]?.id || '' }));
+        setReportGroup((id) => groupRows.some((row) => row.id === id) ? id : groupRows[0]?.id || '');
+        const currentGroup = groupRows.find((row) => row.id === reportGroup) || groupRows[0];
+        setRatePolicyDays(String(currentGroup?.max_rate_age_days ?? '30'));
+        setGroupForm((form) => ({ ...form, reporting_currency: currencies.some((row) => row.id === form.reporting_currency) ? form.reporting_currency : currencyRows[0]?.id || '' }));
+      }
+    } catch (reason) { if (isLatest()) setError(reason.message || t('Không tải được dữ liệu tập đoàn.')); }
+    finally { if (isLatest()) setLoading(false); }
+  }, [reportGroup, latestRequest]);
   useEffect(() => { load(); }, [load]);
 
   async function run(key, action, success) {

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
@@ -24,7 +25,9 @@ export default function ExpenseWorkbenchPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const workflowApproval = app.meta?.modules?.some((module) => module.id === 'workflow-approval') || false;
+  const latestRequest = useLatestRequest();
   const load = useCallback(async (quiet = false) => {
+    const isLatest = latestRequest();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [claimRes, employeeMap, accountMap, paymentRes, requestRes] = await Promise.all([
@@ -36,13 +39,15 @@ export default function ExpenseWorkbenchPage() {
       ]);
       const claimRows = itemsOf(claimRes).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
       const expenseAccounts = [...accountMap.values()].filter((row) => row.kind === 'expense').sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')));
-      setClaims(claimRows); setEmployees(employeeMap); setAccounts(expenseAccounts); setPayments(itemsOf(paymentRes)); setApprovalRequests(itemsOf(requestRes));
-      setSelectedId((id) => claimRows.some((row) => row.id === id) ? id : claimRows[0]?.id || '');
-      setForm((current) => ({ ...current, employee: current.employee || [...employeeMap.values()].find((row) => row.status === 'active')?.id || '' }));
-      setLines((current) => current.map((line) => ({ ...line, account_code: line.account_code || expenseAccounts[0]?.code || '' })));
-    } catch (reason) { setError(reason.message || uiText('Không tải được đề nghị chi phí.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, [workflowApproval]);
+      if (isLatest()) {
+        setClaims(claimRows); setEmployees(employeeMap); setAccounts(expenseAccounts); setPayments(itemsOf(paymentRes)); setApprovalRequests(itemsOf(requestRes));
+        setSelectedId((id) => claimRows.some((row) => row.id === id) ? id : claimRows[0]?.id || '');
+        setForm((current) => ({ ...current, employee: current.employee || [...employeeMap.values()].find((row) => row.status === 'active')?.id || '' }));
+        setLines((current) => current.map((line) => ({ ...line, account_code: line.account_code || expenseAccounts[0]?.code || '' })));
+      }
+    } catch (reason) { if (isLatest()) setError(reason.message || uiText('Không tải được đề nghị chi phí.')); }
+    finally { if (isLatest()) setLoading(false); }
+  }, [workflowApproval, latestRequest]);
   useEffect(() => { load(); }, [load]);
   const selected = claims.find((row) => row.id === selectedId);
   const stats = useMemo(() => ({ draft: claims.filter((row) => ['draft', 'rejected'].includes(row.status)).length, pending: claims.filter((row) => row.status === 'submitted').length, approved: claims.filter((row) => row.status === 'approved').length, paid: claims.filter((row) => row.status === 'paid').length }), [claims]);

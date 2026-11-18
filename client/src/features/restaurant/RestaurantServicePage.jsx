@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { localDateTime as businessDateTime, localDateTimeToIso } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
@@ -45,7 +46,9 @@ export default function RestaurantServicePage() {
   const [recipeOutputQty, setRecipeOutputQty] = useState('1');
   const [recipeIngredients, setRecipeIngredients] = useState(() => [blankRecipeIngredient()]);
   const [reservationForm, setReservationForm] = useState({ guest_name: '', phone: '', table: '', guest_count: '2', starts_at: reservationStart(), ends_at: businessDateTime(new Date(Date.now() + 2 * 60 * 60 * 1000)), note: '' });
+  const latestRequest = useLatestRequest();
   const load = useCallback(async (quiet = false) => {
+    const isLatest = latestRequest();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const canReadTickets = can('restaurant.kitchen_ticket.read');
@@ -71,12 +74,14 @@ export default function RestaurantServicePage() {
         products: productMap, units: unitMap, warehouses: warehouseMap, tickets: ticketResponse,
         payments: invoiceResponse, reservations: reservationResponse } = data;
       const nextOrders = itemsOf(orderResponse).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
-      setTables(itemsOf(tableResponse)); setMenuItems(itemsOf(menuResponse)); setRecipes(itemsOf(recipeResponse)); setOrders(nextOrders); setProducts(productMap); setUnits(unitMap); setWarehouses(warehouseMap); setTickets(itemsOf(ticketResponse)); setInvoices(itemsOf(invoiceResponse)); setReservations(itemsOf(reservationResponse).sort((a, b) => String(a.starts_at || '').localeCompare(String(b.starts_at || ''))));
-      setSelectedId((current) => nextOrders.some((order) => order.id === current) ? current : nextOrders[0]?.id || '');
-      if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được dữ liệu nhà hàng.')).join(' · '));
-    } catch (reason) { setError(reason.message || t('Không tải được dữ liệu nhà hàng.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
+      if (isLatest()) {
+        setTables(itemsOf(tableResponse)); setMenuItems(itemsOf(menuResponse)); setRecipes(itemsOf(recipeResponse)); setOrders(nextOrders); setProducts(productMap); setUnits(unitMap); setWarehouses(warehouseMap); setTickets(itemsOf(ticketResponse)); setInvoices(itemsOf(invoiceResponse)); setReservations(itemsOf(reservationResponse).sort((a, b) => String(a.starts_at || '').localeCompare(String(b.starts_at || ''))));
+        setSelectedId((current) => nextOrders.some((order) => order.id === current) ? current : nextOrders[0]?.id || '');
+        if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được dữ liệu nhà hàng.')).join(' · '));
+      }
+    } catch (reason) { if (isLatest()) setError(reason.message || t('Không tải được dữ liệu nhà hàng.')); }
+    finally { if (isLatest()) setLoading(false); }
+  }, [latestRequest]);
   useEffect(() => { load(); const timer = window.setInterval(() => load(true), 15000); return () => window.clearInterval(timer); }, [load]);
   const occupiedTableIds = useMemo(() => new Set(orders.filter((order) => ['open', 'sent', 'served'].includes(order.status)).map((order) => order.table).filter(Boolean)), [orders]);
   const availableTables = tables.filter((table) => !occupiedTableIds.has(table.id));

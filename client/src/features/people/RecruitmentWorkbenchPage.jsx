@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath } from '../../lib/api.js';
 import { statusLabel, uiTextWith } from '../../lib/i18n.js';
@@ -24,7 +25,9 @@ export default function RecruitmentWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const latestRequest = useLatestRequest();
   const load = useCallback(async (quiet = false) => {
+    const isLatest = latestRequest();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [jobRes, candidateRes, applicationRes, departmentMap, positionMap] = await Promise.all([
@@ -37,12 +40,14 @@ export default function RecruitmentWorkbenchPage() {
       const jobRows = itemsOf(jobRes).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
       const candidateRows = itemsOf(candidateRes).sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi'));
       const applicationRows = itemsOf(applicationRes).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
-      setJobs(jobRows); setCandidates(candidateRows); setApplications(applicationRows); setDepartments(departmentMap); setPositions(positionMap);
-      setSelectedId((id) => applicationRows.some((row) => row.id === id) ? id : applicationRows[0]?.id || '');
-      setApplicationForm((form) => ({ ...form, job: form.job || jobRows.find((row) => row.status === 'open')?.id || '', candidate: form.candidate || candidateRows[0]?.id || '' }));
-    } catch (reason) { setError(t(reason.message || 'Không tải được dữ liệu tuyển dụng.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
+      if (isLatest()) {
+        setJobs(jobRows); setCandidates(candidateRows); setApplications(applicationRows); setDepartments(departmentMap); setPositions(positionMap);
+        setSelectedId((id) => applicationRows.some((row) => row.id === id) ? id : applicationRows[0]?.id || '');
+        setApplicationForm((form) => ({ ...form, job: form.job || jobRows.find((row) => row.status === 'open')?.id || '', candidate: form.candidate || candidateRows[0]?.id || '' }));
+      }
+    } catch (reason) { if (isLatest()) setError(t(reason.message || 'Không tải được dữ liệu tuyển dụng.')); }
+    finally { if (isLatest()) setLoading(false); }
+  }, [latestRequest]);
   useEffect(() => { load(); }, [load]);
   const jobById = useMemo(() => new Map(jobs.map((row) => [row.id, row])), [jobs]);
   const candidateById = useMemo(() => new Map(candidates.map((row) => [row.id, row])), [candidates]);
