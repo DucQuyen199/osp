@@ -69,6 +69,7 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 - The education page owns tuition-batch draft state, permission checks, API mutations, and refreshes; `TuitionBatchPanel` renders the controlled batch form and draft/generation register through callbacks.
 - The HRM workbench owns shift schedule validation, time-zone conversion and persistence; `WorkScheduleEntriesPanel` renders the controlled day override form and exception list, while `WorkSchedulePatternsTable` renders patterns and emits apply/delete requests.
 - The payroll workbench owns annual payroll aggregation, export, permissions and year selection; `PayrollAnnualReportPanel` renders the controlled annual summary and emits year-change and CSV-export requests.
+- The payroll workbench owns run state, permissions and workflow actions; `PayrollRunPayslipsTable` renders the selected run's controlled payslip rows and the page-computed Decimal net total.
 - The manufacturing workbench keeps production commands and output drafts in `ManufacturingWipPage`; `ProductionOrderCard` renders the controlled output fields and emits requested transitions.
 - The manufacturing workbench owns production-order data and action handlers; `ProductionOrdersList` renders the list and resolves product/work-center labels while each `ProductionOrderCard` emits output edits and transitions.
 - The manufacturing workbench owns production-order permissions and creation; `ProductionOrderForm` renders the controlled BOM, warehouse, work-center, lot and scrap-account fields and emits changes through a callback.
@@ -98,6 +99,7 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 - The restaurant workbench owns recipe permissions, ingredient validation and persistence; `RestaurantRecipesPanel` edits controlled recipe lines and renders saved recipes through callbacks.
 - The restaurant workbench owns reservation permissions, creation, table assignment and status transitions; `RestaurantReservationsPanel` renders the controlled booking form and reservation queue, then emits requested operations through callbacks.
 - `RestaurantServicePage` owns order selection and workflow actions; `RestaurantOrderLineItems` renders saved food and drink lines with their exact tax and total snapshots.
+- `RestaurantServicePage` owns order-list state, open-order counts and selection; `RestaurantOrderList` renders prepared selectable order cards and loading/empty states.
 - `RestaurantServicePage` owns order permissions, cancellation/payment drafts, ticket readiness and transitions; `RestaurantOrderDetailPanel` renders the selected order, kitchen progress, payment controls and source payment link through controlled props and callbacks.
 - The restaurant workbench keeps its pre-tax order estimate and legacy line-total fallback in `features/restaurant/domain/restaurantTotals.js`, using the shared Decimal helpers and the server's four-place line rounding.
 - The HR workbench owns attendance-date rules and punch actions; `AttendanceEntriesTable` renders the controlled daily records and emits punch-out requests.

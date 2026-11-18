@@ -10,6 +10,7 @@ import restaurantEnglish from './restaurant.en.js';
 import RestaurantRecipesPanel from './components/RestaurantRecipesPanel.jsx';
 import RestaurantReservationsPanel from './components/RestaurantReservationsPanel.jsx';
 import RestaurantOrderDetailPanel from './components/RestaurantOrderDetailPanel.jsx';
+import RestaurantOrderList from './components/RestaurantOrderList.jsx';
 import { estimateRestaurantSubtotal, restaurantLineTotal } from './domain/restaurantTotals.js';
 const t = (text) => uiTextWith(text, restaurantEnglish);
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -89,6 +90,16 @@ export default function RestaurantServicePage() {
   const exceedsTableCapacity = Boolean(tableId && selectedTable?.seats && Number(guestCount) > Number(selectedTable.seats));
   const availableMenu = menuItems.filter((item) => item.available !== false).map((item) => ({ item, product: products.get(item.product) })).filter(({ product }) => product && product.active !== false).sort((a, b) => String(a.product.name).localeCompare(String(b.product.name), 'vi'));
   const selected = orders.find((order) => order.id === selectedId) || null;
+  const openOrderCount = orders.filter((order) => ['open', 'sent', 'served'].includes(order.status)).length;
+  const orderListItems = orders.map((order) => ({
+    id: order.id,
+    tableLabel: tables.find((table) => table.id === order.table)?.name || '',
+    statusLabel: statusLabel(order.status),
+    statusTone: order.status === 'completed' ? 'success' : order.status === 'cancelled' ? 'plain' : 'warning',
+    dateLabel: fmtDateTime(order.created_at),
+    guestLabel: order.table ? `${order.guest_count || 1} ${t('khách')}` : '',
+    totalLabel: fmtMoney(order.total || 0),
+  }));
   const selectedPayment = selected && invoices.find((payment) => payment.source === 'table_order' && payment.source_id === selected.id);
   const selectedNeedsWarehouse = Boolean(selected?.consumptions?.length);
   const selectedTickets = tickets.filter((ticket) => ticket.order === selectedId);
@@ -241,15 +252,7 @@ export default function RestaurantServicePage() {
         {exceedsTableCapacity && <div className="alert warning" role="status">{t('Bàn chỉ có')} {selectedTable.seats} {t('chỗ; chọn bàn lớn hơn hoặc giảm số khách.')}</div>}
         <button className="btn btn-primary" disabled={busy === 'create' || !cart.length || exceedsTableCapacity}>{busy === 'create' ? t('Đang tạo…') : t('Mở order')}</button>
       </form></section>
-      <section className="restaurant-order-list"><header><h2>{t('Orders')}</h2><span className="badge warning">{orders.filter((order) => ['open', 'sent', 'served'].includes(order.status)).length} {t('đang mở')}</span></header>
-        {loading ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <div className="restaurant-orders">{orders.map((order) => {
-          const table = tables.find((item) => item.id === order.table);
-          return <button className={`card restaurant-order-card${selectedId === order.id ? ' selected' : ''}`} key={order.id} onClick={() => setSelectedId(order.id)}>
-            <span className="restaurant-order-card-head"><strong>{table?.name || t('Mang đi')}</strong><span className={`badge ${order.status === 'completed' ? 'success' : order.status === 'cancelled' ? 'plain' : 'warning'}`}>{statusLabel(order.status)}</span></span>
-            <span className="small muted">{fmtDateTime(order.created_at)}{order.table ? ` · ${order.guest_count || 1} ${t('khách')}` : ''}</span><strong className="num">{fmtMoney(order.total || 0)}</strong>
-          </button>;
-        })}{!orders.length && <div className="empty">{t('Chưa có order.')}</div>}</div>}
-      </section>
+      <RestaurantOrderList loading={loading} orders={orderListItems} openCount={openOrderCount} selectedId={selectedId} onSelect={setSelectedId} t={t} />
       <RestaurantOrderDetailPanel
         selected={selected}
         tableName={tables.find((table) => table.id === selected?.table)?.name}
