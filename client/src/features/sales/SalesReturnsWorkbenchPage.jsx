@@ -3,7 +3,7 @@ import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
-import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { app, can, loadRefs, recordLabel, loadAllResponse, loadIndependentData } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import { absDecimal, addDecimals, compareDecimals, multiplyDecimals, subtractDecimals, minDecimal, roundDecimal } from '../../lib/decimal.js';
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -38,24 +38,30 @@ export default function SalesReturnsWorkbenchPage() {
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
-      const [orderRes, returnRes, productMap, unitMap, partyMap, warehouseMap, shipmentRes, invoiceRes, creditRes, approvalRes] = await Promise.all([
-        can('sales.sales_order.read') ? loadAllResponse('sales.sales_order') : Promise.resolve({ items: [] }),
-        can('sales.sales_return.read') ? loadAllResponse('sales.sales_return') : Promise.resolve({ items: [] }),
-        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
-        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
-        logisticsEnabled && can('logistics.shipment.read') ? loadAllResponse('logistics.shipment') : Promise.resolve({ items: [] }),
-        can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
-        can('accounting.credit_note.read') ? loadAllResponse('accounting.credit_note') : Promise.resolve({ items: [] }),
-        workflowApproval && can('workflow-approval.approval_request.read') ? loadAllResponse('workflow-approval.approval_request') : Promise.resolve({ items: [] }),
-      ]);
+      const { data, errors } = await loadIndependentData({
+        orders: can('sales.sales_order.read') ? loadAllResponse('sales.sales_order') : Promise.resolve({ items: [] }),
+        returns: can('sales.sales_return.read') ? loadAllResponse('sales.sales_return') : Promise.resolve({ items: [] }),
+        products: can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
+        units: can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
+        parties: can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
+        warehouses: can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
+        shipments: logisticsEnabled && can('logistics.shipment.read') ? loadAllResponse('logistics.shipment') : Promise.resolve({ items: [] }),
+        invoices: can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
+        creditNotes: can('accounting.credit_note.read') ? loadAllResponse('accounting.credit_note') : Promise.resolve({ items: [] }),
+        approvals: workflowApproval && can('workflow-approval.approval_request.read') ? loadAllResponse('workflow-approval.approval_request') : Promise.resolve({ items: [] }),
+      }, {
+        orders: { items: [] }, returns: { items: [] }, products: new Map(), units: new Map(), parties: new Map(),
+        warehouses: new Map(), shipments: { items: [] }, invoices: { items: [] }, creditNotes: { items: [] }, approvals: { items: [] },
+      });
+      const { orders: orderRes, returns: returnRes, products: productMap, units: unitMap, parties: partyMap,
+        warehouses: warehouseMap, shipments: shipmentRes, invoices: invoiceRes, creditNotes: creditRes, approvals: approvalRes } = data;
       const orderRows = itemsOf(orderRes).sort((a, b) => String(b.order_date || '').localeCompare(String(a.order_date || '')));
       const returnRows = itemsOf(returnRes).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
       setOrders(orderRows); setReturns(returnRows); setProducts(productMap); setUnits(unitMap); setParties(partyMap); setWarehouses(warehouseMap);
       setShipments(itemsOf(shipmentRes)); setInvoices(itemsOf(invoiceRes)); setCreditNotes(itemsOf(creditRes)); setApprovalRequests(itemsOf(approvalRes));
       setOrderId((id) => orderRows.some((row) => row.id === id && ['confirmed','partially_delivered','delivered'].includes(row.status)) ? id : orderRows.find((row) => ['confirmed','partially_delivered','delivered'].includes(row.status))?.id || '');
       setSelectedId((id) => returnRows.some((row) => row.id === id) ? id : returnRows[0]?.id || '');
+      if (errors.length) setError(errors.map((reason) => reason?.message || uiText('Không tải được đơn bán và phiếu trả hàng.')).join(' · '));
     } catch (reason) { setError(reason.message || uiText('Không tải được đơn bán và phiếu trả hàng.')); }
     finally { if (!quiet) setLoading(false); }
   }, [logisticsEnabled, workflowApproval]);
