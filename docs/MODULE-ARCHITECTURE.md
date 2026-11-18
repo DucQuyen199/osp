@@ -94,3 +94,7 @@ Luồng `accounting.bank_import` giữ facade nhỏ để API công khai ổn đ
 BI giữ schema dashboard/report/KPI trong catalog. `domain.rs` chỉ nhận loại widget đã hỗ trợ và DSL báo cáo an toàn; `application.rs` chuẩn hóa truy vấn; `persistence.rs` đảm bảo widget tham chiếu report trong cùng tenant và kiểu widget khớp query; kernel thực thi report qua API dữ liệu đã phân quyền và xuất CSV theo cùng bộ lọc, có giới hạn số dòng và bảo vệ formula injection. HTTP chỉ điều phối và trả file. React không truy cập PostgreSQL và không dựng SQL. Báo cáo/dashboards được mở ở `#/reports/bi`.
 
 Các kiểu biểu đồ hiện có: table cho query danh sách; number cho aggregate đơn; line/bar/pie cho aggregate có group. KPI formula, lịch gửi báo cáo và xuất PDF/Excel chưa thuộc phạm vi luồng BI này.
+
+### SePay eInvoice async state
+
+SePay v1 `is_draft=false` creates and issues an invoice asynchronously. The e-invoice record stores the tracking code and poll deadline; a worker claim after that deadline checks provider status. Only terminal `Success` plus a nonzero invoice number produces `issued`. Unknown outcomes persist a guard; later retries query by stable `reference_code` and never create again. SePay tenant account, template, and series are resolved from a server-side tenant map.

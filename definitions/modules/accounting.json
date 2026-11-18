@@ -6,7 +6,8 @@
  "version": "0.1.0",
  "depends": [
   "master-data",
-  "hrm"
+  "hrm",
+  "integration-hub"
  ],
  "core": false,
  "entities": [
@@ -986,6 +987,21 @@
      "cancelled": { "from": ["draft"], "to": "cancelled" }
     }
    },
+   "computed": {},
+   "constraints": []
+  },
+  {
+   "name": "bank_feed_schedule",
+   "label": "Lịch đồng bộ sao kê ngân hàng",
+   "fields": [
+    { "name": "statement", "type": "ref", "required": true, "ref": "accounting.bank_statement" },
+    { "name": "connector", "type": "ref", "required": true, "ref": "integration-hub.connector" },
+    { "name": "interval_minutes", "type": "number", "required": true },
+    { "name": "enabled", "type": "bool", "required": false },
+    { "name": "last_attempt_at", "type": "datetime", "required": false, "system": true },
+    { "name": "last_success_at", "type": "datetime", "required": false, "system": true },
+    { "name": "last_error", "type": "text", "required": false, "system": true }
+   ],
    "computed": {},
    "constraints": []
   },

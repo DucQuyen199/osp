@@ -9,7 +9,8 @@ pub use domain::{prepare_action, validate_action, validate_remove, validate_upda
 pub use persistence::validate_persistence;
 pub use provider::{
     CancellationResult, EInvoiceProvider, EInvoiceProviderRegistry, HttpEInvoiceProvider,
-    HttpEInvoiceProviderConfig, IssueResult,
+    HttpEInvoiceProviderConfig, IssueResult, SePayEInvoiceProvider, SePayEInvoiceProviderConfig,
+    SePayTenantConfig,
 };
 pub use worker::{run_once, run_once_with_provider, run_once_with_registry};
 

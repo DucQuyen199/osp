@@ -1,6 +1,7 @@
 //! Durable tenant-scoped issuance and cancellation worker.
 use super::{
     EInvoiceProvider, EInvoiceProviderRegistry, HttpEInvoiceProvider, HttpEInvoiceProviderConfig,
+    SePayEInvoiceProvider, SePayEInvoiceProviderConfig,
 };
 use crate::{
     db::Tx,
@@ -25,6 +26,7 @@ struct Job {
     lease_token: String,
     operation: String,
     request_payload: Value,
+    provider_response: Value,
     provider_reference: Option<String>,
     cancellation_reason: Option<String>,
     provider_code: Option<String>,
@@ -142,39 +144,54 @@ fn lease_seconds(concurrency: usize) -> i64 {
 }
 
 fn configured_provider_registry() -> R<Option<EInvoiceProviderRegistry>> {
-    let Ok(endpoint) = env::var("OSP_EINVOICE_ENDPOINT") else {
-        return Ok(None);
-    };
-    let endpoint = endpoint.trim();
-    if endpoint.is_empty() {
+    let mut registry = EInvoiceProviderRegistry::new();
+    let mut defaults = Vec::new();
+    if let Some(endpoint) = env::var("OSP_EINVOICE_ENDPOINT")
+        .ok()
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+    {
+        let timeout = match env::var("OSP_EINVOICE_TIMEOUT_SEC") {
+            Ok(value) => value
+                .parse::<u64>()
+                .ok()
+                .filter(|seconds| (1..=120).contains(seconds))
+                .ok_or_else(|| {
+                    ApiError::new(
+                        500,
+                        "EINVOICE_CONFIG",
+                        "OSP_EINVOICE_TIMEOUT_SEC must be between 1 and 120",
+                    )
+                })?,
+            Err(_) => 30,
+        };
+        let provider = Arc::new(HttpEInvoiceProvider::new(HttpEInvoiceProviderConfig {
+            code: env::var("OSP_EINVOICE_PROVIDER")
+                .ok()
+                .filter(|value| !value.trim().is_empty())
+                .unwrap_or_else(|| "rest".into()),
+            endpoint,
+            bearer_token: env::var("OSP_EINVOICE_TOKEN").ok(),
+            timeout: Duration::from_secs(timeout),
+        })?);
+        defaults.push(provider.code().to_owned());
+        registry.register(provider)?;
+    }
+    if env::var("OSP_SEPAY_EINVOICE_CLIENT_ID").is_ok() {
+        let config = SePayEInvoiceProviderConfig::from_env()?;
+        let provider = Arc::new(SePayEInvoiceProvider::new(config)?);
+        defaults.push(provider.code().to_owned());
+        registry.register(provider)?;
+    }
+    if registry.is_empty() {
         return Ok(None);
     }
-    let timeout = match env::var("OSP_EINVOICE_TIMEOUT_SEC") {
-        Ok(value) => value
-            .parse::<u64>()
-            .ok()
-            .filter(|seconds| (1..=120).contains(seconds))
-            .ok_or_else(|| {
-                ApiError::new(
-                    500,
-                    "EINVOICE_CONFIG",
-                    "OSP_EINVOICE_TIMEOUT_SEC must be between 1 and 120",
-                )
-            })?,
-        Err(_) => 30,
-    };
-    let provider = Arc::new(HttpEInvoiceProvider::new(HttpEInvoiceProviderConfig {
-        code: env::var("OSP_EINVOICE_PROVIDER")
-            .ok()
-            .filter(|value| !value.trim().is_empty())
-            .unwrap_or_else(|| "rest".into()),
-        endpoint: endpoint.to_owned(),
-        bearer_token: env::var("OSP_EINVOICE_TOKEN").ok(),
-        timeout: Duration::from_secs(timeout),
-    })?);
-    let mut registry = EInvoiceProviderRegistry::new();
-    registry.register(provider.clone())?;
-    registry.set_default(provider.code())?;
+    let selected_default = env::var("OSP_EINVOICE_DEFAULT_PROVIDER")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .or_else(|| defaults.first().cloned())
+        .expect("non-empty provider registry has a default candidate");
+    registry.set_default(&selected_default)?;
     Ok(Some(registry))
 }
 
@@ -187,13 +204,14 @@ async fn claim(kernel: &Kernel, tenant: &Tenant, limit: i64, lease_seconds: i64)
             "WITH ready AS ( \
                SELECT id FROM einvoice__einvoice \
                WHERE tenant_id = $1 AND status IN ('pending', 'cancellation_pending') \
+                 AND (retry_at IS NULL OR retry_at <= now()) \
                  AND (lease_until IS NULL OR lease_until <= now()) \
                ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT $2 \
              ) \
              UPDATE einvoice__einvoice e \
              SET attempts = COALESCE(e.attempts, 0) + 1, lease_until = now() + ($3::bigint * interval '1 second'), lease_token = $4, updated_at = now() \
              FROM ready WHERE e.tenant_id = $1 AND e.id = ready.id \
-             RETURNING e.id, e.operation, e.request_payload, e.provider_reference, e.cancellation_reason, e.provider, e.attempts::bigint",
+             RETURNING e.id, e.operation, e.request_payload, e.provider_response, e.provider_reference, e.cancellation_reason, e.provider, e.attempts::bigint",
             &[&tenant.id, &limit, &lease_seconds, &lease_token],
         )
         .await?;
@@ -208,10 +226,11 @@ async fn claim(kernel: &Kernel, tenant: &Tenant, limit: i64, lease_seconds: i64)
                 .get::<_, Option<String>>(1)
                 .unwrap_or_else(|| "issue".into()),
             request_payload: row.get::<_, Option<Value>>(2).unwrap_or(Value::Null),
-            provider_reference: row.get(3),
-            cancellation_reason: row.get(4),
-            provider_code: row.get(5),
-            attempts: row.get(6),
+            provider_response: row.get::<_, Option<Value>>(3).unwrap_or(Value::Null),
+            provider_reference: row.get(4),
+            cancellation_reason: row.get(5),
+            provider_code: row.get(6),
+            attempts: row.get(7),
         })
         .collect())
 }
@@ -222,25 +241,71 @@ async fn process(
     provider: &dyn EInvoiceProvider,
     job: &Job,
 ) -> R<()> {
+    let mut sepay_create_checkpointed = false;
     let result = match job.operation.as_str() {
         "issue" => {
             let mut request = job.request_payload.clone();
             if let Some(object) = request.as_object_mut() {
                 object.insert("idempotency_key".into(), Value::String(job.id.to_string()));
             }
-            provider.issue(&tenant.id, &request).await.map(|result| {
-                let mut patch = Map::new();
-                patch.insert("provider".into(), Value::String(provider.code().to_owned()));
-                patch.insert("number".into(), Value::String(result.number));
-                put_optional(&mut patch, "serial", result.serial);
-                put_optional(&mut patch, "lookup_code", result.lookup_code);
-                put_optional(&mut patch, "provider_reference", result.provider_reference);
-                patch.insert("provider_response".into(), result.response);
-                patch.insert("provider_error".into(), Value::Null);
-                patch.insert("lease_until".into(), Value::Null);
-                patch.insert("lease_token".into(), Value::Null);
-                ("issued", patch)
-            })
+            let sepay = provider.code() == "sepay";
+            let started = job
+                .provider_response
+                .get("_osp_create_started")
+                .and_then(Value::as_bool)
+                == Some(true);
+            let outcome_unknown = job
+                .provider_response
+                .get("_osp_outcome_unknown")
+                .and_then(Value::as_bool)
+                == Some(true);
+            let should_start =
+                sepay && job.provider_reference.is_none() && !started && !outcome_unknown;
+            let validation = if should_start {
+                provider.validate_issue(&tenant.id, &request)
+            } else {
+                Ok(())
+            };
+            if let Err(error) = validation {
+                Err(error)
+            } else {
+                if should_start {
+                    if !checkpoint_sepay_create(kernel, tenant, job).await? {
+                        return Ok(());
+                    }
+                    sepay_create_checkpointed = true;
+                }
+                if sepay && let Some(object) = request.as_object_mut() {
+                    object.insert(
+                        "provider_reference".into(),
+                        job.provider_reference
+                            .clone()
+                            .map(Value::String)
+                            .unwrap_or(Value::Null),
+                    );
+                    object.insert(
+                        "provider_state".into(),
+                        if sepay_create_checkpointed {
+                            serde_json::json!({"_osp_create_authorized": true})
+                        } else {
+                            job.provider_response.clone()
+                        },
+                    );
+                }
+                provider.issue(&tenant.id, &request).await.map(|result| {
+                    let mut patch = Map::new();
+                    patch.insert("provider".into(), Value::String(provider.code().to_owned()));
+                    patch.insert("number".into(), Value::String(result.number));
+                    put_optional(&mut patch, "serial", result.serial);
+                    put_optional(&mut patch, "lookup_code", result.lookup_code);
+                    put_optional(&mut patch, "provider_reference", result.provider_reference);
+                    patch.insert("provider_response".into(), result.response);
+                    patch.insert("provider_error".into(), Value::Null);
+                    patch.insert("lease_until".into(), Value::Null);
+                    patch.insert("lease_token".into(), Value::Null);
+                    ("issued", patch)
+                })
+            }
         }
         "cancel" => {
             let reference = job.provider_reference.as_deref().unwrap_or_default();
@@ -268,6 +333,42 @@ async fn process(
     };
     match result {
         Ok((action, mut patch)) => {
+            if action == "issued"
+                && patch
+                    .get("provider_response")
+                    .and_then(Value::as_object)
+                    .is_some_and(|response| {
+                        response.get("_osp_pending").and_then(Value::as_bool) == Some(true)
+                    })
+            {
+                patch.remove("number");
+                let reference = patch
+                    .get("provider_reference")
+                    .cloned()
+                    .unwrap_or(Value::Null);
+                if reference.as_str().is_none_or(str::is_empty) {
+                    patch.insert("provider_error".into(), Value::String("EINVOICE_PROVIDER_RESPONSE: pending invoice response is missing its tracking reference".into()));
+                    patch.insert("retry_at".into(), Value::Null);
+                    patch.insert("lease_until".into(), Value::Null);
+                    patch.insert("lease_token".into(), Value::Null);
+                    return finish(kernel, tenant, job, "failed", patch).await;
+                }
+                let delay = patch
+                    .get("provider_response")
+                    .and_then(|value| value.get("_osp_retry_after_seconds"))
+                    .and_then(Value::as_i64)
+                    .unwrap_or(60)
+                    .clamp(15, 3600);
+                let next = chrono::Utc::now()
+                    .checked_add_signed(chrono::Duration::seconds(delay))
+                    .ok_or_else(|| {
+                        ApiError::internal("E-invoice poll time exceeds supported date range")
+                    })?;
+                patch.insert("retry_at".into(), Value::String(next.to_rfc3339()));
+                patch.insert("lease_until".into(), Value::Null);
+                patch.insert("lease_token".into(), Value::Null);
+                return defer(kernel, tenant, job, patch).await;
+            }
             patch.insert("retry_at".into(), Value::Null);
             finish(kernel, tenant, job, action, patch).await
         }
@@ -277,6 +378,33 @@ async fn process(
                 "provider_error".into(),
                 Value::String(format!("{}: {}", error.code, error.message)),
             );
+            if error.code == "EINVOICE_PROVIDER_UNKNOWN" {
+                patch.insert(
+                    "provider_response".into(),
+                    serde_json::json!({"_osp_outcome_unknown": true}),
+                );
+                patch.insert("retry_at".into(), Value::Null);
+                patch.insert("lease_until".into(), Value::Null);
+                patch.insert("lease_token".into(), Value::Null);
+                return finish(kernel, tenant, job, "failed", patch).await;
+            }
+            if provider.code() == "sepay"
+                && job.provider_reference.is_none()
+                && (sepay_create_checkpointed
+                    || job
+                        .provider_response
+                        .get("_osp_create_started")
+                        .and_then(Value::as_bool)
+                        == Some(true))
+                && matches!(
+                    error.code.as_str(),
+                    "EINVOICE_PROVIDER_REJECTED" | "EINVOICE_PROVIDER_TEMPORARY"
+                )
+            {
+                // A resolved synchronous rejection or pre-submit transient
+                // response means the provider did not accept a create request.
+                patch.insert("provider_response".into(), Value::Null);
+            }
             let retry_at =
                 if is_transient_provider_error(&error) && job.attempts < MAX_AUTOMATIC_ATTEMPTS {
                     let delay = retry_delay_seconds(job.attempts);
@@ -376,6 +504,76 @@ async fn finish(
         )
         .await?;
     tx.commit().await
+}
+
+async fn defer(kernel: &Kernel, tenant: &Tenant, job: &Job, patch: Map<String, Value>) -> R<()> {
+    let mut conn = kernel.pool.get().await?;
+    let tx = Tx::begin(&mut conn, &job.tenant_id, true).await?;
+    let lease = tx
+        .query_opt(
+            "SELECT lease_token FROM einvoice__einvoice WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+            &[&job.tenant_id, &job.id],
+        )
+        .await?;
+    if lease
+        .as_ref()
+        .and_then(|row| row.get::<_, Option<String>>(0))
+        .as_deref()
+        != Some(job.lease_token.as_str())
+    {
+        tx.commit().await?;
+        return Ok(());
+    }
+    let entity = kernel.ent(tenant, "einvoice.einvoice")?;
+    kernel
+        .update_in(
+            &tx,
+            &Actor::System,
+            tenant,
+            &entity,
+            &job.id.to_string(),
+            patch,
+            &Opts::top(),
+        )
+        .await?;
+    tx.commit().await
+}
+
+async fn checkpoint_sepay_create(kernel: &Kernel, tenant: &Tenant, job: &Job) -> R<bool> {
+    let mut conn = kernel.pool.get().await?;
+    let tx = Tx::begin(&mut conn, &job.tenant_id, true).await?;
+    let lease = tx
+        .query_opt(
+            "SELECT lease_token FROM einvoice__einvoice WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+            &[&job.tenant_id, &job.id],
+        )
+        .await?;
+    if lease
+        .as_ref()
+        .and_then(|row| row.get::<_, Option<String>>(0))
+        .as_deref()
+        != Some(job.lease_token.as_str())
+    {
+        tx.commit().await?;
+        return Ok(false);
+    }
+    let entity = kernel.ent(tenant, "einvoice.einvoice")?;
+    kernel
+        .update_in(
+            &tx,
+            &Actor::System,
+            tenant,
+            &entity,
+            &job.id.to_string(),
+            serde_json::json!({"provider_response":{"_osp_create_started":true}})
+                .as_object()
+                .cloned()
+                .unwrap_or_default(),
+            &Opts::top(),
+        )
+        .await?;
+    tx.commit().await?;
+    Ok(true)
 }
 
 fn put_optional(patch: &mut Map<String, Value>, key: &str, value: Option<String>) {

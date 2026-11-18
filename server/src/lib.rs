@@ -115,6 +115,11 @@ pub fn spawn_scheduler(k: Arc<kernel::Kernel>, every_secs: u64) {
                 Ok(_) => {}
                 Err(e) => tracing::warn!(error = %e, "tác vụ theo lịch lỗi"),
             }
+            match modules::accounting::run_scheduled_bank_feeds_once(&k).await {
+                Ok(n) if n > 0 => tracing::info!(processed = n, "scheduled bank feeds processed"),
+                Ok(_) => {}
+                Err(e) => tracing::warn!(error = %e.code, "scheduled bank feed worker failed"),
+            }
         }
     });
 }

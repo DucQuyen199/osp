@@ -122,7 +122,10 @@ pub async fn validate_persistence(
     if entity == "period" {
         return periods::validate_persistence(tx, tenant, action, document).await;
     }
-    if matches!(entity, "bank_statement" | "bank_statement_line") {
+    if matches!(
+        entity,
+        "bank_statement" | "bank_statement_line" | "bank_feed_schedule"
+    ) {
         return bank_statements::validate_persistence(tx, tenant, entity, action, document).await;
     }
     if entity == "account" {

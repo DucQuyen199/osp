@@ -59,6 +59,12 @@ The Rust worker issues posted accounting invoices and processes cancellation req
 
 Deployments can register multiple compiled adapters with `EInvoiceProviderRegistry` and start the worker with `spawn_einvoice_worker_with_registry`. A tenant's `einvoiceProvider` setting selects the adapter code for newly queued invoices, and that code is snapshotted on the request so later setting changes do not reroute work already queued. If the tenant has no override, the registry default is used. Adapter credentials must be resolved from environment variables or a secret manager inside the adapter; do not put provider tokens, certificates, or passwords in tenant settings. The REST adapter sends `X-OSP-Tenant-ID` and a tenant-scoped `Idempotency-Key`, which its receiver must honor for safe recovery after a worker restart.
 
+### SePay eInvoice API v1
+
+The built-in SePay eInvoice v1 adapter is enabled when `OSP_SEPAY_EINVOICE_CLIENT_ID` is set. Configure `OSP_SEPAY_EINVOICE_CLIENT_SECRET`, `OSP_SEPAY_EINVOICE_BASE_URL` (defaults to `https://einvoice-api.sepay.vn`; use `https://einvoice-api-sandbox.sepay.vn` for sandbox), `OSP_SEPAY_EINVOICE_PAYMENT_METHOD`, and `OSP_SEPAY_EINVOICE_TENANT_CONFIG`. The latter is a server-side JSON object keyed by OSP tenant ID, with each value containing that tenant's `providerAccountId`, `templateCode`, and `invoiceSeries`. Every tenant using SePay must have an explicit map entry; the adapter fails closed without one. The tenant setting remains only `{ "einvoiceProvider": "sepay" }`, and credentials and account identifiers are never stored in tenant settings. `OSP_SEPAY_EINVOICE_TIMEOUT_SEC` is optional (1–120 seconds).
+
+SePay issuance is asynchronous. The adapter stores the provider tracking code in the durable e-invoice request and the worker polls it on later claims; `Pending` never changes the request to `issued`. Unknown create outcomes are marked for reconciliation, and retries only query the stable invoice reference code; they never submit another create request. Before the adapter makes a network request, it requires a buyer name, currency code (`VND`, `USD`, or `CAD`), ISO invoice date, and line item names, units, quantities, prices, and explicit tax rates. Party contact/tax fields and product name/SKU/unit are snapshotted from the same tenant's records. Missing line tax rates are not inferred. SePay cancellation is not implemented by this adapter, so cancellation requests fail closed.
+
 The REST adapter implements the OSP JSON contract and is not certified for VNPT, Viettel, MISA, or another vendor API. A production adapter requires that provider's current API specification, sandbox account, credentials, invoice-signing certificate where applicable, and successful sandbox issuance/cancellation before production enablement.
 
 Máy cục bộ có thể tạo SSH tunnel bằng lệnh `ssh -L 3000:127.0.0.1:3000` với tài khoản và máy chủ của bạn, mở `http://127.0.0.1:3000`, tạo doanh nghiệp và tài khoản admin, rồi đóng tunnel. Khi signup đã tắt và health check xanh, mới trỏ domain/reverse proxy vào app.
@@ -83,7 +89,7 @@ Doanh nghiệp tạo ra chỉ chọn được trong số module đã cài; modul
 | `OSP_TRUSTED_PROXIES` | rỗng | Danh sách IP/CIDR reverse proxy tin cậy, phân cách bằng dấu phẩy. Chỉ khi peer trực tiếp thuộc danh sách, ứng dụng mới đọc `X-Forwarded-For` từ phải sang trái để xác định IP client và bỏ qua các hop proxy đã tin cậy. Ví dụ: `127.0.0.1/32,10.0.0.0/8`. Không đưa IP client hoặc mạng Internet vào danh sách này. |
 | `DATABASE_URL` | — | Chuỗi kết nối PostgreSQL bắt buộc; `sslmode` nhận `prefer`, `require` hoặc `disable` |
 | `OSP_MODULES` / `--modules=` | tất cả | Danh sách module cần cài |
-| `OSP_JOBS_INTERVAL_SEC` | `60` | Chu kỳ scheduler; đặt `0` để tắt |
+| `OSP_JOBS_INTERVAL_SEC` | `60` | Chu kỳ scheduler; đặt `0` để tắt cả job và bank feed schedules. Bank feed schedule dùng chung worker tick. |
 | `OSP_COMM_CONCURRENCY` | `4` | Số lần gửi đồng thời trên mỗi worker (1–64); giới hạn theo rate limit của nhà cung cấp |
 | `OSP_EINVOICE_CONCURRENCY` | `2` | Số request hóa đơn điện tử đồng thời trên mỗi worker (1–16); điều chỉnh theo provider |
 | `OSP_DEMO` | `1` (dev) · `0` (production) | Bật `POST /api/demo` và nút "Dùng thử" |

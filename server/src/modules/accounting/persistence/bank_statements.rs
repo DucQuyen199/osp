@@ -3,6 +3,7 @@
 mod lines;
 mod matching;
 mod reconciliation;
+mod schedules;
 mod statements;
 
 use crate::{db::Tx, error::R, kernel::Tenant};
@@ -21,6 +22,9 @@ pub async fn validate_persistence(
     document: &Value,
 ) -> R<Vec<String>> {
     match (entity, action) {
+        ("bank_feed_schedule", "created" | "updated" | "removed") => {
+            schedules::validate(tx, tenant, action, document).await
+        }
         ("bank_statement", "created" | "updated" | "removed") => {
             statements::validate(tx, tenant, action, document).await
         }

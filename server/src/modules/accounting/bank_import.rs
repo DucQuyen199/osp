@@ -8,6 +8,7 @@ mod ofx;
 mod persistence;
 mod plaid_feed;
 mod salt_edge_feed;
+mod schedule_worker;
 mod sepay_feed;
 
 pub use import::{
@@ -17,3 +18,5 @@ pub use import::{
     list_salt_edge_accounts, sync_statement_casso, sync_statement_plaid, sync_statement_salt_edge,
     sync_statement_sepay,
 };
+
+pub use schedule_worker::run_scheduled_bank_feeds_once;

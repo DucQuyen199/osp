@@ -2,13 +2,13 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { localDate } from '../../lib/dates.js';
-import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, fmtNumber, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { addDecimals, subtractDecimals } from '../../lib/decimal.js';
 import { app, can, loadAllResponse, loadRefs, loadIndependentData, recordLabel } from '../../lib/state.js';
 import projectEnglish from './project.en.js';
 import ProjectTasksSection from './components/ProjectTasksSection.jsx';
 import ProjectTimesheetsPanel from './components/ProjectTimesheetsPanel.jsx';
+import { useProjectWorkflow } from './hooks/useProjectWorkflow.js';
 const t = (text) => uiTextWith(text, projectEnglish);
 const emptyProject = { name: '', party: '', budget: '' };
 const emptyTask = { title: '', assignee: '', assignee_employee: '', due: '' };
@@ -22,16 +22,13 @@ export default function ProjectWorkbenchPage() {
   const [timesheets, setTimesheets] = useState([]);
   const [parties, setParties] = useState(new Map());
   const [employees, setEmployees] = useState(new Map());
-  const [taskAssignmentForms, setTaskAssignmentForms] = useState({});
   const [projectId, setProjectId] = useState('');
   const [projectForm, setProjectForm] = useState(emptyProject);
   const [taskForm, setTaskForm] = useState(emptyTask);
   const [dependencyForm, setDependencyForm] = useState(emptyDependency);
   const [timesheetForm, setTimesheetForm] = useState({ ...emptyTimesheet, employee: app.user?.name || '' });
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const latestRequest = useLatestRequest();
   const load = useCallback(async (quiet = false) => {
     const isLatest = latestRequest();
@@ -70,72 +67,26 @@ export default function ProjectWorkbenchPage() {
   const projectLaborCost = addDecimals(projectTimesheets.map((entry) => entry.amount));
   const projectBudget = selectedProject?.budget || 0;
   const pendingPredecessors = (task) => projectDependencies.filter((dependency) => dependency.successor === task.id).map((dependency) => taskById.get(dependency.predecessor)).filter((predecessor) => predecessor && predecessor.status !== 'done');
-  async function run(key, operation, success) {
-    setBusy(key); setError(''); setNotice('');
-    try { await operation(); await load(true); setNotice(t(success)); }
-    catch (reason) { setError(reason.message || t("Không thể hoàn tất thao tác.")); await load(true); }
-    finally { setBusy(''); }
-  }
-  async function createProject(event) {
-    event.preventDefault();
-    await run('project', async () => {
-      const project = await api(dataPath('project.project'), { method: 'POST', body: { name: projectForm.name.trim(), ...(projectForm.party ? { party: projectForm.party } : {}), ...(projectForm.budget !== '' ? { budget: String(projectForm.budget) } : {}), status: 'planned' } });
-      setProjectId(project.id); setProjectForm(emptyProject);
-    }, t("Đã tạo dự án ở trạng thái dự kiến."));
-  }
-  async function createTask(event) {
-    event.preventDefault(); if (!selectedProject) return;
-    await run('task', async () => {
-      const employee = employees.get(taskForm.assignee_employee);
-      await api(dataPath('project.task'), { method: 'POST', body: { project: selectedProject.id, title: taskForm.title.trim(), ...(employee ? { assignee: employee.name, assignee_employee: employee.id } : taskForm.assignee.trim() ? { assignee: taskForm.assignee.trim() } : {}), ...(taskForm.due ? { due: taskForm.due } : {}), status: 'todo' } });
-      setTaskForm(emptyTask);
-    }, t("Đã thêm công việc vào dự án."));
-  }
-  function taskAssignment(task) {
-    return taskAssignmentForms[task.id] || {
-      employee: task.assignee_employee || '',
-      assignee: task.assignee || '',
-    };
-  }
-  async function saveTaskAssignment(event, task) {
-    event.preventDefault();
-    const assignment = taskAssignment(task);
-    const employee = employees.get(assignment.employee);
-    await run(`${task.id}:assignment`, async () => {
-      await api(dataPath('project.task', task.id), { method: 'PATCH', body: {
-        assignee_employee: employee?.id || null,
-        assignee: employee?.name || assignment.assignee.trim(),
-      } });
-      setTaskAssignmentForms((current) => { const next = { ...current }; delete next[task.id]; return next; });
-    }, t("Đã cập nhật người phụ trách công việc."));
-  }
-  async function changeStatus(entity, row, action, message) {
-    await run(`${row.id}:${action}`, () => api(dataPath(entity, row.id, action), { method: 'POST' }), message);
-  }
-  async function createDependency(event) {
-    event.preventDefault();
-    await run('dependency', async () => {
-      await api(dataPath('project.task_dependency'), { method: 'POST', body: dependencyForm });
-      setDependencyForm(emptyDependency);
-    }, t("Đã lưu quan hệ tiên quyết. Hệ thống sẽ chặn vòng lặp và chỉ cho hoàn tất sau khi công việc trước đã xong."));
-  }
-  async function removeDependency(dependency) {
-    await run(`dependency:${dependency.id}`, () => api(dataPath('project.task_dependency', dependency.id), { method: 'DELETE' }), t("Đã gỡ quan hệ phụ thuộc."));
-  }
-  async function createTimesheet(event) {
-    event.preventDefault(); if (!selectedProject) return;
-    await run('timesheet', async () => {
-      await api(dataPath('project.timesheet'), { method: 'POST', body: {
-        project: selectedProject.id, ...(timesheetForm.task ? { task: timesheetForm.task } : {}),
-        ...(employees.get(timesheetForm.employee_ref)
-          ? { employee_ref: timesheetForm.employee_ref, employee: employees.get(timesheetForm.employee_ref).name }
-          : (timesheetForm.employee.trim() ? { employee: timesheetForm.employee.trim() } : {})),
-        hours: String(timesheetForm.hours), date: timesheetForm.date,
-        ...(timesheetForm.rate !== '' ? { rate: String(timesheetForm.rate) } : {}),
-      } });
-      setTimesheetForm({ ...emptyTimesheet, employee: app.user?.name || '' });
-    }, t("Đã ghi timesheet; thành tiền được máy chủ tính theo số giờ và đơn giá."));
-  }
+  const workflow = useProjectWorkflow({
+    load, selectedProject, employees, projectForm, setProjectForm, taskForm, setTaskForm,
+    dependencyForm, setDependencyForm, timesheetForm, setTimesheetForm, emptyProject,
+    emptyTask, emptyDependency, emptyTimesheet, defaultEmployeeName: app.user?.name || '',
+    setProjectId, setError, messages: {
+      translate: t,
+      genericError: t('Không thể hoàn tất thao tác.'),
+      createProject: t('Đã tạo dự án ở trạng thái dự kiến.'),
+      createTask: t('Đã thêm công việc vào dự án.'),
+      assignTask: t('Đã cập nhật người phụ trách công việc.'),
+      createDependency: t('Đã lưu quan hệ tiên quyết. Hệ thống sẽ chặn vòng lặp và chỉ cho hoàn tất sau khi công việc trước đã xong.'),
+      removeDependency: t('Đã gỡ quan hệ phụ thuộc.'),
+      createTimesheet: t('Đã ghi timesheet; thành tiền được máy chủ tính theo số giờ và đơn giá.'),
+    },
+  });
+  const {
+    taskAssignment, busy, notice, createProject, createTask, saveTaskAssignment,
+    changeStatus, createDependency, removeDependency, createTimesheet,
+    onTaskFieldChange, onAssignmentEmployeeChange, onAssignmentNameChange,
+  } = workflow;
   const dependencyOptions = projectTasks.filter((task) => task.status !== 'done');
   const activeEmployees = [...employees.values()].filter((employee) => employee.status === 'active');
   return <div className="page">
@@ -162,17 +113,9 @@ export default function ProjectWorkbenchPage() {
         canStartTasks={can('project.task.started')} canCompleteTasks={can('project.task.done')}
         pendingPredecessors={pendingPredecessors} taskAssignment={taskAssignment}
         onCreateTask={createTask}
-        onTaskFieldChange={(field, value) => setTaskForm((current) => ({
-          ...current, [field]: value,
-          ...(field === 'assignee_employee' ? { assignee: employees.get(value)?.name || '' } : {}),
-        }))}
-        onAssignmentEmployeeChange={(task, value) => {
-          const employee = employees.get(value);
-          setTaskAssignmentForms((current) => ({ ...current, [task.id]: { employee: value, assignee: employee?.name || '' } }));
-        }}
-        onAssignmentNameChange={(task, value) => setTaskAssignmentForms((current) => ({
-          ...current, [task.id]: { ...taskAssignment(task), assignee: value },
-        }))}
+        onTaskFieldChange={onTaskFieldChange}
+        onAssignmentEmployeeChange={onAssignmentEmployeeChange}
+        onAssignmentNameChange={onAssignmentNameChange}
         onSaveAssignment={saveTaskAssignment}
         onStatusChange={(task, action) => changeStatus(
           'project.task', task, action, action === 'started' ? 'Đã bắt đầu công việc.' : 'Đã hoàn tất công việc.',

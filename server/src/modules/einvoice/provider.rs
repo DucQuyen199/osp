@@ -9,7 +9,9 @@ use serde_json::Value;
 use std::{collections::BTreeMap, sync::Arc};
 
 mod http;
+mod sepay;
 pub use http::{HttpEInvoiceProvider, HttpEInvoiceProviderConfig};
+pub use sepay::{SePayEInvoiceProvider, SePayEInvoiceProviderConfig, SePayTenantConfig};
 
 #[derive(Debug, Clone)]
 pub struct IssueResult {
@@ -32,6 +34,12 @@ pub struct CancellationResult {
 /// so the worker can retry them safely with the request idempotency key.
 pub trait EInvoiceProvider: Send + Sync {
     fn code(&self) -> &str;
+
+    /// Validate and normalize all local input before the worker checkpoints an
+    /// irreversible create operation. Adapters may leave this as a no-op.
+    fn validate_issue(&self, _tenant_id: &str, _request: &Value) -> R<()> {
+        Ok(())
+    }
 
     fn issue<'a>(&'a self, tenant_id: &'a str, request: &'a Value)
     -> BoxFuture<'a, R<IssueResult>>;
