@@ -38,6 +38,7 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 - The authentication page owns tenant creation, login and recovery state; `AuthVerticalPicker` renders controlled industry choices for signup and emits the selected vertical through a callback.
 - The consolidation workbench owns report snapshot permissions, API actions and grant rechecks; its saved report history renders snapshot metadata and opens immutable payloads through the feature API.
 - The consolidation workbench owns elimination-journal permissions, validation and persistence; `EliminationJournalForm` and `EliminationJournalsTable` render controlled fields and records through props without owning API or business logic.
+- `useConsolidationWorkbenchWorkflow` owns group/member/share/grant drafts, report snapshots and elimination submission; the page keeps permission-gated reads and composes the controlled views.
 
 
 - Keep route-level loading, permission checks, and business actions in the feature page or a feature hook.
@@ -83,6 +84,7 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 - The clinic workbench owns encounter status, prescription permissions and dispensing; `EncounterPrescriptionsPanel` renders encounter prescriptions and the controlled draft form, then emits medication edits and actions through callbacks.
 - The clinic workbench owns lab-result state, permissions and completion actions; `EncounterLabResultsPanel` renders encounter test results and controlled result inputs through callbacks.
 - The clinic workbench owns patient and encounter state, permissions, and save/complete actions; `PatientEncounterSummary` renders patient demographics, allergy warnings, encounter details, and the controlled completion form. The permission-gated patient medical-profile editor is passed as a slot so its page-level access check remains explicit.
+- `useClinicWorkbenchWorkflow` owns patient intake/record, encounter, prescription/dispense and lab actions; `ClinicWorkbenchPage` retains independent reads, selectors and permission-gated composition.
 - The consolidation workbench owns report permissions, loading, and report/snapshot actions; `ConsolidatedTrialBalancePanel` renders controlled date and group filters, rate policy, snapshot history, and consolidated account balances through callbacks.
 - `ProductionInspectionQueue` renders pending production inspections and emits pass/fail decisions through callbacks; `useManufacturingWipWorkflow` validates and persists those decisions.
 - The manufacturing workbench owns failed-quantity accounting, rework permissions and API actions; `ReworkOrdersPanel` renders controlled failed inspection selection, repair quantity and reason fields, plus rework orders and their available actions.
@@ -101,7 +103,7 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 - `PosCartContents` renders controlled cart, customer, voucher and prescription fields; the workflow hook owns cart pricing, quantity changes and eligibility checks.
 - The ecommerce workbench owns order derivation, permissions and workflow actions; `WebOrderRegisters` renders draft-cart and placed-order sections through the existing order-card callback.
 - `PosSessionPanel`, `PosCashOperationsPanel`, and `PosRecentTransactions` render controlled session, cash movement, receipt, refund and partial-return flows through callbacks; the workflow hook owns their API operations and business rules.
-- The BI workbench owns safe query construction, source permissions, scheduling, and persistence; `BiReportBuilderForm` renders controlled report criteria and emits field changes and submit requests through callbacks.
+- The BI workbench delegates report/dashboard/KPI drafts, safe query construction, schedule actions and persistence to `useBiReportsWorkflow`; `BiReportBuilderForm` remains a controlled view and the page owns route-level data reads/rendering.
 - BI report data presentation is split into `BiDataTable`, `BiReportWidget`, and `BiKpiCard` in `features/accounting/components/BiReportVisualizations.jsx`; these components own table/chart/KPI rendering and local read states, while `BiReportsPage` owns route selection, report lifecycle, and persistence.
 - `PosReturnDialog` edits controlled return quantities/reason, previews the refund and emits submit/close callbacks; the workflow hook owns return validation, draft retries and persistence.
 - The restaurant workbench owns recipe permissions, ingredient validation and persistence; `RestaurantRecipesPanel` edits controlled recipe lines and renders saved recipes through callbacks.

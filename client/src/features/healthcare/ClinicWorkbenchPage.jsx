@@ -1,17 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
-import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { compareDecimals } from '../../lib/decimal.js';
-import { app, can, loadAll, loadIndependentData, loadRefs, recordLabel } from '../../lib/state.js';
+import { can, loadAll, loadIndependentData, loadRefs, recordLabel } from '../../lib/state.js';
 import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import clinicEnglish from './clinic.en.js';
 import EncounterPrescriptionsPanel from './components/EncounterPrescriptionsPanel.jsx';
 import PatientEncounterSummary from './components/PatientEncounterSummary.jsx';
 import EncounterLabResultsPanel from './components/EncounterLabResultsPanel.jsx';
+import { useClinicWorkbenchWorkflow } from './hooks/useClinicWorkbenchWorkflow.js';
 const t = (text) => uiTextWith(text, clinicEnglish);
-const newPrescriptionItem = () => ({ rowId: crypto.randomUUID(), product: '', qty: 1, dosage: '', uom: '' });
 export default function ClinicWorkbenchPage() {
   useDocumentTitle(t("Điều phối phòng khám · OSP Suite"));
   const [patients, setPatients] = useState([]);
@@ -23,28 +22,12 @@ export default function ClinicWorkbenchPage() {
   const [units, setUnits] = useState(new Map());
   const [warehouses, setWarehouses] = useState(new Map());
   const [selectedId, setSelectedId] = useState('');
-  const [patientId, setPatientId] = useState('');
-  const [patientRegistration, setPatientRegistration] = useState({ mode: can('master-data.party.create') ? 'new' : 'existing', party: '', name: '', phone: '', email: '', dob: '', gender: '', blood_type: '', allergies: '', insurance_no: '' });
-  const [patientRecordForm, setPatientRecordForm] = useState({ dob: '', gender: '', blood_type: '', allergies: '', insurance_no: '' });
-  const [pendingPatientParty, setPendingPatientParty] = useState(null);
-  const [doctor, setDoctor] = useState(app.user?.name || '');
-  const [complaint, setComplaint] = useState('');
-  const [diagnosis, setDiagnosis] = useState('');
-  const [fee, setFee] = useState('');
-  const [noChargeReason, setNoChargeReason] = useState('');
-  const [testName, setTestName] = useState('');
-  const [testEncounterId, setTestEncounterId] = useState('');
-  const [testResult, setTestResult] = useState({});
-  const [rxWarehouse, setRxWarehouse] = useState('');
-  const [rxItems, setRxItems] = useState(() => [newPrescriptionItem()]);
-  const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const beginRequest = useLatestRequest();
-  const load = useCallback(async (preserveNotice = false) => {
+  const load = useCallback(async () => {
     const isCurrent = beginRequest();
-    setLoading(true); setError(''); if (!preserveNotice) setNotice('');
+    setLoading(true); setError('');
     try {
       const { data, errors } = await loadIndependentData({
         patients: can('clinic.patient.read') ? loadAll('clinic.patient') : Promise.resolve([]),
@@ -77,112 +60,26 @@ export default function ClinicWorkbenchPage() {
   }, [parties, patients]);
   const patient = selected ? patients.find((item) => item.id === selected.patient) : null;
   const patientParty = patient ? parties.get(patient.party) : null;
+  const workflow = useClinicWorkbenchWorkflow({ load, selected, selectedId, patient, setSelectedId, t });
+  const {
+    patientId, setPatientId, patientRegistration, setPatientRegistration, patientRecordForm, setPatientRecordForm,
+    pendingPatientParty, doctor, setDoctor, complaint, setComplaint, diagnosis, setDiagnosis, fee, setFee,
+    noChargeReason, setNoChargeReason, testName, setTestName, testEncounterId, setTestEncounterId,
+    testResult, rxWarehouse, setRxWarehouse, rxItems, busy, workflowError, notice,
+    updateRxItem, addRxItem, removeRxItem, updateTestResult, createEncounter, registerPatient,
+    updatePatientRecord, completeEncounter, createPrescription, dispensePrescription,
+    createLabOrder, completeLab, clearFeedback,
+  } = workflow;
   const encounterPrescriptions = useMemo(() => prescriptions.filter((item) => item.encounter === selectedId), [prescriptions, selectedId]);
   const encounterLabs = useMemo(() => labOrders.filter((item) => item.encounter === selectedId), [labOrders, selectedId]);
   const openEncounters = encounters.filter((item) => item.status === 'open');
-  const updateRxItem = (index, patchValue) => setRxItems((current) => current.map((item, i) => i === index ? { ...item, ...patchValue } : item));
   const unitsFor = (productId) => {
     const baseUnit = products.get(productId)?.uom;
     return baseUnit ? [...units.values()].filter((unit) => unit.id === baseUnit || unit.base_uom === baseUnit) : [];
   };
-  useEffect(() => {
-    if (!selected) return;
-    setDoctor(selected.doctor || app.user?.name || '');
-    setDiagnosis(selected.diagnosis || '');
-    setFee(selected.fee ?? '');
-    setNoChargeReason(selected.no_charge_reason || '');
-  }, [selectedId]);
-  useEffect(() => {
-    setPatientRecordForm({ dob: patient?.dob || '', gender: patient?.gender || '', blood_type: patient?.blood_type || '', allergies: patient?.allergies || '', insurance_no: patient?.insurance_no || '' });
-  }, [patient?.id, patient?.dob, patient?.gender, patient?.blood_type, patient?.allergies, patient?.insurance_no]);
-  const createEncounter = async (event) => {
-    event.preventDefault(); setBusy(true); setError(''); setNotice('');
-    try {
-      const created = await api(dataPath('clinic.encounter'), { method: 'POST', body: { patient: patientId, doctor: doctor.trim() || undefined, complaint: complaint.trim() || undefined } });
-      await load(true); setSelectedId(created.id); setPatientId(''); setComplaint('');
-      setNotice(t("Đã tiếp nhận lượt khám."));
-    } catch (reason) { setError(reason.message || t("Không tạo được lượt khám.")); }
-    finally { setBusy(false); }
-  };
-  const registerPatient = async (event) => {
-    event.preventDefault(); setBusy(true); setError(''); setNotice('');
-    try {
-      let partyId = pendingPatientParty?.id || (patientRegistration.mode === 'existing' ? patientRegistration.party : '');
-      if (!partyId) {
-        const party = await api(dataPath('master-data.party'), { method: 'POST', body: {
-          name: patientRegistration.name.trim(), kind: 'person', is_customer: true,
-          phone: patientRegistration.phone.trim() || undefined, email: patientRegistration.email.trim() || undefined,
-        } });
-        partyId = party.id;
-        setPendingPatientParty({ id: party.id, name: party.name || patientRegistration.name.trim() });
-      }
-      const patient = await api(dataPath('clinic.patient'), { method: 'POST', body: {
-        party: partyId, dob: patientRegistration.dob || undefined, gender: patientRegistration.gender || undefined,
-        blood_type: patientRegistration.blood_type.trim() || undefined, allergies: patientRegistration.allergies.trim() || undefined,
-        insurance_no: patientRegistration.insurance_no.trim() || undefined,
-      } });
-      await load(true); setPatientId(patient.id);
-      setPatientRegistration({ mode: can('master-data.party.create') ? 'new' : 'existing', party: '', name: '', phone: '', email: '', dob: '', gender: '', blood_type: '', allergies: '', insurance_no: '' });
-      setPendingPatientParty(null); setNotice(t("Đã đăng ký hồ sơ bệnh nhân. Có thể tiếp nhận lượt khám ngay."));
-    } catch (reason) {
-      setError(reason.message || t("Không đăng ký được hồ sơ bệnh nhân. Nếu thông tin liên hệ đã tạo, hãy thử lại để hoàn tất hồ sơ."));
-    } finally { setBusy(false); }
-  };
-  const updatePatientRecord = async (event) => {
-    event.preventDefault(); if (!patient) return;
-    setBusy(true); setError(''); setNotice('');
-    try {
-      await api(dataPath('clinic.patient', patient.id), { method: 'PATCH', body: {
-        party: patient.party, dob: patientRecordForm.dob || null, gender: patientRecordForm.gender || null,
-        blood_type: patientRecordForm.blood_type.trim() || null, allergies: patientRecordForm.allergies.trim() || null,
-        insurance_no: patientRecordForm.insurance_no.trim() || null,
-      } });
-      await load(true); setNotice(t("Đã cập nhật thông tin y tế và bảo hiểm của bệnh nhân."));
-    } catch (reason) { setError(reason.message || t("Không thể cập nhật hồ sơ bệnh nhân.")); }
-    finally { setBusy(false); }
-  };
-  const completeEncounter = async (event) => {
-    event.preventDefault(); if (!selected) return;
-    setBusy(true); setError(''); setNotice('');
-    try {
-      const isNoCharge = compareDecimals(fee, 0) === 0;
-      await api(dataPath('clinic.encounter', selected.id, 'completed'), { method: 'POST', body: { doctor: doctor.trim(), diagnosis: diagnosis.trim(), fee: String(fee).trim(), no_charge_reason: isNoCharge ? noChargeReason.trim() : null } });
-      await load(true); setNotice(isNoCharge ? t('Đã hoàn tất lượt khám miễn phí và lưu lý do; không tạo khoản phải thu.') : t("Đã hoàn tất lượt khám và tạo khoản phải thu theo phí khám."));
-    } catch (reason) { setError(reason.message || t("Chưa thể hoàn tất lượt khám. Nhập bác sĩ, chẩn đoán, phí dương hoặc lý do miễn phí.")); }
-    finally { setBusy(false); }
-  };
-  const createPrescription = async (event) => {
-    event.preventDefault(); if (!selected) return;
-    setBusy(true); setError(''); setNotice('');
-    try {
-      await api(dataPath('clinic.prescription'), { method: 'POST', body: { encounter: selected.id, warehouse: rxWarehouse, items: rxItems.filter((item) => item.product && compareDecimals(item.qty || 0, 0) > 0).map((item) => ({ product: item.product, qty: String(item.qty), ...(item.uom ? { uom: item.uom } : {}), dosage: item.dosage.trim() })) } });
-      await load(true); setRxItems([newPrescriptionItem()]); setNotice(t("Đã lưu đơn thuốc nháp. Chỉ có thể phát sau khi hoàn tất lượt khám."));
-    } catch (reason) { setError(reason.message || t("Không lưu được đơn thuốc.")); }
-    finally { setBusy(false); }
-  };
-  const dispensePrescription = async (prescription) => {
-    setBusy(true); setError(''); setNotice('');
-    try { await api(dataPath('clinic.prescription', prescription.id, 'dispensed'), { method: 'POST' }); await load(true); setNotice(t("Đã phát thuốc và ghi nhận xuất kho.")); }
-    catch (reason) { setError(reason.message || t("Không phát được thuốc. Kiểm tra tồn kho, lô và kho cấp phát.")); }
-    finally { setBusy(false); }
-  };
-  const createLabOrder = async (event) => {
-    event.preventDefault(); setBusy(true); setError(''); setNotice('');
-    try { await api(dataPath('clinic.lab_order'), { method: 'POST', body: { encounter: testEncounterId || selected?.id, test: testName.trim() } }); await load(true); setTestName(''); setNotice(t("Đã tạo chỉ định xét nghiệm.")); }
-    catch (reason) { setError(reason.message || t("Không tạo được chỉ định xét nghiệm.")); }
-    finally { setBusy(false); }
-  };
-  const completeLab = async (lab) => {
-    setBusy(true); setError(''); setNotice('');
-    try {
-      await api(dataPath('clinic.lab_order', lab.id, 'resulted'), { method: 'POST', body: { result: String(testResult[lab.id] || '').trim() } });
-      await load(true); setNotice(t("Đã lưu và xác nhận kết quả xét nghiệm."));
-    } catch (reason) { setError(reason.message || t("Cần nhập kết quả xét nghiệm trước khi xác nhận.")); }
-    finally { setBusy(false); }
-  };
   return <div className="page clinic-page">
-    <div className="page-head"><div><h1>{t("Điều phối phòng khám")}</h1><p className="sub">{t("Tiếp nhận bệnh nhân, hoàn tất lượt khám, theo dõi xét nghiệm và phát thuốc theo kho. Hồ sơ được hiển thị theo quyền clinic của tài khoản.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={() => load()}>{t("Làm mới")}</button></div>
-    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
+    <div className="page-head"><div><h1>{t("Điều phối phòng khám")}</h1><p className="sub">{t("Tiếp nhận bệnh nhân, hoàn tất lượt khám, theo dõi xét nghiệm và phát thuốc theo kho. Hồ sơ được hiển thị theo quyền clinic của tài khoản.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={() => { clearFeedback(); load(); }}>{t("Làm mới")}</button></div>
+    {(workflowError || error) && <div className="alert danger" role="alert">{t(workflowError || error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     {loading ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <>
       {can('clinic.patient.create') && (can('master-data.party.create') || can('master-data.party.read')) && <section className="card clinic-intake"><div><h2>{t("Đăng ký bệnh nhân")}</h2><p className="small muted">{t("Tạo hồ sơ bệnh nhân và thông tin liên hệ; dị ứng, nhóm máu và bảo hiểm sẽ gắn với hồ sơ y tế.")}</p></div><form className="clinic-intake-form" onSubmit={registerPatient}>
         {!pendingPatientParty && can('master-data.party.create') && <label className="field"><span className="label">{t("Thông tin liên hệ *")}</span><select className="select" value={patientRegistration.mode} onChange={(event) => setPatientRegistration({ ...patientRegistration, mode: event.target.value, party: '' })}><option value="new">{t("Tạo người liên hệ mới")}</option><option value="existing">{t("Dùng người liên hệ có sẵn")}</option></select></label>}
@@ -231,11 +128,11 @@ export default function ClinicWorkbenchPage() {
           canCreate={can('clinic.prescription.create')} canDispense={can('clinic.prescription.dispensed')}
           onDispense={dispensePrescription} onWarehouseChange={setRxWarehouse}
           onItemChange={updateRxItem}
-          onAddItem={() => setRxItems((current) => [...current, newPrescriptionItem()])}
-          onRemoveItem={(index) => setRxItems((current) => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : current)}
+          onAddItem={addRxItem}
+          onRemoveItem={removeRxItem}
           onSubmit={createPrescription} recordLabel={recordLabel} statusLabel={statusLabel} t={t}
         />
-        <EncounterLabResultsPanel labs={encounterLabs} results={testResult} busy={busy} canUpdateResults={can('clinic.lab_order.update') && can('clinic.lab_order.resulted')} statusLabel={statusLabel} onResultChange={(labId, value) => setTestResult((current) => ({ ...current, [labId]: value }))} onCompleteLab={completeLab} t={t} />
+        <EncounterLabResultsPanel labs={encounterLabs} results={testResult} busy={busy} canUpdateResults={can('clinic.lab_order.update') && can('clinic.lab_order.resulted')} statusLabel={statusLabel} onResultChange={updateTestResult} onCompleteLab={completeLab} t={t} />
       </> : <div className="empty card-pad">{t("Chọn lượt khám trong hàng đợi để xem hồ sơ và xử lý.")}</div>}</section></div>
       <section className="card clinic-lab-queue"><header className="clinic-section-head"><h2>{t("Chỉ định xét nghiệm đang chờ")}</h2><span className="badge plain">{labOrders.filter((lab) => lab.status === 'ordered').length}</span></header><form className="clinic-lab-form" onSubmit={createLabOrder}><label className="field"><span className="label">{t("Lượt khám đang mở")}</span><select className="select" required value={testEncounterId || (selected?.status === 'open' ? selected.id : '')} onChange={(event) => setTestEncounterId(event.target.value)}><option value="">{t("Chọn lượt khám")}</option>{openEncounters.map((item) => { const p = patients.find((record) => record.id === item.patient); return <option key={item.id} value={item.id}>{recordLabel('master-data.party', p && parties.get(p.party))} · {fmtDateTime(item.created_at)}</option>; })}</select></label><label className="field"><span className="label">{t("Xét nghiệm")}</span><input className="input" required value={testName} onChange={(event) => setTestName(event.target.value)} /></label><button className="btn btn-secondary" type="submit" disabled={busy || !can('clinic.lab_order.create')}>{t("Tạo chỉ định")}</button></form></section>
     </>}
