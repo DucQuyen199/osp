@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { uiText } from '../../../lib/i18n.js';
 import { can, loadAll, loadIndependentData } from '../../../lib/state.js';
+import { useLatestRequest } from '../../../lib/useLatestRequest.js';
 
 const emptyMap = () => new Map();
 const emptyRows = () => [];
@@ -11,8 +12,10 @@ export function useStockCountData(workflowApproval) {
   const [data, setData] = useState(emptyData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const beginRequest = useLatestRequest();
 
   const load = useCallback(async () => {
+    const isCurrent = beginRequest();
     setLoading(true);
     setError('');
     try {
@@ -28,6 +31,7 @@ export function useStockCountData(workflowApproval) {
         counts: emptyRows(), warehouses: emptyRows(), products: emptyRows(), units: emptyRows(), lots: emptyRows(),
         locations: emptyRows(), approvalRequests: emptyRows(),
       });
+      if (!isCurrent()) return;
       setData({
         counts: reads.counts.sort((a, b) => String(b.updated_at || b.created_at || '').localeCompare(String(a.updated_at || a.created_at || ''))),
         warehouses: asMap(reads.warehouses),
@@ -39,11 +43,11 @@ export function useStockCountData(workflowApproval) {
       });
       if (errors.length) setError(errors.map((reason) => reason?.message || uiText('Không tải được danh sách kiểm kê.')).join(' · '));
     } catch (reason) {
-      setError(reason.message || uiText('Không tải được danh sách kiểm kê.'));
+      if (isCurrent()) setError(reason.message || uiText('Không tải được danh sách kiểm kê.'));
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [workflowApproval]);
+  }, [workflowApproval, beginRequest]);
 
   useEffect(() => { load(); }, [load]);
   return { ...data, loading, error, setError, load };

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { uiText } from '../../../lib/i18n.js';
 import { can, loadAllResponse, loadIndependentData, loadRefs } from '../../../lib/state.js';
+import { useLatestRequest } from '../../../lib/useLatestRequest.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const emptyResponse = () => ({ items: [] });
@@ -14,8 +15,10 @@ export function useSalesReturnsData(logisticsEnabled, workflowApproval) {
   const [data, setData] = useState(emptyData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const beginRequest = useLatestRequest();
 
   const load = useCallback(async (quiet = false) => {
+    const isCurrent = beginRequest();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const { data: reads, errors } = await loadIndependentData({
@@ -34,6 +37,7 @@ export function useSalesReturnsData(logisticsEnabled, workflowApproval) {
         partyMap: emptyMap(), warehouseMap: emptyMap(), shipmentRes: emptyResponse(), invoiceRes: emptyResponse(),
         creditRes: emptyResponse(), approvalRes: emptyResponse(),
       });
+      if (!isCurrent()) return;
       const { orderRes, returnRes, productMap, unitMap, partyMap, warehouseMap, shipmentRes, invoiceRes, creditRes, approvalRes } = reads;
       setData({
         orders: itemsOf(orderRes).sort((a, b) => String(b.order_date || '').localeCompare(String(a.order_date || ''))),
@@ -49,11 +53,11 @@ export function useSalesReturnsData(logisticsEnabled, workflowApproval) {
       });
       if (errors.length) setError(errors.map((reason) => reason?.message || uiText('Không tải được đơn bán và phiếu trả hàng.')).join(' · '));
     } catch (reason) {
-      setError(reason.message || uiText('Không tải được đơn bán và phiếu trả hàng.'));
+      if (isCurrent()) setError(reason.message || uiText('Không tải được đơn bán và phiếu trả hàng.'));
     } finally {
-      if (!quiet) setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [logisticsEnabled, workflowApproval]);
+  }, [logisticsEnabled, workflowApproval, beginRequest]);
 
   useEffect(() => { load(); }, [load]);
   return { ...data, loading, error, setError, load };

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { uiTextWith } from '../../../lib/i18n.js';
 import { can, loadAllResponse, loadIndependentData, loadRefs } from '../../../lib/state.js';
+import { useLatestRequest } from '../../../lib/useLatestRequest.js';
 import hotelEnglish from '../hotel.en.js';
 
 const t = (text) => uiTextWith(text, hotelEnglish);
@@ -13,8 +14,10 @@ export function useHotelFrontDeskData(accountingEnabled) {
   const [data, setData] = useState(emptyData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const beginRequest = useLatestRequest();
 
   const load = useCallback(async () => {
+    const isCurrent = beginRequest();
     setLoading(true);
     setError('');
     try {
@@ -29,6 +32,7 @@ export function useHotelFrontDeskData(accountingEnabled) {
         reservations: emptyResponse(), parties: emptyMap(), rooms: emptyMap(), roomTypes: emptyMap(),
         charges: emptyResponse(), invoices: emptyResponse(),
       });
+      if (!isCurrent()) return;
       setData({
         reservations: itemsOf(reads.reservations).sort((a, b) => String(a.check_in || '').localeCompare(String(b.check_in || '')) || String(a.created_at || '').localeCompare(String(b.created_at || ''))),
         parties: reads.parties,
@@ -39,11 +43,11 @@ export function useHotelFrontDeskData(accountingEnabled) {
       });
       if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được dữ liệu lễ tân.')).join(' · '));
     } catch (reason) {
-      setError(t(reason.message || 'Không tải được dữ liệu lễ tân.'));
+      if (isCurrent()) setError(t(reason.message || 'Không tải được dữ liệu lễ tân.'));
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [accountingEnabled]);
+  }, [accountingEnabled, beginRequest]);
 
   useEffect(() => { load(); }, [load]);
   return { ...data, loading, error, setError, load };

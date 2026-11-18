@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { uiTextWith } from '../../../lib/i18n.js';
 import { can, loadAllResponse, loadIndependentData, loadRefs } from '../../../lib/state.js';
+import { useLatestRequest } from '../../../lib/useLatestRequest.js';
 import ecommerceEnglish from '../ecommerce.en.js';
 
 const t = (text) => uiTextWith(text, ecommerceEnglish);
@@ -16,8 +17,10 @@ export function useEcommerceOrderData(logisticsEnabled) {
   const [data, setData] = useState(emptyData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const beginRequest = useLatestRequest();
 
   const load = useCallback(async (quiet = false) => {
+    const isCurrent = beginRequest();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const { data: reads, errors } = await loadIndependentData({
@@ -33,6 +36,7 @@ export function useEcommerceOrderData(logisticsEnabled) {
         storefronts: emptyMap(), parties: emptyMap(), products: emptyMap(), currencies: emptyMap(),
         orders: emptyResponse(), salesOrders: emptyResponse(), shipments: emptyResponse(), invoices: emptyResponse(),
       });
+      if (!isCurrent()) return;
       setData({
         storefronts: reads.storefronts,
         parties: reads.parties,
@@ -45,11 +49,11 @@ export function useEcommerceOrderData(logisticsEnabled) {
       });
       if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được danh sách đơn online.')).join(' · '));
     } catch (reason) {
-      setError(t(reason.message || 'Không tải được danh sách đơn online.'));
+      if (isCurrent()) setError(t(reason.message || 'Không tải được danh sách đơn online.'));
     } finally {
-      if (!quiet) setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [logisticsEnabled]);
+  }, [logisticsEnabled, beginRequest]);
 
   useEffect(() => { load(); }, [load]);
   return { ...data, loading, error, setError, load };
