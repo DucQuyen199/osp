@@ -4,6 +4,7 @@ import { localDate } from '../../lib/dates.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtMoney, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { can, loadRefs, loadAllResponse } from '../../lib/state.js';
+import { recordHref } from '../../lib/routes.js';
 import manufacturingEnglish from './manufacturing.en.js';
 import ProductionOrderCard from './components/ProductionOrderCard.jsx';
 import ProductionOrderForm from './components/ProductionOrderForm.jsx';
@@ -420,7 +421,7 @@ export default function ManufacturingWipPage() {
         </div>
       </section>}
       {adjustment && <div className="alert success" role="status">{adjustment.existing ? t("Đã có bút toán đối chiếu cho chênh lệch này.") : t('Đã tạo bút toán nháp.')} {adjustment.id && <a href={`#/e/accounting/journal_entry/${encodeURIComponent(adjustment.id)}`}>{t("Mở bút toán")}</a>} <span>{t('Trạng thái:')} {statusLabel(adjustment.status)}</span></div>}
-      <ManufacturingWipReport report={report} qty={qty} fmtMoney={fmtMoney} statusLabel={statusLabel} t={t} />
+      <ManufacturingWipReport report={report} qty={qty} fmtMoney={fmtMoney} statusLabel={statusLabel} orderHref={(id) => recordHref('manufacturing.production_order', id)} t={t} />
     </div>}
   </div>;
 }
