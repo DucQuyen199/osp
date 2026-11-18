@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { uiText } from '../../../lib/i18n.js';
 import { can, loadAll, loadIndependentData, loadRefs } from '../../../lib/state.js';
+import { useLatestRequest } from '../../../lib/useLatestRequest.js';
 
 const emptyArray = () => [];
 const emptyMap = () => new Map();
@@ -10,8 +11,10 @@ export function usePurchasingSourcingData() {
   const [data, setData] = useState(emptyData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const beginRequest = useLatestRequest();
 
   const load = useCallback(async (quiet = false) => {
+    const isCurrent = beginRequest();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const { data: reads, errors } = await loadIndependentData({
@@ -25,6 +28,7 @@ export function usePurchasingSourcingData() {
       }, {
         requisitions: emptyArray(), rfqs: emptyArray(), orders: emptyArray(), suppliers: emptyMap(), products: emptyMap(), units: emptyMap(), taxes: emptyArray(),
       });
+      if (!isCurrent()) return;
       const requisitions = reads.requisitions.filter((row) => row.sourcing_method === 'competitive' && ['approved', 'sourced'].includes(row.status))
         .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
       setData({
@@ -34,9 +38,9 @@ export function usePurchasingSourcingData() {
         taxes: new Map(reads.taxes.map((row) => [row.id, row])),
       });
       if (errors.length) setError(errors.map((reason) => reason?.message || uiText('Không tải được hồ sơ RFQ và đề nghị mua cạnh tranh.')).join(' · '));
-    } catch (reason) { setError(reason.message || uiText('Không tải được hồ sơ RFQ và đề nghị mua cạnh tranh.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
+    } catch (reason) { if (isCurrent()) setError(reason.message || uiText('Không tải được hồ sơ RFQ và đề nghị mua cạnh tranh.')); }
+    finally { if (isCurrent()) setLoading(false); }
+  }, [beginRequest]);
 
   useEffect(() => { load(); }, [load]);
   return { ...data, loading, error, setError, load };

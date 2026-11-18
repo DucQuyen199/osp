@@ -4,6 +4,7 @@ import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtAgo, fmtDate, fmtDateTime, uiTextWith } from '../../lib/i18n.js';
 import { can, loadIndependentData, loadRefs } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import housekeepingEnglish from './housekeeping.en.js';
 
 const t = (text) => uiTextWith(text, housekeepingEnglish);
@@ -24,8 +25,10 @@ export default function HotelHousekeepingBoardPage() {
   const [maintenanceRoom, setMaintenanceRoom] = useState('');
   const [maintenanceReason, setMaintenanceReason] = useState('');
   const [lastUpdated, setLastUpdated] = useState(null);
+  const beginRequest = useLatestRequest();
 
   const load = useCallback(async (quiet = false) => {
+    const isCurrent = beginRequest();
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const emptyReport = { items: [], itemCount: 0, hasMore: false, cleaningCount: 0, dueToday: 0, readyCount: 0, occupiedCount: 0, maintenanceCount: 0 };
@@ -33,6 +36,7 @@ export default function HotelHousekeepingBoardPage() {
         report: api(tenantPath(`/reports/hotel/housekeeping-board?limit=${PAGE_SIZE}&offset=${offset}`)),
         rooms: can('hotel.room.read') ? loadRefs('hotel.room') : Promise.resolve(new Map()),
       }, { report: emptyReport, rooms: new Map() });
+      if (!isCurrent()) return;
       const { report: result, rooms: roomMap } = reads;
       setItems(result.items || []);
       setItemCount(Number(result.itemCount || 0));
@@ -52,11 +56,11 @@ export default function HotelHousekeepingBoardPage() {
         setOffset(lastOffset);
       }
     } catch (reason) {
-      setError(t(reason.message || 'Không tải được danh sách phòng cần dọn.'));
+      if (isCurrent()) setError(t(reason.message || 'Không tải được danh sách phòng cần dọn.'));
     } finally {
-      if (!quiet) setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [offset]);
+  }, [offset, beginRequest]);
 
   useEffect(() => { load();
     const timer = window.setInterval(() => load(true), 30000);

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { uiTextWith } from '../../../lib/i18n.js';
 import { can, loadAllResponse, loadIndependentData, loadRefs } from '../../../lib/state.js';
+import { useLatestRequest } from '../../../lib/useLatestRequest.js';
 import eventsEnglish from '../events.en.js';
 
 const t = (text) => uiTextWith(text, eventsEnglish);
@@ -13,8 +14,10 @@ export function useEventsOperationsData() {
   const [data, setData] = useState(emptyData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const beginRequest = useLatestRequest();
 
   const load = useCallback(async () => {
+    const isCurrent = beginRequest();
     setLoading(true);
     setError('');
     try {
@@ -26,6 +29,7 @@ export function useEventsOperationsData() {
       }, {
         events: emptyResponse(), tickets: emptyResponse(), parties: emptyMap(), taxes: emptyMap(),
       });
+      if (!isCurrent()) return;
       setData({
         events: itemsOf(reads.events).sort((a, b) => String(a.starts_at || '').localeCompare(String(b.starts_at || ''))),
         tickets: itemsOf(reads.tickets).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))),
@@ -34,11 +38,12 @@ export function useEventsOperationsData() {
       });
       if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được danh sách sự kiện và vé.')).join(' · '));
     } catch (reason) {
+      if (!isCurrent()) return;
       setError(t(reason.message || 'Không tải được danh sách sự kiện và vé.'));
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, []);
+  }, [beginRequest]);
 
   useEffect(() => { load(); }, [load]);
   return { ...data, loading, error, setError, load };
