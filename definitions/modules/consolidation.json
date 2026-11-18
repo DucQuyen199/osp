@@ -102,6 +102,29 @@
       "states": null,
       "computed": {},
       "constraints": []
+    },
+    {
+      "name": "elimination_journal",
+      "label": "Bút toán loại trừ nội bộ",
+      "fields": [
+        { "name": "group", "type": "ref", "required": true, "ref": "consolidation.company_group" },
+        { "name": "posting_date", "type": "date", "required": true },
+        { "name": "memo", "type": "text", "required": true },
+        { "name": "lines", "type": "json", "required": true },
+        { "name": "matching_evidence", "type": "json", "required": true },
+        { "name": "status", "type": "enum", "required": false, "options": ["draft", "submitted", "posted", "rejected"] }
+      ],
+      "states": {
+        "field": "status",
+        "initial": "draft",
+        "actions": {
+          "submitted": { "from": ["draft", "rejected"], "to": "submitted" },
+          "posted": { "from": ["submitted"], "to": "posted" },
+          "rejected": { "from": ["submitted"], "to": "rejected" }
+        }
+      },
+      "computed": {},
+      "constraints": []
     }
   ]
 }

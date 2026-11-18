@@ -49,6 +49,33 @@ impl Kernel {
             .get_row(tx, t, &qname, id)
             .await?
             .ok_or_else(|| ApiError::not_found(format!("Không tìm thấy {qname} {id}")))?;
+        if qname == "consolidation.elimination_journal"
+            && matches!(actor, Actor::User { .. })
+            && !matches!(
+                cur.get("status").and_then(Value::as_str),
+                Some("draft" | "rejected")
+            )
+        {
+            return Err(ApiError::forbidden(
+                "Submitted or posted elimination journals are immutable",
+            ));
+        }
+        if qname == "consolidation.company_group"
+            && matches!(actor, Actor::User { .. })
+            && patch.contains_key("reporting_currency")
+            && tx
+                .query_opt(
+                    "SELECT id FROM consolidation__elimination_journal WHERE tenant_id=$1 AND \"group\"=$2 LIMIT 1",
+                    &[&t.id, &uid],
+                )
+                .await?
+                .is_some()
+        {
+            return Err(ApiError::validation(
+                &qname,
+                vec!["The reporting currency is locked after an elimination journal has been created".into()],
+            ));
+        }
         if qname == "integration-hub.connector"
             && let (Some(previous), Some(replacement)) =
                 (cur.get("config"), patch.get_mut("config"))

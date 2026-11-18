@@ -14,6 +14,7 @@ const APPROVAL_TARGETS: &[&str] = &[
     "hrm.leave_request",
     "accounting.settlement_batch",
     "accounting.journal_entry",
+    "consolidation.elimination_journal",
     "contract.amendment",
     "manufacturing.conditional_acceptance",
 ];
@@ -146,6 +147,12 @@ pub fn request_for_event(event_type: &str, event: &Value) -> Option<Map<String, 
             None,
             None,
         ),
+        "consolidation.elimination_journal.submitted" => (
+            "consolidation.elimination_journal",
+            "Duyệt bút toán loại trừ nội bộ",
+            None,
+            None,
+        ),
         "contract.amendment.submitted" => (
             "contract.amendment",
             "Duyệt phụ lục hợp đồng",
@@ -163,6 +170,23 @@ pub fn request_for_event(event_type: &str, event: &Value) -> Option<Map<String, 
         request.insert("amount".into(), amount.clone());
     }
     if event_type == "accounting.journal_entry.submitted" {
+        let amount = event
+            .get("lines")
+            .and_then(Value::as_array)
+            .and_then(|lines| {
+                lines.iter().try_fold(Decimal::ZERO, |total, line| {
+                    let debit = money::decimal(line.get("debit")?)?;
+                    total.checked_add(debit)
+                })
+            })?;
+        let amount = amount
+            .normalize()
+            .to_string()
+            .parse::<serde_json::Number>()
+            .ok()?;
+        request.insert("amount".into(), Value::Number(amount));
+    }
+    if event_type == "consolidation.elimination_journal.submitted" {
         let amount = event
             .get("lines")
             .and_then(Value::as_array)
@@ -211,11 +235,13 @@ pub fn decision_for_event(event_type: &str, event: &Value) -> Option<(&'static s
         "hrm.leave_request" => "hrm.leave_request",
         "accounting.settlement_batch" => "accounting.settlement_batch",
         "accounting.journal_entry" => "accounting.journal_entry",
+        "consolidation.elimination_journal" => "consolidation.elimination_journal",
         "contract.amendment" => "contract.amendment",
         _ => return None,
     };
     let target_action = match (entity, action) {
         ("accounting.journal_entry", "approved") => "posted",
+        ("consolidation.elimination_journal", "approved") => "posted",
         _ => action,
     };
     Some((entity, target_action))

@@ -102,6 +102,23 @@ const consolidationEnglish = {
   'Tuổi tỷ giá': 'Rate age',
   'ngày': 'days',  'active': 'Active',
   'revoked': 'Revoked',
+  'Đối chiếu và loại trừ nội bộ': 'Intercompany matching and eliminations',
+  'Nhập bút toán điều chỉnh bằng tiền tệ báo cáo, kèm chứng từ đối chiếu. Bút toán chỉ vào báo cáo sau khi người khác duyệt; sổ từng công ty không bị thay đổi.': 'Enter an adjustment in the group reporting currency with matching evidence. It affects the report only after another user approves it; member ledgers stay unchanged.',
+  'Ngày hạch toán': 'Posting date',
+  'Lý do loại trừ': 'Elimination reason',
+  'Tài khoản ghi nợ': 'Debit account',
+  'Số tiền ghi nợ': 'Debit amount',
+  'Tài khoản ghi có': 'Credit account',
+  'Số tiền ghi có': 'Credit amount',
+  'Chứng từ hoặc nội dung đối chiếu': 'Matching document or explanation',
+  'Hai vế phải cân bằng; đơn vị tiền là tiền tệ báo cáo của nhóm.': 'Debits and credits must balance. Amounts use the group reporting currency.',
+  'Gửi duyệt độc lập': 'Submit for independent approval',
+  'Đã gửi bút toán loại trừ để duyệt độc lập.': 'Elimination journal submitted for independent approval.',
+  'Chọn tài khoản': 'Choose an account',
+  'draft': 'Draft',
+  'submitted': 'Pending approval',
+  'posted': 'Approved and posted',
+  'rejected': 'Rejected',
 };
 
 export default consolidationEnglish;

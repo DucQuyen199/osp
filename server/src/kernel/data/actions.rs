@@ -31,6 +31,14 @@ impl Kernel {
         {
             return Err(ApiError::forbidden("contract.addendum.system_apply"));
         }
+        if matches!(actor, Actor::User { .. })
+            && qname == "consolidation.elimination_journal"
+            && matches!(action, "posted" | "rejected")
+        {
+            return Err(ApiError::forbidden(
+                "Elimination journals can only be posted or rejected through an independent approval decision",
+            ));
+        }
         let states = ent.def.states.as_ref().ok_or_else(|| {
             ApiError::new(
                 404,
@@ -111,6 +119,76 @@ impl Kernel {
                         "Submit manual journal entries for independent approval before posting",
                     ));
                 }
+            }
+        }
+        if qname == "consolidation.elimination_journal" && matches!(action, "submitted" | "posted")
+        {
+            if action == "submitted" && !t.has_module("workflow-approval") {
+                return Err(ApiError::new(
+                    409,
+                    "APPROVAL_REQUIRED",
+                    "Enable workflow-approval before submitting an elimination journal",
+                ));
+            }
+            let errors = crate::modules::validate_document_for_tenant(
+                t,
+                &qname,
+                &Value::Object(cur.clone()),
+            );
+            if !errors.is_empty() {
+                return Err(ApiError::validation(&qname, errors));
+            }
+            let lines = cur.get("lines").and_then(Value::as_array).ok_or_else(|| {
+                ApiError::validation(
+                    &qname,
+                    vec!["Elimination journal lines are required".into()],
+                )
+            })?;
+            for line in lines {
+                let code = line
+                    .get("accountCode")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                if tx
+                    .query_opt(
+                        "SELECT id FROM accounting__account WHERE tenant_id=$1 AND code=$2 LIMIT 1",
+                        &[&t.id, &code],
+                    )
+                    .await?
+                    .is_none()
+                {
+                    return Err(ApiError::validation(
+                        &qname,
+                        vec![format!(
+                            "Account code {code} does not exist in the group chart of accounts"
+                        )],
+                    ));
+                }
+            }
+            tx.query_opt(
+                "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                &[&format!("accounting.period_calendar:{}", t.id)],
+            )
+            .await?;
+            let posting_date =
+                cur.get("posting_date")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        ApiError::validation(&qname, vec!["A posting date is required".into()])
+                    })?;
+            if tx
+                .query_opt(
+                    "SELECT id FROM accounting__period WHERE tenant_id=$1 AND status='period_closed' AND start_date <= $2::date AND end_date >= $2::date LIMIT 1 FOR SHARE",
+                    &[&t.id, &posting_date],
+                )
+                .await?
+                .is_some()
+            {
+                return Err(ApiError::new(
+                    409,
+                    "ACCOUNTING_PERIOD_CLOSED",
+                    format!("Cannot post an elimination journal in a closed accounting period ({posting_date})"),
+                ));
             }
         }
         if let (
@@ -570,6 +648,7 @@ fn segregation_reference(qname: &str, action: &str) -> Option<&'static str> {
     match (qname, action) {
         ("inventory.stock_count", "approved" | "rejected") => Some("create"),
         ("accounting.settlement_batch", "approved" | "rejected") => Some("create"),
+        ("consolidation.elimination_journal", "posted" | "rejected") => Some("create"),
         ("purchasing.rfq", "accepted") => Some("create"),
         ("payroll.tax_deduction", "approved" | "rejected") => Some("submitted"),
         ("construction.boq", "approved") => Some("create"),

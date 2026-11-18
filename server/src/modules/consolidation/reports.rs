@@ -350,6 +350,91 @@ impl Kernel {
                 "accounts": accounts,
             }));
         }
+        // Elimination journals are group-owned management overlays. They are
+        // never written into a member tenant's accounting ledger.
+        let mut elimination_conn = self.pool.get().await?;
+        let elimination_tx = Tx::begin(&mut elimination_conn, &owner.id, false).await?;
+        let elimination_rows = elimination_tx.query(
+            "SELECT posting_date::text, memo, lines, matching_evidence FROM consolidation__elimination_journal WHERE tenant_id=$1 AND \"group\"=$2 AND status='posted' AND posting_date <= $3::date ORDER BY posting_date, created_at, id",
+            &[&owner.id, &group_id, &to_text],
+        ).await?;
+        let chart_rows = elimination_tx
+            .query(
+                "SELECT code, name, kind FROM accounting__account WHERE tenant_id=$1",
+                &[&owner.id],
+            )
+            .await?;
+        let chart: BTreeMap<String, (String, String)> = chart_rows
+            .into_iter()
+            .map(|row| {
+                (
+                    row.get::<_, String>(0),
+                    (row.get::<_, String>(1), row.get::<_, String>(2)),
+                )
+            })
+            .collect();
+        let mut eliminations = Vec::with_capacity(elimination_rows.len());
+        for row in elimination_rows {
+            let posting_date: String = row.get(0);
+            let memo: String = row.get(1);
+            let lines: Value = row.get(2);
+            let evidence: Value = row.get(3);
+            let before_period = from_text
+                .as_deref()
+                .is_some_and(|from| posting_date.as_str() < from);
+            for line in lines.as_array().into_iter().flatten() {
+                let code = line
+                    .get("accountCode")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        ApiError::new(
+                            409,
+                            "INVALID_ELIMINATION_JOURNAL",
+                            "An approved elimination journal has a line without an account code",
+                        )
+                    })?
+                    .to_owned();
+                let (name, kind) = chart.get(&code).cloned().ok_or_else(|| {
+                    ApiError::new(
+                        409,
+                        "INVALID_ELIMINATION_ACCOUNT",
+                        format!("Account {code} is no longer in the group chart of accounts"),
+                    )
+                })?;
+                let debit = line
+                    .get("debit")
+                    .and_then(crate::money::decimal)
+                    .unwrap_or(Decimal::ZERO);
+                let credit = line
+                    .get("credit")
+                    .and_then(crate::money::decimal)
+                    .unwrap_or(Decimal::ZERO);
+                let bucket = totals
+                    .entry((code, kind))
+                    .or_insert((name, [Decimal::ZERO; 6]));
+                if before_period {
+                    let opening = bucket.1[0]
+                        .checked_sub(bucket.1[1])
+                        .and_then(|balance| balance.checked_add(debit))
+                        .and_then(|balance| balance.checked_sub(credit))
+                        .ok_or_else(amount_error)?;
+                    bucket.1[0] = opening.max(Decimal::ZERO);
+                    bucket.1[1] = (-opening).max(Decimal::ZERO);
+                } else {
+                    bucket.1[2] = bucket.1[2].checked_add(debit).ok_or_else(amount_error)?;
+                    bucket.1[3] = bucket.1[3].checked_add(credit).ok_or_else(amount_error)?;
+                }
+                let closing = bucket.1[4]
+                    .checked_sub(bucket.1[5])
+                    .and_then(|balance| balance.checked_add(debit))
+                    .and_then(|balance| balance.checked_sub(credit))
+                    .ok_or_else(amount_error)?;
+                bucket.1[4] = closing.max(Decimal::ZERO);
+                bucket.1[5] = (-closing).max(Decimal::ZERO);
+            }
+            eliminations.push(json!({"postingDate": posting_date, "memo": memo, "lines": lines, "matchingEvidence": evidence}));
+        }
+        elimination_tx.commit().await?;
         let accounts = totals
             .into_iter()
             .map(|((code, kind), (name, values))| {
@@ -400,7 +485,7 @@ impl Kernel {
             "reportingCurrency": reporting_currency,
             "maxRateAgeDays": max_rate_age_days.map(json_amount).transpose()?,
             "rateBasis": "latest direct or inverse currency rate effective on or before the report end date; same rate applied to all balance columns",
-            "consolidationMethod": "account-code roll-up; intercompany balances are not eliminated",
+            "consolidationMethod": "account-code roll-up with separately approved group-owned management elimination journals",
             "reconciliation": {
                 "closingDebitTotal": json_amount(debit_total)?,
                 "closingCreditTotal": json_amount(credit_total)?,
@@ -408,6 +493,7 @@ impl Kernel {
                 "withinCentTolerance": imbalance.abs() <= Decimal::new(1, 2),
             },
             "companies": companies,
+            "eliminations": eliminations,
             "accounts": accounts,
         }))
     }
