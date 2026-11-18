@@ -69,7 +69,7 @@ pub async fn validate_persistence(
                 let candidate = id(document, "id").unwrap_or(Uuid::nil());
                 if tx
                     .query_opt(
-                        "SELECT 1 FROM recruitment__candidate WHERE tenant_id = $1 AND lower(email) = lower($2) AND id <> $3 LIMIT 1",
+                        "SELECT 1 FROM recruitment__candidate WHERE tenant_id = $1 AND lower(btrim(email)) = lower(btrim($2)) AND id <> $3 LIMIT 1",
                         &[&tenant.id, &value, &candidate],
                     )
                     .await?
@@ -79,7 +79,7 @@ pub async fn validate_persistence(
                 }
                 if tx
                     .query_opt(
-                        "SELECT 1 FROM hrm__employee WHERE tenant_id = $1 AND lower(email) = lower($2) AND NOT (source = 'recruitment' AND source_id = $3) LIMIT 1",
+                        "SELECT 1 FROM hrm__employee WHERE tenant_id = $1 AND lower(btrim(email)) = lower(btrim($2)) AND NOT (source = 'recruitment' AND source_id = $3) LIMIT 1",
                         &[&tenant.id, &value, &candidate.to_string()],
                     )
                     .await?
@@ -242,7 +242,7 @@ pub async fn validate_persistence(
                     lock_email(tx, tenant, &value).await?;
                     if tx
                         .query_opt(
-                            "SELECT 1 FROM hrm__employee WHERE tenant_id = $1 AND lower(email) = lower($2) LIMIT 1",
+                            "SELECT 1 FROM hrm__employee WHERE tenant_id = $1 AND lower(btrim(email)) = lower(btrim($2)) LIMIT 1",
                             &[&tenant.id, &value],
                         )
                         .await?

@@ -53,6 +53,11 @@ pub async fn handle_source_event(
     ] {
         let value: Option<String> = employee_data.get(column);
         if let Some(value) = value {
+            let value = if field == "email" {
+                value.trim().to_owned()
+            } else {
+                value
+            };
             data.insert(field.into(), Value::String(value));
         }
     }

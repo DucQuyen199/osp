@@ -21,6 +21,18 @@ pub(super) async fn validate_program(
     else {
         return Ok(vec!["Updated charity program requires a valid id".into()]);
     };
+    // Serialize budget changes with approvals/payments, which lock this same
+    // program row before checking the committed disbursement total.
+    if tx
+        .query_opt(
+            "SELECT id FROM charity__program WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+            &[&tenant.id, &program_id],
+        )
+        .await?
+        .is_none()
+    {
+        return Ok(vec!["Charity program was not found in this tenant".into()]);
+    }
     let committed_text: String = tx
         .query_one_row(
             "SELECT COALESCE(SUM(amount), 0)::text FROM charity__disbursement WHERE tenant_id = $1 AND program = $2 AND status IN ('approved', 'paid')",

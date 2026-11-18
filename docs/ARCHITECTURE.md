@@ -226,7 +226,7 @@ For sales orders with a shipping address in a tenant that uses Logistics, confir
 
 Construction persistence is divided into BOQ, site/diary, and subcontract checks. Budget and commitment values are read as PostgreSQL decimal text and compared with checked Decimal arithmetic before a subcontract is signed.
 
-Charity persistence is divided into program-budget, donation-receipt, and disbursement workflows. Donation amounts, program budgets, accounting payment snapshots, and cumulative approved disbursements use Decimal through Rust validation and source-event posting.
+Charity persistence is divided into program-budget, donation-receipt, and disbursement workflows. Donation amounts, program budgets, accounting payment snapshots, and cumulative approved disbursements use Decimal through Rust validation and source-event posting. Program updates lock the program row before checking approved and paid commitments, serializing budget reductions with concurrent disbursement approvals and payments.
 
 Purchasing persistence separates receipt progression and order matching from purchase-return and inspection checks. Supplier, requisition, and shared-approval checks remain in the facade and use the kernel transaction.
 
