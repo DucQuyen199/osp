@@ -4,9 +4,11 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { decryptBackup, encryptBackup } from './backup-crypto.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const project = `osp-verify-${process.pid}-${randomBytes(4).toString('hex')}`;
@@ -98,6 +100,17 @@ try {
 
   const dump = compose(['exec', '-T', 'postgres', 'pg_dump', '-U', 'postgres', '-d', 'osp', '-Fc'], { binary: true });
   assert.ok(dump.length > 1000, 'backup must contain database records');
+  const archivePath = join(temporary, 'osp.dump');
+  const encryptedPath = join(temporary, 'osp.dump.enc');
+  const decryptedPath = join(temporary, 'osp-restored.dump');
+  const backupKey = randomBytes(32);
+  await writeFile(archivePath, dump, { mode: 0o600 });
+  await encryptBackup(archivePath, encryptedPath, backupKey);
+  await decryptBackup(encryptedPath, decryptedPath, backupKey);
+  const decryptedDump = await readFile(decryptedPath);
+  assert.deepEqual(decryptedDump, dump, 'encrypted backup must round-trip byte-for-byte');
+  const archiveList = compose(['exec', '-T', 'postgres', 'pg_restore', '--list'], { input: decryptedDump });
+  assert.match(String(archiveList), /TABLE DATA/, 'restored encrypted archive must be a valid PostgreSQL archive');
   compose(['exec', '-T', 'postgres', 'psql', '-U', 'postgres', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1', '-c', 'CREATE DATABASE osp_restore OWNER osp_app']);
   compose(['exec', '-T', 'postgres', 'pg_restore', '-U', 'postgres', '--exit-on-error', '--dbname=osp_restore'], { input: dump });
   config.services.osp.environment.DATABASE_URL = `postgresql://osp_app:${password}@postgres:5432/osp_restore`;
@@ -107,7 +120,7 @@ try {
   const restored = await api(`${data}/sales/sales_order/${order.id}`);
   assert.equal(restored.status, 'confirmed');
   assert.equal((await api(`${data}/accounting/invoice?source_id=${order.id}`)).items.length, 1);
-  console.log('pg_dump/pg_restore, application restart, session persistence and restored financial data passed.');
+  console.log('pg_dump, AES-256-GCM backup round trip, pg_restore, application restart, session persistence and restored financial data passed.');
 } finally {
   try {
     // Explicit project identity confines removal to this run's containers,

@@ -8,7 +8,7 @@
 | `npm.cmd test` | 16 test đạt, gồm domain, HTTP và bộ luồng PostgreSQL thật |
 | `npm.cmd run e2e` | Các bước giao diện, bàn phím, di động và axe-core đạt |
 | Build image Linux | `osp-suite:rust-web-verification` build được với Rust 1.89 |
-| `npm.cmd run test:container` | Compose riêng, luồng bán hàng, backup/restore và restart đạt |
+| `npm.cmd run test:container` | Compose riêng, luồng bán hàng, mã hóa/giải mã archive pg_dump thật, backup/restore và restart đạt |
 
 Kiểm tra catalog xác nhận 50 module, 182 entity, 811 sự kiện và 22 gói ngành.
 API danh sách của mọi entity đã được gọi với xác thực trên PostgreSQL thật.

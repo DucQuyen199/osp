@@ -30,7 +30,7 @@ Runtime TypeScript đã được gỡ. Node.js chỉ còn chạy công cụ phá
 | `npm test` | Bộ kiểm thử tương thích hiện có |
 | `cargo test --manifest-path server/Cargo.toml --no-default-features` | Test domain và HTTP không cần PostgreSQL |
 | `npm run e2e` | Chrome/Edge và axe-core trên cơ sở dữ liệu tạm riêng |
-| `npm run test:container` | Image Linux đã build, luồng bán hàng và diễn tập pg_dump/pg_restore trong Compose project tạm riêng |
+| `npm run test:container` | Image Linux đã build, luồng bán hàng và diễn tập pg_dump, mã hóa backup AES-GCM, pg_restore trong Compose project tạm riêng |
 
 Trước khi chạy `test:container`, build image bằng
 `docker build -t osp-suite:rust-web-verification .` hoặc đặt `OSP_VERIFY_IMAGE`
