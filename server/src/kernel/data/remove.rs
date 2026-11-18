@@ -36,6 +36,17 @@ impl Kernel {
             .get_row(tx, t, &qname, id)
             .await?
             .ok_or_else(|| ApiError::not_found(format!("Không tìm thấy {qname} {id}")))?;
+        if qname == "consolidation.elimination_journal"
+            && !matches!(actor, Actor::System)
+            && matches!(
+                cur.get("status").and_then(Value::as_str),
+                Some("submitted" | "posted")
+            )
+        {
+            return Err(ApiError::forbidden(
+                "Submitted or posted elimination journals are immutable and cannot be deleted",
+            ));
+        }
         let domain_errors = crate::modules::validate_remove(&qname, &Value::Object(cur.clone()));
         if !domain_errors.is_empty() {
             return Err(ApiError::validation(&qname, domain_errors));
