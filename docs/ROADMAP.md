@@ -62,6 +62,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Hóa đơn điện tử lưu lý do hủy cùng giao dịch chuyển sang chờ provider xử lý hủy.
 - POS ghi nhận số tiền khách đưa, tự tính/in tiền thối và chặn hoàn tất giao dịch tiền mặt khi nhận thiếu; tiền thực đếm và chốt ca dùng cùng giao dịch sau khi kiểm tra đơn/phiếu quỹ nháp và tính chênh lệch tiền. Ước tính giỏ hàng trên quầy dùng Decimal, làm tròn từng dòng 4 chữ số như máy chủ trước khi cộng tổng và thuế.
 - Nhà thuốc cộng lượng kê, đã cấp, còn lại và lượng thuốc trả cách ly bằng Decimal để giữ đúng hạn mức theo đơn và số lượng được hủy.
+- Báo giá dịch vụ hiện trường quy đổi đơn giá theo đơn vị và làm tròn từng dòng bằng Decimal như máy chủ trước khi cộng tổng.
 - Bảo trì lưu kết quả sửa chữa và cặp giờ công/đơn giá đầy đủ cùng lần hoàn tất, xuất vật tư và cập nhật lịch định kỳ.
 - Bảo trì có danh mục kỹ thuật viên nội bộ/nhà thầu, chuyên môn và liên hệ; lệnh mở có thể được phân công và chỉ gán kỹ thuật viên còn hoạt động thuộc tenant.
 - Mua hàng lưu lý do tranh chấp hóa đơn nhà cung cấp và ghi chú xử lý cùng lần chuyển trạng thái, tránh tạo công nợ khi hóa đơn đang tranh chấp; hàng đã nhận có thể trả vì lỗi QC hoặc giao dư/sai mặt hàng, kể cả khi đơn còn nhận từng phần, với hạn mức khóa theo số thực nhận.
