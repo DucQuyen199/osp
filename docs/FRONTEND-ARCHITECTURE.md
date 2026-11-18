@@ -132,8 +132,10 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 - The hotel front desk delegates permission-gated reservation, guest, room, room-type, folio-charge and invoice reads plus loading/error state to `features/hospitality/hooks/useHotelFrontDeskData.js`; the page owns current reservation selection, room availability, date edits and guest workflows.
 - The automotive workshop owns repair-order status, permissions and price refreshes; `RepairQuoteEditor` edits the controlled parts, labor, warehouse and complaint draft, then submits the revised quote through a callback while the order is still awaiting customer approval.
 - `AutoServiceWorkshopPage` owns selected repair-order and odometer state, permissions and updates; `RepairOrderVehicleSummary` renders the vehicle/repair snapshot and controlled odometer form through callbacks.
+- `AutoServiceWorkshopPage` also owns quote totals, action permissions, decline validation and repair transitions; `RepairOrderWorkflowPanel` renders the selected quote, invoice link, available actions and vehicle history through controlled props and callbacks.
 - The pharmacy workbench owns prescription validation, status transitions and persistence; `PrescriptionForm` renders controlled prescription details and medicine lines for new records or editable drafts, and emits updates through callbacks.
 - The pharmacy workbench owns prescription permissions, quantity balance calculations and actions; `PrescriptionRegister` renders controlled prescription rows and emits edit, verify and cancel requests.
+- The pharmacy workbench owns quarantined-return quantity calculations, permissions and disposal actions; `ReturnedMedicineInspectionCard` renders the controlled inspection and disposal form.
 - The contract workbench owns contract and amendment permissions, API actions, and workflow state; `ContractDraftForm` renders controlled draft fields and emits field changes, while `ContractRegisterTable` renders the selectable register and emits selection changes.
 - The approval workbench owns rule persistence, request decisions, and authorization checks; `ApprovalApproverPicker` renders controlled role and user selections through callbacks.
 - The purchasing workbench owns invoice draft state and persistence; `purchasingSelectors.js` derives received, returnable and invoiceable quantities plus supplier-invoice totals, tax, foreign-price completeness, and purchase-price variance outside the React page. Those calculations use Decimal arithmetic and mirror server line rounding and base-currency variance conversion.
@@ -202,6 +204,7 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 - The communication workbench pages reminders at 25 rows and delivery logs at 50 rows through the tenant entity API; status summary cards use server totals and remain correct when operators browse older pages.
 - The cross-module event stream loads 50 newest-first events per page; the root-only toggle is applied before counting and paging so it never hides matching older roots behind child events.
 - Entity detail event tabs query the complete causal lineage by record ID on the server, instead of searching only the tenant's latest 1,000 events in the browser.
+- `EntityDetailPage` owns route, tab state, event loading, permissions and workflow actions; `EntityDetailTabs` presents typed record fields and the event timeline through controlled props.
 
 ## Styling layers
 

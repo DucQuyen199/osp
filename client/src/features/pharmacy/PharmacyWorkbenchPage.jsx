@@ -10,6 +10,7 @@ import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import pharmacyEnglish from './pharmacy.en.js';
 import PrescriptionForm from './components/PrescriptionForm.jsx';
 import PrescriptionRegister from './components/PrescriptionRegister.jsx';
+import ReturnedMedicineInspectionCard from './components/ReturnedMedicineInspectionCard.jsx';
 const t = (text) => uiTextWith(text, pharmacyEnglish);
 const today = localDate;
 const newLine = () => ({ rowId: crypto.randomUUID(), product: '', uom: '', qty: '1', dosage: '' });
@@ -221,17 +222,27 @@ export default function PharmacyWorkbenchPage() {
         const disposed = addDecimals(returnDispositions.filter((item) => item.inspection === inspection.id && item.status === 'posted').map((item) => item.qty || 0));
         const remaining = compareDecimals(subtractDecimals(inspection.qty || 0, disposed), '0') < 0 ? '0' : subtractDecimals(inspection.qty || 0, disposed);
         const draft = disposalDrafts[inspection.id] || {};
-        return <article className="card card-pad stack-sm" key={inspection.id}>
-          <div className="row wrap"><div className="grow"><strong>{productName(inspection.product)}</strong><div className="small muted">{t('Số lượng cách ly')}: {fmtNumber(remaining)} · {t('Trạng thái')}: {statusLabel(inspection.status)} · {t('Mã truy xuất')}: {String(inspection.source_id || '').slice(0, 8)}</div>{inspection.lot && <div className="small muted">{t('Lô')}: {String(inspection.lot).slice(0, 12)}</div>}{inspection.note && <div className="small muted">{inspection.note}</div>}</div>
-            {inspection.status === 'pending' && can('quality.inspection.update') && can('quality.inspection.failed') && <button className="btn btn-danger btn-sm" type="button" disabled={busy} onClick={() => failReturnedMedicine(inspection)}>{t('Xác nhận không đạt')}</button>}
-          </div>
-          {inspection.status === 'failed' && compareDecimals(remaining, '0') > 0 && can('pharmacy.return_disposition.create') && can('pharmacy.return_disposition.posted') && <form className="row wrap" onSubmit={(event) => disposeReturnedMedicine(event, inspection)}>
-            <label className="field"><span className="label">{t('Số lượng hủy')}</span><input className="input num" type="number" min="0.000001" max={remaining} step="any" required value={draft.qty || ''} onChange={(event) => setDisposalDrafts((items) => ({ ...items, [inspection.id]: { ...items[inspection.id], qty: event.target.value } }))} /></label>
-            <label className="field grow"><span className="label">{t('Lý do / chứng từ hủy')}</span><input className="input" required minLength="5" maxLength="500" value={draft.note || ''} onChange={(event) => setDisposalDrafts((items) => ({ ...items, [inspection.id]: { ...items[inspection.id], note: event.target.value } }))} /></label>
-            <button className="btn btn-danger" type="submit" disabled={busy || compareDecimals(remaining, '0') <= 0}>{t('Ghi sổ hủy')}</button>
-          </form>}
-          {compareDecimals(remaining, '0') <= 0 && <div className="small muted">{t('Đã hủy hết số lượng cách ly.')}</div>}
-        </article>;
+        return <ReturnedMedicineInspectionCard
+          key={inspection.id}
+          productLabel={productName(inspection.product)}
+          remaining={remaining}
+          canDispose={compareDecimals(remaining, '0') > 0}
+          remainingLabel={fmtNumber(remaining)}
+          statusLabel={statusLabel(inspection.status)}
+          sourceId={String(inspection.source_id || '').slice(0, 8)}
+          lot={inspection.lot ? String(inspection.lot).slice(0, 12) : ''}
+          note={inspection.note}
+          draft={draft}
+          busy={busy}
+          showFailAction={inspection.status === 'pending' && can('quality.inspection.update') && can('quality.inspection.failed')}
+          showDispositionForm={inspection.status === 'failed' && compareDecimals(remaining, '0') > 0 && can('pharmacy.return_disposition.create') && can('pharmacy.return_disposition.posted')}
+          fullyDisposed={compareDecimals(remaining, '0') <= 0}
+          t={t}
+          onFail={() => failReturnedMedicine(inspection)}
+          onSubmit={(event) => disposeReturnedMedicine(event, inspection)}
+          onQuantityChange={(value) => setDisposalDrafts((items) => ({ ...items, [inspection.id]: { ...items[inspection.id], qty: value } }))}
+          onNoteChange={(value) => setDisposalDrafts((items) => ({ ...items, [inspection.id]: { ...items[inspection.id], note: value } }))}
+        />;
       })}
     </section>
     <PrescriptionRegister
