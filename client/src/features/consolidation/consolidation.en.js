@@ -119,6 +119,7 @@ const consolidationEnglish = {
   'submitted': 'Pending approval',
   'posted': 'Approved and posted',
   'rejected': 'Rejected',
+  'Chưa có bút toán loại trừ cho nhóm này.': 'No elimination journals for this group yet.',
 };
 
 export default consolidationEnglish;

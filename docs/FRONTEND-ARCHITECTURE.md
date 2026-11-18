@@ -33,6 +33,7 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 
 ### Feature-local workflow components
 - The consolidation workbench owns report snapshot permissions, API actions and grant rechecks; its saved report history renders snapshot metadata and opens immutable payloads through the feature API.
+- The consolidation workbench owns elimination-journal permissions, validation and persistence; `EliminationJournalForm` and `EliminationJournalsTable` render controlled fields and records through props without owning API or business logic.
 
 
 - Keep route-level loading, permission checks, and business actions in the feature page or a feature hook.

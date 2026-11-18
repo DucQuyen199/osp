@@ -4,6 +4,8 @@ import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { can, isAdmin } from '../../lib/state.js';
 import { uiTextWith } from '../../lib/i18n.js';
 import consolidationEnglish from './consolidation.en.js';
+import EliminationJournalForm from './components/EliminationJournalForm.jsx';
+import EliminationJournalsTable from './components/EliminationJournalsTable.jsx';
 
 const t = (text) => uiTextWith(text, consolidationEnglish);
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -176,20 +178,19 @@ export default function ConsolidationWorkbenchPage() {
   }
 
   const canManage = isAdmin();
-  const eliminationSection = reportGroup && can('consolidation.elimination_journal.create') ? <section className="card card-pad"><h2>{t('Đối chiếu và loại trừ nội bộ')}</h2><p className="sub">{t('Nhập bút toán điều chỉnh bằng tiền tệ báo cáo, kèm chứng từ đối chiếu. Bút toán chỉ vào báo cáo sau khi người khác duyệt; sổ từng công ty không bị thay đổi.')}</p><form className="form-grid" onSubmit={createElimination}>
-    <label className="field"><span className="label">{t('Ngày hạch toán')} *</span><input className="input" type="date" required value={eliminationForm.posting_date} onChange={(event) => setEliminationForm((form) => ({ ...form, posting_date: event.target.value }))}/></label>
-    <label className="field full"><span className="label">{t('Lý do loại trừ')} *</span><input className="input" required maxLength={500} value={eliminationForm.memo} onChange={(event) => setEliminationForm((form) => ({ ...form, memo: event.target.value }))}/></label>
-    <label className="field"><span className="label">{t('Tài khoản ghi nợ')} *</span><select className="input" required value={eliminationForm.account_debit} onChange={(event) => setEliminationForm((form) => ({ ...form, account_debit: event.target.value }))}><option value="">{t('Chọn tài khoản')}</option>{accounts.map((account) => <option key={account.id} value={account.code}>{account.code} · {account.name}</option>)}</select></label>
-    <label className="field"><span className="label">{t('Số tiền ghi nợ')} *</span><input className="input" type="number" min="0.01" step="0.01" required value={eliminationForm.debit} onChange={(event) => setEliminationForm((form) => ({ ...form, debit: event.target.value }))}/></label>
-    <label className="field"><span className="label">{t('Tài khoản ghi có')} *</span><select className="input" required value={eliminationForm.account_credit} onChange={(event) => setEliminationForm((form) => ({ ...form, account_credit: event.target.value }))}><option value="">{t('Chọn tài khoản')}</option>{accounts.map((account) => <option key={account.id} value={account.code}>{account.code} · {account.name}</option>)}</select></label>
-    <label className="field"><span className="label">{t('Số tiền ghi có')} *</span><input className="input" type="number" min="0.01" step="0.01" required value={eliminationForm.credit} onChange={(event) => setEliminationForm((form) => ({ ...form, credit: event.target.value }))}/></label>
-    <label className="field full"><span className="label">{t('Chứng từ hoặc nội dung đối chiếu')} *</span><textarea className="input" required rows="3" value={eliminationForm.evidence} onChange={(event) => setEliminationForm((form) => ({ ...form, evidence: event.target.value }))}/></label>
-    <div className="row full"><span className="sub">{t('Hai vế phải cân bằng; đơn vị tiền là tiền tệ báo cáo của nhóm.')}</span><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || !accounts.length}>{t('Gửi duyệt độc lập')}</button></div>
-  </form><div className="table-wrap"><table className="table"><thead><tr><th>{t('Ngày')}</th><th>{t('Lý do')}</th><th>{t('Trạng thái')}</th></tr></thead><tbody>{eliminationJournals.filter((row) => row.group === reportGroup).map((row) => <tr key={row.id}><td>{row.posting_date}</td><td>{row.memo}</td><td>{t(row.status || 'draft')}</td></tr>)}</tbody></table></div></section> : null;
+  const updateEliminationField = (field, value) => setEliminationForm((form) => ({ ...form, [field]: value }));
+  const eliminationSection = reportGroup && can('consolidation.elimination_journal.create') ? (
+    <section className="card card-pad">
+      <h2>{t('Đối chiếu và loại trừ nội bộ')}</h2>
+      <p className="sub">{t('Nhập bút toán điều chỉnh bằng tiền tệ báo cáo, kèm chứng từ đối chiếu. Bút toán chỉ vào báo cáo sau khi người khác duyệt; sổ từng công ty không bị thay đổi.')}</p>
+      <EliminationJournalForm form={eliminationForm} accounts={accounts} busy={busy} onFieldChange={updateEliminationField} onSubmit={createElimination} t={t}/>
+      <EliminationJournalsTable rows={eliminationJournals} groupId={reportGroup} t={t}/>
+    </section>
+  ) : null;
   return <div className="page">
     <div className="page-head"><div><h1>{t('Quản lý tập đoàn')}</h1><p className="sub">{t('Tạo nhóm pháp nhân, yêu cầu tenant thành viên đồng ý và quản lý quyền chia sẻ.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div>
-    {eliminationSection}
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
+    {eliminationSection}
     {canManage && can('consolidation.company_group.create') && <section className="card card-pad"><h2>{t('Tạo nhóm công ty')}</h2><form className="form-grid" onSubmit={createGroup}>
       <label className="field"><span className="label">{t('Tên nhóm')} *</span><input className="input" required maxLength={160} value={groupForm.name} onChange={(event) => setGroupForm((form) => ({ ...form, name: event.target.value }))}/></label>
       <label className="field"><span className="label">{t('Tiền tệ báo cáo')} *</span><select className="input" required value={groupForm.reporting_currency} onChange={(event) => setGroupForm((form) => ({ ...form, reporting_currency: event.target.value }))}><option value="">{t('Chọn tiền tệ')}</option>{currencies.map((currency) => <option key={currency.id} value={currency.id}>{currency.code} · {currency.name}</option>)}</select></label>
