@@ -68,7 +68,7 @@ export default function PharmacyWorkbenchPage() {
   const createPrescription = async (event) => {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
-      const items = activeLines.map((line) => ({ product: line.product, qty: Number(line.qty), ...(line.uom ? { uom: line.uom } : {}), dosage: line.dosage.trim() }));
+      const items = activeLines.map((line) => ({ product: line.product, qty: String(line.qty), ...(line.uom ? { uom: line.uom } : {}), dosage: line.dosage.trim() }));
       if (editingId) {
         await api(dataPath('pharmacy.prescription', editingId), { method: 'PATCH', body: { ...form, items } });
       } else {
@@ -124,11 +124,12 @@ export default function PharmacyWorkbenchPage() {
     event.preventDefault();
     const draft = disposalDrafts[inspection.id] || {};
     const qtyText = String(draft.qty ?? '').trim();
-    const qty = Number(qtyText);
     const note = String(draft.note || '').trim();
     const disposed = addDecimals(returnDispositions.filter((item) => item.inspection === inspection.id && item.status === 'posted').map((item) => item.qty || 0));
     const remaining = compareDecimals(subtractDecimals(inspection.qty || 0, disposed), '0') < 0 ? '0' : subtractDecimals(inspection.qty || 0, disposed);
-    if (!Number.isFinite(qty) || compareDecimals(qtyText || 0, '0') <= 0 || compareDecimals(qtyText || 0, remaining) > 0 || note.length < 5 || note.length > 500) {
+    let quantityValid = false;
+    try { quantityValid = compareDecimals(qtyText || 0, '0') > 0 && compareDecimals(qtyText, remaining) <= 0; } catch { quantityValid = false; }
+    if (!quantityValid || note.length < 5 || note.length > 500) {
       setError(t('Nhập số lượng hủy hợp lệ trong giới hạn còn cách ly và ghi lý do từ 5 đến 500 ký tự.'));
       return;
     }
@@ -136,10 +137,10 @@ export default function PharmacyWorkbenchPage() {
     try {
       let disposition = returnDispositions.find((item) => item.inspection === inspection.id && item.status === 'draft');
       if (!disposition) {
-        disposition = await api(dataPath('pharmacy.return_disposition'), { method: 'POST', body: { inspection: inspection.id, qty, note } });
+        disposition = await api(dataPath('pharmacy.return_disposition'), { method: 'POST', body: { inspection: inspection.id, qty: qtyText, note } });
         setReturnDispositions((items) => [...items, disposition]);
       } else if (compareDecimals(disposition.qty || 0, qtyText) !== 0 || disposition.note !== note) {
-        disposition = await api(dataPath('pharmacy.return_disposition', disposition.id), { method: 'PATCH', body: { qty, note } });
+        disposition = await api(dataPath('pharmacy.return_disposition', disposition.id), { method: 'PATCH', body: { qty: qtyText, note } });
         setReturnDispositions((items) => items.map((item) => item.id === disposition.id ? disposition : item));
       }
       await api(dataPath('pharmacy.return_disposition', disposition.id, 'posted'), { method: 'POST' });
