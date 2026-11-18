@@ -29,7 +29,7 @@ export default function BillOfMaterialsSection({
       <label className="field"><span>{t('Sản lượng định mức *')}</span><input className="input num" type="number" min="0.000001" step="any" required value={outputQty} onChange={(event) => onOutputQtyChange(event.target.value)} /></label>
       <div className="manufacturing-lines"><h4>{t('Nguyên vật liệu')}</h4>{components.map((component, index) => {
         const options = unitsFor(component.product);
-        return <div className="manufacturing-line" key={index}>
+        return <div className="manufacturing-line" key={component.rowId}>
           <select className="select" required aria-label={`${t('Vật tư')} BOM ${index + 1}`} value={component.product} onChange={(event) => onComponentChange(index, 'product', event.target.value)}><option value="">{t('Chọn vật tư')}</option>{[...products.values()].filter((row) => row.active !== false && row.kind !== 'service').map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
           <input className="input num" type="number" min="0.000001" step="any" aria-label={`${t('Số lượng')} ${t('Vật tư')} ${index + 1}`} required value={component.qty} onChange={(event) => onComponentChange(index, 'qty', event.target.value)} />
           {options.length > 1 && <select className="select" aria-label={`${t('Vật tư')} ${t('đơn vị gốc')} ${index + 1}`} value={component.uom || products.get(component.product)?.uom || ''} onChange={(event) => onComponentChange(index, 'uom', event.target.value)}>{options.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` · ${unit.ratio} × ${t('đơn vị gốc')}` : ` · ${t('đơn vị gốc')}`}</option>)}</select>}

@@ -3,6 +3,7 @@ import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { confirmDialog, textDialog, toast } from '../../lib/feedback.js';
 import { fmtMoney, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { can } from '../../lib/state.js';
 import crmEnglish from './crm.en.js';
 const t = (text) => uiTextWith(text, crmEnglish);
@@ -15,6 +16,7 @@ export default function CrmPipelinePage() {
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState('board');
   const [workingDeal, setWorkingDeal] = useState('');
+  const latestRequest = useLatestRequest();
   const boardTabRef = useRef(null);
   const listTabRef = useRef(null);
   const handleTabKeyDown = (event) => {
@@ -28,20 +30,24 @@ export default function CrmPipelinePage() {
     (nextView === 'board' ? boardTabRef : listTabRef).current?.focus();
   };
   const load = useCallback(async () => {
+    const isLatest = latestRequest();
     setLoading(true);
     setError('');
     try {
       const params = new URLSearchParams();
       if (from) params.set('from', from);
       if (to) params.set('to', to);
-      setReport(await api(`${tenantPath('/reports/crm/pipeline')}?${params}`));
+      const nextReport = await api(`${tenantPath('/reports/crm/pipeline')}?${params}`);
+      if (isLatest()) setReport(nextReport);
     } catch (reason) {
-      setReport(null);
-      setError(t(reason.message || 'Không tải được pipeline bán hàng.'));
+      if (isLatest()) {
+        setReport(null);
+        setError(t(reason.message || 'Không tải được pipeline bán hàng.'));
+      }
     } finally {
-      setLoading(false);
+      if (isLatest()) setLoading(false);
     }
-  }, [from, to]);
+  }, [from, to, latestRequest]);
   const moveDeal = async (deal, stage) => {
     setError('');
     try {

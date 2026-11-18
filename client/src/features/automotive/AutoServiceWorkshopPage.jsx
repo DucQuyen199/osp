@@ -111,7 +111,7 @@ export default function AutoServiceWorkshopPage() {
     } catch (reason) { setError(t(reason.message || 'Không tiếp nhận được xe.')); }
     finally { setBusy(''); }
   };
-  const addLine = () => setDraftLines((current) => [...current, { product: productChoices[0]?.id || '', qty: '1', uom: '' }]);
+  const addLine = () => setDraftLines((current) => [...current, { rowId: crypto.randomUUID(), product: productChoices[0]?.id || '', qty: '1', uom: '' }]);
   const updateLine = (index, key, value) => setDraftLines((current) => current.map((line, i) => i === index ? { ...line, [key]: value, ...(key === 'product' ? { uom: '' } : {}) } : line));
   const createOrder = async (event) => {
     event.preventDefault(); if (!vehicleId || !draftLines.length || intakeOdometer === '') return;
@@ -151,7 +151,7 @@ export default function AutoServiceWorkshopPage() {
     repairOrderId: order.id,
     complaint: order.complaint || '',
     warehouseId: order.warehouse || '',
-    lines: (order.lines || []).map((line) => ({ product: line.product || '', qty: String(line.qty ?? ''), uom: line.uom || '' })),
+    lines: (order.lines || []).map((line) => ({ rowId: crypto.randomUUID(), product: line.product || '', qty: String(line.qty ?? ''), uom: line.uom || '' })),
   });
   const updateQuoteDraft = (field, value) => setQuoteDraft((current) => ({ ...current, [field]: value }));
   const updateQuoteLine = (index, field, value) => setQuoteDraft((current) => ({
@@ -160,7 +160,7 @@ export default function AutoServiceWorkshopPage() {
   }));
   const addQuoteLine = () => setQuoteDraft((current) => current && ({
     ...current,
-    lines: [...current.lines, { product: productChoices[0]?.id || '', qty: '1', uom: '' }],
+    lines: [...current.lines, { rowId: crypto.randomUUID(), product: productChoices[0]?.id || '', qty: '1', uom: '' }],
   }));
   const removeQuoteLine = (index) => setQuoteDraft((current) => ({
     ...current,
@@ -217,7 +217,7 @@ export default function AutoServiceWorkshopPage() {
         <label className="field workshop-complaint"><span>{t('Khách mô tả / yêu cầu')}</span><textarea className="input textarea" value={complaint} onChange={(event) => setComplaint(event.target.value)} /></label>
       </div>
       <div className="workshop-lines"><div className="workshop-section-head"><h3>{t('Phụ tùng và công việc')}</h3><button type="button" className="btn" onClick={addLine} disabled={!productChoices.length}>{t('Thêm dòng')}</button></div>
-        {draftLines.map((line, index) => { const product = products.get(line.product); return <div className="workshop-line" key={index}>
+        {draftLines.map((line, index) => { const product = products.get(line.product); return <div className="workshop-line" key={line.rowId}>
           <select className="select" required value={line.product} onChange={(event) => updateLine(index, 'product', event.target.value)}><option value="">{t('Chọn phụ tùng / dịch vụ')}</option>{productChoices.map((item) => <option key={item.id} value={item.id}>{item.name} · {fmtMoney(item.price || 0)}</option>)}</select>{unitsFor(line.product).length > 0 && <select className="select" aria-label={t('Unit')} value={line.uom || products.get(line.product)?.uom || ''} onChange={(event) => updateLine(index, 'uom', event.target.value)}>{unitsFor(line.product).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` (${unit.ratio} × ${t('base')})` : ` (${t('base')})`}</option>)}</select>}
           <input className="input" type="number" min="0.001" step="any" required aria-label={t('Số lượng')} value={line.qty} onChange={(event) => updateLine(index, 'qty', event.target.value)} />
           <strong className="num">{fmtMoney(repairQuoteLineTotal(product?.price, unitRatio(line), line.qty))}</strong>

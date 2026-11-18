@@ -35,7 +35,7 @@ export default function ManufacturingWipPage() {
   const [editingBom, setEditingBom] = useState('');
   const [bomProduct, setBomProduct] = useState('');
   const [bomOutputQty, setBomOutputQty] = useState('1');
-  const [components, setComponents] = useState([{ product: '', qty: '1', uom: '' }]);
+  const [components, setComponents] = useState(() => [{ rowId: crypto.randomUUID(), product: '', qty: '1', uom: '' }]);
   const [orderBom, setOrderBom] = useState('');
   const [orderQty, setOrderQty] = useState('1');
   const [orderWarehouse, setOrderWarehouse] = useState('');
@@ -73,10 +73,10 @@ export default function ManufacturingWipPage() {
     && inspection.status === 'failed'
     && compareDecimals(remainingFailedQty(inspection), '0.000001') > 0
   );
-  const resetBom = () => { setEditingBom(''); setBomProduct(''); setBomOutputQty('1'); setComponents([{ product: '', qty: '1', uom: '' }]); };
+  const resetBom = () => { setEditingBom(''); setBomProduct(''); setBomOutputQty('1'); setComponents([{ rowId: crypto.randomUUID(), product: '', qty: '1', uom: '' }]); };
   const editBom = (bom) => {
     setEditingBom(bom.id); setBomProduct(bom.product); setBomOutputQty(String(bom.output_qty || 1));
-    setComponents(Array.isArray(bom.components) && bom.components.length ? bom.components.map((row) => ({ product: row.product || '', qty: String(row.qty || ''), uom: row.uom || '' })) : [{ product: '', qty: '1', uom: '' }]);
+    setComponents(Array.isArray(bom.components) && bom.components.length ? bom.components.map((row) => ({ rowId: crypto.randomUUID(), product: row.product || '', qty: String(row.qty || ''), uom: row.uom || '' })) : [{ rowId: crypto.randomUUID(), product: '', qty: '1', uom: '' }]);
   };
   const saveBom = async (event) => {
     event.preventDefault(); setBusy('bom'); setError('');
@@ -256,7 +256,7 @@ export default function ManufacturingWipPage() {
         onProductChange={setBomProduct}
         onOutputQtyChange={setBomOutputQty}
         onComponentChange={(index, field, value) => setComponents((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: value, ...(field === 'product' ? { uom: '' } : {}) } : row))}
-        onAddComponent={() => setComponents((rows) => [...rows, { product: '', qty: '1', uom: '' }])}
+        onAddComponent={() => setComponents((rows) => [...rows, { rowId: crypto.randomUUID(), product: '', qty: '1', uom: '' }])}
         onRemoveComponent={(index) => setComponents((rows) => rows.filter((_, rowIndex) => rowIndex !== index))}
         onReset={resetBom}
         onEdit={editBom}

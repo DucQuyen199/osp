@@ -7,7 +7,7 @@ export default function MaintenancePartsEditor({ parts, products, unitsFor, onAd
       <span className="grow" />
       <button className="btn btn-secondary btn-sm" type="button" disabled={!products.size} onClick={onAdd}>{t('Thêm vật tư')}</button>
     </div>
-    {parts.map((line, index) => <div className="row wrap u-legacy-43a97fe494" key={index} >
+    {parts.map((line, index) => <div className="row wrap u-legacy-43a97fe494" key={line.rowId} >
       <select className="select" required value={line.product} onChange={(event) => onUpdate(index, 'product', event.target.value)}>
         <option value="">{t('Chọn vật tư')}</option>
         {[...products.values()].filter((row) => row.active !== false && (row.tracked ?? row.kind === 'goods')).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}

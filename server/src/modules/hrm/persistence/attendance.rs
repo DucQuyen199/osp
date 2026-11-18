@@ -36,11 +36,18 @@ pub(super) async fn validate(
         .unwrap_or(uuid::Uuid::nil());
     let employee_row = tx
         .query_opt(
-            "SELECT status, hire_date FROM hrm__employee WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+            "SELECT status, hire_date, termination_date FROM hrm__employee WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
             &[&tenant.id, &employee],
         )
         .await?;
     let mut errors = Vec::new();
+    if employee_row
+        .as_ref()
+        .and_then(|row| row.get::<_, Option<NaiveDate>>(2))
+        .is_some_and(|termination_date| date > termination_date)
+    {
+        errors.push("Attendance cannot be recorded after the termination date".into());
+    }
     if let Some(employee_row) = employee_row {
         let status: String = employee_row.get(0);
         let hire_date: Option<NaiveDate> = employee_row.get(1);

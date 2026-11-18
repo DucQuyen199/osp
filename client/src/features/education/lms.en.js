@@ -19,7 +19,7 @@ const lmsEnglish = {
   'Tùy chọn': 'Optional', 'Bắt buộc': 'Required', 'Ghi danh học viên': 'Enroll learner', 'Chọn người học': 'Select a learner', 'Ghi danh': 'Enroll',
   'Học viên và tiến độ': 'Learners and progress', 'Bạn chưa có quyền xem danh sách ghi danh.': 'You do not have permission to view enrollments.',
   'Chưa có học viên ghi danh.': 'No learners enrolled yet.', 'Học viên': 'Learner', 'Ghi danh ': 'Enrolled ', 'Hoàn thành': 'Completed', 'Đang học': 'In progress',
-  'Bài tiếp theo:': 'Next lesson:', 'Ghi nhận hoàn thành': 'Mark complete',
+  'Bài tiếp theo:': 'Next lesson:', 'Bài học tùy chọn': 'Optional lesson', 'Ghi nhận hoàn thành': 'Mark complete',
   'Đã ghi nhận toàn bộ bài học; trạng thái hoàn thành được cập nhật tự động.': 'All lessons are complete. Course completion status updates automatically.',
   'OSP SUITE · CHỨNG NHẬN HOÀN THÀNH': 'OSP SUITE · CERTIFICATE OF COMPLETION', 'Chứng nhận được cấp cho': 'This certificate is awarded to',
   'đã hoàn thành đầy đủ các bài học bắt buộc của khóa học.': 'for completing all required lessons in this course.',

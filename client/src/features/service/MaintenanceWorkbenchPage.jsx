@@ -97,7 +97,7 @@ export default function MaintenanceWorkbenchPage() {
       setResolution(''); setLaborHours(''); setLaborRate('');
     }, 'Đã hoàn tất lệnh. Vật tư được xuất khỏi kho đã chọn và kế hoạch định kỳ được cập nhật.');
   }
-  const addPart = () => setParts((current) => [...current, { product: [...products.keys()][0] || '', qty: '1', uom: '' }]);
+  const addPart = () => setParts((current) => [...current, { rowId: crypto.randomUUID(), product: [...products.keys()][0] || '', qty: '1', uom: '' }]);
   const updatePart = (index, field, value) => setParts((current) => current.map((row, i) => i === index ? { ...row, [field]: value, ...(field === 'product' ? { uom: '' } : {}) } : row));
   return <div className="page">
     <div className="page-head"><div><h1>{t('Bảo trì tài sản và thiết bị')}</h1><p className="sub">{t('Theo dõi lịch bảo trì định kỳ, tiếp nhận sự cố, phân công kỹ thuật, xuất vật tư và lưu kết quả sửa chữa.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div>

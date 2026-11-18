@@ -19,21 +19,21 @@ export default function AccountMenu({ user, interfaceLanguage, numberLocale, onI
   }, [open]);
 
   return <div className="menu">
-    <button ref={toggleRef} className="btn btn-ghost" type="button" aria-haspopup="menu" aria-expanded={open} aria-label={`${uiText('Tài khoản')} ${user.name}`} onClick={() => setOpen((current) => !current)}><span className="avatar">{initials}</span></button>
-    {open && <div className="menu-pop" role="menu">
-      <div className="menu-item" role="none"><div><strong>{user.name}</strong><div className="faint">{user.email || uiText('Tài khoản máy')}</div></div></div>
-      <div className="menu-item" role="none"><strong>{uiText('Ngôn ngữ giao diện')}</strong></div>
+    <button ref={toggleRef} className="btn btn-ghost" type="button" aria-expanded={open} aria-controls="account-menu" aria-label={`${uiText('Tài khoản')} ${user.name}`} onClick={() => setOpen((current) => !current)}><span className="avatar">{initials}</span></button>
+    {open && <div className="menu-pop" id="account-menu">
+      <div className="menu-item"><div><strong>{user.name}</strong><div className="faint">{user.email || uiText('Tài khoản máy')}</div></div></div>
+      <div className="menu-item"><strong>{uiText('Ngôn ngữ giao diện')}</strong></div>
       <div role="group" aria-label={uiText('Ngôn ngữ giao diện')}>
-        <button className="menu-item" role="menuitemradio" aria-checked={interfaceLanguage === 'vi-VN'} type="button" onClick={() => onInterfaceLanguageChange('vi-VN')}>{uiText('Tiếng Việt')}</button>
-        <button className="menu-item" role="menuitemradio" aria-checked={interfaceLanguage === 'en-US'} type="button" onClick={() => onInterfaceLanguageChange('en-US')}>{uiText('Tiếng Anh')}</button>
+        <button className="menu-item" aria-pressed={interfaceLanguage === 'vi-VN'} type="button" onClick={() => onInterfaceLanguageChange('vi-VN')}>{uiText('Tiếng Việt')}</button>
+        <button className="menu-item" aria-pressed={interfaceLanguage === 'en-US'} type="button" onClick={() => onInterfaceLanguageChange('en-US')}>{uiText('Tiếng Anh')}</button>
       </div>
-      <div className="menu-item" role="none"><strong>{uiText('Định dạng ngày và số')}</strong></div>
+      <div className="menu-item"><strong>{uiText('Định dạng ngày và số')}</strong></div>
       <div role="group" aria-label={uiText('Định dạng ngày và số')}>
-        <button className="menu-item" role="menuitemradio" aria-checked={numberLocale === 'vi-VN'} type="button" onClick={() => onNumberLocaleChange('vi-VN')}>{uiText('Việt Nam · ngày/tháng/năm')}</button>
-        <button className="menu-item" role="menuitemradio" aria-checked={numberLocale === 'en-US'} type="button" onClick={() => onNumberLocaleChange('en-US')}>{uiText('Hoa Kỳ · tháng/ngày/năm')}</button>
+        <button className="menu-item" aria-pressed={numberLocale === 'vi-VN'} type="button" onClick={() => onNumberLocaleChange('vi-VN')}>{uiText('Việt Nam · ngày/tháng/năm')}</button>
+        <button className="menu-item" aria-pressed={numberLocale === 'en-US'} type="button" onClick={() => onNumberLocaleChange('en-US')}>{uiText('Hoa Kỳ · tháng/ngày/năm')}</button>
       </div>
-      <a className="menu-item" role="menuitem" href="#/account/security" onClick={() => setOpen(false)}>{uiText('Bảo mật tài khoản')}</a>
-      <button className="menu-item" role="menuitem" type="button" onClick={onLogout}><Icon name="logout" />{uiText('Đăng xuất')}</button>
+      <a className="menu-item" href="#/account/security" onClick={() => setOpen(false)}>{uiText('Bảo mật tài khoản')}</a>
+      <button className="menu-item" type="button" onClick={onLogout}><Icon name="logout" />{uiText('Đăng xuất')}</button>
     </div>}
   </div>;
 }
