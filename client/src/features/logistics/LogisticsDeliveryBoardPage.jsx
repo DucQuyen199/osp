@@ -8,6 +8,7 @@ import { recordHref } from '../../lib/routes.js';
 import { compareDecimals } from '../../lib/decimal.js';
 import { isDeliveredShort, isDeliveredWithinLimit, sameDeliveryLine } from './domain/deliveryQuantities.js';
 import logisticsEnglish from './logistics.en.js';
+import DeliveryProofFields from './components/DeliveryProofFields.jsx';
 const t = (text) => uiTextWith(text, logisticsEnglish);
 const PAGE_SIZE = 100;
 const LANES = [
@@ -162,19 +163,15 @@ export default function LogisticsDeliveryBoardPage() {
     </div>
     {shipment.failureReason && <div className="alert danger delivery-alert">{shipment.failureReason}</div>}
     {shipment.lastTrackingEvent && <div className="small delivery-tracking"><strong>{statusLabel(shipment.lastTrackingEvent)}</strong>{shipment.lastTrackingLocation && ` · ${shipment.lastTrackingLocation}`}{shipment.lastTrackingAt && ` · ${fmtDateTime(shipment.lastTrackingAt)}`}</div>}
-    {shipment.status === 'dispatched' && can('logistics.shipment.delivered') && <div className="delivery-proof" role="group" aria-label={t('Bằng chứng giao hàng')}>
-      <div className="delivery-proof-lines">
-        <strong>{t('Số lượng thực nhận theo vận đơn')}</strong>
-        {(shipment.lines || []).map((line, index) => <label className="field" key={`${line.product || 'line'}-${index}`}>
-          <span>{line.productName || line.name || line.product || `${t('Mặt hàng')} ${index + 1}`} · {t('đã điều phối')} {line.qty} {line.uom_name || ''}</span>
-          <input className="input num" aria-label={`${t('Số lượng thực nhận dòng')} ${index + 1}`} type="number" min="0" max={line.qty} step="any" value={deliveryProof[shipment.id]?.deliveredQuantities?.[index] ?? line.qty} onChange={(event) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], deliveredQuantities: { ...current[shipment.id]?.deliveredQuantities, [index]: event.target.value } } }))}/>
-        </label>)}
-      </div>
-      {(shipment.lines || []).some((line, index) => isDeliveredShort(deliveryProof[shipment.id]?.deliveredQuantities?.[index] ?? line.qty ?? 0, line.qty || 0)) && <label className="field"><span>{t('Lý do giao thiếu (bắt buộc, 5–500 ký tự)')}</span><textarea className="input" rows="2" maxLength="500" value={deliveryProof[shipment.id]?.shortDeliveryReason || ''} onChange={(event) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], shortDeliveryReason: event.target.value } }))}/></label>}
-      <label className="field"><span>{t('Người nhận hàng (nếu có)')}</span><input className="input" maxLength="160" value={deliveryProof[shipment.id]?.receivedBy || ''} onChange={(event) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], receivedBy: event.target.value } }))}/></label>
-      <label className="field"><span>{t('Mã POD / bằng chứng giao hàng')}</span><input className="input" maxLength="1000" value={deliveryProof[shipment.id]?.evidence || ''} onChange={(event) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], evidence: event.target.value } }))}/></label>
-      <p className="small muted">{t('Điền tên người nhận hoặc mã tham chiếu/bằng chứng từ đơn vị vận chuyển.')}</p>
-    </div>}
+    {shipment.status === 'dispatched' && can('logistics.shipment.delivered') && <DeliveryProofFields
+      shipment={shipment} proof={deliveryProof[shipment.id] || {}}
+      hasShortDelivery={(shipment.lines || []).some((line, index) => isDeliveredShort(deliveryProof[shipment.id]?.deliveredQuantities?.[index] ?? line.qty ?? 0, line.qty || 0))}
+      t={t}
+      onQuantityChange={(index, value) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], deliveredQuantities: { ...current[shipment.id]?.deliveredQuantities, [index]: value } } }))}
+      onShortReasonChange={(value) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], shortDeliveryReason: value } }))}
+      onReceivedByChange={(value) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], receivedBy: value } }))}
+      onEvidenceChange={(value) => setDeliveryProof((current) => ({ ...current, [shipment.id]: { ...current[shipment.id], evidence: value } }))}
+    />}
     <footer className="row wrap delivery-footer">
       {shipment.source === 'sales_order' && shipment.sourceId && can('sales.sales_order.read') && <a className="small" href={recordHref('sales.sales_order', shipment.sourceId)}>{t('Mở đơn bán')}</a>}
       <span className="grow" />

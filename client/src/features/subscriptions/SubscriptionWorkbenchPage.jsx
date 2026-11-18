@@ -7,6 +7,7 @@ import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import { addDecimals, divideDecimals, multiplyDecimals } from '../../lib/decimal.js';
 import subscriptionEnglish from './subscription.en.js';
+import SubscriptionBillingCyclesTable from './components/SubscriptionBillingCyclesTable.jsx';
 const t = (text) => uiTextWith(text, subscriptionEnglish);
 const today = localDate;
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -52,6 +53,8 @@ export default function SubscriptionWorkbenchPage() {
   useEffect(() => { load(); }, [load]);
   const planById = useMemo(() => new Map(plans.map((row) => [row.id, row])), [plans]);
   const invoiceByCycle = useMemo(() => new Map(invoices.filter((row) => row.source === 'subscription').map((row) => [row.source_id, row])), [invoices]);
+  const billingCycles = useMemo(() => [...cycles].sort((a, b) => String(a.due_date || '').localeCompare(String(b.due_date || ''))), [cycles]);
+  const isInvoiceDue = (row) => row.status === 'pending' && row.due_date <= today();
   const cycleBySubscription = useMemo(() => {
     const map = new Map();
     for (const row of cycles) map.set(row.subscription, [...(map.get(row.subscription) || []), row]);
@@ -92,9 +95,7 @@ export default function SubscriptionWorkbenchPage() {
     </form>{!plans.length && <p className="small muted">{t('Chưa có gói dịch vụ. Người có quyền quản lý gói cần tạo gói trước khi tiếp nhận khách hàng.')}</p>}</section>}
     {loading ? <div className="skeleton" data-h="row" /> : <div className="layout-split u-mt-16" >
       <section className="card card-pad"><h2>{t('Danh sách thuê bao')}</h2>{!subscriptions.length ? <p className="empty">{t('Chưa có thuê bao.')}</p> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Khách hàng / gói')}</th><th>{t('Bắt đầu')}</th><th>{t('Trạng thái')}</th><th>{t('Thao tác')}</th></tr></thead><tbody>{subscriptions.map((row) => <tr key={row.id}><td><strong>{parties.has(row.party) ? recordLabel('master-data.party', parties.get(row.party)) : t('Khách hàng')}</strong><div className="small muted">{planById.get(row.plan)?.name || t('Gói dịch vụ')} · {fmtMoney(planById.get(row.plan)?.price || 0)} / {({ monthly: t('tháng'), quarterly: t('quý'), yearly: t('năm') })[planById.get(row.plan)?.interval] || ''}</div></td><td>{fmtDate(row.start)}</td><td><span className="badge warning">{statusLabel(row.status)}</span></td><td>{row.status === 'active' && can('subscription.subscription.paused') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => changeStatus(row, 'paused')}>{t('Tạm dừng')}</button>}{row.status === 'paused' && can('subscription.subscription.resumed') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => changeStatus(row, 'resumed')}>{t('Tiếp tục')}</button>}{['active','paused'].includes(row.status) && can('subscription.subscription.cancelled') && <button className="btn btn-ghost btn-sm u-ml-6"  disabled={Boolean(busy)} onClick={() => changeStatus(row, 'cancelled')}>{t('Hủy thuê bao')}</button>}</td></tr>)}</tbody></table></div>}</section>
-      <section className="card card-pad"><h2>{t('Kỳ thu và hóa đơn')}</h2>{!cycles.length ? <p className="empty">{t('Kỳ thu đầu tiên được tạo khi kích hoạt thuê bao có giá gói lớn hơn 0.')}</p> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Khách hàng')}</th><th>{t('Đến hạn')}</th><th>{t('Số tiền đã chụp')}</th><th>{t('Trạng thái / hóa đơn')}</th></tr></thead><tbody>{[...cycles].sort((a,b) => String(a.due_date || '').localeCompare(String(b.due_date || ''))).map((row) => <tr key={row.id}><td>{parties.has(row.party) ? recordLabel('master-data.party', parties.get(row.party)) : t('Khách hàng')}<div className="small muted">{planById.get(subscriptions.find((item) => item.id === row.subscription)?.plan)?.name || t('Thuê bao')}</div></td><td>{fmtDate(row.due_date)}</td><td>{fmtMoney(row.amount)}</td><td><span className="badge warning">{statusLabel(row.status)}</span>{invoiceByCycle.has(row.id) && <a className="btn btn-ghost btn-sm u-ml-6"  href={`#/e/accounting/invoice/${invoiceByCycle.get(row.id).id}`}>{statusLabel(invoiceByCycle.get(row.id).status)} · {t('mở hóa đơn')}</a>}{row.status === 'pending' && row.due_date <= today() && <span className="small muted u-ml-6" >{t('Hệ thống sẽ phát hành hóa đơn đến hạn.')}</span>}</td></tr>)}</tbody></table></div>}
-        <p className="small muted u-mt-12" >{t('Thanh toán được ghi nhận trên hóa đơn kế toán. Khi hóa đơn được thanh toán, hệ thống tự chốt kỳ thu và lên lịch kỳ tiếp theo; không ghi nhận thanh toán thủ công trên thuê bao.')}</p>
-      </section>
+      <SubscriptionBillingCyclesTable cycles={billingCycles} parties={parties} subscriptions={subscriptions} planById={planById} invoiceByCycle={invoiceByCycle} fmtDate={fmtDate} fmtMoney={fmtMoney} statusLabel={statusLabel} recordLabel={recordLabel} isInvoiceDue={isInvoiceDue} t={t} />
     </div>}
   </div>;
 }

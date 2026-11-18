@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { useLatestRequest } from '../../lib/useLatestRequest.js';
-import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate, localDateTimeToIso } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse, loadIndependentData } from '../../lib/state.js';
 import realEstateEnglish from './real-estate.en.js';
+import PropertyInventoryTable from './components/PropertyInventoryTable.jsx';
 const t = (text) => uiTextWith(text, realEstateEnglish);
 const today = localDate;
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
@@ -119,7 +119,7 @@ export default function RealEstateWorkbenchPage() {
       <div className="row full"><span className="grow" /><button className="btn btn-primary" disabled={Boolean(busy)}>{t("Thêm bất động sản")}</button></div>
     </form></section>}
     {loading ? <div className="skeleton" data-h="row" /> : !properties.length ? <div className="card card-pad empty">{t("Chưa có bất động sản. Thêm tài sản mới để bắt đầu nhận lịch xem và giữ chỗ.")}</div> : <div className="layout-split u-mt-16" >
-      <section className="card card-pad"><h2>{t("Danh mục bất động sản")}</h2><div className="table-wrap"><table className="table"><thead><tr><th>{t("Tài sản")}</th><th>{t("Diện tích")}</th><th>{t("Giá niêm yết")}</th><th>{t("Trạng thái")}</th></tr></thead><tbody>{properties.map((row) => <tr {...selectableTableRowProps} key={row.id} aria-selected={selectedProperty === row.id} className={[selectedProperty === row.id ? 'selected' : '', 'u-pointer'].filter(Boolean).join(' ')} onClick={() => setSelectedProperty(row.id)} ><td><strong>{row.title}</strong><div className="small muted">{kindLabel(row.kind)} · {row.address || t('Chưa có địa chỉ')}</div></td><td>{row.area ? `${row.area} m²` : '—'}</td><td>{fmtMoney(row.sale_price || row.price || 0)}</td><td>{statusLabel(row.status)}</td></tr>)}</tbody></table></div></section>
+      <PropertyInventoryTable properties={properties} selectedId={selectedProperty} onSelect={setSelectedProperty} kindLabel={kindLabel} fmtMoney={fmtMoney} statusLabel={statusLabel} t={t} />
       {selected && <section className="card card-pad"><div className="row wrap"><div><h2>{selected.title}</h2><div className="small muted">{kindLabel(selected.kind)} · {selected.address || t('Chưa có địa chỉ')} · {selected.area ? `${selected.area} m²` : t('Chưa nhập diện tích')}</div></div><span className="grow"/><span className="badge warning">{statusLabel(selected.status)}</span></div>
         {can('real-estate.viewing.create') && <form className="form-grid u-mt-16"  onSubmit={createViewing}><h3 className="full">{t("Lịch xem")}</h3><label className="field"><span className="label">{t("Khách quan tâm")}</span><select className="select" value={viewingForm.party} onChange={(e) => setViewingForm({ ...viewingForm, party: e.target.value })}><option value="">{t("Chưa xác định")}</option>{[...parties.values()].map((party) => <option key={party.id} value={party.id}>{recordLabel('master-data.party', party)}</option>)}</select></label><label className="field"><span className="label">{t("Thời gian *")}</span><input className="input" required type="datetime-local" value={viewingForm.at} onChange={(e) => setViewingForm({ ...viewingForm, at: e.target.value })}/></label><label className="field full"><span className="label">{t("Ghi chú")}</span><input className="input" value={viewingForm.note} onChange={(e) => setViewingForm({ ...viewingForm, note: e.target.value })}/></label><div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy)}>{t("Xếp lịch xem")}</button></div></form>}
         {viewingRows.length > 0 && <div className="table-wrap"><table className="table"><thead><tr><th>{t("Lịch xem")}</th><th>{t("Khách")}</th><th>{t("Ghi chú")}</th></tr></thead><tbody>{viewingRows.map((row) => <tr key={row.id}><td>{row.at ? fmtDateTime(row.at) : t('Chưa xếp lịch')}</td><td>{parties.has(row.party) ? recordLabel('master-data.party', parties.get(row.party)) : '—'}</td><td>{row.note || '—'}</td></tr>)}</tbody></table></div>}
