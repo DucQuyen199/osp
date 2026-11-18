@@ -175,7 +175,7 @@ Các số đo của runtime cũ đã được gỡ để tránh dùng chúng đ�
 **Hệ quả khi định cỡ**
 - PostgreSQL cho phép nhiều tiến trình/container cùng truy cập; thao tác ghi cùng tenant được khóa tư vấn trong giao dịch để giữ tính nhất quán.
 - Lọc, sắp xếp và phân trang chạy trong PostgreSQL; cần tối ưu chỉ mục theo workload thực tế khi dữ liệu lớn.
-- Giao diện web tải tối đa 1.000 bản ghi mỗi danh sách.
+- Danh sách CRUD tải tối đa 25 dòng mỗi trang qua PostgreSQL; workflow đối chiếu có thể nạp nhiều trang qua helper dùng chung. Cần xem xét tải DB và bộ nhớ trình duyệt cho workflow trên tenant có lượng dữ liệu lớn.
 - Các replica dùng PostgreSQL chung và khóa transaction theo tenant; quota Governor hiện theo từng tiến trình. Cần giới hạn tổng tại proxy khi chạy nhiều replica.
 
 Diễn tập Linux độc lập, bao gồm khôi phục database thật:

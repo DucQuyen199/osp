@@ -269,9 +269,9 @@ Chữ cái đầu của hai từ cuối trong tên, nền `--accent-soft`.
 
 ### 4.1 Danh sách
 `page-head` (breadcrumb, `h1` = tên theo thuật ngữ ngành, mô tả quy trình trạng thái, nút Xuất/Nhập/Tạo) → `card` chứa `toolbar` (tìm kiếm + lọc trạng thái) → bảng → `pager`.
-- Tìm kiếm tức thì phía client trên tối đa 1.000 bản ghi đã tải (nhãn của trường tham chiếu cũng được tìm).
-- Bản ghi mới nhất hiển thị trước.
-- Vượt 1.000 bản ghi: hiển thị thông báo giới hạn. *(Phân trang/tìm kiếm phía máy chủ nằm trong [lộ trình](ROADMAP.md).)*
+- Danh sách CRUD dùng tìm kiếm, lọc trạng thái và phân trang phía máy chủ; mỗi lần tải tối đa 25 dòng. Tìm kiếm được debounce và phải reset về trang đầu khi đổi từ khóa hoặc bộ lọc.
+- Bản ghi mới nhất hiển thị trước; giữ tổng số dòng và điều khiển trang từ metadata API, không tải toàn bộ entity chỉ để tìm kiếm hoặc dựng bảng.
+- Workflow cần nhiều bản ghi để tính toán hoặc đối chiếu dùng `loadAll`/`loadAllResponse` trong `client/src/lib/state.js`; không tự viết vòng lặp phân trang trong từng màn hình.
 
 ### 4.2 Chi tiết bản ghi (drawer)
 Tiêu đề = nhãn bản ghi + huy hiệu trạng thái → thanh hành động → tab **Thông tin** / **Hệ quả liên module**.
@@ -348,8 +348,8 @@ Tên loại dữ liệu và trường tham chiếu đi qua `entityLabel()` / `fi
 - **Chưa kiểm thử với trình đọc màn hình thật** (NVDA, JAWS, VoiceOver). axe không thay thế được việc này.
 - Chưa có kiểm thử người dùng khuyết tật.
 - Ô nhập ngày/giờ dùng điều khiển gốc nên định dạng theo ngôn ngữ trình duyệt (có thể hiện `mm/dd/yyyy`).
-- Chỉ có tiếng Việt; chưa có cơ chế đa ngôn ngữ (xem lộ trình).
-- Danh sách tối đa 1.000 bản ghi tải một lần; với dữ liệu lớn cần phân trang phía máy chủ.
+- Giao diện hỗ trợ tiếng Việt và tiếng Anh. Nhãn dữ liệu tenant và một số thông báo nghiệp vụ do máy chủ tạo vẫn cần rà thủ công ở cả hai ngôn ngữ.
+- CRUD list đã phân trang phía máy chủ; các workflow đặc thù được theo dõi riêng trong [kiến trúc frontend](FRONTEND-ARCHITECTURE.md) và lộ trình.
 
 ---
 
