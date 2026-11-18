@@ -140,7 +140,7 @@ pub async fn validate_persistence(
                 .is_some(),
             "cleaning" => tx
                 .query_opt(
-                    "SELECT id FROM hotel__reservation WHERE tenant_id = $1 AND room = $2 AND status = 'checked_out' ORDER BY check_out DESC LIMIT 1",
+                    "SELECT id FROM hotel__reservation checked_out WHERE checked_out.tenant_id = $1 AND checked_out.room = $2 AND checked_out.status = 'checked_out' AND NOT EXISTS (SELECT 1 FROM hotel__reservation current_stay WHERE current_stay.tenant_id = checked_out.tenant_id AND current_stay.room = checked_out.room AND current_stay.status = 'checked_in') ORDER BY checked_out.check_out DESC LIMIT 1",
                     &[&tenant.id, &room_id],
                 )
                 .await?

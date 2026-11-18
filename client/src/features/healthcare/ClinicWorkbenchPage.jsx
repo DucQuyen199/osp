@@ -141,7 +141,7 @@ export default function ClinicWorkbenchPage() {
     event.preventDefault(); if (!selected) return;
     setBusy(true); setError(''); setNotice('');
     try {
-      await api(dataPath('clinic.encounter', selected.id, 'completed'), { method: 'POST', body: { doctor: doctor.trim(), diagnosis: diagnosis.trim(), fee: Number(fee) } });
+      await api(dataPath('clinic.encounter', selected.id, 'completed'), { method: 'POST', body: { doctor: doctor.trim(), diagnosis: diagnosis.trim(), fee: String(fee).trim() } });
       await load(true); setNotice(t("Đã hoàn tất lượt khám và tạo khoản phải thu theo phí khám."));
     } catch (reason) { setError(reason.message || t("Chưa thể hoàn tất lượt khám. Hãy nhập bác sĩ, chẩn đoán và phí khám.")); }
     finally { setBusy(false); }
