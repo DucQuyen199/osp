@@ -16,6 +16,89 @@ pub(super) async fn run(kernel: &Arc<Kernel>) {
     recruitment(kernel).await;
     pharmacy(kernel).await;
     automotive(kernel).await;
+    beauty_wellness_bookings(kernel).await;
+}
+
+async fn beauty_wellness_bookings(kernel: &Arc<Kernel>) {
+    let t = Ctx::new(kernel, Some("beauty-wellness"), &[]).await;
+    let guest = t
+        .create("master-data.party", json!({ "name": "Salon customer" }))
+        .await;
+    let stylist = t
+        .create(
+            "booking.resource",
+            json!({ "name": "Senior stylist", "kind": "staff" }),
+        )
+        .await;
+    let haircut = t
+        .create(
+            "booking.service",
+            json!({ "name": "Haircut", "duration_min": 45, "price": 75 }),
+        )
+        .await;
+    let coloring = t
+        .create(
+            "booking.service",
+            json!({ "name": "Hair coloring", "duration_min": 90, "price": 180 }),
+        )
+        .await;
+    let starts_at = chrono::Utc::now()
+        .checked_add_signed(chrono::Duration::hours(2))
+        .unwrap()
+        .to_rfc3339();
+    let appointment = t
+        .create(
+            "booking.booking",
+            json!({ "party": id(&guest), "resource": id(&stylist), "service": id(&haircut), "starts_at": starts_at }),
+        )
+        .await;
+    let start =
+        chrono::DateTime::parse_from_rfc3339(appointment["starts_at"].as_str().unwrap()).unwrap();
+    let end =
+        chrono::DateTime::parse_from_rfc3339(appointment["ends_at"].as_str().unwrap()).unwrap();
+    assert_eq!((end - start).num_minutes(), 45);
+    assert_eq!(appointment["price"], 75.0);
+    let overlapping_start = (start + chrono::Duration::minutes(30)).to_rfc3339();
+    assert_eq!(
+        t.try_create(
+            "booking.booking",
+            json!({ "party": id(&guest), "resource": id(&stylist), "service": id(&haircut), "starts_at": overlapping_start }),
+        )
+        .await
+        .unwrap_err(),
+        "CONSTRAINT",
+        "service duration must be included in resource conflict checks"
+    );
+    let repriced = t
+        .update(
+            "booking.booking",
+            &id(&appointment),
+            json!({ "service": id(&coloring) }),
+        )
+        .await;
+    let repriced_start =
+        chrono::DateTime::parse_from_rfc3339(repriced["starts_at"].as_str().unwrap()).unwrap();
+    let repriced_end =
+        chrono::DateTime::parse_from_rfc3339(repriced["ends_at"].as_str().unwrap()).unwrap();
+    assert_eq!((repriced_end - repriced_start).num_minutes(), 90);
+    assert_eq!(repriced["price"], 180.0);
+    t.act("booking.booking", &id(&appointment), "confirmed")
+        .await;
+    assert!(
+        t.k.update(
+            &t.a,
+            &t.t,
+            "booking.booking",
+            &id(&appointment),
+            o(json!({ "service": id(&haircut) })),
+        )
+        .await
+        .is_err(),
+        "a confirmed appointment cannot be moved or repriced in place"
+    );
+    println!(
+        "âœ” beauty/wellness: service duration and price snapshots, staff conflict prevention, confirmed appointment immutability"
+    );
 }
 
 async fn automotive(kernel: &Arc<Kernel>) {
