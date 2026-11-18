@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { app, can, loadAll, loadRefs } from '../../../lib/state.js';
+import { app, can, loadAll, loadIndependentData, loadRefs } from '../../../lib/state.js';
 
 export function useBankReconciliationData(statementId, translate) {
   const [statements, setStatements] = useState([]);
@@ -15,17 +15,21 @@ export function useBankReconciliationData(statementId, translate) {
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
-      const [statementRows, accountMap, currencyMap, partyMap] = await Promise.all([
-        can('accounting.bank_statement.read') ? loadAll('accounting.bank_statement') : Promise.resolve([]),
-        can('accounting.account.read') ? loadRefs('accounting.account') : Promise.resolve(new Map()),
-        can('master-data.currency.read') ? loadRefs('master-data.currency') : Promise.resolve(new Map()),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-      ]);
+      const emptyRows = () => [];
+      const emptyMap = () => new Map();
+      const { data, errors } = await loadIndependentData({
+        statementRows: can('accounting.bank_statement.read') ? loadAll('accounting.bank_statement') : Promise.resolve(emptyRows()),
+        accountMap: can('accounting.account.read') ? loadRefs('accounting.account') : Promise.resolve(emptyMap()),
+        currencyMap: can('master-data.currency.read') ? loadRefs('master-data.currency') : Promise.resolve(emptyMap()),
+        partyMap: can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(emptyMap()),
+      }, { statementRows: emptyRows(), accountMap: emptyMap(), currencyMap: emptyMap(), partyMap: emptyMap() });
+      const { statementRows, accountMap, currencyMap, partyMap } = data;
       statementRows.sort((a, b) => String(b.start_date || '').localeCompare(String(a.start_date || '')));
       setStatements(statementRows);
       setAccounts(accountMap);
       setCurrencies(currencyMap);
       setParties(partyMap);
+      setError(errors[0]?.message || (errors.length ? translate('Một số dữ liệu đối soát ngân hàng không tải được.') : ''));
     } catch (reason) {
       setError(reason.message || translate('Không tải được dữ liệu đối soát ngân hàng.'));
     } finally {

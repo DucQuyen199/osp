@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { uiText } from '../../../lib/i18n.js';
-import { can, loadAllResponse, loadRefs } from '../../../lib/state.js';
+import { can, loadAllResponse, loadIndependentData, loadRefs } from '../../../lib/state.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const emptyData = () => ({
@@ -16,19 +16,25 @@ export function useHrmOperationsData(attendanceDate, scheduleMonthStart, schedul
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
-      const [employeeRes, leaveRes, attendanceRes, revisionRes, allocationRes, scheduleRes, patternRes, templateRes, departmentMap, positionMap, requestRes] = await Promise.all([
-        can('hrm.employee.read') ? loadAllResponse('hrm.employee') : Promise.resolve({ items: [] }),
-        can('hrm.leave_request.read') ? loadAllResponse('hrm.leave_request') : Promise.resolve({ items: [] }),
-        can('hrm.attendance.read') ? loadAllResponse('hrm.attendance', { date: attendanceDate }) : Promise.resolve({ items: [] }),
-        can('hrm.salary_revision.read') ? loadAllResponse('hrm.salary_revision') : Promise.resolve({ items: [] }),
-        can('hrm.leave_allocation.read') ? loadAllResponse('hrm.leave_allocation') : Promise.resolve({ items: [] }),
-        can('hrm.work_schedule_entry.read') ? loadAllResponse('hrm.work_schedule_entry', { work_date__gte: scheduleMonthStart, work_date__lt: scheduleMonthEnd, sort: 'work_date' }) : Promise.resolve({ items: [] }),
-        can('hrm.work_schedule_pattern.read') ? loadAllResponse('hrm.work_schedule_pattern') : Promise.resolve({ items: [] }),
-        can('hrm.work_schedule_template.read') ? loadAllResponse('hrm.work_schedule_template') : Promise.resolve({ items: [] }),
-        can('hrm.department.read') ? loadRefs('hrm.department') : Promise.resolve(new Map()),
-        can('hrm.position.read') ? loadRefs('hrm.position') : Promise.resolve(new Map()),
-        workflowApproval && can('workflow-approval.approval_request.read') ? loadAllResponse('workflow-approval.approval_request') : Promise.resolve({ items: [] }),
-      ]);
+      const emptyMap = () => new Map();
+      const emptyResponse = () => ({ items: [] });
+      const { data, errors } = await loadIndependentData({
+        employeeRes: can('hrm.employee.read') ? loadAllResponse('hrm.employee') : Promise.resolve(emptyResponse()),
+        leaveRes: can('hrm.leave_request.read') ? loadAllResponse('hrm.leave_request') : Promise.resolve(emptyResponse()),
+        attendanceRes: can('hrm.attendance.read') ? loadAllResponse('hrm.attendance', { date: attendanceDate }) : Promise.resolve(emptyResponse()),
+        revisionRes: can('hrm.salary_revision.read') ? loadAllResponse('hrm.salary_revision') : Promise.resolve(emptyResponse()),
+        allocationRes: can('hrm.leave_allocation.read') ? loadAllResponse('hrm.leave_allocation') : Promise.resolve(emptyResponse()),
+        scheduleRes: can('hrm.work_schedule_entry.read') ? loadAllResponse('hrm.work_schedule_entry', { work_date__gte: scheduleMonthStart, work_date__lt: scheduleMonthEnd, sort: 'work_date' }) : Promise.resolve(emptyResponse()),
+        patternRes: can('hrm.work_schedule_pattern.read') ? loadAllResponse('hrm.work_schedule_pattern') : Promise.resolve(emptyResponse()),
+        templateRes: can('hrm.work_schedule_template.read') ? loadAllResponse('hrm.work_schedule_template') : Promise.resolve(emptyResponse()),
+        departmentMap: can('hrm.department.read') ? loadRefs('hrm.department') : Promise.resolve(emptyMap()),
+        positionMap: can('hrm.position.read') ? loadRefs('hrm.position') : Promise.resolve(emptyMap()),
+        requestRes: workflowApproval && can('workflow-approval.approval_request.read') ? loadAllResponse('workflow-approval.approval_request') : Promise.resolve(emptyResponse()),
+      }, {
+        employeeRes: emptyResponse(), leaveRes: emptyResponse(), attendanceRes: emptyResponse(), revisionRes: emptyResponse(), allocationRes: emptyResponse(), scheduleRes: emptyResponse(),
+        patternRes: emptyResponse(), templateRes: emptyResponse(), departmentMap: emptyMap(), positionMap: emptyMap(), requestRes: emptyResponse(),
+      });
+      const { employeeRes, leaveRes, attendanceRes, revisionRes, allocationRes, scheduleRes, patternRes, templateRes, departmentMap, positionMap, requestRes } = data;
       const employees = itemsOf(employeeRes).sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi'));
       setData({
         employees,
@@ -44,6 +50,7 @@ export function useHrmOperationsData(attendanceDate, scheduleMonthStart, schedul
         allocations: itemsOf(allocationRes),
         approvalRequests: itemsOf(requestRes),
       });
+      setError(errors[0]?.message || (errors.length ? uiText('Một số dữ liệu nhân sự không tải được.') : ''));
     } catch (reason) {
       setError(reason.message || uiText('Không tải được dữ liệu nhân sự.'));
     } finally {

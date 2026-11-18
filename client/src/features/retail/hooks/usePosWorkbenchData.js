@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { app, can, loadAllResponse, loadRefs } from '../../../lib/state.js';
+import { app, can, loadAllResponse, loadIndependentData, loadRefs } from '../../../lib/state.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const emptyData = () => ({
@@ -17,20 +17,27 @@ export function usePosWorkbenchData(translate) {
     setError('');
     try {
       const pharmacyEnabled = app.meta?.modules?.some((module) => module.id === 'pharmacy');
-      const [warehouses, branches, products, units, parties, taxes, accounts, sessionResponse, orderResponse, movementResponse, prescriptionResponse, returnResponse] = await Promise.all([
-        can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
-        can('master-data.branch.read') ? loadRefs('master-data.branch') : Promise.resolve(new Map()),
-        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
-        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('master-data.tax.read') ? loadRefs('master-data.tax') : Promise.resolve(new Map()),
-        can('accounting.account.read') ? loadRefs('accounting.account') : Promise.resolve(new Map()),
-        can('pos.pos_session.read') ? loadAllResponse('pos.pos_session') : Promise.resolve({ items: [] }),
-        can('pos.pos_order.read') ? loadAllResponse('pos.pos_order') : Promise.resolve({ items: [] }),
-        can('pos.cash_movement.read') ? loadAllResponse('pos.cash_movement') : Promise.resolve({ items: [] }),
-        pharmacyEnabled && can('pharmacy.prescription.read') ? loadAllResponse('pharmacy.prescription') : Promise.resolve({ items: [] }),
-        can('pos.pos_return.read') ? loadAllResponse('pos.pos_return') : Promise.resolve({ items: [] }),
-      ]);
+      const emptyMap = () => new Map();
+      const emptyResponse = () => ({ items: [] });
+      const { data: reads, errors } = await loadIndependentData({
+        warehouses: can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(emptyMap()),
+        branches: can('master-data.branch.read') ? loadRefs('master-data.branch') : Promise.resolve(emptyMap()),
+        products: can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(emptyMap()),
+        units: can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(emptyMap()),
+        parties: can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(emptyMap()),
+        taxes: can('master-data.tax.read') ? loadRefs('master-data.tax') : Promise.resolve(emptyMap()),
+        accounts: can('accounting.account.read') ? loadRefs('accounting.account') : Promise.resolve(emptyMap()),
+        sessionResponse: can('pos.pos_session.read') ? loadAllResponse('pos.pos_session') : Promise.resolve(emptyResponse()),
+        orderResponse: can('pos.pos_order.read') ? loadAllResponse('pos.pos_order') : Promise.resolve(emptyResponse()),
+        movementResponse: can('pos.cash_movement.read') ? loadAllResponse('pos.cash_movement') : Promise.resolve(emptyResponse()),
+        prescriptionResponse: pharmacyEnabled && can('pharmacy.prescription.read') ? loadAllResponse('pharmacy.prescription') : Promise.resolve(emptyResponse()),
+        returnResponse: can('pos.pos_return.read') ? loadAllResponse('pos.pos_return') : Promise.resolve(emptyResponse()),
+      }, {
+        warehouses: emptyMap(), branches: emptyMap(), products: emptyMap(), units: emptyMap(), parties: emptyMap(), taxes: emptyMap(), accounts: emptyMap(),
+        sessionResponse: emptyResponse(), orderResponse: emptyResponse(), movementResponse: emptyResponse(), prescriptionResponse: emptyResponse(), returnResponse: emptyResponse(),
+      });
+      const { warehouses, branches, products, units, parties, taxes, accounts, sessionResponse, orderResponse, movementResponse, prescriptionResponse, returnResponse } = reads;
+      setError(errors[0]?.message || (errors.length ? translate('Một số dữ liệu POS không tải được.') : ''));
       setData({
         warehouses, branches, products, units, parties, taxes, accounts,
         sessions: itemsOf(sessionResponse).filter((row) => row.status === 'open').sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))),

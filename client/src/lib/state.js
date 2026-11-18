@@ -127,6 +127,23 @@ export async function loadAllResponse(qname, filters = {}) {
   return { items, total: items.length };
 }
 
+/** Load unrelated feature datasets concurrently without letting one failed request erase the others. */
+export async function loadIndependentData(reads, fallbacks = {}) {
+  const entries = Object.entries(reads);
+  const results = await Promise.allSettled(entries.map(([, request]) => request));
+  const data = {};
+  const errors = [];
+  entries.forEach(([key], index) => {
+    const result = results[index];
+    if (result.status === 'fulfilled') data[key] = result.value;
+    else {
+      data[key] = fallbacks[key];
+      errors.push(result.reason);
+    }
+  });
+  return { data, errors };
+}
+
 export function loadRefs(qname) {
   const cached = refCache.get(qname);
   if (cached && (!cached.settled || Date.now() - cached.loadedAt < REF_CACHE_TTL_MS)) {

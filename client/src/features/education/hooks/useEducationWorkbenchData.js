@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { uiText } from '../../../lib/i18n.js';
-import { can, loadAllResponse, loadRefs } from '../../../lib/state.js';
+import { can, loadAllResponse, loadIndependentData, loadRefs } from '../../../lib/state.js';
 
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const emptyData = () => ({
@@ -17,19 +17,25 @@ export function useEducationWorkbenchData() {
     setLoading(true);
     setError('');
     try {
-      const [classRes, enrollmentRes, studentRes, partyMap, employeeMap, sessionRes, attendanceRes, gradeRes, feeRes, tuitionBatchRes, invoiceRes] = await Promise.all([
-        can('school.course_class.read') ? loadAllResponse('school.course_class') : Promise.resolve({ items: [] }),
-        can('school.class_enrollment.read') ? loadAllResponse('school.class_enrollment') : Promise.resolve({ items: [] }),
-        can('school.student.read') ? loadAllResponse('school.student') : Promise.resolve({ items: [] }),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('hrm.employee.read') ? loadRefs('hrm.employee') : Promise.resolve(new Map()),
-        can('school.class_session.read') ? loadAllResponse('school.class_session') : Promise.resolve({ items: [] }),
-        can('school.attendance.read') ? loadAllResponse('school.attendance') : Promise.resolve({ items: [] }),
-        can('school.grade.read') ? loadAllResponse('school.grade') : Promise.resolve({ items: [] }),
-        can('school.fee.read') ? loadAllResponse('school.fee') : Promise.resolve({ items: [] }),
-        can('school.tuition_batch.read') ? loadAllResponse('school.tuition_batch') : Promise.resolve({ items: [] }),
-        can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
-      ]);
+      const emptyMap = () => new Map();
+      const emptyResponse = () => ({ items: [] });
+      const { data, errors } = await loadIndependentData({
+        classRes: can('school.course_class.read') ? loadAllResponse('school.course_class') : Promise.resolve(emptyResponse()),
+        enrollmentRes: can('school.class_enrollment.read') ? loadAllResponse('school.class_enrollment') : Promise.resolve(emptyResponse()),
+        studentRes: can('school.student.read') ? loadAllResponse('school.student') : Promise.resolve(emptyResponse()),
+        partyMap: can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(emptyMap()),
+        employeeMap: can('hrm.employee.read') ? loadRefs('hrm.employee') : Promise.resolve(emptyMap()),
+        sessionRes: can('school.class_session.read') ? loadAllResponse('school.class_session') : Promise.resolve(emptyResponse()),
+        attendanceRes: can('school.attendance.read') ? loadAllResponse('school.attendance') : Promise.resolve(emptyResponse()),
+        gradeRes: can('school.grade.read') ? loadAllResponse('school.grade') : Promise.resolve(emptyResponse()),
+        feeRes: can('school.fee.read') ? loadAllResponse('school.fee') : Promise.resolve(emptyResponse()),
+        tuitionBatchRes: can('school.tuition_batch.read') ? loadAllResponse('school.tuition_batch') : Promise.resolve(emptyResponse()),
+        invoiceRes: can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve(emptyResponse()),
+      }, {
+        classRes: emptyResponse(), enrollmentRes: emptyResponse(), studentRes: emptyResponse(), partyMap: emptyMap(), employeeMap: emptyMap(), sessionRes: emptyResponse(),
+        attendanceRes: emptyResponse(), gradeRes: emptyResponse(), feeRes: emptyResponse(), tuitionBatchRes: emptyResponse(), invoiceRes: emptyResponse(),
+      });
+      const { classRes, enrollmentRes, studentRes, partyMap, employeeMap, sessionRes, attendanceRes, gradeRes, feeRes, tuitionBatchRes, invoiceRes } = data;
       const classes = itemsOf(classRes);
       const students = new Map(itemsOf(studentRes).map((student) => [student.id, student]));
       setData({
@@ -45,6 +51,7 @@ export function useEducationWorkbenchData() {
         tuitionBatches: itemsOf(tuitionBatchRes),
         invoices: itemsOf(invoiceRes),
       });
+      setError(errors[0]?.message || (errors.length ? uiText('Một số dữ liệu lớp học không tải được.') : ''));
     } catch (reason) {
       setError(reason.message || uiText('Không tải được dữ liệu lớp học.'));
     } finally {
