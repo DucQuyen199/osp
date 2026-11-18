@@ -18,6 +18,7 @@ use tower::ServiceExt;
 #[derive(Default)]
 struct RecordingEInvoiceProvider {
     issues: Mutex<Vec<(String, Value)>>,
+    cancellations: Mutex<Vec<(String, String, String)>>,
 }
 
 impl EInvoiceProvider for RecordingEInvoiceProvider {
@@ -56,9 +57,17 @@ impl EInvoiceProvider for RecordingEInvoiceProvider {
         &'a self,
         tenant_id: &'a str,
         provider_reference: &'a str,
-        _reason: &'a str,
+        reason: &'a str,
     ) -> BoxFuture<'a, R<CancellationResult>> {
         Box::pin(async move {
+            self.cancellations
+                .lock()
+                .expect("provider cancellation log lock")
+                .push((
+                    tenant_id.to_owned(),
+                    provider_reference.to_owned(),
+                    reason.to_owned(),
+                ));
             Ok(CancellationResult {
                 provider_reference: Some(provider_reference.to_owned()),
                 response: json!({ "accepted": true, "tenantId": tenant_id }),
@@ -591,6 +600,66 @@ async fn run(k: Arc<Kernel>, url: String, defs: PathBuf) {
         assert_eq!(
             t.get("accounting.invoice", &id(inv)).await["status"],
             "paid"
+        );
+        let cancellation_order = t
+            .create(
+                "sales.sales_order",
+                json!({ "party": id(&party), "warehouse": warehouse, "lines": lines(&id(&service), 1, 5_000_000) }),
+            )
+            .await;
+        t.act("sales.sales_order", &id(&cancellation_order), "confirmed")
+            .await;
+        t.act("sales.sales_order", &id(&cancellation_order), "delivered")
+            .await;
+        let cancellation_invoice = t
+            .list(
+                "accounting.invoice",
+                &[("source_id", &id(&cancellation_order))],
+            )
+            .await
+            .remove(0);
+        let cancellation_record = t
+            .list(
+                "einvoice.einvoice",
+                &[("invoice", &id(&cancellation_invoice))],
+            )
+            .await
+            .remove(0);
+        run_once_with_provider(&k, &provider)
+            .await
+            .expect("provider issues cancellation test invoice");
+        assert_eq!(
+            t.get("einvoice.einvoice", &id(&cancellation_record)).await["status"],
+            "issued"
+        );
+        let (cancel_status, cancel_result) = t
+            .api(
+                "POST",
+                &format!(
+                    "/data/einvoice/einvoice/{}/cancel_requested",
+                    id(&cancellation_record)
+                ),
+                json!({ "cancellation_reason": "Duplicate test invoice" }),
+            )
+            .await;
+        assert_eq!(cancel_status, 200, "{cancel_result}");
+        run_once_with_provider(&k, &provider)
+            .await
+            .expect("provider processes invoice cancellation");
+        let cancelled = t.get("einvoice.einvoice", &id(&cancellation_record)).await;
+        assert_eq!(cancelled["status"], "cancelled");
+        assert_eq!(cancelled["cancellation_reason"], "Duplicate test invoice");
+        assert!(
+            provider
+                .cancellations
+                .lock()
+                .expect("provider cancellation log lock")
+                .iter()
+                .any(
+                    |(tenant_id, provider_reference, reason)| tenant_id == &t.t.id
+                        && provider_reference == &id(&cancellation_record)
+                        && reason == "Duplicate test invoice"
+                )
         );
         let events = k.event_log(&t.t, 500).await.unwrap();
         assert!(
