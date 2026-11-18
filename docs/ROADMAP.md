@@ -12,6 +12,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Trường học tạo học phí nháp theo đợt/lớp/kỳ một cách nguyên tử, bỏ qua khoản đã có, lưu số tiền cùng hạn thu; nhân viên phát hành hóa đơn sau khi rà soát từng khoản.
 - PostgreSQL qua TLS Rustls với kiểm tra CA/hostname, transaction/savepoint, tenant lock, migration, RLS, backup. `npm run backup` hỗ trợ AES-256-GCM cho archive qua khóa triển khai; mã hóa at-rest của database volume vẫn do hạ tầng cung cấp.
 - Tài sản cố định có vốn hóa, khấu hao theo hai phương pháp, thanh lý và báo cáo lịch dự báo theo tháng dùng chung công thức Decimal với luồng ghi sổ.
+- Sổ tài sản cộng giá trị còn lại và kiểm tra giới hạn giá trị thu hồi/hao mòn đầu kỳ bằng Decimal như quy tắc kế toán phía máy chủ.
 - Application của module tài sản cố định chia facade và use case nhỏ cho chuẩn hóa tài sản, khấu hao, vốn hóa, thanh lý và cập nhật sổ cái.
 - Application kế toán giữ facade nhỏ; phân giải tài khoản, ghi sổ bút toán và phân bổ phế phẩm sản xuất được tách thành các module Rust theo trách nhiệm riêng, vẫn chạy trong transaction của kernel.
 - Persistence thanh toán kế toán giữ facade và chia kiểm tra hóa đơn, hoàn tiền, nguồn thanh toán và tài khoản mặc định thành module Rust chuyên trách; số liệu tiếp tục dùng Decimal và transaction của kernel.

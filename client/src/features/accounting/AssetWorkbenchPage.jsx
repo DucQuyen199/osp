@@ -3,6 +3,7 @@ import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate, localMonth } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
+import { addDecimals, compareDecimals, subtractDecimals } from '../../lib/decimal.js';
 import { can, loadAllResponse } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 const rows = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -39,7 +40,7 @@ export default function AssetWorkbenchPage() {
   useEffect(() => { load(); }, [load]);
   const visibleAssets = useMemo(() => assets.filter((asset) => filter === 'all' || asset.status === filter), [assets, filter]);
   const activeAssets = assets.filter((asset) => asset.status === 'active');
-  const activeBookValue = activeAssets.reduce((sum, asset) => sum + Number(asset.book_value ?? asset.cost ?? 0), 0);
+  const activeBookValue = addDecimals(activeAssets.map((asset) => asset.book_value ?? asset.cost ?? 0));
   const draftDepreciations = depreciations.filter((row) => row.status === 'draft').length;
   const depreciationExists = (assetId, period) => depreciations.some((row) => row.asset === assetId && String(row.period || '').slice(0, 7) === period);
   async function run(key, operation, message) {
@@ -50,8 +51,8 @@ export default function AssetWorkbenchPage() {
   }
   async function createAsset(event) {
     event.preventDefault();
-    if (Number(form.salvage_value) > Number(form.cost)) { setError(uiText('Giá trị thu hồi không thể lớn hơn nguyên giá.')); return; }
-    if (form.acquisition_method === 'opening_balance' && Number(form.opening_accumulated_depreciation || 0) > Number(form.cost) - Number(form.salvage_value || 0)) { setError(uiText('Hao mòn lũy kế đầu kỳ không thể vượt quá nguyên giá sau khi trừ giá trị thu hồi.')); return; }
+    if (compareDecimals(form.salvage_value || 0, form.cost || 0) > 0) { setError(uiText('Giá trị thu hồi không thể lớn hơn nguyên giá.')); return; }
+    if (form.acquisition_method === 'opening_balance' && compareDecimals(form.opening_accumulated_depreciation || 0, subtractDecimals(form.cost || 0, form.salvage_value || 0)) > 0) { setError(uiText('Hao mòn lũy kế đầu kỳ không thể vượt quá nguyên giá sau khi trừ giá trị thu hồi.')); return; }
     const payload = { name: form.name.trim(), code: form.code.trim(), in_service_date: form.in_service_date, cost: Number(form.cost), salvage_value: Number(form.salvage_value || 0), useful_life_months: Number(form.useful_life_months), depreciation_method: form.depreciation_method, acquisition_method: form.acquisition_method, location: form.location.trim() || undefined, category: form.category.trim() || undefined };
     if (form.purchase_date) payload.purchase_date = form.purchase_date;
     if (form.depreciation_method === 'declining_balance') payload.declining_balance_factor = Number(form.declining_balance_factor || 2);
@@ -65,7 +66,7 @@ export default function AssetWorkbenchPage() {
   async function dispose(asset) {
     const draft = disposals[asset.id] || {};
     const proceeds = Number(draft.proceeds || 0);
-    if (proceeds > 0 && !draft.method) { setError(uiText('Chọn phương thức nhận tiền thanh lý.')); return; }
+    if (compareDecimals(draft.proceeds || 0, '0') > 0 && !draft.method) { setError(uiText('Chọn phương thức nhận tiền thanh lý.')); return; }
     await run(`${asset.id}:disposed`, async () => {
       await api(dataPath('asset.asset', asset.id), { method: 'PATCH', body: { disposal_proceeds: proceeds, ...(proceeds > 0 ? { disposal_method: draft.method } : {}) } });
       await api(dataPath('asset.asset', asset.id, 'disposed'), { method: 'POST' });
@@ -82,7 +83,7 @@ export default function AssetWorkbenchPage() {
   return <div className="page">
     <div className="page-head"><div><h1>{uiText("Sổ tài sản cố định")}</h1><p className="sub">{uiText("Đăng ký, vốn hóa, theo dõi hao mòn, ghi khấu hao và thanh lý tài sản có liên kết sổ cái.")}</p></div><div className="row"><a className="btn btn-ghost" href="#/reports/asset/depreciation-schedule">{uiText("Lịch khấu hao")}</a><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{uiText("Làm mới")}</button></div></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
-    <div className="stats u-legacy-bf4a218e05" ><div className="card stat"><span className="stat-label">{uiText("Tổng tài sản")}</span><strong className="stat-value">{assets.length}</strong></div><div className="card stat"><span className="stat-label">{uiText("Đang hoạt động")}</span><strong className="stat-value">{activeAssets.length}</strong></div><div className="card stat"><span className="stat-label">{uiText("Giá trị sổ sách")}</span><strong className="stat-value">{fmtMoney(activeBookValue)}</strong></div><div className="card stat"><span className="stat-label">{uiText("Phiếu khấu hao nháp")}</span><strong className="stat-value">{draftDepreciations}</strong></div></div>
+    <div className="stats u-legacy-bf4a218e05" ><div className="card stat"><span className="stat-label">{uiText("Tổng tài sản")}</span><strong className="stat-value">{assets.length}</strong></div><div className="card stat"><span className="stat-label">{uiText("Đang hoạt động")}</span><strong className="stat-value">{activeAssets.length}</strong></div><div className="card stat"><span className="stat-label">{uiText("Giá trị sổ sách")}</span><strong className="stat-value">{fmtMoney(Number(activeBookValue))}</strong></div><div className="card stat"><span className="stat-label">{uiText("Phiếu khấu hao nháp")}</span><strong className="stat-value">{draftDepreciations}</strong></div></div>
     {can('asset.asset.create') && <section className="card card-pad"><h2>{uiText("Đăng ký tài sản")}</h2><form className="form-grid" onSubmit={createAsset}>
       <label className="field"><span className="label">{uiText("Tên tài sản *")}</span><input className="input" required maxLength="240" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })}/></label>
       <label className="field"><span className="label">{uiText("Mã tài sản *")}</span><input className="input" required maxLength="120" value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value })}/></label>
@@ -96,7 +97,7 @@ export default function AssetWorkbenchPage() {
       <label className="field"><span className="label">{uiText("Phương pháp khấu hao")}</span><select className="select" value={form.depreciation_method} onChange={(event) => setForm({ ...form, depreciation_method: event.target.value })}><option value="straight_line">{uiText("Đường thẳng")}</option><option value="declining_balance">{uiText("Số dư giảm dần")}</option></select></label>
       {form.depreciation_method === 'declining_balance' && <label className="field"><span className="label">{uiText("Hệ số điều chỉnh (≤ 2)")}</span><input className="input num" type="number" min="0.01" max="2" step="0.01" value={form.declining_balance_factor} onChange={(event) => setForm({ ...form, declining_balance_factor: event.target.value })}/></label>}
       <label className="field"><span className="label">{uiText("Cách hình thành tài sản")}</span><select className="select" value={form.acquisition_method} onChange={(event) => setForm({ ...form, acquisition_method: event.target.value })}><option value="cash">{uiText("Chi tiền mặt")}</option><option value="bank">{uiText("Chi qua ngân hàng")}</option><option value="opening_balance">{uiText("Số dư đầu kỳ")}</option></select></label>
-      {form.acquisition_method === 'opening_balance' && <label className="field"><span className="label">{uiText("Hao mòn lũy kế đầu kỳ")}</span><input className="input num" type="number" min="0" max={Math.max(0, Number(form.cost || 0) - Number(form.salvage_value || 0))} step="0.01" value={form.opening_accumulated_depreciation} onChange={(event) => setForm({ ...form, opening_accumulated_depreciation: event.target.value })}/></label>}
+      {form.acquisition_method === 'opening_balance' && <label className="field"><span className="label">{uiText("Hao mòn lũy kế đầu kỳ")}</span><input className="input num" type="number" min="0" max={Number(compareDecimals(subtractDecimals(form.cost || 0, form.salvage_value || 0), '0') < 0 ? '0' : subtractDecimals(form.cost || 0, form.salvage_value || 0))} step="0.01" value={form.opening_accumulated_depreciation} onChange={(event) => setForm({ ...form, opening_accumulated_depreciation: event.target.value })}/></label>}
       <div className="row full"><span className="grow small muted">{uiText("Khi vốn hóa, hệ thống tạo bút toán Nợ 211 và Có 111/112/411; số dư đầu kỳ sẽ ghi thêm hao mòn Có 214.")}</span><button className="btn btn-primary" disabled={Boolean(busy)}>{uiText("Tạo tài sản nháp")}</button></div>
     </form></section>}
     {can('asset.asset.read') && <section className="card card-pad u-legacy-92c18f6bda" ><div className="row wrap"><div><h2>{uiText("Danh mục tài sản")}</h2><p className="small muted">{uiText("Tài sản đã vốn hóa được giữ trong sổ kiểm toán, kể cả sau thanh lý.")}</p></div><span className="grow"/><label className="field"><span className="label">{uiText("Trạng thái")}</span><select className="select" value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">{uiText("Tất cả")}</option><option value="draft">{uiText("Bản nháp")}</option><option value="active">{uiText("Đang sử dụng")}</option><option value="disposed">{uiText("Đã thanh lý")}</option></select></label></div>
