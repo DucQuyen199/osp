@@ -36,6 +36,21 @@ export const session = {
 };
 let memory = null;
 
+function parseResponseJson(text) {
+  return JSON.parse(text, (_key, value, context) => {
+    if (typeof value !== 'number' || typeof context?.source !== 'string') return value;
+
+    // Keep JSON numbers with more precision than a JavaScript Number can safely
+    // carry as text. Decimal helpers can then use the original server value.
+    const source = context.source;
+    const mantissa = source.split(/[eE]/, 1)[0].replace(/^[+-]/, '').replace('.', '');
+    const significantDigits = mantissa.replace(/^0+/, '').replace(/0+$/, '').length;
+    return significantDigits > 15 || (Number.isInteger(value) && !Number.isSafeInteger(value))
+      ? source
+      : value;
+  });
+}
+
 const listeners = new Set();
 export const onUnauthorized = (fn) => {
   listeners.add(fn);
@@ -93,7 +108,7 @@ export async function api(path, { method = 'GET', body, token, raw = false, head
   }
   const text = await res.text();
   let data = null;
-  try { data = text ? JSON.parse(text) : null; } catch { /* không phải JSON */ }
+  try { data = text ? parseResponseJson(text) : null; } catch { /* không phải JSON */ }
   if (!res.ok) {
     const e = data?.error || {};
     if (res.status === 401 && tok && !path.includes('/auth/login')) listeners.forEach((fn) => fn());
