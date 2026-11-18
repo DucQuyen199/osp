@@ -55,7 +55,8 @@ OSP_DEFS=definitions OSP_PUBLIC=client-dist OSP_MODULES=crm,sales,accounting car
 npm run check          # fmt + cargo check + catalog lint
 npm test               # Rust unit/integration tests
 npm run e2e            # giao diện bằng Chrome thật + accessibility (cần Chrome/Edge)
-npm run backup         # sao lưu nóng cơ sở dữ liệu
+npm run backup         # sao lưu nóng; mã hóa khi đặt OSP_BACKUP_ENCRYPTION_KEY
+npm run test:backup-crypto # kiểm tra mã hóa và phát hiện archive bị sửa
 ```
 
 ## Cấu trúc

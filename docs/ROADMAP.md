@@ -9,7 +9,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - LMS tự phát hành chứng chỉ bất biến khi học viên hoàn thành đủ bài bắt buộc; lưu snapshot người học/khóa học, tra cứu theo số và in từ workbench.
 - Trường học liên kết lớp với hồ sơ giáo viên HRM tùy chọn, chặn xếp trùng giờ giữa các lớp và không cho chấm dứt nhân viên còn buổi dạy tương lai; buổi học lưu snapshot giáo viên.
 - Trường học tạo học phí nháp theo đợt/lớp/kỳ một cách nguyên tử, bỏ qua khoản đã có, lưu số tiền cùng hạn thu; nhân viên phát hành hóa đơn sau khi rà soát từng khoản.
-- PostgreSQL, transaction/savepoint, tenant lock, migration, RLS, backup.
+- PostgreSQL, transaction/savepoint, tenant lock, migration, RLS, backup. `npm run backup` hỗ trợ AES-256-GCM cho archive qua khóa triển khai; mã hóa at-rest của database volume vẫn do hạ tầng cung cấp.
 - Tài sản cố định có vốn hóa, khấu hao theo hai phương pháp, thanh lý và báo cáo lịch dự báo theo tháng dùng chung công thức Decimal với luồng ghi sổ.
 - Application của module tài sản cố định chia facade và use case nhỏ cho chuẩn hóa tài sản, khấu hao, vốn hóa, thanh lý và cập nhật sổ cái.
 - Application kế toán giữ facade nhỏ; phân giải tài khoản, ghi sổ bút toán và phân bổ phế phẩm sản xuất được tách thành các module Rust theo trách nhiệm riêng, vẫn chạy trong transaction của kernel.

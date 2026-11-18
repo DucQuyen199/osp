@@ -108,10 +108,25 @@ PostgreSQL chứa **tất cả**: dữ liệu nghiệp vụ, doanh nghiệp, ng�
 ### Sao lưu
 ```bash
 umask 077
-docker compose exec -T postgres sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -h 127.0.0.1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "osp-backup-$(date +%F).dump"
+export OSP_BACKUP_ENCRYPTION_KEY="$(openssl rand -hex 32)"
+npm run backup -- "data/backup/osp-$(date +%F).dump.enc"
 ```
 
-Lưu bản dump ở nơi an toàn ngoài host Docker và đặt lịch chạy định kỳ.
+`npm run backup` xác minh archive bằng `pg_restore --list` trước khi hoàn tất. Khi
+đặt `OSP_BACKUP_ENCRYPTION_KEY` (32 byte, 64 ký tự hex hoặc base64), archive được
+mã hóa AES-256-GCM; nếu không đặt khóa, công cụ cảnh báo và tạo dump rõ như trước.
+Lưu khóa trong secret manager tách khỏi bản backup, giữ lại khóa tương ứng với
+từng thế hệ backup, và định kỳ thử khôi phục. Mất khóa thì không thể giải mã.
+
+Giải mã và kiểm tra archive trong thư mục tạm có quyền truy cập hạn chế:
+```bash
+node tools/decrypt-backup.mjs data/backup/osp-YYYY-MM-DD.dump.enc /secure-temp/osp.dump
+pg_restore --exit-on-error --dbname "$DATABASE_URL" /secure-temp/osp.dump
+rm -f /secure-temp/osp.dump
+```
+
+Lưu bản sao lưu ngoài host Docker. Mã hóa archive không thay thế mã hóa ổ đĩa
+hoặc volume PostgreSQL đang chạy; hãy cấu hình mã hóa storage ở hạ tầng.
 
 Bản sao lưu toàn bộ tenant cần tài khoản quản trị backup có quyền đọc qua RLS;
 không dùng role ứng dụng `osp_app` không có `BYPASSRLS` để dump toàn database.
@@ -121,7 +136,7 @@ credential quản trị này vào `DATABASE_URL` của ứng dụng.
 Khuyến nghị: chạy hằng ngày bằng cron/Task Scheduler, giữ ≥ 7 bản, **chép ra ngoài máy chủ**, và **định kỳ thử khôi phục**.
 
 ### Khôi phục
-Khôi phục cần dừng ứng dụng, dựng lại database trên môi trường đã chọn, khôi phục dump bằng `pg_restore`, rồi khởi động ứng dụng. Thử quy trình trên máy staging trước khi thao tác production; không khôi phục đè dữ liệu production khi chưa có kế hoạch và bản backup kiểm chứng.
+Khôi phục cần dừng ứng dụng, dựng lại database trên môi trường đã chọn, giải mã archive (nếu được mã hóa), khôi phục bằng `pg_restore`, rồi khởi động ứng dụng. Thử quy trình trên máy staging trước khi thao tác production; không khôi phục đè dữ liệu production khi chưa có kế hoạch và bản backup kiểm chứng.
 
 ### Nâng cấp
 Lược đồ DB có phiên bản (`schema_version`); khi khởi động, các migration chưa chạy được áp dụng tự động trong một giao dịch. **Luôn sao lưu trước khi nâng cấp.** Không hỗ trợ hạ cấp.
