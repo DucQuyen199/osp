@@ -1,26 +1,20 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { compareDecimals } from '../../lib/decimal.js';
-import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { app, can, recordLabel } from '../../lib/state.js';
 import MaintenancePartsEditor from './components/MaintenancePartsEditor.jsx';
 import maintenanceEnglish from './maintenance.en.js';
+import { useMaintenanceWorkbenchData } from './hooks/useMaintenanceWorkbenchData.js';
 const t = (text) => uiTextWith(text, maintenanceEnglish);
-const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
 const today = localDate;
 export default function MaintenanceWorkbenchPage() {
   useDocumentTitle(`${t('Bảo trì tài sản')} · OSP Suite`);
-  const [plans, setPlans] = useState([]);
-  const [requests, setRequests] = useState([]);
-  const [assets, setAssets] = useState(new Map());
-  const [products, setProducts] = useState(new Map());
-  const [units, setUnits] = useState(new Map());
-  const [warehouses, setWarehouses] = useState(new Map());
-  const [technicians, setTechnicians] = useState(new Map());
+  const { plans, requests, assets, products, units, warehouses, technicians, loading, error, setError, load } = useMaintenanceWorkbenchData();
   const [selectedId, setSelectedId] = useState('');
   const [assetId, setAssetId] = useState('');
   const [description, setDescription] = useState('');
@@ -34,31 +28,10 @@ export default function MaintenanceWorkbenchPage() {
   const [laborHours, setLaborHours] = useState('');
   const [laborRate, setLaborRate] = useState('');
   const [busy, setBusy] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const [planRes, requestRes, assetMap, productMap, unitMap, warehouseMap, technicianMap] = await Promise.all([
-        can('maintenance.maintenance_plan.read') ? loadAllResponse('maintenance.maintenance_plan') : Promise.resolve({ items: [] }),
-        can('maintenance.maintenance_request.read') ? loadAllResponse('maintenance.maintenance_request') : Promise.resolve({ items: [] }),
-        can('asset.asset.read') ? loadRefs('asset.asset') : Promise.resolve(new Map()),
-        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
-        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
-        can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
-        can('maintenance.maintenance_technician.read') ? loadRefs('maintenance.maintenance_technician') : Promise.resolve(new Map()),
-      ]);
-      const planRows = itemsOf(planRes).sort((a, b) => String(a.next_due || '9999').localeCompare(String(b.next_due || '9999')));
-      const requestRows = itemsOf(requestRes).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
-      setPlans(planRows); setRequests(requestRows); setAssets(assetMap); setProducts(productMap); setUnits(unitMap); setWarehouses(warehouseMap); setTechnicians(technicianMap);
-      setSelectedId((id) => requestRows.some((row) => row.id === id) ? id : requestRows[0]?.id || '');
-      setAssetId((id) => id || [...assetMap.keys()][0] || '');
-      setWarehouse((id) => id || [...warehouseMap.keys()][0] || '');
-    } catch (reason) { setError(t(reason.message || 'Không tải được lịch bảo trì và lệnh công việc.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { setSelectedId((id) => id && requests.some((row) => row.id === id) ? id : requests[0]?.id || ''); }, [requests]);
+  useEffect(() => { setAssetId((id) => id || [...assets.keys()][0] || ''); }, [assets]);
+  useEffect(() => { setWarehouse((id) => id || [...warehouses.keys()][0] || ''); }, [warehouses]);
   const selected = requests.find((row) => row.id === selectedId);
   useEffect(() => { setAssignedTechnician(selected?.technician || ''); }, [selectedId, selected?.technician]);
   const openRequests = requests.filter((row) => ['open', 'in_progress'].includes(row.status));
