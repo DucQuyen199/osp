@@ -1,27 +1,19 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, fmtNumber, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { addDecimals, multiplyDecimals } from '../../lib/decimal.js';
-import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { can, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import agricultureEnglish from './agriculture.en.js';
 import { AgricultureHarvestForm, AgricultureInputForm } from './components/AgricultureFieldworkForms.jsx';
+import { useAgricultureData } from './hooks/useAgricultureData.js';
 const t = (text) => uiTextWith(text, agricultureEnglish);
-const listItems = (response) => Array.isArray(response?.items) ? response.items : [];
 const today = localDate;
 export default function AgricultureOperationsPage() {
   useDocumentTitle(`${t('Điều hành mùa vụ')} · OSP Suite`);
-  const [farms, setFarms] = useState([]);
-  const [cycles, setCycles] = useState([]);
-  const [harvests, setHarvests] = useState([]);
-  const [applications, setApplications] = useState([]);
-  const [products, setProducts] = useState(new Map());
-  const [units, setUnits] = useState(new Map());
-  const [warehouses, setWarehouses] = useState(new Map());
-  const [parties, setParties] = useState(new Map());
-  const [lots, setLots] = useState(new Map());
+  const { farms, cycles, harvests, applications, products, units, warehouses, parties, lots, loading, error: dataError, load: loadData } = useAgricultureData();
   const [inputCostReport, setInputCostReport] = useState(null);
   const [inputCostError, setInputCostError] = useState('');
   const [cycleId, setCycleId] = useState('');
@@ -46,34 +38,20 @@ export default function AgricultureOperationsPage() {
   const [harvestGrade, setHarvestGrade] = useState('');
   const [harvestLotCode, setHarvestLotCode] = useState('');
   const [harvestDate, setHarvestDate] = useState(today());
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const load = useCallback(async (preserveNotice = false) => {
-    setLoading(true); setError(''); if (!preserveNotice) setNotice('');
-    try {
-      const [farmResponse, cycleResponse, harvestResponse, inputResponse, productMap, unitMap, warehouseMap, partyMap, lotMap] = await Promise.all([
-        can('agriculture.farm.read') ? loadAllResponse('agriculture.farm') : Promise.resolve({ items: [] }),
-        can('agriculture.crop_cycle.read') ? loadAllResponse('agriculture.crop_cycle') : Promise.resolve({ items: [] }),
-        can('agriculture.harvest.read') ? loadAllResponse('agriculture.harvest') : Promise.resolve({ items: [] }),
-        can('agriculture.input_application.read') ? loadAllResponse('agriculture.input_application') : Promise.resolve({ items: [] }),
-        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
-        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
-        can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('inventory.lot.read') ? loadRefs('inventory.lot') : Promise.resolve(new Map()),
-      ]);
-      const farmItems = listItems(farmResponse);
-      const cycleItems = listItems(cycleResponse).sort((a, b) => String(a.expected_harvest || '9999').localeCompare(String(b.expected_harvest || '9999')));
-      setFarms(farmItems); setCycles(cycleItems); setHarvests(listItems(harvestResponse)); setApplications(listItems(inputResponse));
-      setProducts(productMap); setUnits(unitMap); setWarehouses(warehouseMap); setParties(partyMap); setLots(lotMap);
-      setCycleId((current) => cycleItems.some((item) => item.id === current) ? current : cycleItems.find((item) => item.status === 'growing')?.id || cycleItems[0]?.id || '');
-      setNewCycleFarm((current) => farmItems.some((item) => item.id === current) ? current : farmItems[0]?.id || '');
-    } catch (reason) { setError(reason.message || t('Không tải được dữ liệu mùa vụ.')); }
-    finally { setLoading(false); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
+  const load = async (preserveNotice = false) => {
+    setError('');
+    if (!preserveNotice) setNotice('');
+    await loadData();
+  };
+  useEffect(() => {
+    setCycleId((current) => cycles.some((item) => item.id === current) ? current : cycles.find((item) => item.status === 'growing')?.id || cycles[0]?.id || '');
+  }, [cycles]);
+  useEffect(() => {
+    setNewCycleFarm((current) => farms.some((item) => item.id === current) ? current : farms[0]?.id || '');
+  }, [farms]);
   const selectedCycle = cycles.find((item) => item.id === cycleId) || null;
   const selectedFarm = selectedCycle && farms.find((farm) => farm.id === selectedCycle.farm);
   const unitsFor = (productId) => {
@@ -199,7 +177,7 @@ export default function AgricultureOperationsPage() {
   return <div className="page agriculture-page">
     <div className="page-head"><div><h1>{t('Điều hành mùa vụ')}</h1><p className="sub">{t('Quản lý trang trại, theo dõi vụ đang canh tác, ghi vật tư và nhập sản lượng thu hoạch vào kho.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{loading ? t('Đang tải…') : t('Làm mới')}</button></div>
     <div className="row wrap agriculture-summary"><span className="badge success">{t('Vụ đang canh tác')}: {activeCycles}</span><span className="badge warning">{t('Có ngày thu dự kiến')}: {upcomingCycles}</span><span className="badge plain">{t('Trang trại')}: {farms.length}</span></div>
-    {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
+    {(error || dataError) && <div className="alert danger" role="alert">{t(error || dataError)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     {loading ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <>
       <div className="agriculture-setup">
         <details className="card agriculture-panel"><summary>{t('Tạo trang trại')}</summary><form className="agriculture-form" onSubmit={createFarm}>
