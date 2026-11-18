@@ -5,12 +5,14 @@ import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
+import { compareDecimals } from '../../lib/decimal.js';
 import restaurantEnglish from './restaurant.en.js';
 import RestaurantRecipesPanel from './components/RestaurantRecipesPanel.jsx';
 import RestaurantReservationsPanel from './components/RestaurantReservationsPanel.jsx';
 import { estimateRestaurantSubtotal, restaurantLineTotal } from './domain/restaurantTotals.js';
 const t = (text) => uiTextWith(text, restaurantEnglish);
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
+const isPositiveQuantity = (value) => { try { return compareDecimals(value || 0, '0') > 0; } catch { return false; } };
 const METHODS = [['cash', 'Tiền mặt'], ['card', 'Thẻ'], ['transfer', 'Chuyển khoản'], ['ewallet', 'Ví điện tử']];
 const reservationStart = () => businessDateTime(new Date(Date.now() + 60 * 60 * 1000));
 export default function RestaurantServicePage() {
@@ -77,12 +79,21 @@ export default function RestaurantServicePage() {
   const selectedNeedsWarehouse = Boolean(selected?.consumptions?.length);
   const selectedTickets = tickets.filter((ticket) => ticket.order === selectedId);
   const ticketsReady = selectedTickets.length > 0 && selectedTickets.every((ticket) => ticket.status === 'ready');
-  const cart = Object.entries(quantities).map(([id, qty]) => ({ ...availableMenu.find(({ item }) => item.id === id), menuItemId: id, qty: Number(qty), note: String(lineNotes[id] || '').trim() })).filter((line) => line.product && line.qty > 0);
+  const cart = Object.entries(quantities).map(([id, qty]) => ({ ...availableMenu.find(({ item }) => item.id === id), menuItemId: id, qty: String(qty ?? ''), note: String(lineNotes[id] || '').trim() })).filter((line) => line.product && isPositiveQuantity(line.qty));
   const indicativeTotal = estimateRestaurantSubtotal(cart);
   const setQuantity = (id, value) => {
-    const qty = Math.max(0, Number(value) || 0);
-    setQuantities((current) => { const next = { ...current }; if (qty) next[id] = qty; else delete next[id]; return next; });
-    if (!qty) setLineNotes((current) => { const next = { ...current }; delete next[id]; return next; });
+    if (value === '' || value == null) {
+      setQuantities((current) => ({ ...current, [id]: '' }));
+      return;
+    }
+    let positive;
+    try { positive = compareDecimals(value, '0') > 0; } catch { positive = false; }
+    setQuantities((current) => {
+      const next = { ...current };
+      if (positive) next[id] = String(value); else delete next[id];
+      return next;
+    });
+    if (!positive) setLineNotes((current) => { const next = { ...current }; delete next[id]; return next; });
   };
   const recipeProducts = menuItems.map((item) => products.get(item.product)).filter((product) => product && product.active !== false);
   const ingredientProducts = [...products.values()].filter((product) => product.active !== false && product.kind !== 'service');
@@ -99,7 +110,7 @@ export default function RestaurantServicePage() {
   const saveRecipe = async (event) => {
     event.preventDefault(); setBusy('recipe'); setError(''); setNotice('');
     try {
-      const body = { product: recipeProduct, output_qty: Number(recipeOutputQty), ingredients: recipeIngredients.map((item) => ({ product: item.product, qty: Number(item.qty), ...(item.uom ? { uom: item.uom } : {}) })) };
+      const body = { product: recipeProduct, output_qty: String(recipeOutputQty), ingredients: recipeIngredients.map((item) => ({ product: item.product, qty: String(item.qty), ...(item.uom ? { uom: item.uom } : {}) })) };
       await api(editingRecipe ? dataPath('restaurant.recipe', editingRecipe) : dataPath('restaurant.recipe'), { method: editingRecipe ? 'PATCH' : 'POST', body });
       resetRecipe(); await load(true); setNotice(t('Đã lưu công thức món ăn.'));
     } catch (reason) { setError(reason.message || t('Không lưu được công thức.')); }
@@ -210,7 +221,7 @@ export default function RestaurantServicePage() {
           <div><strong>{recordLabel('master-data.product', product)}</strong><span className="small muted">{t(item.station === 'bar' ? 'Quầy pha chế' : 'Bếp')}</span></div>
           <strong className="num">{fmtMoney(product.price || 0)}</strong>
           <label className="field"><span>{t('Số lượng')}</span><input className="input" type="number" min="0" step="1" value={quantities[item.id] || ''} onChange={(event) => setQuantity(item.id, event.target.value)} /></label>
-          {Number(quantities[item.id] || 0) > 0 && <label className="field"><span>{t('Ghi chú cho bếp/quầy')}</span><textarea className="textarea" rows="2" maxLength="500" placeholder={t('Ví dụ: không hành, ít đá')} value={lineNotes[item.id] || ''} onChange={(event) => setLineNotes((current) => ({ ...current, [item.id]: event.target.value }))} /></label>}
+          {isPositiveQuantity(quantities[item.id]) && <label className="field"><span>{t('Ghi chú cho bếp/quầy')}</span><textarea className="textarea" rows="2" maxLength="500" placeholder={t('Ví dụ: không hành, ít đá')} value={lineNotes[item.id] || ''} onChange={(event) => setLineNotes((current) => ({ ...current, [item.id]: event.target.value }))} /></label>}
         </article>)}</div>
         <div className="restaurant-cart-total"><span>{t('Tạm tính chưa gồm thuế')}</span><strong className="num">{fmtMoney(indicativeTotal)}</strong></div>
         {exceedsTableCapacity && <div className="alert warning" role="status">{t('Bàn chỉ có')} {selectedTable.seats} {t('chỗ; chọn bàn lớn hơn hoặc giảm số khách.')}</div>}
