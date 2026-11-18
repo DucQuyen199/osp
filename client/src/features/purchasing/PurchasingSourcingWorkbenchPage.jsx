@@ -4,10 +4,15 @@ import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
+import { addDecimals, compareDecimals } from '../../lib/decimal.js';
 import { app, can, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
+import { lineValue } from './domain/purchasingSelectors.js';
 import { usePurchasingSourcingData } from './hooks/usePurchasingSourcingData.js';
-const number = (value) => Number(value || 0);
+const decimalInput = (value) => String(value ?? '0').trim().replace(/^([+-]?)\./, (_, sign) => `${sign}0.`);
+const isPositiveDecimal = (value) => {
+  try { return compareDecimals(value, '0') > 0; } catch { return false; }
+};
 const action = (row, verb) => api(dataPath('purchasing.rfq', row.id, verb), { method: 'POST' });
 export default function PurchasingSourcingWorkbenchPage() {
   useDocumentTitle(`${uiText('RFQ và so sánh báo giá')} · OSP Suite`);
@@ -22,16 +27,16 @@ export default function PurchasingSourcingWorkbenchPage() {
   const [notice, setNotice] = useState('');
   useEffect(() => { setSelectedId((current) => current && requisitions.some((row) => row.id === current) ? current : requisitions[0]?.id || ''); }, [requisitions]);
   const selected = requisitions.find((row) => row.id === selectedId);
-  const quotes = useMemo(() => rfqs.filter((row) => row.purchase_requisition === selectedId).sort((a, b) => quoteTotal(a) - quoteTotal(b)), [rfqs, selectedId, taxes]);
+  const quotes = useMemo(() => rfqs.filter((row) => row.purchase_requisition === selectedId).sort((a, b) => compareDecimals(quoteTotal(a), quoteTotal(b))), [rfqs, selectedId, taxes]);
   const winner = quotes.find((row) => row.status === 'accepted');
   const acceptedOrder = winner && orders.find((row) => row.source === 'rfq' && row.source_id === winner.id);
   const invitedSuppliers = new Set(quotes.map((row) => row.supplier));
   const eligibleSuppliers = [...suppliers.values()].filter((row) => row.active !== false && !invitedSuppliers.has(row.id));
   function quoteTotal(row) {
-    return (row.quote_lines || []).reduce((sum, line) => {
-      const rate = number(taxes.get(line.tax)?.rate);
-      return sum + number(line.qty) * number(line.price) * (1 + rate / 100);
-    }, 0);
+    return addDecimals((row.quote_lines || []).map((line) => quoteLineTotal(line)));
+  }
+  function quoteLineTotal(line) {
+    return lineValue({ ...line, qty: decimalInput(line.qty), price: decimalInput(line.price) }, taxes);
   }
   function quoteLines(row) {
     const lines = quoteDrafts[row.id] || (row.quote_lines?.length ? row.quote_lines : (row.lines || []).map((line) => ({ ...line, price: '', tax: '' })));
@@ -57,9 +62,9 @@ export default function PurchasingSourcingWorkbenchPage() {
   }
   async function saveQuote(row) {
     const lines = quoteLines(row).map((line) => ({
-      product: line.product, qty: number(line.qty), price: number(line.price), ...(line.uom ? { uom: line.uom } : {}), ...(line.tax ? { tax: line.tax } : {}),
+      product: line.product, qty: decimalInput(line.qty), price: decimalInput(line.price), ...(line.uom ? { uom: line.uom } : {}), ...(line.tax ? { tax: line.tax } : {}),
     }));
-    if (!lines.length || lines.some((line) => !Number.isFinite(line.price) || line.price <= 0)) {
+    if (!lines.length || lines.some((line) => !isPositiveDecimal(line.price))) {
       setError(uiText('Nhập đơn giá lớn hơn 0 cho mọi dòng báo giá.')); return;
     }
     const meta = quoteMeta[row.id] || {};
@@ -99,8 +104,8 @@ export default function PurchasingSourcingWorkbenchPage() {
           const total = quoteTotal({ quote_lines: draft });
           return <tr key={row.id} className={row.status === 'accepted' ? 'selected' : ''}>
             <td><strong>{recordLabel('master-data.party', suppliers.get(row.supplier))}</strong><div className="small muted"><a href={recordHref('purchasing.rfq', row.id)}>RFQ {String(row.id).slice(0, 8)}</a>{row.quote_reference ? ` · ${row.quote_reference}` : ''}</div></td>
-            <td>{draft.map((line, index) => <div className="row wrap u-mb-6" key={`${line.product}-${index}`} ><span className="small grow">{products.get(line.product)?.name || uiText('Hàng hóa')} · {line.qty} {line.uom_name}</span>{editable ? <><input className="input num u-max-w-130" aria-label={uiText('Đơn giá báo')} type="number" min="0.000001" step="any"  value={line.price ?? ''} onChange={(event) => setQuoteDrafts((current) => ({ ...current, [row.id]: draft.map((item, i) => i === index ? { ...item, price: event.target.value } : item) }))}/><select className="select u-max-w-150" aria-label={uiText('Thuế báo giá')}  value={line.tax || ''} onChange={(event) => setQuoteDrafts((current) => ({ ...current, [row.id]: draft.map((item, i) => i === index ? { ...item, tax: event.target.value } : item) }))}><option value="">{uiText('Không thuế')}</option>{[...taxes.values()].map((tax) => <option key={tax.id} value={tax.id}>{tax.name} · {tax.rate}%</option>)}</select></> : <span className="small">{fmtMoney(number(line.price) * number(line.qty) * (1 + number(taxes.get(line.tax)?.rate) / 100))}</span>}</div>)}</td>
-            <td><strong>{row.status === 'sent' ? (total > 0 ? fmtMoney(total) : uiText('Chưa báo giá')) : fmtMoney(quoteTotal(row))}</strong></td>
+            <td>{draft.map((line, index) => <div className="row wrap u-mb-6" key={`${line.product}-${index}`} ><span className="small grow">{products.get(line.product)?.name || uiText('Hàng hóa')} · {line.qty} {line.uom_name}</span>{editable ? <><input className="input num u-max-w-130" aria-label={uiText('Đơn giá báo')} type="number" min="0.000001" step="any" value={line.price ?? ''} onChange={(event) => setQuoteDrafts((current) => ({ ...current, [row.id]: draft.map((item, i) => i === index ? { ...item, price: event.target.value } : item) }))}/><select className="select u-max-w-150" aria-label={uiText('Thuế báo giá')} value={line.tax || ''} onChange={(event) => setQuoteDrafts((current) => ({ ...current, [row.id]: draft.map((item, i) => i === index ? { ...item, tax: event.target.value } : item) }))}><option value="">{uiText('Không thuế')}</option>{[...taxes.values()].map((tax) => <option key={tax.id} value={tax.id}>{tax.name} · {tax.rate}%</option>)}</select></> : <span className="small">{fmtMoney(quoteLineTotal(line))}</span>}</div>)}</td>
+            <td><strong>{row.status === 'sent' ? (compareDecimals(total, '0') > 0 ? fmtMoney(total) : uiText('Chưa báo giá')) : fmtMoney(quoteTotal(row))}</strong></td>
             <td>{row.response_due && <div className="small muted">{uiText('Phản hồi trước')} {fmtDate(row.response_due)}</div>}{editable ? <><input className="input" aria-label={uiText('Số tham chiếu báo giá')} maxLength="120" placeholder={uiText('Số báo giá')} value={meta.quote_reference ?? row.quote_reference ?? ''} onChange={(event) => setQuoteMeta((current) => ({ ...current, [row.id]: { ...meta, quote_reference: event.target.value } }))}/><input className="input" aria-label={uiText('Ngày hết hạn báo giá')} type="date" value={meta.valid_until ?? row.valid_until ?? ''} onChange={(event) => setQuoteMeta((current) => ({ ...current, [row.id]: { ...meta, valid_until: event.target.value } }))}/></> : <>{row.valid_until ? fmtDate(row.valid_until) : uiText('Không giới hạn')}<div className="small muted">{row.quote_reference || ''}</div></>}</td>
             <td><span className={`badge ${row.status === 'accepted' ? 'success' : row.status === 'rejected' || row.status === 'cancelled' ? 'danger' : 'warning'}`}>{statusLabel(row.status)}</span><div className="row wrap u-mt-6" >{row.status === 'draft' && can('purchasing.rfq.sent') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => rfqAction(row, 'sent')}>{uiText(emailQueueEnabled ? 'Gửi lời mời báo giá' : 'Ghi nhận đã gửi')}</button>}{editable && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => saveQuote(row)}>{uiText('Lưu báo giá')}</button>}{row.status === 'quoted' && !winner && can('purchasing.rfq.accepted') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => rfqAction(row, 'accepted')}>{uiText('Chọn báo giá')}</button>}{['sent','quoted'].includes(row.status) && can('purchasing.rfq.rejected') && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => rfqAction(row, 'rejected')}>{uiText('Từ chối')}</button>}{row.status === 'draft' && can('purchasing.rfq.cancelled') && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => rfqAction(row, 'cancelled')}>{uiText('Hủy')}</button>}</div></td>
           </tr>;

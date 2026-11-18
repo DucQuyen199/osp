@@ -10,6 +10,7 @@ import { compareDecimals } from '../../lib/decimal.js';
 import restaurantEnglish from './restaurant.en.js';
 import RestaurantRecipesPanel from './components/RestaurantRecipesPanel.jsx';
 import RestaurantReservationsPanel from './components/RestaurantReservationsPanel.jsx';
+import RestaurantOrderLineItems from './components/RestaurantOrderLineItems.jsx';
 import { estimateRestaurantSubtotal, restaurantLineTotal } from './domain/restaurantTotals.js';
 const t = (text) => uiTextWith(text, restaurantEnglish);
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -253,8 +254,8 @@ export default function RestaurantServicePage() {
       <section className="restaurant-order-detail card">{selected ? <>
       <header className="restaurant-order-card-head"><div><h2>{tables.find((table) => table.id === selected.table)?.name || t('Mang đi')}</h2><span className="small muted">{fmtDateTime(selected.created_at)}{selected.table ? ` · ${selected.guest_count || 1} ${t('khách')}` : ''}</span></div><span className={`badge ${selected.status === 'completed' ? 'success' : selected.status === 'cancelled' ? 'plain' : 'warning'}`}>{statusLabel(selected.status)}</span></header>
         {selected.cancellation_reason && <div className="small muted">{t('Lý do hủy:')} {selected.cancellation_reason}</div>}
-        <ul className="restaurant-detail-lines">{(selected.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{line.product_name || products.get(line.product)?.name || t('Món')} × {line.qty}{Number(line.tax_rate) > 0 && <small className="small muted"> · {t('Thuế')} {line.tax_rate}%</small>}{line.note && <small className="small muted"> · {t('Ghi chú:')} {line.note}</small>}</span><strong className="num">{fmtMoney(restaurantLineTotal(line))}</strong></li>)}</ul>
-        {Number(selected.tax_total) > 0 && <div className="restaurant-tax-total"><span>{t('Thuế bán hàng')}</span><strong className="num">{fmtMoney(selected.tax_total)}</strong></div>}
+        <RestaurantOrderLineItems lines={selected.lines || []} products={products} lineTotal={restaurantLineTotal} t={t} />
+        {compareDecimals(selected.tax_total || 0, '0') > 0 && <div className="restaurant-tax-total"><span>{t('Thuế bán hàng')}</span><strong className="num">{fmtMoney(selected.tax_total)}</strong></div>}
         <div className="restaurant-cart-total"><span>{t('Tổng đã gồm thuế')}</span><strong className="num">{fmtMoney(selected.total || 0)}</strong></div>
         {selectedTickets.length > 0 && <div className="restaurant-ticket-status"><h3>{t('Tiến độ bếp')}</h3>{selectedTickets.map((ticket) => <div key={ticket.id}><span>{t(ticket.station === 'bar' ? 'Quầy pha chế' : 'Bếp')}</span><strong>{statusLabel(ticket.status)}</strong></div>)}</div>}
         {selected.status === 'open' && can('restaurant.table_order.sent') && <div className="restaurant-actions"><button className="btn btn-primary" disabled={!!busy} onClick={() => transition(selected, 'sent')}>{t('Gửi bếp và quầy pha chế')}</button>{can('restaurant.table_order.cancelled') && <button className="btn" disabled={!!busy} onClick={() => transition(selected, 'cancelled')}>{t('Hủy order')}</button>}</div>}

@@ -77,6 +77,7 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 - The POS terminal owns return permissions, the draft retry flow and persistence; `PosReturnDialog` edits controlled return quantities and reason, previews the refund, and emits submit/close callbacks.
 - The restaurant workbench owns recipe permissions, ingredient validation and persistence; `RestaurantRecipesPanel` edits controlled recipe lines and renders saved recipes through callbacks.
 - The restaurant workbench owns reservation permissions, creation, table assignment and status transitions; `RestaurantReservationsPanel` renders the controlled booking form and reservation queue, then emits requested operations through callbacks.
+- `RestaurantServicePage` owns order selection and workflow actions; `RestaurantOrderLineItems` renders saved food and drink lines with their exact tax and total snapshots.
 - The restaurant workbench keeps its pre-tax order estimate and legacy line-total fallback in `features/restaurant/domain/restaurantTotals.js`, using the shared Decimal helpers and the server's four-place line rounding.
 - The HR workbench owns attendance-date rules and punch actions; `AttendanceEntriesTable` renders the controlled daily records and emits punch-out requests.
 - The HR workbench owns leave and salary-revision decisions, employee permissions, and resubmission actions; `LeaveRequestsTable`, `EmployeeDirectoryTable`, and `SalaryRevisionsTable` render controlled records and emit the requested decisions through callbacks.
