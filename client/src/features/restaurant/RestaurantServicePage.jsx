@@ -8,6 +8,7 @@ import { recordHref } from '../../lib/routes.js';
 import restaurantEnglish from './restaurant.en.js';
 import RestaurantRecipesPanel from './components/RestaurantRecipesPanel.jsx';
 import RestaurantReservationsPanel from './components/RestaurantReservationsPanel.jsx';
+import { estimateRestaurantSubtotal, restaurantLineTotal } from './domain/restaurantTotals.js';
 const t = (text) => uiTextWith(text, restaurantEnglish);
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const METHODS = [['cash', 'Tiền mặt'], ['card', 'Thẻ'], ['transfer', 'Chuyển khoản'], ['ewallet', 'Ví điện tử']];
@@ -77,7 +78,7 @@ export default function RestaurantServicePage() {
   const selectedTickets = tickets.filter((ticket) => ticket.order === selectedId);
   const ticketsReady = selectedTickets.length > 0 && selectedTickets.every((ticket) => ticket.status === 'ready');
   const cart = Object.entries(quantities).map(([id, qty]) => ({ ...availableMenu.find(({ item }) => item.id === id), menuItemId: id, qty: Number(qty), note: String(lineNotes[id] || '').trim() })).filter((line) => line.product && line.qty > 0);
-  const indicativeTotal = cart.reduce((total, line) => total + (Number(line.product.price) || 0) * line.qty, 0);
+  const indicativeTotal = estimateRestaurantSubtotal(cart);
   const setQuantity = (id, value) => {
     const qty = Math.max(0, Number(value) || 0);
     setQuantities((current) => { const next = { ...current }; if (qty) next[id] = qty; else delete next[id]; return next; });
@@ -227,7 +228,7 @@ export default function RestaurantServicePage() {
       <section className="restaurant-order-detail card">{selected ? <>
       <header className="restaurant-order-card-head"><div><h2>{tables.find((table) => table.id === selected.table)?.name || t('Mang đi')}</h2><span className="small muted">{fmtDateTime(selected.created_at)}{selected.table ? ` · ${selected.guest_count || 1} ${t('khách')}` : ''}</span></div><span className={`badge ${selected.status === 'completed' ? 'success' : selected.status === 'cancelled' ? 'plain' : 'warning'}`}>{statusLabel(selected.status)}</span></header>
         {selected.cancellation_reason && <div className="small muted">{t('Lý do hủy:')} {selected.cancellation_reason}</div>}
-        <ul className="restaurant-detail-lines">{(selected.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{line.product_name || products.get(line.product)?.name || t('Món')} × {line.qty}{Number(line.tax_rate) > 0 && <small className="small muted"> · {t('Thuế')} {line.tax_rate}%</small>}{line.note && <small className="small muted"> · {t('Ghi chú:')} {line.note}</small>}</span><strong className="num">{fmtMoney(line.line_total ?? (Number(line.price || 0) * Number(line.qty || 0)))}</strong></li>)}</ul>
+        <ul className="restaurant-detail-lines">{(selected.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{line.product_name || products.get(line.product)?.name || t('Món')} × {line.qty}{Number(line.tax_rate) > 0 && <small className="small muted"> · {t('Thuế')} {line.tax_rate}%</small>}{line.note && <small className="small muted"> · {t('Ghi chú:')} {line.note}</small>}</span><strong className="num">{fmtMoney(restaurantLineTotal(line))}</strong></li>)}</ul>
         {Number(selected.tax_total) > 0 && <div className="restaurant-tax-total"><span>{t('Thuế bán hàng')}</span><strong className="num">{fmtMoney(selected.tax_total)}</strong></div>}
         <div className="restaurant-cart-total"><span>{t('Tổng đã gồm thuế')}</span><strong className="num">{fmtMoney(selected.total || 0)}</strong></div>
         {selectedTickets.length > 0 && <div className="restaurant-ticket-status"><h3>{t('Tiến độ bếp')}</h3>{selectedTickets.map((ticket) => <div key={ticket.id}><span>{t(ticket.station === 'bar' ? 'Quầy pha chế' : 'Bếp')}</span><strong>{statusLabel(ticket.status)}</strong></div>)}</div>}
