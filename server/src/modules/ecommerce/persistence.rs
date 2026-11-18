@@ -144,28 +144,30 @@ async fn validate_web_order(
             }
         }
     }
-    if let Some(lines) = document.get("lines").and_then(Value::as_array) {
-        for (index, line) in lines.iter().enumerate() {
-            let Some(product) = line
-                .get("product")
-                .and_then(Value::as_str)
-                .and_then(|value| Uuid::parse_str(value).ok())
-            else {
-                continue;
-            };
-            let active = tx
-                .query_opt(
-                    "SELECT active FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
-                    &[&tenant.id, &product],
-                )
-                .await?;
-            match active {
-                Some(row) if row.get::<_, Option<bool>>(0) != Some(false) => {}
-                Some(_) => errors.push(format!("Sản phẩm dòng {} đã ngừng hoạt động", index + 1)),
-                None => errors.push(format!(
-                    "Sản phẩm dòng {} không tồn tại trong doanh nghiệp",
-                    index + 1
-                )),
+    if action != "cancelled" {
+        if let Some(lines) = document.get("lines").and_then(Value::as_array) {
+            for (index, line) in lines.iter().enumerate() {
+                let Some(product) = line
+                    .get("product")
+                    .and_then(Value::as_str)
+                    .and_then(|value| Uuid::parse_str(value).ok())
+                else {
+                    continue;
+                };
+                let active = tx
+                    .query_opt(
+                        "SELECT active FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                        &[&tenant.id, &product],
+                    )
+                    .await?;
+                match active {
+                    Some(row) if row.get::<_, Option<bool>>(0) != Some(false) => {}
+                    Some(_) => errors.push(format!("Sản phẩm dòng {} đã ngừng hoạt động", index + 1)),
+                    None => errors.push(format!(
+                        "Sản phẩm dòng {} không tồn tại trong doanh nghiệp",
+                        index + 1
+                    )),
+                }
             }
         }
     }
