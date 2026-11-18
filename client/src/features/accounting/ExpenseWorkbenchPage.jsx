@@ -3,7 +3,7 @@ import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
-import { addDecimals } from '../../lib/decimal.js';
+import { addDecimals, compareDecimals } from '../../lib/decimal.js';
 import { can, loadRefs, recordLabel, app, loadAllResponse } from '../../lib/state.js';
 import { listHref, recordHref } from '../../lib/routes.js';
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -54,7 +54,7 @@ export default function ExpenseWorkbenchPage() {
   }
   async function createClaim(event) {
     event.preventDefault();
-    const claimItems = lines.filter((line) => line.account_code && Number(line.amount) > 0).map((line) => ({ description: line.description.trim() || undefined, amount: Number(line.amount), account_code: line.account_code }));
+    const claimItems = lines.filter((line) => line.account_code && compareDecimals(line.amount || 0, 0) > 0).map((line) => ({ description: line.description.trim() || undefined, amount: String(line.amount), account_code: line.account_code }));
     if (!claimItems.length) { setError(uiText('Thêm ít nhất một khoản chi hợp lệ.')); return; }
     await run('claim:create', async () => {
       const claim = await api(dataPath('expense.expense_claim'), { method: 'POST', body: { ...form, items: claimItems, note: form.note.trim() || undefined } });

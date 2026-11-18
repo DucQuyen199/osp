@@ -11,13 +11,13 @@ const lineAmounts = (qty, price, rate) => {
   return { net, tax, total: roundDecimal(addDecimals([net, tax]), 4) };
 };
 
-export const keyOf = (line) => `${line.product}|${Number(line.price || 0)}|${line.tax || ''}|${Number(line.tax_rate ?? 0)}|${line.uom || ''}`;
+export const keyOf = (line) => `${line.product}|${addDecimals([line.price || 0])}|${line.tax || ''}|${addDecimals([line.tax_rate ?? 0])}|${line.uom || ''}`;
 
-export const orderPriceKeyOf = (line) => `${line.product}|${Number(line.price || 0)}|${line.uom || ''}|${line.po_tax ?? line.tax ?? ''}|${Number(line.po_tax_rate ?? line.tax_rate ?? 0)}`;
+export const orderPriceKeyOf = (line) => `${line.product}|${addDecimals([line.price || 0])}|${line.uom || ''}|${line.po_tax ?? line.tax ?? ''}|${addDecimals([line.po_tax_rate ?? line.tax_rate ?? 0])}`;
 
 export const lineValue = (line, taxes) => {
   const rate = taxes.get(line.tax)?.rate ?? line.tax_rate ?? 0;
-  return Number(lineAmounts(line.qty, line.price, rate).total);
+  return lineAmounts(line.qty, line.price, rate).total;
 };
 
 export function returnSourceLineFor(inspection, receipts, order) {
@@ -64,7 +64,7 @@ export function calculateUnreceivedPurchaseLines(order, receipts) {
     qty: maxZero(subtractDecimals(line.qty, received.get(key) || '0')),
     key,
   })).filter((line) => compareDecimals(line.qty, '0.000001') > 0)
-    .map((line) => ({ ...line, qty: Number(line.qty) }));
+    .map((line) => ({ ...line, qty: String(line.qty) }));
 }
 
 export function invoiceLineForReturn(invoiceId, orderLine, invoices) {
@@ -136,7 +136,7 @@ export function calculateInvoiceableLines(receipts, invoices, returns) {
   return [...received.entries()]
     .map(([key, line]) => ({ ...line, qty: maxZero(subtractDecimals(line.qty, reserved.get(key) || '0')) }))
     .filter((line) => compareDecimals(line.qty, '0.000001') > 0)
-    .map((line) => ({ ...line, qty: Number(line.qty) }));
+    .map((line) => ({ ...line, qty: String(line.qty) }));
 }
 
 export function calculateSupplierInvoiceDraftTotals({
@@ -162,7 +162,7 @@ export function calculateSupplierInvoiceDraftTotals({
 
   const adjustmentsInvalid = adjustments.some((line) => {
     const hasAnyValue = line.description.trim() || line.amount !== '';
-    return Boolean(hasAnyValue) && (!line.description.trim() || Number(line.amount) <= 0
+    return Boolean(hasAnyValue) && (!line.description.trim() || compareDecimals(line.amount || 0, 0) <= 0
       || (line.allocation === 'landed_cost' && (line.kind !== 'charge' || !(line.receipt_ids || []).length)));
   });
 
@@ -192,10 +192,10 @@ export function calculateSupplierInvoiceDraftTotals({
   const variance = subtractDecimals(subtractDecimals(baseTotal, baseTaxTotal), matchedNet);
 
   return {
-    adjustmentTotals: { net: Number(adjustmentTotals.net), tax: Number(adjustmentTotals.tax) },
+    adjustmentTotals,
     adjustmentsInvalid,
     foreignPriceMissing,
-    total: Number(total),
-    variance: Number(variance),
+    total,
+    variance,
   };
 }

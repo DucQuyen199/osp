@@ -54,8 +54,8 @@ export default function PaymentsWorkbenchPage() {
   }
   async function createTransaction(event) {
     event.preventDefault();
-    if (!(Number(form.amount) > 0) || !form.party || Boolean(form.invoice) === Boolean(form.bill)) { setError(uiText('Chọn đúng một hóa đơn bán hoặc hóa đơn mua và nhập số tiền hợp lệ.')); return; }
-    const payload = { provider: form.provider, method: form.method, party: form.party, amount: Number(form.amount), ...(form.invoice ? { invoice: form.invoice } : { bill: form.bill }), ...(form.reference.trim() ? { reference: form.reference.trim() } : {}) };
+    if (compareDecimals(form.amount || 0, 0) <= 0 || !form.party || Boolean(form.invoice) === Boolean(form.bill)) { setError(uiText('Chọn đúng một hóa đơn bán hoặc hóa đơn mua và nhập số tiền hợp lệ.')); return; }
+    const payload = { provider: form.provider, method: form.method, party: form.party, amount: String(form.amount), ...(form.invoice ? { invoice: form.invoice } : { bill: form.bill }), ...(form.reference.trim() ? { reference: form.reference.trim() } : {}) };
     await run('transaction:create', async () => {
       await api(dataPath('payments.payment_txn'), { method: 'POST', body: payload });
       setForm((current) => ({ ...current, amount: '', reference: '', invoice: '', bill: '' }));
@@ -77,7 +77,7 @@ export default function PaymentsWorkbenchPage() {
     event.preventDefault();
     if (!refundForm.payment_txn || compareDecimals(refundForm.amount || 0, 0) <= 0) return;
     await run('refund:create', async () => {
-      await api(dataPath('payments.payment_refund'), { method: 'POST', body: { payment_txn: refundForm.payment_txn, amount: Number(refundForm.amount), ...(refundForm.reference.trim() ? { reference: refundForm.reference.trim() } : {}) } });
+      await api(dataPath('payments.payment_refund'), { method: 'POST', body: { payment_txn: refundForm.payment_txn, amount: String(refundForm.amount), ...(refundForm.reference.trim() ? { reference: refundForm.reference.trim() } : {}) } });
       setRefundForm({ payment_txn: '', amount: '', reference: '' });
     }, uiText('Đã tạo hồ sơ hoàn tiền chờ xử lý.'));
   }
