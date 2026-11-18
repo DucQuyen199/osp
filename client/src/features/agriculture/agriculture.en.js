@@ -21,7 +21,7 @@ const agricultureEnglish = {
   'Chọn trang trại': 'Select a farm', 'Cây trồng / vụ *': 'Crop / cycle *', 'Ví dụ: Lúa đông xuân': 'For example: winter-spring rice',
   'Ngày gieo trồng *': 'Planting date *', 'Thu hoạch dự kiến': 'Expected harvest', 'Mở vụ mùa': 'Open crop cycle',
   'Vụ mùa': 'Crop cycles', 'Quá ngày dự kiến': 'Past expected date', 'Gieo': 'Planted', 'Dự thu': 'Expected harvest',
-  'Đã thu': 'Harvested', 'Dự kiến': 'Expected', 'Tạo trang trại và mở vụ mùa để bắt đầu.': 'Create a farm and open a crop cycle to get started.',
+  'Đã thu': 'Harvested', 'Lần thu': 'Harvest entries', 'Dự kiến': 'Expected', 'Tạo trang trại và mở vụ mùa để bắt đầu.': 'Create a farm and open a crop cycle to get started.',
   'Sản lượng đã thu theo sản phẩm': 'Harvested quantity by product', 'Diện tích': 'Area', 'Chưa khai báo': 'Not provided',
   'Năng suất lũy kế theo sản phẩm': 'Cumulative yield by product', 'Chưa có thu hoạch': 'No harvest recorded',
   'Cần diện tích': 'Area required', 'Lần bón / dùng vật tư': 'Input applications',
