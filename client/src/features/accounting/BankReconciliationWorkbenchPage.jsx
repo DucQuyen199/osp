@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate } from '../../lib/dates.js';
@@ -31,7 +31,7 @@ export default function BankReconciliationWorkbenchPage() {
   const [statementForm, setStatementForm] = useState({ account: '', currency: '', statement_number: '', start_date: `${today().slice(0, 7)}-01`, end_date: today(), opening_balance: '', closing_balance: '' });
   const [lineForm, setLineForm] = useState({ transaction_date: today(), reference: '', description: '', direction: 'credit', amount: '' });
   const [statementFile, setStatementFile] = useState(null);
-  const [cassoConnectorId, setCassoConnectorId] = useState('');
+  const [bankFeedConnectorId, setBankFeedConnectorId] = useState('');
   const [cassoSyncFrom, setCassoSyncFrom] = useState('');
   const [cassoSyncTo, setCassoSyncTo] = useState('');
   const [matchChoices, setMatchChoices] = useState({});
@@ -43,10 +43,10 @@ export default function BankReconciliationWorkbenchPage() {
   useEffect(() => {
     setStatementId((id) => statements.some((row) => row.id === id) ? id : statements.find((row) => row.status === 'draft')?.id || statements[0]?.id || '');
   }, [statements]);
-  const cassoFeedConnectors = useMemo(() => connectors.filter((connector) => connector.enabled && connector.config?.adapter === 'casso_bank_feed'), [connectors]);
+  const bankFeedConnectors = useMemo(() => connectors.filter((connector) => connector.enabled && ['casso_bank_feed', 'sepay_bank_feed'].includes(connector.config?.adapter)), [connectors]);
   useEffect(() => {
-    setCassoConnectorId((id) => cassoFeedConnectors.some((connector) => connector.id === id) ? id : cassoFeedConnectors[0]?.id || '');
-  }, [cassoFeedConnectors]);
+    setBankFeedConnectorId((id) => bankFeedConnectors.some((connector) => connector.id === id) ? id : bankFeedConnectors[0]?.id || '');
+  }, [bankFeedConnectors]);
   useEffect(() => {
     setStatementForm((form) => ({ ...form, account: form.account || [...accounts.values()].find((account) => account.code === '112')?.id || [...accounts.values()].find(isBankAccount)?.id || '', currency: form.currency || baseCurrency?.id || '' }));
   }, [accounts, baseCurrency]);
@@ -56,6 +56,11 @@ export default function BankReconciliationWorkbenchPage() {
     await loadData(quiet);
   };
   const selected = statements.find((row) => row.id === statementId);
+  const selectedBankFeed = bankFeedConnectors.find((connector) => connector.id === bankFeedConnectorId);
+  const selectedBankAccount = accounts.get(selected?.account);
+  const syncAccountMapped = selectedBankFeed?.config?.adapter === 'casso_bank_feed'
+    ? Boolean(selectedBankAccount?.casso_bank_account_id)
+    : Boolean(selectedBankAccount?.bank_account_id);
   useEffect(() => {
     setCassoSyncFrom(selected?.start_date || '');
     setCassoSyncTo(selected?.end_date || '');
@@ -96,14 +101,17 @@ export default function BankReconciliationWorkbenchPage() {
     }, (result) => t('Đã nhập {imported} dòng; bỏ qua {skipped} dòng trùng.').replace('{imported}', result.imported).replace('{skipped}', result.skipped));
   }
   async function syncCasso() {
-    if (!selected || !cassoConnectorId) return;
-    await run(`${selected.id}:casso-sync`, async () => api(tenantPath(`/accounting/bank-statements/${selected.id}/sync-casso`), {
+    if (!selected || !selectedBankFeed) return;
+    const isSePay = selectedBankFeed.config?.adapter === 'sepay_bank_feed';
+    const provider = isSePay ? 'SePay' : 'Casso';
+    const endpoint = isSePay ? 'sync-sepay' : 'sync-casso';
+    await run(`${selected.id}:${endpoint}`, async () => api(tenantPath(`/accounting/bank-statements/${selected.id}/${endpoint}`), {
       method: 'POST', body: {
-        connectorId: cassoConnectorId,
+        connectorId: bankFeedConnectorId,
         fromDate: cassoSyncFrom || selected.start_date,
         toDate: cassoSyncTo || selected.end_date,
       },
-    }), (result) => t('Đã đồng bộ {imported} giao dịch từ Casso; bỏ qua {skipped} dòng trùng.').replace('{imported}', result.imported).replace('{skipped}', result.skipped));
+    }), (result) => t('Đã đồng bộ {imported} giao dịch từ {provider}; bỏ qua {skipped} dòng trùng.').replace('{imported}', result.imported).replace('{skipped}', result.skipped).replace('{provider}', provider));
   }
   async function createLine(event) {
     event.preventDefault(); if (!selected) return;
@@ -249,7 +257,7 @@ export default function BankReconciliationWorkbenchPage() {
       {selected && <section className="card card-pad"><div className="row wrap"><div><h2>{t('Sao kê {number}').replace('{number}', selected.statement_number)}</h2><div className="small muted">{accounts.get(selected.account) ? recordLabel('accounting.account', accounts.get(selected.account)) : t('Tài khoản 112')} · {fmtDate(selected.start_date)} – {fmtDate(selected.end_date)} · {currencyCode}</div></div><span className="grow"/><span className={`badge ${selected.status === 'reconciled' ? 'success' : 'warning'}`}>{statusLabel(selected.status)}</span>{selected.status === 'draft' && can('accounting.bank_statement.cancelled') && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={cancelStatement}>{t("Hủy sao kê")}</button>}</div>
         <div className="stats u-mt-12" ><div className="card stat"><span className="stat-label">{t("Giao dịch Có")}</span><strong className="stat-value num">{fmtMoney(totals.credits, currencyCode)}</strong></div><div className="card stat"><span className="stat-label">{t("Giao dịch Nợ")}</span><strong className="stat-value num">{fmtMoney(totals.debits, currencyCode)}</strong></div><div className="card stat"><span className="stat-label">{t("Khớp / bỏ qua")}</span><strong className="stat-value">{totals.matched} / {totals.ignored}</strong><span className="small muted">{t("Còn {count} chưa xử lý").replace("{count}", totals.unmatched)}</span></div><div className="card stat"><span className="stat-label">{t("Số dư tính toán / sao kê")}</span><strong className="stat-value num">{fmtMoney(totals.calculated, currencyCode)}</strong><span className={`small ${compareDecimals(absDecimal(totals.difference), '0.005') <= 0 ? 'muted' : 'danger'}`}>{t("Chênh lệch {amount}").replace("{amount}", fmtMoney(totals.difference, currencyCode))}</span></div></div>
         {selected.status === 'draft' && <><div className="row wrap u-mt-12" ><label className="field grow"><span className="label">{t("Tệp CSV, CAMT.053 hoặc JSON Casso")}</span><input className="input" type="file" accept=".csv,.xml,.camt,.json,text/csv,application/xml,text/xml,application/json" disabled={Boolean(busy)} onChange={(event) => setStatementFile(event.target.files?.[0] || null)}/></label><button className="btn btn-secondary" type="button" disabled={!statementFile || Boolean(busy)} onClick={importFile}>{t("Nhập {format}").replace("{format}", statementFile && /\.json$/i.test(statementFile.name) ? 'Casso JSON' : statementFile && /\.(xml|camt)$/i.test(statementFile.name) ? 'CAMT.053' : 'CSV')}</button><a className="small" href={recordHref('accounting.bank_statement', selected.id)}>{t("Mở chi tiết / sửa số dư")}</a></div><p className="small muted">{t('Với CAMT.053 và Casso, hãy cấu hình IBAN, mã tài khoản hoặc mã tài khoản Casso trên tài khoản kế toán đã chọn trước khi nhập.')}</p>
-          {cassoFeedConnectors.length > 0 && <div className="row wrap u-mt-12"><label className="field"><span className="label">{t('Casso connector')}</span><select className="select" value={cassoConnectorId} onChange={(event) => setCassoConnectorId(event.target.value)}>{cassoFeedConnectors.map((connector) => <option key={connector.id} value={connector.id}>{connector.name}</option>)}</select></label><label className="field"><span className="label">{t('Từ ngày đồng bộ')}</span><input className="input" type="date" min={selected.start_date} max={selected.end_date} value={cassoSyncFrom} onChange={(event) => setCassoSyncFrom(event.target.value)}/></label><label className="field"><span className="label">{t('Đến ngày đồng bộ')}</span><input className="input" type="date" min={cassoSyncFrom || selected.start_date} max={selected.end_date} value={cassoSyncTo} onChange={(event) => setCassoSyncTo(event.target.value)}/></label><button className="btn btn-secondary" type="button" disabled={Boolean(busy) || !cassoConnectorId || !accounts.get(selected.account)?.casso_bank_account_id || !cassoSyncFrom || !cassoSyncTo || cassoSyncFrom > cassoSyncTo} onClick={syncCasso}>{t('Đồng bộ từ Casso API')}</button></div>}          {can('accounting.bank_statement_line.create') && <form className="form-grid u-mt-12"  onSubmit={createLine}><div className="full"><h3>{t("Thêm giao dịch thủ công")}</h3></div><label className="field"><span className="label">{t("Ngày giao dịch *")}</span><input className="input" required type="date" min={selected.start_date} max={selected.end_date} value={lineForm.transaction_date} onChange={(event) => setLineForm((form) => ({ ...form, transaction_date: event.target.value }))}/></label><label className="field"><span className="label">{t("Chiều tiền *")}</span><select className="select" value={lineForm.direction} onChange={(event) => setLineForm((form) => ({ ...form, direction: event.target.value }))}><option value="credit">{t("Có · tiền vào")}</option><option value="debit">{t("Nợ · tiền ra")}</option></select></label><label className="field"><span className="label">{t("Số tiền *")}</span><input className="input num" required type="number" min="0.01" step="any" value={lineForm.amount} onChange={(event) => setLineForm((form) => ({ ...form, amount: event.target.value }))}/></label><label className="field"><span className="label">{t("Mã tham chiếu")}</span><input className="input" value={lineForm.reference} onChange={(event) => setLineForm((form) => ({ ...form, reference: event.target.value }))}/></label><label className="field"><span className="label">{t("Diễn giải")}</span><input className="input" value={lineForm.description} onChange={(event) => setLineForm((form) => ({ ...form, description: event.target.value }))}/></label><div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy) || !lineForm.amount}>{t("Thêm dòng")}</button></div></form>}
+          {bankFeedConnectors.length > 0 && <div className="row wrap u-mt-12"><label className="field"><span className="label">{t('Bank feed connector')}</span><select className="select" value={bankFeedConnectorId} onChange={(event) => setBankFeedConnectorId(event.target.value)}>{bankFeedConnectors.map((connector) => <option key={connector.id} value={connector.id}>{connector.name}</option>)}</select></label><label className="field"><span className="label">{t('Từ ngày đồng bộ')}</span><input className="input" type="date" min={selected.start_date} max={selected.end_date} value={cassoSyncFrom} onChange={(event) => setCassoSyncFrom(event.target.value)}/></label><label className="field"><span className="label">{t('Đến ngày đồng bộ')}</span><input className="input" type="date" min={cassoSyncFrom || selected.start_date} max={selected.end_date} value={cassoSyncTo} onChange={(event) => setCassoSyncTo(event.target.value)}/></label><button className="btn btn-secondary" type="button" disabled={Boolean(busy) || !bankFeedConnectorId || !syncAccountMapped || !cassoSyncFrom || !cassoSyncTo || cassoSyncFrom > cassoSyncTo} onClick={syncCasso}>{t('Đồng bộ từ {provider} API').replace('{provider}', selectedBankFeed?.config?.adapter === 'sepay_bank_feed' ? 'SePay' : 'Casso')}</button></div>}          {can('accounting.bank_statement_line.create') && <form className="form-grid u-mt-12"  onSubmit={createLine}><div className="full"><h3>{t("Thêm giao dịch thủ công")}</h3></div><label className="field"><span className="label">{t("Ngày giao dịch *")}</span><input className="input" required type="date" min={selected.start_date} max={selected.end_date} value={lineForm.transaction_date} onChange={(event) => setLineForm((form) => ({ ...form, transaction_date: event.target.value }))}/></label><label className="field"><span className="label">{t("Chiều tiền *")}</span><select className="select" value={lineForm.direction} onChange={(event) => setLineForm((form) => ({ ...form, direction: event.target.value }))}><option value="credit">{t("Có · tiền vào")}</option><option value="debit">{t("Nợ · tiền ra")}</option></select></label><label className="field"><span className="label">{t("Số tiền *")}</span><input className="input num" required type="number" min="0.01" step="any" value={lineForm.amount} onChange={(event) => setLineForm((form) => ({ ...form, amount: event.target.value }))}/></label><label className="field"><span className="label">{t("Mã tham chiếu")}</span><input className="input" value={lineForm.reference} onChange={(event) => setLineForm((form) => ({ ...form, reference: event.target.value }))}/></label><label className="field"><span className="label">{t("Diễn giải")}</span><input className="input" value={lineForm.description} onChange={(event) => setLineForm((form) => ({ ...form, description: event.target.value }))}/></label><div className="row full"><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy) || !lineForm.amount}>{t("Thêm dòng")}</button></div></form>}
         </>}
         <BankStatementLinesTable
           lines={selectedLines} loading={linesLoading} draft={selected.status === 'draft'} busy={busy}

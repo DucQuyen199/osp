@@ -97,6 +97,7 @@ fn validate_connector(document: &Value) -> Vec<String> {
             match config.get("adapter").and_then(Value::as_str) {
                 Some("http_event_sink") => validate_http_event_sink(config, &mut errors),
                 Some("casso_bank_feed") => validate_casso_bank_feed(config, &mut errors),
+                Some("sepay_bank_feed") => validate_sepay_bank_feed(config, &mut errors),
                 _ => errors.push("Enabled connector must use a supported adapter".into()),
             }
         }
@@ -118,6 +119,24 @@ fn validate_casso_bank_feed(config: &Value, errors: &mut Vec<String>) {
         Some(value)
             if (16..=512).contains(&value.len()) && !value.chars().any(char::is_control) => {}
         _ => errors.push("Casso bank feed requires an app_secret of 16 to 512 characters".into()),
+    }
+}
+
+fn validate_sepay_bank_feed(config: &Value, errors: &mut Vec<String>) {
+    match config.get("api_token").and_then(Value::as_str) {
+        Some(value)
+            if value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_alphanumeric()) => {}
+        _ => errors.push("SePay API v2 requires a 64-character alphanumeric api_token".into()),
+    }
+    match config.get("bank_account_id").and_then(Value::as_str) {
+        Some(value) if uuid::Uuid::parse_str(value).is_ok() => {}
+        _ => errors.push("SePay bank feed requires a bank_account_id UUID from SePay".into()),
+    }
+    if !matches!(
+        config.get("environment").and_then(Value::as_str),
+        Some("sandbox" | "production")
+    ) {
+        errors.push("SePay environment must be sandbox or production".into());
     }
 }
 

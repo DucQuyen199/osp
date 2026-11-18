@@ -13,6 +13,7 @@ pub use application::{
 };
 pub use bank_import::{
     import_statement_camt053, import_statement_casso, import_statement_csv, sync_statement_casso,
+    sync_statement_sepay,
 };
 pub use domain::{validate, validate_action, validate_action_at, validate_remove, validate_update};
 pub use persistence::{post_stock_movement, validate_persistence};

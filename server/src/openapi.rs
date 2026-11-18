@@ -1063,6 +1063,27 @@ pub fn build(reg: &Registry) -> Value {
         } }),
     );
     paths.insert(
+        "/api/t/{tenantId}/accounting/bank-statements/{statementId}/sync-sepay".into(),
+        json!({ "post": {
+            "tags": ["accounting", "integration-hub"], "summary": "Sync SePay transactions into a bank statement", "security": sec,
+            "parameters": [tid, { "name": "statementId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                "type": "object", "required": ["connectorId"], "properties": {
+                    "connectorId": { "type": "string", "format": "uuid", "description": "Enabled tenant-scoped SePay bank-feed connector" },
+                    "fromDate": { "type": "string", "format": "date", "description": "Optional date within the statement period; defaults to statement start date" },
+                    "toDate": { "type": "string", "format": "date", "description": "Optional date within the statement period; defaults to statement end date" }
+                }
+            } } } },
+            "responses": with_common(Map::from_iter([
+                ("200".to_string(), json!({ "description": "Transactions imported idempotently after checking provider UUID and ledger account number" })),
+                ("409".to_string(), err("Only draft statements accept imported rows")),
+                ("422".to_string(), err("Invalid connector, date range, account mapping, or provider response")),
+                ("429".to_string(), err("SePay API rate limit reached; retry after the provider delay")),
+                ("502".to_string(), err("SePay transaction API is unavailable"))
+            ]))
+        } }),
+    );
+    paths.insert(
         "/api/t/{tenantId}/accounting/bank-statements/{statementId}/import".into(),
         json!({ "post": {
             "tags": ["accounting"], "summary": "Import bank statement CSV", "security": sec,

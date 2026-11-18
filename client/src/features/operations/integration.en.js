@@ -32,6 +32,10 @@ const integrationEnglish = {
   'Cần URL HTTPS công khai, events và header xác thực. Secret được che khi đọc lại.': 'Requires a public HTTPS URL, events, and authentication headers. Secrets are masked when read back.',
   'Adapter trong cấu hình phải khớp loại connector đã chọn.': 'The configured adapter must match the selected connector type.',
   'Đã cấu hình': 'Configured',
+  'SePay API v2 bank feed': 'SePay API v2 bank feed',
+  'Casso Flow v3 bank feed': 'Casso Flow v3 bank feed',
+  'Chọn adapter HTTP gửi sự kiện ra ngoài hoặc một nhà cung cấp để đồng bộ giao dịch ngân hàng vào sao kê.': 'Choose an HTTP event sink for outbound events or a provider to sync bank transactions into statements.',
+  'SePay API v2: chọn sandbox để thử hoặc production để chạy thật; nhập API token 64 ký tự và bank account UUID trong SePay. Token được che khi đọc lại. Trên tài khoản kế toán, cấu hình bank_account_id bằng số tài khoản ngân hàng.': 'SePay API v2: choose sandbox for testing or production for live use; enter the 64-character API token and SePay bank account UUID. The token is masked when read back. Set bank_account_id on the ledger account to the bank account number.',
 };
 
 export default integrationEnglish;

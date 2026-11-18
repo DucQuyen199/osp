@@ -83,6 +83,54 @@ pub async fn sync_statement_casso(
     from_date: Option<&str>,
     to_date: Option<&str>,
 ) -> R<Value> {
+    sync_statement_feed(
+        kernel,
+        actor,
+        tenant,
+        statement_id,
+        connector_id,
+        from_date,
+        to_date,
+        "casso_bank_feed",
+        "casso",
+    )
+    .await
+}
+
+pub async fn sync_statement_sepay(
+    kernel: &Kernel,
+    actor: &Actor,
+    tenant: &Tenant,
+    statement_id: &str,
+    connector_id: &str,
+    from_date: Option<&str>,
+    to_date: Option<&str>,
+) -> R<Value> {
+    sync_statement_feed(
+        kernel,
+        actor,
+        tenant,
+        statement_id,
+        connector_id,
+        from_date,
+        to_date,
+        "sepay_bank_feed",
+        "sepay",
+    )
+    .await
+}
+
+async fn sync_statement_feed(
+    kernel: &Kernel,
+    actor: &Actor,
+    tenant: &Tenant,
+    statement_id: &str,
+    connector_id: &str,
+    from_date: Option<&str>,
+    to_date: Option<&str>,
+    adapter: &'static str,
+    provider: &'static str,
+) -> R<Value> {
     let statement_id = authorize_import(kernel, actor, tenant, statement_id)?;
     kernel.ent(tenant, "integration-hub.connector")?;
     kernel.authorize(tenant, actor, "integration-hub.connector.read")?;
@@ -97,7 +145,7 @@ pub async fn sync_statement_casso(
     let tx = Tx::begin(&mut conn, &tenant.id, false).await?;
     let statement = tx
         .query_opt(
-            "SELECT statement.status, statement.start_date, statement.end_date, account.code, account.kind, account.casso_bank_account_id FROM accounting__bank_statement statement JOIN accounting__account account ON account.tenant_id = statement.tenant_id AND account.id = statement.account WHERE statement.tenant_id = $1 AND statement.id = $2",
+            "SELECT statement.status, statement.start_date, statement.end_date, account.code, account.kind, account.bank_account_id, account.casso_bank_account_id FROM accounting__bank_statement statement JOIN accounting__account account ON account.tenant_id = statement.tenant_id AND account.id = statement.account WHERE statement.tenant_id = $1 AND statement.id = $2",
             &[&tenant.id, &statement_id],
         )
         .await?
@@ -107,7 +155,11 @@ pub async fn sync_statement_casso(
     let end: NaiveDate = statement.get(2);
     let account_code: String = statement.get(3);
     let account_kind: String = statement.get(4);
-    let expected_account: Option<String> = statement.get(5);
+    let expected_account: Option<String> = if provider == "casso" {
+        statement.get(6)
+    } else {
+        statement.get(5)
+    };
     if status != "draft" {
         return Err(ApiError::new(
             409,
@@ -122,12 +174,14 @@ pub async fn sync_statement_casso(
     {
         return Err(ApiError::validation(
             "accounting.bank_statement",
-            vec!["Casso feed requires a bank asset account in chart group 112".into()],
+            vec![format!(
+                "{provider} feed requires a bank asset account in chart group 112"
+            )],
         ));
     }
     let expected_account = expected_account
         .filter(|value| !value.trim().is_empty())
-        .ok_or_else(|| ApiError::validation("accounting.account", vec!["Configure casso_bank_account_id on the ledger account linked to this statement".into()]))?;
+        .ok_or_else(|| ApiError::validation("accounting.account", vec![if provider == "casso" { "Configure casso_bank_account_id on the ledger account linked to this statement" } else { "Configure bank_account_id on the ledger account linked to this statement" }.into()]))?;
     let parse_date = |value: Option<&str>, fallback: NaiveDate, field: &str| -> R<NaiveDate> {
         match value {
             Some(value) => NaiveDate::parse_from_str(value, "%Y-%m-%d").map_err(|_| {
@@ -142,7 +196,12 @@ pub async fn sync_statement_casso(
     let from = parse_date(from_date, start, "fromDate")?;
     let to = parse_date(to_date, end, "toDate")?;
     if from > to || from < start || to > end {
-        return Err(ApiError::validation("accounting.bank_statement", vec!["Casso sync dates must be within the selected statement period and fromDate must not be after toDate".into()]));
+        return Err(ApiError::validation(
+            "accounting.bank_statement",
+            vec![format!(
+                "{provider} sync dates must be within the selected statement period and fromDate must not be after toDate"
+            )],
+        ));
     }
     let connector = tx
         .query_opt(
@@ -150,19 +209,27 @@ pub async fn sync_statement_casso(
             &[&tenant.id, &connector_id],
         )
         .await?
-        .ok_or_else(|| ApiError::not_found("Enabled Casso connector not found for this tenant"))?;
+        .ok_or_else(|| {
+            ApiError::not_found(format!(
+                "Enabled {provider} connector not found for this tenant"
+            ))
+        })?;
     let config: Option<Value> = connector.get(0);
     let config = config
-        .filter(|config| config.get("adapter").and_then(Value::as_str) == Some("casso_bank_feed"))
+        .filter(|config| config.get("adapter").and_then(Value::as_str) == Some(adapter))
         .ok_or_else(|| {
             ApiError::validation(
                 "integration-hub.connector",
-                vec!["Selected connector is not a Casso bank feed".into()],
+                vec![format!("Selected connector is not a {provider} bank feed")],
             )
         })?;
     tx.commit().await?;
 
-    let parsed = super::casso_feed::fetch(&config, from, to, &expected_account).await?;
+    let parsed = if provider == "casso" {
+        super::casso_feed::fetch(&config, from, to, &expected_account).await?
+    } else {
+        super::sepay_feed::fetch(&config, from, to, &expected_account).await?
+    };
     persistence::import_lines(
         kernel,
         actor,
@@ -170,8 +237,16 @@ pub async fn sync_statement_casso(
         statement_id,
         parsed.lines,
         Some(parsed.identity),
-        "CASSO",
-        "Casso transaction",
+        if provider == "casso" {
+            "CASSO"
+        } else {
+            "SEPAY"
+        },
+        if provider == "casso" {
+            "Casso transaction"
+        } else {
+            "SePay transaction"
+        },
     )
     .await
 }

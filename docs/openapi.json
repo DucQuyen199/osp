@@ -19558,6 +19558,144 @@
         ]
       }
     },
+    "/api/t/{tenantId}/accounting/bank-statements/{statementId}/sync-sepay": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "statementId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "connectorId": {
+                    "description": "Enabled tenant-scoped SePay bank-feed connector",
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "fromDate": {
+                    "description": "Optional date within the statement period; defaults to statement start date",
+                    "format": "date",
+                    "type": "string"
+                  },
+                  "toDate": {
+                    "description": "Optional date within the statement period; defaults to statement end date",
+                    "format": "date",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "connectorId"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Transactions imported idempotently after checking provider UUID and ledger account number"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Only draft statements accept imported rows"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Invalid connector, date range, account mapping, or provider response"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "SePay API rate limit reached; retry after the provider delay"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "SePay transaction API is unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sync SePay transactions into a bank statement",
+        "tags": [
+          "accounting",
+          "integration-hub"
+        ]
+      }
+    },
     "/api/t/{tenantId}/approvals/approvers": {
       "get": {
         "description": "Returns only user IDs, names, and disabled flags. Requires workflow-approval.approval_rule.read, create, or update; disabled users are included so existing rules can be edited and cleaned up.",

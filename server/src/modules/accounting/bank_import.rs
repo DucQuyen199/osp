@@ -5,7 +5,9 @@ mod csv;
 mod import;
 mod model;
 mod persistence;
+mod sepay_feed;
 
 pub use import::{
     import_statement_camt053, import_statement_casso, import_statement_csv, sync_statement_casso,
+    sync_statement_sepay,
 };

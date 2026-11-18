@@ -98,4 +98,7 @@ export default {
   'Đến ngày đồng bộ': 'Sync through date',
   'Đồng bộ từ Casso API': 'Sync from Casso API',
   'Đã đồng bộ {imported} giao dịch từ Casso; bỏ qua {skipped} dòng trùng.': 'Synced {imported} transactions from Casso; skipped {skipped} duplicate rows.',
+  'Bank feed connector': 'Bank feed connector',
+  'Đồng bộ từ {provider} API': 'Sync from {provider} API',
+  'Đã đồng bộ {imported} giao dịch từ {provider}; bỏ qua {skipped} dòng trùng.': 'Synced {imported} transactions from {provider}; skipped {skipped} duplicate rows.',
 };
