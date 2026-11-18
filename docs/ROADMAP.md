@@ -6,6 +6,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 
 - 51 module, 208 loại dữ liệu, 948 sự kiện, 22 gói ngành; nghiệp vụ liên module chạy trong Rust bounded contexts.
 - Điện/nước/khí/viễn thông hỗ trợ biểu giá lũy tiến theo ngưỡng lũy kế, phí cố định mỗi kỳ và snapshot chi tiết từng bậc trên lịch sử chỉ số/hóa đơn.
+- Màn hình ước tính tiêu thụ tiện ích dùng Decimal, tính từng bậc và làm tròn từng khoản như máy chủ trước khi cộng phí cố định.
 - LMS tự phát hành chứng chỉ bất biến khi học viên hoàn thành đủ bài bắt buộc; lưu snapshot người học/khóa học, tra cứu theo số và in từ workbench.
 - Trường học liên kết lớp với hồ sơ giáo viên HRM tùy chọn, chặn xếp trùng giờ giữa các lớp và không cho chấm dứt nhân viên còn buổi dạy tương lai; buổi học lưu snapshot giáo viên.
 - Trường học tạo học phí nháp theo đợt/lớp/kỳ một cách nguyên tử, bỏ qua khoản đã có, lưu số tiền cùng hạn thu; nhân viên phát hành hóa đơn sau khi rà soát từng khoản.

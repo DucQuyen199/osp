@@ -3,6 +3,7 @@ import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localMonth } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
+import { estimateUtilityCharge } from './domain/utilityEstimate.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import utilitiesEnglish from './utilities.en.js';
 const t = (text) => uiTextWith(text, utilitiesEnglish);
@@ -13,22 +14,6 @@ const nextPeriod = (period) => {
   return month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, '0')}`;
 };
 const money = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 2 });
-const estimateUtilityCharge = (consumption, meter) => {
-  const tiers = Array.isArray(meter?.tariff_tiers) ? meter.tariff_tiers : [];
-  let usageAmount = 0;
-  if (!tiers.length) usageAmount = consumption * Number(meter?.rate || 0);
-  else {
-    let lower = 0;
-    for (const tier of tiers) {
-      const upper = tier.up_to == null ? consumption : Number(tier.up_to);
-      const units = Math.max(0, Math.min(consumption, upper) - lower);
-      usageAmount += units * Number(tier.rate || 0);
-      if (tier.up_to == null || consumption <= upper) break;
-      lower = upper;
-    }
-  }
-  return usageAmount + Number(meter?.fixed_charge || 0);
-};
 export default function UtilitiesWorkbenchPage() {
   useDocumentTitle(t("Ghi chỉ số và hóa đơn tiện ích · OSP Suite"));
   const [meters, setMeters] = useState([]);
@@ -75,9 +60,8 @@ export default function UtilitiesWorkbenchPage() {
   const meterReadings = useMemo(() => readings.filter((item) => item.meter === selectedMeter).sort((a, b) => String(b.period).localeCompare(String(a.period))), [readings, selectedMeter]);
   const latest = meterReadings[0];
   const previous = meterReadings.find((item) => item.period < period);
-  const previousReading = Number(previous?.reading ?? meter?.opening_reading ?? 0);
-  const consumption = Math.max(0, Number(readingValue || 0) - previousReading);
-  const estimate = estimateUtilityCharge(consumption, meter);
+  const previousReading = String(previous?.reading ?? meter?.opening_reading ?? 0);
+  const { consumption, total: estimate } = estimateUtilityCharge(readingValue || 0, previousReading, meter);
   const readingForBill = new Map(readings.map((item) => [item.id, item]));
   const billByReading = new Map(bills.map((item) => [item.meter_reading, item]));
   const invoiceByBill = new Map(invoices.filter((item) => item.source === 'utility_bill').map((item) => [item.source_id, item]));
