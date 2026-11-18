@@ -412,6 +412,25 @@ async fn messaging(kernel: &Arc<Kernel>) {
         deliveries.to_string().contains(&id(&webhook)),
         "{deliveries}"
     );
+    assert!(
+        osp_server::modules::integration_hub::run_once(kernel)
+            .await
+            .unwrap()
+            >= 1,
+        "the webhook worker should claim the queued test delivery"
+    );
+    let (status, retries) = t.api("GET", "/outbox?status=retry", json!(null)).await;
+    assert_eq!(status, 200, "{retries}");
+    assert!(
+        retries.as_array().unwrap().iter().any(|delivery| {
+            delivery["webhookId"] == id(&webhook)
+                && delivery["status"] == "retry"
+                && delivery["attempts"] == 1
+                && !delivery["error"].as_str().unwrap_or_default().is_empty()
+        }),
+        "a transient reserved-domain DNS failure should schedule a retry"
+    );
+
     println!(
         "✔ messaging/integration: due reminder queue, one outbox event, credential edits and private-host denial"
     );

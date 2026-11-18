@@ -512,7 +512,7 @@ async fn finish_failed(kernel: &Kernel, delivery: &Delivery, failure: Failure) -
         .min(3600);
     let conn = kernel.pool.get().await?;
     conn.execute(
-        "UPDATE osp_outbox SET status = $2, available_at = now() + ($3 * interval '1 second'), locked_at = NULL, last_error = $4 WHERE id = $1 AND status = 'processing'",
+        "UPDATE osp_outbox SET status = $2, available_at = now() + ($3::bigint * interval '1 second'), locked_at = NULL, last_error = $4 WHERE id = $1 AND status = 'processing'",
         &[&delivery.id, &status, &backoff, &failure.message],
     )
     .await?;
