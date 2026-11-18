@@ -211,7 +211,7 @@ export default function AuthPage({ route, onSignedIn }) {
             <div className="field full"><label htmlFor="signup-company">{t('Tên doanh nghiệp')}</label><input className="input" id="signup-company" name="company" required autoComplete="organization" /></div>
             <div className="field"><label htmlFor="signup-admin">{t('Tên người quản trị')}</label><input className="input" id="signup-admin" name="adminName" required autoComplete="name" /></div>
             <div className="field"><label htmlFor="signup-email">{t('Email đăng nhập')}</label><input className="input" id="signup-email" name="email" type="email" required autoComplete="username" /></div>
-            <div className="field full"><label htmlFor="signup-password">{t('Mật khẩu')}</label><input className="input" id="signup-password" name="password" type="password" required minLength="8" autoComplete="new-password" /><p className="hint">{t('Tối thiểu 8 ký tự.')}</p></div>
+            <div className="field full"><label htmlFor="signup-password">{t('Mật khẩu')}</label><input className="input" id="signup-password" name="password" type="password" required minLength="15" maxLength="200" autoComplete="new-password" /><p className="hint">{t('Tối thiểu 15 ký tự.')}</p></div>
           </div>
         </fieldset>
         <button className="btn btn-primary" type="submit" disabled={Boolean(busy)}>{t(busy === 'signup' ? 'Đang tạo doanh nghiệp…' : 'Tạo doanh nghiệp')}</button>
@@ -226,8 +226,8 @@ export default function AuthPage({ route, onSignedIn }) {
         <button className="btn btn-primary" type="submit" disabled={Boolean(busy)}>{t(busy === 'verify-request' ? 'Đang gửi…' : 'Gửi liên kết xác minh')}</button>
         <button className="btn btn-ghost" type="button" onClick={() => setMode('login')}>{t('Quay lại đăng nhập')}</button>
       </form> : mode === 'verify' ? <div className="stack"><p className="muted">{t(busy === 'verify' ? 'Đang xử lý liên kết xác minh…' : 'Bạn có thể quay lại đăng nhập sau khi xác minh.')}</p><button className="btn btn-ghost" type="button" onClick={() => { setMode('login'); location.hash = '#/login'; }}>{t('Quay lại đăng nhập')}</button></div> : <form className="stack" onSubmit={completeReset}>
-        <div className="field"><label htmlFor="new-password">{t('Mật khẩu mới')}</label><input className="input" id="new-password" name="password" type="password" autoComplete="new-password" minLength="8" maxLength="200" required /></div>
-        <div className="field"><label htmlFor="confirm-password">{t('Nhập lại mật khẩu')}</label><input className="input" id="confirm-password" name="confirm" type="password" autoComplete="new-password" minLength="8" maxLength="200" required /></div>
+        <div className="field"><label htmlFor="new-password">{t('Mật khẩu mới')}</label><input className="input" id="new-password" name="password" type="password" autoComplete="new-password" minLength="15" maxLength="200" required /><p className="hint">{t('Tối thiểu 15 ký tự.')}</p></div>
+        <div className="field"><label htmlFor="confirm-password">{t('Nhập lại mật khẩu')}</label><input className="input" id="confirm-password" name="confirm" type="password" autoComplete="new-password" minLength="15" maxLength="200" required /></div>
         <button className="btn btn-primary" type="submit" disabled={Boolean(busy)}>{t(busy === 'reset' ? 'Đang cập nhật…' : 'Đặt lại mật khẩu')}</button>
       </form>}
       {mode === 'login' && catalog.oidc && <div className="stack-sm"><button className="btn" type="button" disabled={Boolean(busy)} onClick={startOidc}>{t(busy === 'oidc' ? 'Đang chuyển tới nhà cung cấp…' : 'Đăng nhập bằng tài khoản doanh nghiệp')}</button></div>}

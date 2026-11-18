@@ -43,7 +43,7 @@ pub fn build(reg: &Registry) -> Value {
             "requestBody": { "required": true, "content": { "application/json": { "schema": {
                 "type": "object", "required": ["name", "admin"], "properties": {
                     "name": { "type": "string", "maxLength": 120 }, "vertical": { "type": "string" }, "modules": { "type": "array", "items": { "type": "string" } },
-                    "admin": { "type": "object", "required": ["name", "email", "password"], "properties": { "name": { "type": "string" }, "email": { "type": "string", "format": "email" }, "password": { "type": "string", "minLength": 8, "maxLength": 200 } } }
+                    "admin": { "type": "object", "required": ["name", "email", "password"], "properties": { "name": { "type": "string" }, "email": { "type": "string", "format": "email" }, "password": { "type": "string", "minLength": 15, "maxLength": 200 } } }
                 }
             } } } },
             "responses": with_common(Map::from_iter([("201".to_string(), json!({ "description": "Tenant created; verification email queued", "content": { "application/json": { "schema": { "type": "object", "properties": { "tenantId": { "type": "string" }, "emailVerificationRequired": { "type": "boolean" }, "modules": { "type": "array", "items": { "type": "string" } }, "warnings": { "type": "array", "items": { "type": "string" } } } } } } })), ("422".to_string(), err("Invalid tenant or administrator data")), ("503".to_string(), err("Email verification is not configured"))]))
@@ -660,7 +660,7 @@ pub fn build(reg: &Registry) -> Value {
             "tags": ["auth"], "summary": "Consume a reset token and set a new password",
             "requestBody": { "required": true, "content": { "application/json": { "schema": {
                 "type": "object", "required": ["token", "password"],
-                "properties": { "token": { "type": "string" }, "password": { "type": "string", "minLength": 8, "maxLength": 200 } }
+                "properties": { "token": { "type": "string" }, "password": { "type": "string", "minLength": 15, "maxLength": 200 } }
             } } } },
             "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Password changed; reset token consumed and active sessions revoked" })), ("422".to_string(), err("Token expired or password invalid"))]))
         } }),

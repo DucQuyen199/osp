@@ -16,6 +16,7 @@ const subscriptionEnglish = {
   'Đến hạn': 'Due date', 'Số tiền đã chụp': 'Amount snapshot', 'Trạng thái / hóa đơn': 'Status / invoice', 'Thuê bao': 'Subscription',
   'mở hóa đơn': 'Open invoice', 'Hệ thống sẽ phát hành hóa đơn đến hạn.': 'The system will issue the invoice when it is due.',
   'Thanh toán được ghi nhận trên hóa đơn kế toán. Khi hóa đơn được thanh toán, hệ thống tự chốt kỳ thu và lên lịch kỳ tiếp theo; không ghi nhận thanh toán thủ công trên thuê bao.': 'Payments are recorded on accounting invoices. Once an invoice is paid, the system closes the billing cycle and schedules the next one. Do not record payments manually on a subscription.',
+  'Chỉ chốt kỳ thu sau khi hóa đơn kế toán nguồn đã thanh toán': 'Settle a billing cycle only after its source accounting invoice is paid.',
   'tháng': 'month', 'quý': 'quarter', 'năm': 'year',
 };
 

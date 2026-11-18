@@ -106,14 +106,15 @@ pub async fn verify_password(pw: String, stored: Option<String>) -> bool {
 }
 
 pub fn check_password(pw: &str) -> R<()> {
-    if pw.chars().count() < 8 {
+    let length = pw.chars().count();
+    if length < 15 {
         return Err(ApiError::new(
             422,
             "WEAK_PASSWORD",
-            "Mật khẩu tối thiểu 8 ký tự",
+            "Mật khẩu tối thiểu 15 ký tự",
         ));
     }
-    if pw.len() > 200 {
+    if length > 200 {
         return Err(ApiError::new(422, "WEAK_PASSWORD", "Mật khẩu quá dài"));
     }
     Ok(())

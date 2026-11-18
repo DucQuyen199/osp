@@ -579,7 +579,7 @@ const uiTextEnglish = {
   'Tài khoản máy không có mật khẩu đăng nhập tương tác, vì vậy không thể bật TOTP.': 'Service accounts do not have an interactive password, so TOTP cannot be enabled.',
   'Lưu mã khôi phục': 'Save recovery codes', 'Mỗi mã chỉ dùng được một lần. Chúng sẽ không hiển thị lại sau khi rời trang.': 'Each code works once. They will not be shown again after you leave this page.',
   'Sao chép mã': 'Copy codes', 'Đã lưu, ẩn mã': 'Saved, hide codes', 'Ứng dụng tương thích TOTP như Google Authenticator, Microsoft Authenticator hoặc 1Password có thể dùng mã này.': 'Use this with a TOTP app such as Google Authenticator, Microsoft Authenticator, or 1Password.',
-  'Mật khẩu hiện tại': 'Current password', 'Đang tạo mã…': 'Generating code…', 'Bắt đầu thiết lập': 'Start setup', 'Thêm tài khoản bằng cách nhập khóa này vào ứng dụng xác thực. Khóa chỉ hiển thị trong phiên thiết lập 10 phút.': 'Add an account in your authenticator app using this key. The key is shown only during this 10-minute setup session.',
+  'Mật khẩu hiện tại': 'Current password', 'Tối thiểu 15 ký tự.': 'At least 15 characters.', 'Đang tạo mã…': 'Generating code…', 'Bắt đầu thiết lập': 'Start setup', 'Thêm tài khoản bằng cách nhập khóa này vào ứng dụng xác thực. Khóa chỉ hiển thị trong phiên thiết lập 10 phút.': 'Add an account in your authenticator app using this key. The key is shown only during this 10-minute setup session.',
   'Khóa TOTP': 'TOTP key', 'Liên kết otpauth': 'otpauth link', 'Mã 6 chữ số trong ứng dụng': '6-digit code from your app', 'Đang xác minh…': 'Verifying…', 'Bật xác thực hai lớp': 'Enable two-factor authentication',
   'Hủy': 'Cancel', 'Tắt xác thực hai lớp': 'Disable two-factor authentication', 'Mã TOTP hoặc mã khôi phục': 'TOTP or recovery code', 'Đang tắt…': 'Disabling…',
   'Không tải được token.': 'Could not load tokens.', 'API token': 'API tokens', 'Nhập ít nhất một quyền cho token giới hạn.': 'Enter at least one permission for a scoped token.',
@@ -1443,5 +1443,6 @@ const uiTextEnglish = {
   'Configure an applicable journal entry approval rule before submitting': 'Hãy cấu hình quy tắc phê duyệt phù hợp trước khi gửi bút toán.',
   'Submit manual journal entries for independent approval before posting': 'Hãy gửi bút toán thủ công để người khác phê duyệt trước khi ghi sổ.',
   'Journal rejection must come from an approval decision': 'Bút toán chỉ bị từ chối theo quyết định trong luồng phê duyệt.',
+  'Mật khẩu tối thiểu 15 ký tự': 'Password must be at least 15 characters.',
 };
 export default uiTextEnglish;

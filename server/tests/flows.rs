@@ -1381,7 +1381,7 @@ async fn run(k: Arc<Kernel>, url: String, defs: PathBuf) {
                 admin: Some(AdminInput {
                     name: None,
                     email: Some("Boss@X.vn".into()),
-                    password: Some("password-1".into()),
+                    password: Some("password-for-test-1".into()),
                 }),
                 require_email_verification: false,
             })
@@ -1392,13 +1392,16 @@ async fn run(k: Arc<Kernel>, url: String, defs: PathBuf) {
             "INVALID_CREDENTIALS"
         );
         assert_eq!(
-            k.login(&t.id, "khong@x.vn", "password-1")
+            k.login(&t.id, "khong@x.vn", "password-for-test-1")
                 .await
                 .unwrap_err()
                 .code,
             "INVALID_CREDENTIALS"
         );
-        let ok = k.login(&t.id, "BOSS@x.vn", "password-1").await.unwrap();
+        let ok = k
+            .login(&t.id, "BOSS@x.vn", "password-for-test-1")
+            .await
+            .unwrap();
         assert!(ok["token"].as_str().unwrap().starts_with("osp_"));
         assert!(ok["user"].get("passwordHash").is_none());
         for _ in 0..5 {
@@ -1408,7 +1411,7 @@ async fn run(k: Arc<Kernel>, url: String, defs: PathBuf) {
             );
         }
         assert_eq!(
-            k.login(&t.id, "boss@x.vn", "password-1")
+            k.login(&t.id, "boss@x.vn", "password-for-test-1")
                 .await
                 .unwrap_err()
                 .code,

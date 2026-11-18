@@ -88,6 +88,27 @@ pub async fn validate_persistence(
                 None => Ok(vec!["Không tìm thấy thuê bao của kỳ thu".into()]),
             }
         }
+        ("billing_cycle", "paid") => {
+            let Some(id) = document
+                .get("id")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+            else {
+                return Ok(vec!["Không xác định được kỳ thu cần chốt".into()]);
+            };
+            if tx
+                .query_opt(
+                    "SELECT id FROM accounting__invoice WHERE tenant_id = $1 AND source = 'subscription' AND source_id = $2 AND status = 'paid' LIMIT 1",
+                    &[&tenant.id, &id.to_string()],
+                )
+                .await?
+                .is_some()
+            {
+                Ok(Vec::new())
+            } else {
+                Ok(vec!["Chỉ chốt kỳ thu sau khi hóa đơn kế toán nguồn đã thanh toán".into()])
+            }
+        }
         ("subscription", "removed") => {
             let Some(id) = document
                 .get("id")
