@@ -4,7 +4,7 @@ import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate, localDateTimeToIso } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
-import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { can, loadRefs, recordLabel, loadAllResponse, loadIndependentData } from '../../lib/state.js';
 import realEstateEnglish from './real-estate.en.js';
 const t = (text) => uiTextWith(text, realEstateEnglish);
 const today = localDate;
@@ -31,22 +31,26 @@ export default function RealEstateWorkbenchPage() {
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
-      const [propertyRes, reservationRes, viewingRes, leaseRes, cycleRes, partyMap, invoiceRes] = await Promise.all([
-        can('real-estate.property.read') ? loadAllResponse('real-estate.property') : Promise.resolve({ items: [] }),
-        can('real-estate.reservation.read') ? loadAllResponse('real-estate.reservation') : Promise.resolve({ items: [] }),
-        can('real-estate.viewing.read') ? loadAllResponse('real-estate.viewing') : Promise.resolve({ items: [] }),
-        can('real-estate.lease.read') ? loadAllResponse('real-estate.lease') : Promise.resolve({ items: [] }),
-        can('real-estate.rent_cycle.read') ? loadAllResponse('real-estate.rent_cycle') : Promise.resolve({ items: [] }),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
-      ]);
-      const propertyRows = itemsOf(propertyRes);
-      setProperties(propertyRows); setReservations(itemsOf(reservationRes)); setViewings(itemsOf(viewingRes));
-      setLeases(itemsOf(leaseRes)); setRentCycles(itemsOf(cycleRes)); setInvoices(itemsOf(invoiceRes)); setParties(partyMap);
+      const { data, errors } = await loadIndependentData({
+        properties: can('real-estate.property.read') ? loadAllResponse('real-estate.property') : Promise.resolve({ items: [] }),
+        reservations: can('real-estate.reservation.read') ? loadAllResponse('real-estate.reservation') : Promise.resolve({ items: [] }),
+        viewings: can('real-estate.viewing.read') ? loadAllResponse('real-estate.viewing') : Promise.resolve({ items: [] }),
+        leases: can('real-estate.lease.read') ? loadAllResponse('real-estate.lease') : Promise.resolve({ items: [] }),
+        rentCycles: can('real-estate.rent_cycle.read') ? loadAllResponse('real-estate.rent_cycle') : Promise.resolve({ items: [] }),
+        parties: can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
+        invoices: can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
+      }, {
+        properties: { items: [] }, reservations: { items: [] }, viewings: { items: [] }, leases: { items: [] },
+        rentCycles: { items: [] }, parties: new Map(), invoices: { items: [] },
+      });
+      const propertyRows = itemsOf(data.properties);
+      setProperties(propertyRows); setReservations(itemsOf(data.reservations)); setViewings(itemsOf(data.viewings));
+      setLeases(itemsOf(data.leases)); setRentCycles(itemsOf(data.rentCycles)); setInvoices(itemsOf(data.invoices)); setParties(data.parties);
       setSelectedProperty((current) => propertyRows.some((row) => row.id === current) ? current : propertyRows[0]?.id || '');
       setViewingForm((current) => ({ ...current, property: current.property || propertyRows.find((row) => row.status === 'available')?.id || '' }));
-      setReservationForm((current) => ({ ...current, property: current.property || propertyRows.find((row) => row.status === 'available')?.id || '', party: current.party || [...partyMap.keys()][0] || '' }));
-      setLeaseForm((current) => ({ ...current, property: current.property || propertyRows.find((row) => ['available', 'reserved'].includes(row.status))?.id || '', tenant: current.tenant || [...partyMap.keys()][0] || '' }));
+      setReservationForm((current) => ({ ...current, property: current.property || propertyRows.find((row) => row.status === 'available')?.id || '', party: current.party || [...data.parties.keys()][0] || '' }));
+      setLeaseForm((current) => ({ ...current, property: current.property || propertyRows.find((row) => ['available', 'reserved'].includes(row.status))?.id || '', tenant: current.tenant || [...data.parties.keys()][0] || '' }));
+      if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được dữ liệu bất động sản.')).join(' · '));
     } catch (reason) { setError(t(reason.message || 'Không tải được dữ liệu bất động sản.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);

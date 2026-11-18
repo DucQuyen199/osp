@@ -4,7 +4,7 @@ import { localMonth } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { estimateUtilityCharge } from './domain/utilityEstimate.js';
-import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { can, loadRefs, recordLabel, loadAllResponse, loadIndependentData } from '../../lib/state.js';
 import utilitiesEnglish from './utilities.en.js';
 const t = (text) => uiTextWith(text, utilitiesEnglish);
 const currentPeriod = localMonth;
@@ -35,18 +35,19 @@ export default function UtilitiesWorkbenchPage() {
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const [meterRes, readingRes, partyMap, billRes, invoiceRes] = await Promise.all([
-        can('utilities.meter.read') ? loadAllResponse('utilities.meter') : Promise.resolve({ items: [] }),
-        can('utilities.meter_reading.read') ? loadAllResponse('utilities.meter_reading') : Promise.resolve({ items: [] }),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('utilities.utility_bill.read') ? loadAllResponse('utilities.utility_bill') : Promise.resolve({ items: [] }),
-        can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
-      ]);
-      const meterItems = meterRes.items || []; const readingItems = readingRes.items || [];
-      setMeters(meterItems); setReadings(readingItems); setParties(partyMap);
-      setBills(billRes.items || []); setInvoices(invoiceRes.items || []);
+      const { data, errors } = await loadIndependentData({
+        meters: can('utilities.meter.read') ? loadAllResponse('utilities.meter') : Promise.resolve({ items: [] }),
+        readings: can('utilities.meter_reading.read') ? loadAllResponse('utilities.meter_reading') : Promise.resolve({ items: [] }),
+        parties: can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
+        bills: can('utilities.utility_bill.read') ? loadAllResponse('utilities.utility_bill') : Promise.resolve({ items: [] }),
+        invoices: can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
+      }, { meters: { items: [] }, readings: { items: [] }, parties: new Map(), bills: { items: [] }, invoices: { items: [] } });
+      const meterItems = data.meters.items || [];
+      setMeters(meterItems); setReadings(data.readings.items || []); setParties(data.parties);
+      setBills(data.bills.items || []); setInvoices(data.invoices.items || []);
       setSelectedMeter((current) => current && meterItems.some((x) => x.id === current) ? current : meterItems[0]?.id || '');
-      setMeterForm((current) => ({ ...current, party: current.party || [...partyMap.keys()][0] || '' }));
+      setMeterForm((current) => ({ ...current, party: current.party || [...data.parties.keys()][0] || '' }));
+      if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được dữ liệu công tơ.')).join(' · '));
     } catch (reason) { setError(reason.message || t("Không tải được dữ liệu công tơ.")); }
     finally { setLoading(false); }
   }, []);
