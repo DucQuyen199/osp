@@ -49,7 +49,7 @@ export default function PurchaseReturnsPanel({
         <select className="select" required value={returnForm.inspection} onChange={(event) => onInspectionChange(event.target.value)}>
           <option value="">{uiText('Chọn phiếu QC')}</option>
           {returnableInspections.map((inspection) => <option key={inspection.id} value={inspection.id}>
-            {products.get(inspection.product)?.name || uiText('Hàng hóa')} · {fmtNumber(Number(inspection.qty))} · {uiText(inspection.source === 'purchase_receipt' ? 'Phiếu nhận' : 'Đơn mua')} {String(inspection.source_id).slice(0, 8)}
+            {products.get(inspection.product)?.name || uiText('Hàng hóa')} · {fmtNumber(String(inspection.qty))} · {uiText(inspection.source === 'purchase_receipt' ? 'Phiếu nhận' : 'Đơn mua')} {String(inspection.source_id).slice(0, 8)}
           </option>)}
         </select>
       </label>

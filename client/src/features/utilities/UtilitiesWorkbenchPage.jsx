@@ -17,7 +17,7 @@ const nextPeriod = (period) => {
   if (!year || !month) return currentPeriod();
   return month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, '0')}`;
 };
-const money = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 2 });
+const money = (value) => fmtNumber(String(value || 0), { maximumFractionDigits: 2 });
 export default function UtilitiesWorkbenchPage() {
   useDocumentTitle(t("Ghi chỉ số và hóa đơn tiện ích · OSP Suite"));
   const [meters, setMeters] = useState([]);

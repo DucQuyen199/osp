@@ -19,7 +19,7 @@ import { isWithinFailedQty, productionOutputMatchesPlan, productionOutputQuantit
 import { useManufacturingWipData } from './hooks/useManufacturingWipData.js';
 const t = (text) => uiTextWith(text, manufacturingEnglish);
 const today = localDate;
-const qty = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
+const qty = (value) => fmtNumber(String(value || 0), { maximumFractionDigits: 3 });
 export default function ManufacturingWipPage() {
   useDocumentTitle(t("WIP sản xuất · OSP Suite"));
   const [asOf, setAsOf] = useState(today());

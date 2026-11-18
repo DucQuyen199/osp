@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { api, tenantPath } from '../../lib/api.js';
 import { can } from '../../lib/state.js';
 import { compareDecimals } from '../../lib/decimal.js';
-const quantity = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
+const quantity = (value) => fmtNumber(String(value || 0), { maximumFractionDigits: 3 });
 export default function InventoryReplenishmentPage() {
   useDocumentTitle(`${uiText('Đề xuất bổ sung tồn kho')} · OSP Suite`);
   const [report, setReport] = useState(null);

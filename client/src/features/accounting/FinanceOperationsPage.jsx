@@ -11,7 +11,7 @@ import InsurancePolicyPanel from './workbenches/InsurancePolicyPanel.jsx';
 import InsuranceClaimsPanel from './workbenches/InsuranceClaimsPanel.jsx';
 const today = localDate;
 const defaultFirstDueDate = () => addCalendarMonths(today(), 1);
-const money = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 2 });
+const money = (value) => fmtNumber(String(value || 0), { maximumFractionDigits: 2 });
 const actions = async (qname, row, action) => api(dataPath(qname, row.id, action), { method: 'POST' });
 export default function FinanceOperationsPage() {
   useDocumentTitle(`${uiText('Điều hành cho vay và bảo hiểm')} · OSP Suite`);

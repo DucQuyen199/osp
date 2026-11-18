@@ -1,4 +1,5 @@
 import { businessTimezone } from './dates.js';
+import { multiplyDecimals, roundDecimal } from './decimal.js';
 
 // Từ điển tiếng Việt cho nhãn trường, trạng thái, hành động + định dạng số/ngày.
 // Quy ước nội dung: câu ngắn, động từ ở đầu nút ("Tạo mới", "Xác nhận"), không viết hoa tràn lan, dùng "bạn".
@@ -344,7 +345,74 @@ const numberFormatter = (locale = formatLocale, options = {}) => {
   if (!numberFormatters.has(key)) numberFormatters.set(key, new Intl.NumberFormat(locale, options));
   return numberFormatters.get(key);
 };
-export const fmtNumber = (n, options) => numberFormatter(formatLocale, options).format(n);
+const supportsExactNumberStrings = new Intl.NumberFormat('en-US').format('9007199254740993') === '9,007,199,254,740,993';
+const exactFormatters = new Map();
+function formatExactDecimal(formatter, value) {
+  const options = formatter.resolvedOptions();
+  if (options.notation !== 'standard'
+    || (options.roundingMode && options.roundingMode !== 'halfExpand')
+    || (options.roundingIncrement && options.roundingIncrement !== 1)
+    || (options.roundingPriority && options.roundingPriority !== 'auto')
+    || options.maximumSignificantDigits !== undefined
+    || options.minimumSignificantDigits !== undefined) {
+    return formatter.format(Number(value));
+  }
+  const input = String(value).trim();
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(input)) return formatter.format(Number(value));
+  const text = input.replace(/^([+-]?)\./, '$10.');
+  const decimal = options.style === 'percent' ? multiplyDecimals([text, '100']) : text;
+  const rounded = roundDecimal(decimal, options.maximumFractionDigits);
+  const negative = text.startsWith('-');
+  const unsigned = rounded.startsWith('-') ? rounded.slice(1) : rounded;
+  const [integerPart = '0', rawFraction = ''] = unsigned.split('.');
+  const fraction = rawFraction.padEnd(options.minimumFractionDigits, '0');
+  const integerValue = BigInt(integerPart || '0');
+  const signedInteger = negative ? -integerValue : integerValue;
+  const patternValue = integerValue === 0n && negative ? -1n : signedInteger;
+  const pattern = formatter.formatToParts(patternValue);
+  const numberFormatterKey = `${options.locale}:${options.numberingSystem}:${options.useGrouping}:${options.minimumIntegerDigits}`;
+  if (!exactFormatters.has(numberFormatterKey)) {
+    exactFormatters.set(numberFormatterKey, new Intl.NumberFormat(options.locale, {
+      numberingSystem: options.numberingSystem,
+      useGrouping: options.useGrouping,
+      minimumIntegerDigits: options.minimumIntegerDigits,
+      maximumFractionDigits: 0,
+    }));
+  }
+  const localizedInteger = exactFormatters.get(numberFormatterKey).formatToParts(integerValue)
+    .filter((part) => part.type === 'integer' || part.type === 'group');
+  const firstNumeric = pattern.findIndex((part) => part.type === 'integer' || part.type === 'group');
+  const lastNumeric = pattern.findLastIndex((part) => part.type === 'integer' || part.type === 'group');
+  if (firstNumeric < 0 || lastNumeric < firstNumeric) return formatter.format(Number(value));
+  const symbolKey = `${options.locale}:${options.numberingSystem}`;
+  if (!exactFormatters.has(symbolKey)) {
+    const fractionFormatter = new Intl.NumberFormat(options.locale, {
+      numberingSystem: options.numberingSystem, useGrouping: false,
+      minimumFractionDigits: 1, maximumFractionDigits: 1,
+    });
+    const digitFormatter = new Intl.NumberFormat(options.locale, {
+      numberingSystem: options.numberingSystem, useGrouping: false, maximumFractionDigits: 0,
+    });
+    exactFormatters.set(symbolKey, {
+      decimal: fractionFormatter.formatToParts(1.1).find((part) => part.type === 'decimal')?.value || '.',
+      digits: Array.from({ length: 10 }, (_, digit) => digitFormatter.format(BigInt(digit))),
+    });
+  }
+  const { decimal: decimalSeparator, digits } = exactFormatters.get(symbolKey);
+  const localizedFraction = [...fraction].map((digit) => digits[Number(digit)]).join('');
+  const suffix = pattern.slice(lastNumeric + 1).filter((part) => part.type !== 'decimal' && part.type !== 'fraction');
+  const output = [
+    ...pattern.slice(0, firstNumeric),
+    ...localizedInteger,
+    ...(localizedFraction ? [{ type: 'decimal', value: decimalSeparator }, { type: 'fraction', value: localizedFraction }] : []),
+    ...suffix,
+  ];
+  return output.map((part) => part.value).join('');
+}
+const formatNumber = (formatter, value) => typeof value === 'string' && !supportsExactNumberStrings
+  ? formatExactDecimal(formatter, value)
+  : formatter.format(value);
+export const fmtNumber = (n, options) => formatNumber(numberFormatter(formatLocale, options), n);
 export let baseCurrency = 'VND';
 const moneyFormatters = new Map();
 export const setBaseCurrency = (currency) => {
@@ -358,7 +426,7 @@ export const fmtMoney = (n, currency = baseCurrency) => {
       style: 'currency', currency: code, maximumFractionDigits: 2,
     }));
   }
-  return moneyFormatters.get(key).format(n);
+  return formatNumber(moneyFormatters.get(key), n);
 };
 export function fmtDate(s) {
   if (!s) return '';

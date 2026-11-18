@@ -9,7 +9,7 @@ import { useEventsOperationsData } from './hooks/useEventsOperationsData.js';
 const t = (text) => uiTextWith(text, eventsEnglish);
 const inMinutes = (minutes) => localDateTime(new Date(Date.now() + minutes * 60000));
 const paymentMethods = [['cash', 'Tiền mặt'], ['card', 'Thẻ'], ['transfer', 'Chuyển khoản'], ['ewallet', 'Ví điện tử'], ['bank', 'Ngân hàng']];
-const price = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 2 });
+const price = (value) => fmtNumber(String(value || 0), { maximumFractionDigits: 2 });
 export default function EventsOperationsPage() {
   useDocumentTitle(`${t('Quản lý sự kiện và quầy vé')} · OSP Suite`);
   const { events, tickets, parties, taxes, loading, error, setError, load } = useEventsOperationsData();

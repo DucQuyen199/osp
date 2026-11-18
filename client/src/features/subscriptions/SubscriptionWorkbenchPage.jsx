@@ -5,15 +5,16 @@ import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { addDecimals, divideDecimals, multiplyDecimals } from '../../lib/decimal.js';
 import subscriptionEnglish from './subscription.en.js';
 const t = (text) => uiTextWith(text, subscriptionEnglish);
 const today = localDate;
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const transition = (entity, row, action) => api(dataPath(entity, row.id, action), { method: 'POST' });
 const normalizedMonthly = (plan) => {
-  const price = Number(plan?.price || 0);
-  if (plan?.interval === 'quarterly') return price / 3;
-  if (plan?.interval === 'yearly') return price / 12;
+  const price = String(plan?.price || 0);
+  if (plan?.interval === 'quarterly') return divideDecimals(price, '3', 28);
+  if (plan?.interval === 'yearly') return divideDecimals(price, '12', 28);
   return price;
 };
 export default function SubscriptionWorkbenchPage() {
@@ -58,8 +59,8 @@ export default function SubscriptionWorkbenchPage() {
     return map;
   }, [cycles]);
   const activeSubscriptions = subscriptions.filter((row) => row.status === 'active');
-  const mrr = activeSubscriptions.reduce((sum, row) => sum + normalizedMonthly(planById.get(row.plan)), 0);
-  const annualRecurring = mrr * 12;
+  const mrr = addDecimals(activeSubscriptions.map((row) => normalizedMonthly(planById.get(row.plan))));
+  const annualRecurring = multiplyDecimals([mrr, '12']);
   const overdue = cycles.filter((cycle) => cycle.status === 'due' && cycle.due_date < today()).length;
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');

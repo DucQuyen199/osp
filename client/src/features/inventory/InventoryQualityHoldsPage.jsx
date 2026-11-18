@@ -5,7 +5,7 @@ import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtMoney, fmtNumber, uiText } from '../../lib/i18n.js';
 import { compareDecimals } from '../../lib/decimal.js';
 import { can, loadRefs } from '../../lib/state.js';
-const quantity = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
+const quantity = (value) => fmtNumber(String(value || 0), { maximumFractionDigits: 3 });
 const validReleaseQuantity = (qty, maximum) => { try { return compareDecimals(qty || 0, 0) > 0 && compareDecimals(qty, maximum) <= 0; } catch { return false; } };
 const unitName = (item) => item.unit || uiText('Chưa đặt đơn vị');
 const statusLabel = (value) => uiText(value === 'failed' ? 'Không đạt' : 'Chờ kiểm tra');

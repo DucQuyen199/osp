@@ -4,7 +4,7 @@ import { api, tenantPath } from '../../lib/api.js';
 import { fmtDate, fmtDateTime, fmtMoney, fmtNumber, uiText } from '../../lib/i18n.js';
 import { recordHref } from '../../lib/routes.js';
 import { can, entityLabel } from '../../lib/state.js';
-const quantity = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
+const quantity = (value) => fmtNumber(String(value || 0), { maximumFractionDigits: 3 });
 export default function InventoryLotTraceabilityPage({ lotId }) {
   useDocumentTitle(`${uiText('Truy xuất lô hàng')} · OSP Suite`);
   const [report, setReport] = useState(null);

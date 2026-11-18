@@ -3,7 +3,7 @@ import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, fmtNumber, statusLabel, uiText } from '../../lib/i18n.js';
 import { can } from '../../lib/state.js';
-const quantity = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
+const quantity = (value) => fmtNumber(String(value || 0), { maximumFractionDigits: 3 });
 export default function InventoryLotExpiryPage() {
   useDocumentTitle(`${uiText('Lô sắp hết hạn')} · OSP Suite`);
   const [days, setDays] = useState(90);
