@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { absDecimal, addDecimals, compareDecimals, minDecimal, subtractDecimals } from '../client/src/lib/decimal.js';
+import { absDecimal, addDecimals, compareDecimals, minDecimal, roundDecimal, subtractDecimals } from '../client/src/lib/decimal.js';
 
 test('decimal addition and subtraction avoid binary floating point drift', () => {
   assert.equal(addDecimals(['0.1', 0.2]), '0.3');
@@ -13,6 +13,8 @@ test('decimal addition and subtraction avoid binary floating point drift', () =>
   assert.equal(minDecimal('1.2500', '1.24'), '1.24');
   assert.equal(minDecimal('1.25', '2'), '1.25');
   assert.equal(absDecimal('-100.05'), '100.05');
+  assert.equal(roundDecimal('12.345'), '12.35');
+  assert.equal(roundDecimal('-12.345'), '-12.35');
 });
 
 test('decimal arithmetic rejects invalid monetary input', () => {

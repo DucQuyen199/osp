@@ -48,6 +48,18 @@ export function absDecimal(value) {
   return decimalText(coefficient < 0n ? -coefficient : coefficient, scale);
 }
 
+export function roundDecimal(value, places = 2) {
+  if (!Number.isInteger(places) || places < 0) throw new RangeError('Decimal places must be a non-negative integer');
+  const { coefficient, scale } = decimalParts(value);
+  if (scale <= places) return decimalText(coefficient, scale);
+  const divisor = 10n ** BigInt(scale - places);
+  const negative = coefficient < 0n;
+  const absolute = negative ? -coefficient : coefficient;
+  let rounded = absolute / divisor;
+  if ((absolute % divisor) * 2n >= divisor) rounded += 1n;
+  return decimalText(negative ? -rounded : rounded, places);
+}
+
 export function compareDecimals(left, right) {
   const a = decimalParts(left);
   const b = decimalParts(right);
