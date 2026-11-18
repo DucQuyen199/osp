@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtAgo, fmtDate, fmtDateTime, uiTextWith } from '../../lib/i18n.js';
-import { can, loadRefs } from '../../lib/state.js';
+import { can, loadIndependentData, loadRefs } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import housekeepingEnglish from './housekeeping.en.js';
 
@@ -28,10 +28,12 @@ export default function HotelHousekeepingBoardPage() {
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
-      const [result, roomMap] = await Promise.all([
-        api(tenantPath(`/reports/hotel/housekeeping-board?limit=${PAGE_SIZE}&offset=${offset}`)),
-        loadRefs('hotel.room'),
-      ]);
+      const emptyReport = { items: [], itemCount: 0, hasMore: false, cleaningCount: 0, dueToday: 0, readyCount: 0, occupiedCount: 0, maintenanceCount: 0 };
+      const { data: reads, errors } = await loadIndependentData({
+        report: api(tenantPath(`/reports/hotel/housekeeping-board?limit=${PAGE_SIZE}&offset=${offset}`)),
+        rooms: can('hotel.room.read') ? loadRefs('hotel.room') : Promise.resolve(new Map()),
+      }, { report: emptyReport, rooms: new Map() });
+      const { report: result, rooms: roomMap } = reads;
       setItems(result.items || []);
       setItemCount(Number(result.itemCount || 0));
       setHasMore(Boolean(result.hasMore));
@@ -44,6 +46,7 @@ export default function HotelHousekeepingBoardPage() {
         maintenanceCount: result.maintenanceCount || 0,
       });
       setLastUpdated(new Date().toISOString());
+      if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được danh sách phòng cần dọn.')).join(' · '));
       if (offset > 0 && offset >= Number(result.itemCount || 0)) {
         const lastOffset = result.itemCount > 0 ? Math.floor((result.itemCount - 1) / PAGE_SIZE) * PAGE_SIZE : 0;
         setOffset(lastOffset);
