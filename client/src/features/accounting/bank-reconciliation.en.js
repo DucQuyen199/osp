@@ -75,7 +75,7 @@ export default {
   'Tài khoản': 'Account',
   'Tài khoản 112': 'Account 112',
   'Tài khoản ngân hàng *': 'Bank account *',
-  'Tệp CSV hoặc CAMT.053': 'CSV or CAMT.053 file',
+  'Tệp CSV, CAMT.053 hoặc JSON Casso': 'CSV, CAMT.053, or Casso JSON file',
   'Thanh toán': 'Payment',
   'Thao tác đối soát không thành công.': 'Reconciliation action failed.',
   'Thêm dòng': 'Add line',

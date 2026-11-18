@@ -142,12 +142,14 @@ export default function EntityDetailPage({ qname, id }) {
   const importStatementFile = async () => {
     if (!statementFile) return;
     const isCamt053 = /\.(xml|camt)$/i.test(statementFile.name);
+    const isCasso = /\.json$/i.test(statementFile.name);
     setWorking('import');
     try {
-      const endpoint = isCamt053 ? 'import-camt053' : 'import';
-      const contentType = isCamt053 ? 'application/xml; charset=utf-8' : 'text/csv; charset=utf-8';
+      const endpoint = isCasso ? 'import-casso' : isCamt053 ? 'import-camt053' : 'import';
+      const contentType = isCasso ? 'application/json' : isCamt053 ? 'application/xml; charset=utf-8' : 'text/csv; charset=utf-8';
+      const content = await statementFile.text();
       const result = await api(tenantPath(`/accounting/bank-statements/${id}/${endpoint}`), {
-        method: 'POST', body: await statementFile.text(), headers: { 'content-type': contentType },
+        method: 'POST', body: isCasso ? JSON.parse(content) : content, headers: { 'content-type': contentType },
       });
       setStatementFile(null);
       entityChanged('accounting.bank_statement_line');
@@ -192,8 +194,8 @@ export default function EntityDetailPage({ qname, id }) {
               <span className="grow" />
               {canEditRecord && <button className="btn btn-sm" type="button" disabled={Boolean(working)} onClick={edit}>{uiText('Sửa')}</button>}
               {qname === 'accounting.bank_statement' && record?.status === 'draft' && can('accounting.bank_statement_line.create') && <>
-                <input className="input" type="file" accept=".csv,.xml,.camt,text/csv,application/xml,text/xml" aria-label={uiText('Tệp sao kê CSV hoặc CAMT.053')} disabled={Boolean(working)} onChange={(event) => setStatementFile(event.target.files?.[0] || null)} />
-                <button className="btn btn-sm" type="button" disabled={!statementFile || Boolean(working)} onClick={importStatementFile}>{working === 'import' ? uiText('Đang nhập…') : `${uiText('Nhập')} ${statementFile && /\.(xml|camt)$/i.test(statementFile.name) ? 'CAMT.053' : 'CSV'}`}</button>
+                <input className="input" type="file" accept=".csv,.xml,.camt,.json,text/csv,application/xml,text/xml,application/json" aria-label={uiText('Tệp sao kê CSV, CAMT.053 hoặc JSON Casso')} disabled={Boolean(working)} onChange={(event) => setStatementFile(event.target.files?.[0] || null)} />
+                <button className="btn btn-sm" type="button" disabled={!statementFile || Boolean(working)} onClick={importStatementFile}>{working === 'import' ? uiText('Đang nhập…') : `${uiText('Nhập')} ${statementFile && /\.json$/i.test(statementFile.name) ? 'Casso JSON' : statementFile && /\.(xml|camt)$/i.test(statementFile.name) ? 'CAMT.053' : 'CSV'}`}</button>
               </>}
               {can(`${qname}.delete`) && <button className="btn btn-sm btn-danger" type="button" disabled={Boolean(working)} onClick={remove}>{uiText('Xóa')}</button>}
             </div>

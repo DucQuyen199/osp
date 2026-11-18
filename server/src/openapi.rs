@@ -1021,6 +1021,29 @@ pub fn build(reg: &Registry) -> Value {
         } }),
     );
     paths.insert(
+        "/api/t/{tenantId}/accounting/bank-statements/{statementId}/import-casso".into(),
+        json!({ "post": {
+            "tags": ["accounting"], "summary": "Import Casso bank transactions", "security": sec,
+            "parameters": [tid, { "name": "statementId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                "oneOf": [
+                    { "type": "object", "required": ["data"], "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/CassoBankTransaction" } } } },
+                    { "type": "object", "required": ["data"], "properties": {
+                        "data": { "type": "object", "required": ["records"], "properties": {
+                            "records": { "type": "array", "items": { "$ref": "#/components/schemas/CassoBankTransaction" } }
+                        } }
+                    } }
+                ]
+            } } } },
+            "responses": with_common(Map::from_iter([
+                ("200".to_string(), json!({ "description": "Rows imported or skipped as exact idempotent replays" })),
+                ("409".to_string(), err("Only a draft statement accepts imported rows")),
+                ("413".to_string(), err("Payload exceeds 1 MB or has more than 20,000 transactions")),
+                ("422".to_string(), err("Invalid Casso transaction, date, or duplicate reference"))
+            ]))
+        } }),
+    );
+    paths.insert(
         "/api/t/{tenantId}/accounting/bank-statements/{statementId}/import".into(),
         json!({ "post": {
             "tags": ["accounting"], "summary": "Import bank statement CSV", "security": sec,
@@ -1289,6 +1312,13 @@ pub fn build(reg: &Registry) -> Value {
         .iter()
         .map(|id| json!({ "name": id, "description": reg.modules[id].name }))
         .collect();
+    schemas.insert("CassoBankTransaction".into(), json!({ "type": "object", "required": ["id", "amount", "when"], "properties": {
+        "id": { "oneOf": [{ "type": "string" }, { "type": "integer" }], "description": "Stable Casso transaction identifier" },
+        "tid": { "type": "string", "description": "Bank transaction reference" },
+        "amount": { "type": "number", "not": { "const": 0 }, "description": "Signed amount: positive is credit, negative is debit" },
+        "when": { "type": "string", "description": "Transaction date or timestamp" },
+        "description": { "type": "string", "maxLength": 1000 }
+    } }));
     json!({
         "openapi": "3.1.0",
         "info": { "title": "OSP Suite API", "version": "0.3.0", "description": "API sinh tự động từ khai báo module. Xem docs/API.md cho các endpoint quản trị." },

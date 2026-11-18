@@ -170,7 +170,7 @@ const uiTextEnglish = {
   'Chưa phân bổ': 'Unallocated', 'Chọn': 'Select', 'Không chọn': 'Do not select', 'Quản lý': 'Manage',
   'Chưa lưu được': 'Could not save', 'Tự tính': 'Calculated automatically', 'Hủy': 'Cancel', 'Xác nhận': 'Confirm', 'Đang lưu…': 'Saving…',
   'Lưu thay đổi': 'Save changes', 'Tạo mới': 'Create', 'Đã lưu thay đổi.': 'Changes saved.', 'Không lưu được dữ liệu.': 'Could not save data.',
-  'Tệp sao kê CSV hoặc CAMT.053': 'CSV or CAMT.053 statement file', 'Đang nhập…': 'Importing…', 'Nhập': 'Import',
+  'Tệp sao kê CSV, CAMT.053 hoặc JSON Casso': 'CSV, CAMT.053, or Casso JSON statement file', 'Đang nhập…': 'Importing…', 'Nhập': 'Import',
   'Số lượng dòng': 'Line quantity', 'Đơn giá dòng': 'Line unit price', 'Chiết khấu dòng': 'Line discount', 'Thuế dòng': 'Line tax',
   'Lô hàng dòng': 'Line lot', 'Xóa dòng': 'Remove line', 'Sản phẩm dòng': 'Line product', 'Tài khoản dòng': 'Line account',
   'Phòng ban dòng': 'Line department', 'Nợ dòng': 'Line debit', 'Có dòng': 'Line credit',

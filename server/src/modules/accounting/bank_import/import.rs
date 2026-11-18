@@ -39,6 +39,27 @@ pub async fn import_statement_camt053(
     .await
 }
 
+pub async fn import_statement_casso(
+    kernel: &Kernel,
+    actor: &Actor,
+    tenant: &Tenant,
+    statement_id: &str,
+    payload: &Value,
+) -> R<Value> {
+    let statement_id = authorize_import(kernel, actor, tenant, statement_id)?;
+    let lines = super::casso::parse(payload)?;
+    persistence::import_lines(
+        kernel,
+        actor,
+        tenant,
+        statement_id,
+        lines,
+        "CASSO",
+        "Casso transaction",
+    )
+    .await
+}
+
 fn authorize_import(
     kernel: &Kernel,
     actor: &Actor,

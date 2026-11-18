@@ -560,6 +560,8 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
     let limit =
         if method == Method::POST && seg(3) == Some("documents") && seg(5) == Some("attachments") {
             crate::modules::document::MAX_ATTACHMENT_BYTES
+        } else if seg(6) == Some("import-casso") {
+            1_000_000
         } else if seg(6) == Some("import-camt053") {
             5_000_000
         } else if seg(6) == Some("import") || seg(4) == Some("import") || seg(3) == Some("import") {
@@ -1230,6 +1232,27 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
             return json_ok(
                 crate::modules::accounting::import_statement_csv(k, &actor, &t, statement_id, csv)
                     .await?,
+            );
+        }
+        (
+            &Method::POST,
+            [
+                "accounting",
+                "bank-statements",
+                statement_id,
+                "import-casso",
+            ],
+        ) => {
+            let payload = parse_json(&bytes)?;
+            return json_ok(
+                crate::modules::accounting::import_statement_casso(
+                    k,
+                    &actor,
+                    &t,
+                    statement_id,
+                    &payload,
+                )
+                .await?,
             );
         }
         (
