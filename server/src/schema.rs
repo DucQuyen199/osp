@@ -188,6 +188,8 @@ CREATE TABLE IF NOT EXISTS osp_audit (
   detail text
 );
 CREATE INDEX IF NOT EXISTS osp_audit_tenant ON osp_audit (tenant_id, seq DESC);
+CREATE INDEX IF NOT EXISTS osp_audit_actor ON osp_audit (tenant_id, user_id, seq DESC);
+CREATE INDEX IF NOT EXISTS osp_audit_action ON osp_audit (tenant_id, action, seq DESC);
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'osp_audit_tenant_fk') THEN
     ALTER TABLE osp_audit ADD CONSTRAINT osp_audit_tenant_fk

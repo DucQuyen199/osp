@@ -19,6 +19,13 @@ pub struct Event {
     pub causation: Option<Uuid>,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct AuditLogFilter {
+    pub user_id: Option<String>,
+    pub action: Option<String>,
+    pub target: Option<String>,
+}
+
 enum Outcome {
     Ok,
     Skipped(String),
@@ -386,6 +393,7 @@ impl Kernel {
         t: &Tenant,
         limit: i64,
         offset: i64,
+        filter: &AuditLogFilter,
     ) -> R<Value> {
         self.authorize(t, actor, "tenant.audit")?;
         let page_size = limit.clamp(1, 100);
@@ -394,21 +402,34 @@ impl Kernel {
         let tx = Tx::begin_snapshot(&mut conn, &t.id).await?;
         let total: i64 = tx
             .query_one_row(
-                "SELECT count(*) FROM osp_audit WHERE tenant_id = $1",
-                &[&t.id],
+                "SELECT count(*) FROM osp_audit WHERE tenant_id = $1 \
+                 AND ($2::text IS NULL OR user_id = $2) \
+                 AND ($3::text IS NULL OR action = $3) \
+                 AND ($4::text IS NULL OR COALESCE(target, '') ILIKE '%' || $4 || '%')",
+                &[&t.id, &filter.user_id, &filter.action, &filter.target],
             )
             .await?
             .get(0);
         let items = tx
             .query_json(
                 "SELECT jsonb_build_object('id', id, 'at', at, 'userId', user_id, 'action', action, 'target', target, 'detail', detail) \
-                 FROM osp_audit WHERE tenant_id = $1 ORDER BY seq DESC LIMIT $2 OFFSET $3",
-                &[&t.id, &page_size, &offset],
+                 FROM osp_audit WHERE tenant_id = $1 \
+                 AND ($2::text IS NULL OR user_id = $2) \
+                 AND ($3::text IS NULL OR action = $3) \
+                 AND ($4::text IS NULL OR COALESCE(target, '') ILIKE '%' || $4 || '%') \
+                 ORDER BY seq DESC LIMIT $5 OFFSET $6",
+                &[&t.id, &filter.user_id, &filter.action, &filter.target, &page_size, &offset],
+            )
+            .await?;
+        let actions = tx
+            .query_json(
+                "SELECT to_jsonb(action) FROM (SELECT DISTINCT action FROM osp_audit WHERE tenant_id = $1 ORDER BY action) a",
+                &[&t.id],
             )
             .await?;
         let has_more = offset + (items.len() as i64) < total;
         Ok(
-            json!({ "items": items, "total": total, "pageSize": page_size, "offset": offset, "hasMore": has_more }),
+            json!({ "items": items, "total": total, "pageSize": page_size, "offset": offset, "hasMore": has_more, "actions": actions }),
         )
     }
 

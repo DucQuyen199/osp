@@ -19253,6 +19253,30 @@
               "minimum": 0,
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "userId",
+            "schema": {
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "action",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "target",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -19261,6 +19285,12 @@
               "application/json": {
                 "schema": {
                   "properties": {
+                    "actions": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
                     "hasMore": {
                       "type": "boolean"
                     },
@@ -19285,13 +19315,14 @@
                     "total",
                     "pageSize",
                     "offset",
-                    "hasMore"
+                    "hasMore",
+                    "actions"
                   ],
                   "type": "object"
                 }
               }
             },
-            "description": "Tenant-scoped audit page with total and snapshot-consistent pagination metadata"
+            "description": "Tenant-scoped audit page with filtered total, available actions, and snapshot-consistent pagination metadata"
           },
           "401": {
             "content": {
@@ -19322,6 +19353,16 @@
               }
             },
             "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "A query filter exceeds its supported length"
           }
         },
         "security": [

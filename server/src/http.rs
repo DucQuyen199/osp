@@ -336,6 +336,25 @@ fn query_usize(query: &[(String, String)], name: &str, default: usize, max: usiz
     Ok(parsed)
 }
 
+fn query_text(query: &[(String, String)], name: &str, max_chars: usize) -> R<Option<String>> {
+    let value = query
+        .iter()
+        .find(|(key, _)| key == name)
+        .map(|(_, value)| value.trim())
+        .filter(|value| !value.is_empty());
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    if value.chars().count() > max_chars {
+        return Err(ApiError::new(
+            422,
+            "INVALID_QUERY",
+            format!("{name} must not exceed {max_chars} characters"),
+        ));
+    }
+    Ok(Some(value.to_owned()))
+}
+
 fn reply_to_response(r: Reply) -> Response {
     match r {
         Reply::Json(status, v) => {
@@ -1789,8 +1808,13 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
             return json_ok(k.audit_log(&actor, &t, qnum("limit", 200)).await?);
         }
         (&Method::GET, ["audit", "page"]) => {
+            let filter = crate::kernel::rules::AuditLogFilter {
+                user_id: query_text(&query, "userId", 120)?,
+                action: query_text(&query, "action", 100)?,
+                target: query_text(&query, "target", 200)?,
+            };
             return json_ok(
-                k.audit_log_page(&actor, &t, qnum("limit", 50), qnum("offset", 0))
+                k.audit_log_page(&actor, &t, qnum("limit", 50), qnum("offset", 0), &filter)
                     .await?,
             );
         }

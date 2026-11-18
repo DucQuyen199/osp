@@ -476,7 +476,16 @@ async fn run(k: Arc<Kernel>, url: String, defs: PathBuf) {
                 .iter()
                 .any(|e| e["action"] == "qualified" && e["detail"] == "new→qualified")
         );
-        let audit_page = k.audit_log_page(&t.a, &t.t, 1, 0).await.unwrap();
+        let audit_page = k
+            .audit_log_page(
+                &t.a,
+                &t.t,
+                1,
+                0,
+                &osp_server::kernel::rules::AuditLogFilter::default(),
+            )
+            .await
+            .unwrap();
         assert_eq!(audit_page["pageSize"], 1);
         assert_eq!(audit_page["offset"], 0);
         assert!(audit_page["total"].as_i64().unwrap() >= 1);
@@ -485,8 +494,65 @@ async fn run(k: Arc<Kernel>, url: String, defs: PathBuf) {
             audit_page["hasMore"],
             audit_page["total"].as_i64().unwrap() > 1
         );
+        assert!(
+            audit_page["actions"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("qualified"))
+        );
+        let qualified_page = k
+            .audit_log_page(
+                &t.a,
+                &t.t,
+                10,
+                0,
+                &osp_server::kernel::rules::AuditLogFilter {
+                    action: Some("qualified".into()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+        assert!(qualified_page["total"].as_i64().unwrap() >= 1);
+        assert!(
+            qualified_page["items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|entry| entry["action"] == "qualified")
+        );
+        let user_id = qualified_page["items"][0]["userId"].as_str().unwrap();
+        let actor_filtered_page = k
+            .audit_log_page(
+                &t.a,
+                &t.t,
+                10,
+                0,
+                &osp_server::kernel::rules::AuditLogFilter {
+                    user_id: Some(user_id.to_owned()),
+                    action: Some("qualified".into()),
+                    target: Some("crm.lead".into()),
+                },
+            )
+            .await
+            .unwrap();
+        assert!(actor_filtered_page["total"].as_i64().unwrap() >= 1);
+        assert!(actor_filtered_page["items"].as_array().unwrap().iter().all(
+            |entry| entry["userId"] == user_id
+                && entry["action"] == "qualified"
+                && entry["target"].as_str().unwrap().contains("crm.lead")
+        ));
         assert_eq!(
-            k.audit_log_page(&va, &t.t, 1, 0).await.unwrap_err().code,
+            k.audit_log_page(
+                &va,
+                &t.t,
+                1,
+                0,
+                &osp_server::kernel::rules::AuditLogFilter::default()
+            )
+            .await
+            .unwrap_err()
+            .code,
             "FORBIDDEN"
         );
         let (audit_status, audit_response) = t
@@ -495,6 +561,23 @@ async fn run(k: Arc<Kernel>, url: String, defs: PathBuf) {
         assert_eq!(audit_status, 200, "{audit_response}");
         assert_eq!(audit_response["items"].as_array().unwrap().len(), 1);
         assert!(audit_response["total"].as_i64().unwrap() >= 1);
+        let (filtered_status, filtered_response) = t
+            .api(
+                "GET",
+                &format!("/audit/page?limit=10&offset=0&action=qualified&userId={user_id}&target=crm.lead"),
+                json!(null),
+            )
+            .await;
+        assert_eq!(filtered_status, 200, "{filtered_response}");
+        assert!(
+            filtered_response["items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|entry| entry["action"] == "qualified"
+                    && entry["userId"] == user_id
+                    && entry["target"].as_str().unwrap().contains("crm.lead"))
+        );
         assert_eq!(
             k.create(&t.a, &t.t, "utilities.meter", o(json!({})))
                 .await
