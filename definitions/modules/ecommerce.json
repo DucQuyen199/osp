@@ -47,6 +47,12 @@
      "type": "ref",
      "required": false,
      "ref": "master-data.tax"
+    },
+    {
+     "name": "paused",
+     "label": "Tạm dừng nhận đơn online",
+     "type": "bool",
+     "required": false
     }
    ],
    "states": null,

@@ -81,6 +81,8 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Nhóm công ty đa tenant yêu cầu tenant thành viên chấp thuận bằng token một lần có hạn dùng; consent được ghi/audit ở hai tenant và thu hồi đồng bộ. Báo cáo bảng cân đối phát sinh hợp nhất chỉ đọc trong RLS riêng từng tenant, yêu cầu grant theo người dùng và loại báo cáo, quy đổi theo tỷ giá gần nhất đến ngày cuối kỳ; mỗi nhóm cấu hình tuổi tỷ giá tối đa, báo cáo từ chối khi thiếu chính sách hoặc tỷ giá quá hạn, giữ số tiền gốc theo từng pháp nhân và cộng theo mã tài khoản. Ảnh chụp báo cáo bất biến được audit và chỉ mở khi grant còn hiệu lực.
 
 - Báo cáo hợp nhất có ảnh chụp bất biến có audit và bút toán loại trừ quản trị riêng, cân bằng, có bằng chứng đối chiếu và duyệt độc lập; chỉ bút toán đã duyệt mới vào tổng hợp, không sửa sổ thành viên. Mô hình chưa tự ghép giao dịch nội bộ và chưa triển khai chính sách dịch thuật/loại trừ theo chuẩn mực báo cáo tài chính.
+- Gian hàng thương mại điện tử có thể tạm dừng nhận đơn; bộ chọn loại bỏ gian hàng tạm dừng, còn máy chủ chặn tạo/đặt/cập nhật giỏ mới trong cùng giao dịch và vẫn cho hủy giỏ đã tạo. Gian hàng cũ không có giá trị này tiếp tục hoạt động.
+
 ## Còn thiếu
 
 - provider-specific SSO provisioning, mã hóa at-rest toàn hệ thống, lưu audit độc lập/WORM chống DBA và kiểm thử xâm nhập. Cảnh báo trong ứng dụng hiện số luồng lỗi và integration outbox dead-letter cho quản trị viên, có trang xử lý/chạy lại/đóng; Prometheus xuất bộ đếm tổng hợp kèm rule mẫu, còn kênh nhận thông báo được cấu hình bên ngoài qua Alertmanager. Prometheus HTTP metrics và trace OTLP/HTTP có thể bật riêng; trace tiếp tục W3C `traceparent`, chỉ xuất span HTTP đã giảm trường dữ liệu và không gắn nhãn tenant.

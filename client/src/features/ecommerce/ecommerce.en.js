@@ -1,5 +1,8 @@
 const ecommerceEnglish = {
   'Không tải được danh sách đơn online.': 'Could not load online orders.',
+  'Gian hàng đang tạm dừng, không thể tạo hoặc cập nhật giỏ đơn online': 'This storefront is paused. Online carts cannot be created or updated.',
+  'Không có gian hàng nào đang nhận đơn online.': 'No storefronts are currently accepting online orders.',
+  'Tạm dừng nhận đơn online': 'Pause online order intake',
   'Điều phối đơn online': 'Online order desk',
   'Đã tạo giỏ hàng': 'Cart created',
   'với giá theo gian hàng. Kiểm tra tổng tiền rồi đặt đơn.': 'with storefront pricing. Review the total before placing the order.',

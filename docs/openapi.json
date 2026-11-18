@@ -5863,6 +5863,9 @@
           "name": {
             "type": "string"
           },
+          "paused": {
+            "type": "boolean"
+          },
           "price_list": {
             "description": "Tham chiếu tới sales.price_list",
             "format": "uuid",
@@ -5898,6 +5901,9 @@
           },
           "name": {
             "type": "string"
+          },
+          "paused": {
+            "type": "boolean"
           },
           "price_list": {
             "description": "Tham chiếu tới sales.price_list",

@@ -12,7 +12,7 @@ pub async fn validate_persistence(
 ) -> R<Vec<String>> {
     match entity {
         "storefront" => validate_storefront(tx, tenant, action, document).await,
-        "web_order" => validate_web_order(tx, tenant, document).await,
+        "web_order" => validate_web_order(tx, tenant, action, document).await,
         _ => Ok(Vec::new()),
     }
 }
@@ -100,7 +100,12 @@ async fn validate_storefront(
     Ok(errors)
 }
 
-async fn validate_web_order(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<Vec<String>> {
+async fn validate_web_order(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    action: &str,
+    document: &Value,
+) -> R<Vec<String>> {
     let mut errors = Vec::new();
     for (field, table, label) in [
         ("party", "master_data__party", "Khách hàng"),
@@ -117,6 +122,26 @@ async fn validate_web_order(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R
         let sql = format!("SELECT id FROM {table} WHERE tenant_id = $1 AND id = $2 FOR SHARE");
         if tx.query_opt(&sql, &[&tenant.id, &id]).await?.is_none() {
             errors.push(format!("{label} không tồn tại trong doanh nghiệp"));
+        }
+    }
+    let is_cart_write = action == "created"
+        || document.get("status").and_then(Value::as_str) == Some("cart");
+    if is_cart_write && action != "cancelled" {
+        if let Some(storefront_id) = document
+            .get("storefront")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+        {
+            let paused = tx
+                .query_opt(
+                    "SELECT paused FROM ecommerce__storefront WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                    &[&tenant.id, &storefront_id],
+                )
+                .await?
+                .and_then(|row| row.get::<_, Option<bool>>(0));
+            if paused == Some(true) {
+                errors.push("Gian hàng đang tạm dừng, không thể tạo hoặc cập nhật giỏ đơn online".into());
+            }
         }
     }
     if let Some(lines) = document.get("lines").and_then(Value::as_array) {

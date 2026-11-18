@@ -25,6 +25,10 @@ export default function EcommerceOrderDeskPage() {
     const timer = window.setInterval(() => load(true), 20000);
     return () => window.clearInterval(timer);
   }, [load]);
+  const activeStorefronts = useMemo(() => new Map([...storefronts].filter(([, item]) => item.paused !== true)), [storefronts]);
+  useEffect(() => {
+    setStorefront((current) => current && activeStorefronts.has(current) ? current : activeStorefronts.keys().next().value || '');
+  }, [activeStorefronts]);
   const cartDrafts = useMemo(() => Object.entries(quantities).map(([id, qty]) => ({ product: products.get(id), qty: String(qty ?? '') })).filter((line) => line.product), [quantities, products]);
   const cartLines = useMemo(() => cartDrafts.filter((line) => {
     try { return compareDecimals(line.qty || 0, 0) > 0; } catch { return false; }
@@ -113,7 +117,7 @@ export default function EcommerceOrderDeskPage() {
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     {loading && !orders.length ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : <>
       {can('ecommerce.web_order.create') && <WebOrderCreateForm
-        storefronts={storefronts}
+        storefronts={activeStorefronts}
         parties={parties}
         filteredProducts={filteredProducts}
         quantities={quantities}
