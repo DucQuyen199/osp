@@ -4,6 +4,7 @@ import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, statusLabel, uiText } from '../../lib/i18n.js';
 import { can, recordLabel } from '../../lib/state.js';
 import { useQualityWorkbenchData } from './hooks/useQualityWorkbenchData.js';
+import QualityNonconformanceTable from './components/QualityNonconformanceTable.jsx';
 export default function QualityWorkbenchPage() {
   useDocumentTitle(`${uiText('Sổ sự không phù hợp')} · OSP Suite`);
   const severityLabels = { minor: uiText('Nhẹ'), major: uiText('Nghiêm trọng'), critical: uiText('Tới hạn') };
@@ -45,11 +46,7 @@ export default function QualityWorkbenchPage() {
     </form></section>}
     {!can('quality.nonconformance.read') ? <div className="empty">{uiText('Bạn chưa có quyền xem hồ sơ NCR.')}</div> : loading ? <div className="skeleton" data-h="row"/> : <section className="card card-pad u-mt-16" >
       <div className="row wrap"><div><h2>{uiText('Danh sách NCR')}</h2><p className="small muted">{uiText('NCR được tạo khi phiếu kiểm tra chuyển sang không đạt và đóng tự động khi phiếu được thông qua.')}</p></div><span className="grow"/><label className="field"><span className="label">{uiText('Lọc trạng thái')}</span><select className="select" value={filter} onChange={(event) => setFilter(event.target.value)}><option value="open">{uiText('Đang mở')}</option><option value="closed">{uiText('Đã đóng')}</option><option value="all">{uiText('Tất cả')}</option></select></label></div>
-      {!visible.length ? <div className="empty">{uiText('Không có hồ sơ NCR trong bộ lọc này.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{uiText('Tiêu đề / thời điểm')}</th><th>{uiText('Mức độ')}</th><th>{uiText('Phiếu QC / sản phẩm')}</th><th>{uiText('Mô tả')}</th><th>{uiText('Trạng thái')}</th><th>{uiText('Thao tác')}</th></tr></thead><tbody>{visible.map((record) => {
-        const inspection = inspections.get(record.inspection);
-        const product = inspection && products.get(inspection.product);
-        return <tr key={record.id}><td><strong>{record.title}</strong><div className="small muted">{fmtDateTime(record.createdAt)}</div></td><td><span className={`badge ${record.severity === 'critical' ? 'danger' : record.severity === 'major' ? 'warning' : 'plain'}`}>{severityLabels[record.severity] || statusLabel(record.severity)}</span></td><td>{inspection ? <><a href={`#/e/quality/inspection/${inspection.id}`}>{product ? recordLabel('master-data.product', product) : uiText('Phiếu kiểm tra')}</a><div className="small muted">{statusLabel(inspection.status)} · {inspection.source || ''}</div></> : <span className="muted">{record.source ? `${record.source} · ${record.source_id || ''}` : uiText('Không liên kết')}</span>}</td><td className="small u-pre-wrap" >{record.description || '—'}</td><td><span className={`badge ${record.status === 'open' ? 'warning' : 'success'}`}>{record.status === 'open' ? uiText('Đang mở') : uiText('Đã đóng')}</span></td><td>{record.status === 'open' && can('quality.nonconformance.closed') && <button className="btn btn-secondary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => close(record)}>{uiText('Đóng NCR')}</button>}</td></tr>;
-      })}</tbody></table></div>}
+      {!visible.length ? <div className="empty">{uiText('Không có hồ sơ NCR trong bộ lọc này.')}</div> : <QualityNonconformanceTable records={visible} inspections={inspections} products={products} severityLabels={severityLabels} busy={busy} canClose={can('quality.nonconformance.closed')} fmtDateTime={fmtDateTime} statusLabel={statusLabel} recordLabel={recordLabel} uiText={uiText} onClose={close} />}
     </section>}
   </div>;
 }
