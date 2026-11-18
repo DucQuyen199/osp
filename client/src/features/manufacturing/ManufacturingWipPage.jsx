@@ -7,7 +7,7 @@ import { can } from '../../lib/state.js';
 import { compareDecimals } from '../../lib/decimal.js';
 import { recordHref } from '../../lib/routes.js';
 import manufacturingEnglish from './manufacturing.en.js';
-import ProductionOrderCard from './components/ProductionOrderCard.jsx';
+import ProductionOrdersList from './components/ProductionOrdersList.jsx';
 import ProductionOrderForm from './components/ProductionOrderForm.jsx';
 import ProductionInspectionQueue from './components/ProductionInspectionQueue.jsx';
 import ManufacturingWipReportSection from './components/ManufacturingWipReportSection.jsx';
@@ -278,7 +278,17 @@ export default function ManufacturingWipPage() {
         }}
         onSubmit={createProductionOrder}
       />}
-      <div className="manufacturing-orders"><h3>{t("L\u1ec7nh s\u1ea3n xu\u1ea5t")}</h3>{productionOrders.map((order) => <ProductionOrderCard key={order.id} order={order} productName={products.get(order.product)?.name} workCenterName={workCenters.get(order.work_center)?.name} draft={outputs[order.id] || {}} busy={busy} formatQty={qty} t={t} onOutputChange={(field, value) => setOutputs((rows) => ({ ...rows, [order.id]: { ...rows[order.id], [field]: value } }))} onAction={operateOrder} />)}{!productionOrders.length && <p className="small muted">{t("Ch\u01b0a c\u00f3 l\u1ec7nh s\u1ea3n xu\u1ea5t.")}</p>}</div>
+      <ProductionOrdersList
+        orders={productionOrders}
+        products={products}
+        workCenters={workCenters}
+        outputDrafts={outputs}
+        busy={busy}
+        formatQuantity={qty}
+        onOutputChange={(id, field, value) => setOutputs((rows) => ({ ...rows, [id]: { ...rows[id], [field]: value } }))}
+        onAction={operateOrder}
+        t={t}
+      />
       {can('quality.inspection.read') && <ProductionInspectionQueue inspections={inspections} products={products} qcNotes={qcNotes} busy={busy} canPass={can('quality.inspection.passed')} canRecordFailure={can('quality.inspection.failed') && can('quality.inspection.update')} formatQty={qty} baseUnitName={baseUnitName} t={t} onNoteChange={(id, value) => setQcNotes((rows) => ({ ...rows, [id]: value }))} onDecide={decideInspection} />}
     </section>
       {can('manufacturing.rework_order.read') && <ReworkOrdersPanel

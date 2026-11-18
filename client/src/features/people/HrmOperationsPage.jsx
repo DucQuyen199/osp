@@ -5,7 +5,7 @@ import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { app, can, recordLabel } from '../../lib/state.js';
 import { listHref, recordHref } from '../../lib/routes.js';
-import AttendanceEntriesTable from './components/AttendanceEntriesTable.jsx';
+import AttendanceDayPanel from './components/AttendanceDayPanel.jsx';
 import WorkSchedulePatternForm from './components/WorkSchedulePatternForm.jsx';
 import EmployeeIntakeForm from './components/EmployeeIntakeForm.jsx';
 import LeaveRequestForm from './components/LeaveRequestForm.jsx';
@@ -233,10 +233,24 @@ export default function HrmOperationsPage() {
     <div className="page-head"><div><h1>{uiText("Vận hành nhân sự")}</h1><p className="sub">{uiText("Quản lý hồ sơ, ghi nhận chấm công, duyệt nghỉ phép và điều chỉnh lương theo ngày hiệu lực.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{uiText("Làm mới")}</button></div>
     {(error || dataError) && <div className="alert danger" role="alert">{uiText(error || dataError)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
     <div className="stats u-mb-16" ><div className="card stat"><span className="stat-label">{uiText("Nhân viên đang làm")}</span><strong className="stat-value">{activeEmployees.length}</strong></div><div className="card stat"><span className="stat-label">{uiText("Đơn nghỉ chờ duyệt")}</span><strong className="stat-value">{pendingLeaves.length}</strong></div><div className="card stat"><span className="stat-label">{uiText("Điều chỉnh lương chờ duyệt")}</span><strong className="stat-value">{pendingRevisions.length}</strong></div><div className="card stat"><span className="stat-label">{uiText("Thiếu giờ ra hôm nay")}</span><strong className="stat-value">{attendanceDate === localDate() ? incompleteAttendance : '—'}</strong></div></div>
-    <section className="card card-pad"><h2>{uiText("Chấm công trong ngày")}</h2><div className="row wrap"><label className="field"><span className="label">{uiText("Ngày")}</span><input className="input" type="date" value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)}/></label><label className="field grow"><span className="label">{uiText("Nhân viên ghi nhận giờ vào")}</span><select className="select" value={punchEmployee} onChange={(event) => setPunchEmployee(event.target.value)}><option value="">{uiText("Chọn nhân viên")}</option>{activeEmployees.map((row) => <option key={row.id} value={row.id}>{recordLabel('hrm.employee', row)}</option>)}</select></label>{can('hrm.attendance.create') && <button className="btn btn-primary" type="button" disabled={Boolean(busy) || !punchEmployee || attendanceDate !== localDate() || Boolean(attendanceByEmployee.get(punchEmployee)?.check_in)} onClick={punchIn}>{uiText("Ghi giờ vào")}</button>}</div>
-      {attendance.length > 0 && <AttendanceEntriesTable attendance={attendance} employees={employeeMap} busy={busy} canPunchOut={can('hrm.attendance.update') && attendanceDate === localDate()} onPunchOut={punchOut} />}
-      {!attendance.length && !loading && <p className="small muted">{uiText("Chưa có bản ghi chấm công trong ngày đã chọn.")}</p>}
-    </section>
+    <AttendanceDayPanel
+      attendanceDate={attendanceDate}
+      punchEmployee={punchEmployee}
+      activeEmployees={activeEmployees}
+      attendance={attendance}
+      employeeMap={employeeMap}
+      loading={loading}
+      busy={busy}
+      canCreate={can('hrm.attendance.create')}
+      canPunchOut={can('hrm.attendance.update') && attendanceDate === localDate()}
+      punchInDisabled={Boolean(busy) || !punchEmployee || attendanceDate !== localDate() || Boolean(attendanceByEmployee.get(punchEmployee)?.check_in)}
+      onDateChange={setAttendanceDate}
+      onEmployeeChange={setPunchEmployee}
+      onPunchIn={punchIn}
+      onPunchOut={punchOut}
+      recordLabel={recordLabel}
+      t={uiText}
+    />
     {(can('hrm.work_schedule_pattern.create') || can('hrm.work_schedule_pattern.read') || can('hrm.work_schedule_template.create') || can('hrm.work_schedule_template.read')) && <section className="card card-pad u-mt-16" >
       <h2>{uiText("Lịch ca luân phiên")}</h2>
       <p className="small muted">{uiText("Khai báo chu kỳ ngày làm/nghỉ, ngày bắt đầu và múi giờ. Khi áp dụng, hệ thống sinh lịch theo ngày để chấm công, nghỉ phép và payroll cùng sử dụng. Mỗi đợt tối đa 10 năm và 40.000 dòng; phạm vi ngày tối đa giảm theo số nhân viên trong đội.")}</p>
