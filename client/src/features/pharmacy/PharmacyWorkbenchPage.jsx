@@ -4,6 +4,7 @@ import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { textDialog } from '../../lib/feedback.js';
 import { fmtDateTime, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
+import { addDecimals, compareDecimals, subtractDecimals } from '../../lib/decimal.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import pharmacyEnglish from './pharmacy.en.js';
 import PrescriptionForm from './components/PrescriptionForm.jsx';
@@ -48,7 +49,7 @@ export default function PharmacyWorkbenchPage() {
         const quantities = dispensed.get(order.prescription) || new Map();
         for (const line of Array.isArray(order.lines) ? order.lines : []) {
           if (!line.product) continue;
-          quantities.set(line.product, (quantities.get(line.product) || 0) + Number(line.base_qty ?? line.qty ?? 0));
+          quantities.set(line.product, addDecimals([quantities.get(line.product) || '0', line.base_qty ?? line.qty ?? 0]));
         }
         dispensed.set(order.prescription, quantities);
       }
@@ -122,10 +123,12 @@ export default function PharmacyWorkbenchPage() {
   const disposeReturnedMedicine = async (event, inspection) => {
     event.preventDefault();
     const draft = disposalDrafts[inspection.id] || {};
-    const qty = Number(draft.qty);
+    const qtyText = String(draft.qty ?? '').trim();
+    const qty = Number(qtyText);
     const note = String(draft.note || '').trim();
-    const remaining = Math.max(0, Number(inspection.qty || 0) - returnDispositions.filter((item) => item.inspection === inspection.id && item.status === 'posted').reduce((sum, item) => sum + Number(item.qty || 0), 0));
-    if (!Number.isFinite(qty) || qty <= 0 || qty > remaining || note.length < 5 || note.length > 500) {
+    const disposed = addDecimals(returnDispositions.filter((item) => item.inspection === inspection.id && item.status === 'posted').map((item) => item.qty || 0));
+    const remaining = compareDecimals(subtractDecimals(inspection.qty || 0, disposed), '0') < 0 ? '0' : subtractDecimals(inspection.qty || 0, disposed);
+    if (!Number.isFinite(qty) || compareDecimals(qtyText || 0, '0') <= 0 || compareDecimals(qtyText || 0, remaining) > 0 || note.length < 5 || note.length > 500) {
       setError(t('Nhập số lượng hủy hợp lệ trong giới hạn còn cách ly và ghi lý do từ 5 đến 500 ký tự.'));
       return;
     }
@@ -135,7 +138,7 @@ export default function PharmacyWorkbenchPage() {
       if (!disposition) {
         disposition = await api(dataPath('pharmacy.return_disposition'), { method: 'POST', body: { inspection: inspection.id, qty, note } });
         setReturnDispositions((items) => [...items, disposition]);
-      } else if (Number(disposition.qty) !== qty || disposition.note !== note) {
+      } else if (compareDecimals(disposition.qty || 0, qtyText) !== 0 || disposition.note !== note) {
         disposition = await api(dataPath('pharmacy.return_disposition', disposition.id), { method: 'PATCH', body: { qty, note } });
         setReturnDispositions((items) => items.map((item) => item.id === disposition.id ? disposition : item));
       }
@@ -152,15 +155,15 @@ export default function PharmacyWorkbenchPage() {
     const dispensed = dispensedByPrescription.get(prescription.id) || new Map();
     const prescribedByProduct = new Map();
     for (const item of items) {
-      const qty = Number(item.base_qty ?? item.qty ?? 0);
-      prescribedByProduct.set(item.product, (prescribedByProduct.get(item.product) || 0) + qty);
+      const quantity = item.base_qty ?? item.qty ?? 0;
+      prescribedByProduct.set(item.product, addDecimals([prescribedByProduct.get(item.product) || '0', quantity]));
     }
     const shown = new Set();
     return items.map((item) => {
       const firstForProduct = !shown.has(item.product);
       shown.add(item.product);
-      const prescribed = prescribedByProduct.get(item.product) || 0;
-      const dispensedQty = dispensed.get(item.product) || 0;
+      const prescribed = prescribedByProduct.get(item.product) || '0';
+      const dispensedQty = dispensed.get(item.product) || '0';
       const product = products.find((row) => row.id === item.product);
       const baseUnit = item.base_uom || product?.uom;
       return {
@@ -169,7 +172,7 @@ export default function PharmacyWorkbenchPage() {
         balance: firstForProduct ? {
           prescribed,
           dispensed: dispensedQty,
-          remaining: Math.max(0, prescribed - dispensedQty),
+          remaining: compareDecimals(subtractDecimals(prescribed, dispensedQty), '0') < 0 ? '0' : subtractDecimals(prescribed, dispensedQty),
           unit: units.get(baseUnit)?.name || t('đơn vị gốc'),
         } : null,
       };
@@ -200,19 +203,19 @@ export default function PharmacyWorkbenchPage() {
     <section className="card card-pad stack">
       <div className="row wrap"><div><h2>{t('Thuốc khách trả đang cách ly')}</h2><p className="small muted">{t('Thuốc trả từ đơn thuốc được giữ ngoài tồn bán. Dược sĩ ghi nhận không đạt, sau đó ghi sổ hủy có lý do.')}</p></div><span className="grow" /><button className="btn btn-secondary" type="button" disabled={loading || busy} onClick={load}>{t('Làm mới')}</button></div>
       {!can('quality.inspection.read') ? <div className="empty">{t('Cần quyền đọc phiếu chất lượng để xem thuốc trả đang cách ly.')}</div> : loading ? <div className="skeleton" data-h="row" /> : returnInspections.length === 0 ? <div className="empty">{t('Chưa có thuốc khách trả đang cách ly.')}</div> : returnInspections.map((inspection) => {
-        const disposed = returnDispositions.filter((item) => item.inspection === inspection.id && item.status === 'posted').reduce((sum, item) => sum + Number(item.qty || 0), 0);
-        const remaining = Math.max(0, Number(inspection.qty || 0) - disposed);
+        const disposed = addDecimals(returnDispositions.filter((item) => item.inspection === inspection.id && item.status === 'posted').map((item) => item.qty || 0));
+        const remaining = compareDecimals(subtractDecimals(inspection.qty || 0, disposed), '0') < 0 ? '0' : subtractDecimals(inspection.qty || 0, disposed);
         const draft = disposalDrafts[inspection.id] || {};
         return <article className="card card-pad stack-sm" key={inspection.id}>
           <div className="row wrap"><div className="grow"><strong>{productName(inspection.product)}</strong><div className="small muted">{t('Số lượng cách ly')}: {fmtNumber(remaining)} · {t('Trạng thái')}: {statusLabel(inspection.status)} · {t('Mã truy xuất')}: {String(inspection.source_id || '').slice(0, 8)}</div>{inspection.lot && <div className="small muted">{t('Lô')}: {String(inspection.lot).slice(0, 12)}</div>}{inspection.note && <div className="small muted">{inspection.note}</div>}</div>
             {inspection.status === 'pending' && can('quality.inspection.update') && can('quality.inspection.failed') && <button className="btn btn-danger btn-sm" type="button" disabled={busy} onClick={() => failReturnedMedicine(inspection)}>{t('Xác nhận không đạt')}</button>}
           </div>
-          {inspection.status === 'failed' && remaining > 0 && can('pharmacy.return_disposition.create') && can('pharmacy.return_disposition.posted') && <form className="row wrap" onSubmit={(event) => disposeReturnedMedicine(event, inspection)}>
+          {inspection.status === 'failed' && compareDecimals(remaining, '0') > 0 && can('pharmacy.return_disposition.create') && can('pharmacy.return_disposition.posted') && <form className="row wrap" onSubmit={(event) => disposeReturnedMedicine(event, inspection)}>
             <label className="field"><span className="label">{t('Số lượng hủy')}</span><input className="input num" type="number" min="0.000001" max={remaining} step="any" required value={draft.qty || ''} onChange={(event) => setDisposalDrafts((items) => ({ ...items, [inspection.id]: { ...items[inspection.id], qty: event.target.value } }))} /></label>
             <label className="field grow"><span className="label">{t('Lý do / chứng từ hủy')}</span><input className="input" required minLength="5" maxLength="500" value={draft.note || ''} onChange={(event) => setDisposalDrafts((items) => ({ ...items, [inspection.id]: { ...items[inspection.id], note: event.target.value } }))} /></label>
-            <button className="btn btn-danger" type="submit" disabled={busy || remaining <= 0}>{t('Ghi sổ hủy')}</button>
+            <button className="btn btn-danger" type="submit" disabled={busy || compareDecimals(remaining, '0') <= 0}>{t('Ghi sổ hủy')}</button>
           </form>}
-          {remaining <= 0 && <div className="small muted">{t('Đã hủy hết số lượng cách ly.')}</div>}
+          {compareDecimals(remaining, '0') <= 0 && <div className="small muted">{t('Đã hủy hết số lượng cách ly.')}</div>}
         </article>;
       })}
     </section>
