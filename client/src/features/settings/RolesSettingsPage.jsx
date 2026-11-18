@@ -1,38 +1,13 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
-import { api, tenantPath } from '../../lib/api.js';
-import { toast } from '../../lib/feedback.js';
 import { uiText } from '../../lib/i18n.js';
-import { app, can, loadMeta } from '../../lib/state.js';
+import { app, can } from '../../lib/state.js';
 import SettingsTabs from './SettingsTabs.jsx';
+import { useRolesSettingsWorkflow } from './hooks/useRolesSettingsWorkflow.js';
 export default function RolesSettingsPage() {
   useDocumentTitle(`${uiText('Vai trò')} · ${uiText('Cài đặt')} · OSP Suite`);
-  const [roleId, setRoleId] = useState('');
-  const [name, setName] = useState('');
-  const [permissions, setPermissions] = useState('');
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-  const edit = (id, role) => {
-    setRoleId(id);
-    setName(role.name);
-    setPermissions(role.permissions.join('\n'));
-    setError('');
-  };
-  const save = async (event) => {
-    event.preventDefault();
-    setBusy(true);
-    setError('');
-    try {
-      await api(tenantPath('/roles'), {
-        method: 'POST',
-        body: { id: roleId.trim(), name: name.trim(), permissions: permissions.split('\n').map((item) => item.trim()).filter(Boolean) },
-      });
-      await loadMeta();
-      window.dispatchEvent(new Event('osp:meta'));
-      toast(uiText('Đã lưu vai trò.'), 'success');
-    } catch (reason) { setError(reason.message || uiText('Không lưu được vai trò.')); }
-    finally { setBusy(false); }
-  };
+  const { roleId, setRoleId, name, setName, permissions, setPermissions, error, busy, edit, save }
+    = useRolesSettingsWorkflow();
   if (!can('tenant.admin')) return <div className="page"><div className="alert danger" role="alert">{uiText('Chỉ quản trị viên mới được quản lý vai trò.')}</div></div>;
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Cài đặt')}</h1><p className="sub">{uiText('Vai trò và quyền của doanh nghiệp')} “{app.meta.name}”.</p></div></div>

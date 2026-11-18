@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
-import { api, tenantPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, fmtNumber, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { addDecimals, compareDecimals, divideDecimals, multiplyDecimals } from '../../lib/decimal.js';
 import { can, recordLabel } from '../../lib/state.js';
@@ -11,13 +10,12 @@ import { AgricultureHarvestForm, AgricultureInputForm } from './components/Agric
 import AgricultureCycleHistory from './components/AgricultureCycleHistory.jsx';
 import { useAgricultureData } from './hooks/useAgricultureData.js';
 import { useAgricultureOperationsWorkflow } from './hooks/useAgricultureOperationsWorkflow.js';
+import { useAgricultureInputCostsData } from './hooks/useAgricultureInputCostsData.js';
 const t = (text) => uiTextWith(text, agricultureEnglish);
 const today = localDate;
 export default function AgricultureOperationsPage() {
   useDocumentTitle(`${t('Điều hành mùa vụ')} · OSP Suite`);
   const { farms, cycles, harvests, applications, products, units, warehouses, parties, lots, loading, error: dataError, load: loadData } = useAgricultureData();
-  const [inputCostReport, setInputCostReport] = useState(null);
-  const [inputCostError, setInputCostError] = useState('');
   const [cycleId, setCycleId] = useState('');
   const [error, setError] = useState('');
   const load = async (preserveNotice = false) => {
@@ -70,18 +68,7 @@ export default function AgricultureOperationsPage() {
     return [...totals.values()];
   }, [cycleHarvests, products, units]);
   const canViewInputCost = can('agriculture.input_application.read') && can('inventory.stock_move.read');
-  useEffect(() => {
-    let active = true;
-    if (!selectedCycle || !canViewInputCost) {
-      setInputCostReport(null); setInputCostError('');
-      return () => { active = false; };
-    }
-    setInputCostReport(null); setInputCostError('');
-    api(tenantPath(`/reports/agriculture/crop-cycles/${encodeURIComponent(selectedCycle.id)}/input-costs`))
-      .then((report) => { if (active) setInputCostReport(report); })
-      .catch((reason) => { if (active) setInputCostError(reason.message || t('Không tải được chi phí vật tư.')); });
-    return () => { active = false; };
-  }, [selectedCycle?.id, cycleInputs, canViewInputCost]);
+  const { report: inputCostReport, error: inputCostError } = useAgricultureInputCostsData({ cycleId: selectedCycle?.id, inputs: cycleInputs, enabled: canViewInputCost });
   const harvestSafety = useMemo(() => {
     const unknownProducts = new Set();
     const latestDate = cycleInputs.reduce((latest, application) => {

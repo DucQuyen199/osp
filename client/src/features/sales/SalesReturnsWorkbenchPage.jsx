@@ -1,50 +1,34 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
-import { api, dataPath } from '../../lib/api.js';
 import { fmtMoney, statusLabel, uiText, uiTextWith } from '../../lib/i18n.js';
 import { app, can, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import { absDecimal, addDecimals, compareDecimals, multiplyDecimals, subtractDecimals, minDecimal, roundDecimal } from '../../lib/decimal.js';
 import { useSalesReturnsData } from './hooks/useSalesReturnsData.js';
+import { useSalesReturnsWorkflow } from './hooks/useSalesReturnsWorkflow.js';
 import SalesReturnRegisterPanel from './components/SalesReturnRegisterPanel.jsx';
 import wholesaleEnglish from './wholesale.en.js';
 const t = (text) => uiTextWith(text, wholesaleEnglish);
-const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
 const sameDecimal = (left, right) => compareDecimals(left ?? 0, right ?? 0) === 0;
 const samePrice = (left, right) => compareDecimals(absDecimal(subtractDecimals(left ?? 0, right ?? 0)), '0.005') <= 0;
 const positiveDecimal = (value) => { try { return compareDecimals(value || 0, 0) > 0; } catch { return false; } };
 export default function SalesReturnsWorkbenchPage() {
   useDocumentTitle(`${uiText('Trả hàng bán')} · OSP Suite`);
-  const [orderId, setOrderId] = useState('');
-  const [quantities, setQuantities] = useState({});
-  const [returnInvoiceId, setReturnInvoiceId] = useState('');
-  const [linkedInvoiceId, setLinkedInvoiceId] = useState('');
-  const [reason, setReason] = useState('');
-  const [selectedId, setSelectedId] = useState('');
-  const [busy, setBusy] = useState('');
-  const [notice, setNotice] = useState('');
   const workflowApproval = app.meta?.modules?.some((module) => module.id === 'workflow-approval') || false;
   const logisticsEnabled = app.meta?.modules?.some((module) => module.id === 'logistics') || false;
   const { orders, returns, products, units, parties, warehouses, shipments, invoices, creditNotes, approvalRequests, loading, error, setError, load } = useSalesReturnsData(logisticsEnabled, workflowApproval);
-  useEffect(() => {
-    setOrderId((id) => orders.some((row) => row.id === id && ['confirmed','partially_delivered','delivered'].includes(row.status)) ? id : orders.find((row) => ['confirmed','partially_delivered','delivered'].includes(row.status))?.id || '');
-    setSelectedId((id) => returns.some((row) => row.id === id) ? id : returns[0]?.id || '');
-  }, [orders, returns]);
+  const workflow = useSalesReturnsWorkflow({ orders, returns, invoices, load, setError });
+  const {
+    orderId, quantities, returnInvoiceId, setReturnInvoiceId,
+    linkedInvoiceId, setLinkedInvoiceId, reason, setReason, selectedId, setSelectedId,
+    busy, notice, formOrder, formInvoices, selected, selectedOrder, selectedReturnInvoices,
+    changeOrder, changeQuantity, createReturn, transition, assignReturnInvoice,
+  } = workflow;
   const orderById = useMemo(() => new Map(orders.map((row) => [row.id, row])), [orders]);
   const returnableOrders = orders.filter((row) => ['confirmed','partially_delivered','delivered'].includes(row.status));
-  const formOrder = orderById.get(orderId);
-  const selected = returns.find((row) => row.id === selectedId);
-  const selectedOrder = orderById.get(selected?.sales_order);
-  const selectedReturnInvoices = selectedOrder ? invoicesFor(selectedOrder) : [];
   const unitName = (line) => line.uom_name || units.get(line.uom)?.name || '';
   const stats = useMemo(() => ({ pending: returns.filter((row) => row.status === 'submitted').length, approved: returns.filter((row) => row.status === 'approved').length, received: returns.filter((row) => row.status === 'received').length, draft: returns.filter((row) => ['draft','rejected'].includes(row.status)).length }), [returns]);
-  async function run(key, operation, success) {
-    setBusy(key); setError(''); setNotice('');
-    try { await operation(); setNotice(success); await load(true); }
-    catch (reason) { setError(reason.message || uiText('Thao tác không thành công.')); await load(true); }
-    finally { setBusy(''); }
-  }
   function shipmentsFor(order) { return shipments.filter((shipment) => shipment.source === 'sales_order' && shipment.source_id === order.id); }
   function invoicesFor(order) { return order ? invoices.filter((invoice) => invoice.source === 'sales_order' && invoice.source_id === order.id && ['posted', 'partially_paid', 'partially_settled', 'paid', 'settled'].includes(invoice.status)) : []; }
   function invoiceFor(order, preferredId) {
@@ -79,41 +63,12 @@ export default function SalesReturnsWorkbenchPage() {
     }).filter((line) => compareDecimals(line.remaining, '0.000001') > 0);
   }
   const eligible = formOrder ? eligibleLines(formOrder) : [];
-  const formInvoices = formOrder ? invoicesFor(formOrder) : [];
+
   const selectedInvoice = formOrder ? invoiceFor(formOrder, returnInvoiceId) : null;
   const hasReturnQuantity = eligible.some((line) => positiveDecimal(quantities[line.key]));
   const returnSubmitDisabled = !hasReturnQuantity || !reason.trim() || !selectedInvoice;
   const linkedInvoice = selected ? invoiceFor(selectedOrder, selected.invoice || linkedInvoiceId) : null;
   const returnedTotal = selected ? addDecimals((selected.lines || []).map((line) => line.line_total ?? multiplyDecimals([line.price || 0, line.qty || 0]))) : '0';
-  useEffect(() => {
-    setReturnInvoiceId((current) => formInvoices.some((invoice) => invoice.id === current) ? current : formInvoices.length === 1 ? formInvoices[0].id : '');
-  }, [orderId, invoices]);
-  useEffect(() => {
-    setLinkedInvoiceId(selected?.invoice || (selectedOrder && invoicesFor(selectedOrder).length === 1 ? invoicesFor(selectedOrder)[0].id : ''));
-  }, [selectedId, selected?.invoice, invoices]);
-  async function createReturn(event) {
-    event.preventDefault(); if (!formOrder) return;
-    if (!selectedInvoice) { setError(uiText('Chọn một hóa đơn đã ghi sổ của đơn bán trước khi gửi duyệt phiếu trả.')); return; }
-    if (eligible.some((line) => positiveDecimal(quantities[line.key]) && compareDecimals(quantities[line.key], line.remaining) > 0)) { setError(uiText('Số lượng trả không được vượt số lượng còn đủ điều kiện trả.')); return; }
-    const lines = eligible.map((line) => ({ product: line.product, uom: line.uom || undefined, price: String(line.price), qty: String(quantities[line.key] || '0'), discount_pct: String(line.discount_pct), tax: line.tax, tax_rate: String(line.tax_rate) })).filter((line) => positiveDecimal(line.qty));
-    if (!lines.length || !reason.trim()) { setError(uiText('Nhập số lượng trả và lý do cho ít nhất một mặt hàng.')); return; }
-    await run('return:create', async () => {
-      const row = await api(dataPath('sales.sales_return'), { method: 'POST', body: { sales_order: formOrder.id, invoice: selectedInvoice.id, warehouse: formOrder.warehouse || undefined, lines, reason: reason.trim() } });
-      setSelectedId(row.id); setReason(''); setQuantities({});
-      await action('sales.sales_return', row, 'submitted');
-    }, uiText('Đã lập và gửi duyệt phiếu trả. Số lượng được đối chiếu với hàng đã giao và các phiếu đang xử lý.'));
-  }
-  async function transition(row, verb) {
-    const messages = { submitted: uiText('Đã gửi phiếu trả duyệt.'), approved: uiText('Đã duyệt phiếu trả; kho có thể tiếp nhận hàng.'), rejected: uiText('Đã từ chối phiếu trả.'), received: uiText('Đã nhập lại hàng và tạo credit note để điều chỉnh công nợ khách hàng.'), cancelled: uiText('Đã hủy phiếu trả.') };
-    await run(`${row.id}:${verb}`, () => action('sales.sales_return', row, verb), messages[verb]);
-  }
-  async function assignReturnInvoice(row) {
-    if (!linkedInvoiceId) return;
-    await run(`${row.id}:invoice`, () => api(dataPath('sales.sales_return', row.id), { method: 'PATCH', body: { invoice: linkedInvoiceId } }), uiText('Đã gắn hóa đơn gốc vào phiếu trả.'));
-  }
-  async function decideApproval(request, verb) {
-    await run(`${request.id}:${verb}`, () => action('workflow-approval.approval_request', request, verb), uiText(verb === 'approved' ? 'Đã duyệt phiếu trả.' : 'Đã từ chối phiếu trả.'));
-  }
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Trả hàng và điều chỉnh doanh thu')}</h1><p className="sub">{uiText('Chỉ nhận trả trên số lượng đủ điều kiện, phê duyệt trước khi nhập kho và tạo credit note theo hóa đơn gốc.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{uiText('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
@@ -136,9 +91,9 @@ export default function SalesReturnsWorkbenchPage() {
       unitName={unitName}
       fmtMoney={fmtMoney}
       statusLabel={statusLabel}
-      onOrderChange={(value) => { setOrderId(value); setQuantities({}); }}
+      onOrderChange={changeOrder}
       onInvoiceChange={setReturnInvoiceId}
-      onQuantityChange={(key, value) => setQuantities((current) => ({ ...current, [key]: value }))}
+      onQuantityChange={changeQuantity}
       onReasonChange={setReason}
       onSubmit={createReturn}
       t={t}
