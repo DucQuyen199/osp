@@ -13,6 +13,7 @@ import PosSessionPanel from './components/PosSessionPanel.jsx';
 import PosCashOperationsPanel from './components/PosCashOperationsPanel.jsx';
 import PosRecentTransactions from './components/PosRecentTransactions.jsx';
 import { calculatePosTotals } from './domain/posTotals.js';
+import { buildPosReturnLines, estimatePosReturnTotal, remainingPosReturnQuantity } from './domain/posReturns.js';
 import retailEnglish from './retail.en.js';
 import { usePosWorkbenchData } from './hooks/usePosWorkbenchData.js';
 
@@ -25,6 +26,7 @@ export default function PosTerminalPage() {
   const [returnQuantities, setReturnQuantities] = useState({});
   const [returnReason, setReturnReason] = useState('');
   const [returnDraftId, setReturnDraftId] = useState('');
+  const [returnDraftSignature, setReturnDraftSignature] = useState('');
   const [prescriptionId, setPrescriptionId] = useState('');
   const [sessionId, setSessionId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
@@ -215,6 +217,7 @@ export default function PosTerminalPage() {
     setReturnQuantities({});
     setReturnReason('');
     setReturnDraftId('');
+    setReturnDraftSignature('');
     setError('');
   };
 
@@ -222,9 +225,7 @@ export default function PosTerminalPage() {
     event.preventDefault();
     if (!returningOrder) return;
     const reason = returnReason.trim();
-    const lines = Object.entries(returnQuantities)
-      .map(([lineIndex, qty]) => ({ line_index: Number(lineIndex), qty: Number(qty) }))
-      .filter((line) => Number.isFinite(line.qty) && line.qty > 0);
+    const lines = buildPosReturnLines(returnQuantities);
     if (reason.length < 5 || reason.length > 500) {
       setError(t('Lý do trả hàng cần từ 5 đến 500 ký tự.'));
       return;
@@ -233,21 +234,27 @@ export default function PosTerminalPage() {
       setError(t('Nhập số lượng lớn hơn 0 cho ít nhất một mặt hàng.'));
       return;
     }
+    if (lines.some((line) => compareDecimals(line.qty, remainingPosReturnQuantity(returningOrder, line.line_index, returns)) > 0)) {
+      setError(t('Số lượng trả vượt số lượng còn được phép.'));
+      return;
+    }
     setBusy(true); setError(''); setNotice('');
     try {
       let returnId = returnDraftId;
+      const draftSignature = JSON.stringify({ reason, lines });
       if (!returnId) {
         const created = await api(dataPath('pos.pos_return'), { method: 'POST', body: { pos_order: returningOrder.id, reason, lines } });
         returnId = created.id;
         setReturnDraftId(returnId);
+        setReturnDraftSignature(draftSignature);
+      } else if (draftSignature !== returnDraftSignature) {
+        await api(dataPath('pos.pos_return', returnId), { method: 'PATCH', body: { reason, lines } });
+        setReturnDraftSignature(draftSignature);
       }
-      await api(dataPath('pos.pos_return', returnId, 'received'), { method: 'POST' });
-      setNotice(`${t('Đã ghi nhận phiếu trả hàng')} ${String(returnId).slice(0, 8)} · ${fmtMoney(lines.reduce((sum, line) => {
-        const sold = Number(returningOrder.lines?.[line.line_index]?.qty) || 0;
-        const value = Number(returningOrder.lines?.[line.line_index]?.line_total) || 0;
-        return sum + (sold > 0 ? value * line.qty / sold : 0);
-      }, 0))}.`);
-      setReturningOrder(null); setReturnDraftId('');
+      const received = await api(dataPath('pos.pos_return', returnId, 'received'), { method: 'POST' });
+      const refundTotal = received?.total ?? estimatePosReturnTotal(returningOrder, lines);
+      setNotice(`${t('Đã ghi nhận phiếu trả hàng')} ${String(returnId).slice(0, 8)} · ${fmtMoney(refundTotal)}.`);
+      setReturningOrder(null); setReturnDraftId(''); setReturnDraftSignature('');
       await load(true);
       setPrintingOrderId(returnId);
     } catch (reason) {
@@ -258,7 +265,7 @@ export default function PosTerminalPage() {
   const printingReturn = returns.find((record) => record.id === printingOrderId && record.status === 'received');
   const returnSourceOrder = printingReturn ? orders.find((order) => order.id === printingReturn.pos_order) : null;
   const printingOrder = printingReturn
-    ? { ...returnSourceOrder, id: printingReturn.id, created_at: printingReturn.created_at, status: 'partial_return', total: printingReturn.total, tax_total: printingReturn.tax_total, voucher_discount: (printingReturn.lines || []).reduce((sum, line) => sum + (Number(line.voucher_discount_amount) || 0), 0), lines: printingReturn.lines, refund_reason: printingReturn.reason, return_source_id: printingReturn.pos_order, method: 'refund', cash_received: undefined, change_due: undefined }
+    ? { ...returnSourceOrder, id: printingReturn.id, created_at: printingReturn.created_at, status: 'partial_return', total: printingReturn.total, tax_total: printingReturn.tax_total, voucher_discount: addDecimals((printingReturn.lines || []).map((line) => line.voucher_discount_amount || 0)), lines: printingReturn.lines, refund_reason: printingReturn.reason, return_source_id: printingReturn.pos_order, method: 'refund', cash_received: undefined, change_due: undefined }
     : orders.find((order) => order.id === printingOrderId);
 
   const createCashMovement = async (event) => {

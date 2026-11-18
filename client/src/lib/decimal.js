@@ -43,6 +43,21 @@ export function multiplyDecimals(values) {
   }, '1');
 }
 
+export function divideDecimals(dividend, divisor, places = 28) {
+  if (!Number.isInteger(places) || places < 0 || places > 28) throw new RangeError('Decimal division scale must be between 0 and 28');
+  const a = decimalParts(dividend);
+  const b = decimalParts(divisor);
+  if (b.coefficient === 0n) throw new RangeError('Cannot divide by zero');
+  const numerator = a.coefficient * 10n ** BigInt(b.scale + places);
+  const denominator = b.coefficient * 10n ** BigInt(a.scale);
+  let quotient = numerator / denominator;
+  const remainder = numerator % denominator;
+  if ((remainder < 0n ? -remainder : remainder) * 2n >= (denominator < 0n ? -denominator : denominator)) {
+    quotient += (numerator < 0n) !== (denominator < 0n) ? -1n : 1n;
+  }
+  return decimalText(quotient, places);
+}
+
 export function addDecimals(values) {
   return values.reduce((total, value) => combine(total, value), '0');
 }

@@ -1,5 +1,6 @@
 import React from 'react';
 import { fmtMoney } from '../../../lib/i18n.js';
+import { buildPosReturnLines, estimatePosReturnTotal, remainingPosReturnQuantity } from '../domain/posReturns.js';
 
 export default function PosReturnDialog({
   order,
@@ -17,14 +18,7 @@ export default function PosReturnDialog({
   t,
 }) {
   if (!order) return null;
-  const returned = returns.filter((record) => record.pos_order === order.id && record.status === 'received');
-  const estimate = Object.entries(quantities).reduce((sum, [index, rawQty]) => {
-    const line = order.lines?.[Number(index)];
-    const sold = Number(line?.qty) || 0;
-    const amount = Number(line?.line_total) || 0;
-    const qty = Number(rawQty) || 0;
-    return sum + (sold > 0 ? amount * qty / sold : 0);
-  }, 0);
+  const estimate = estimatePosReturnTotal(order, buildPosReturnLines(quantities));
 
   return <div className="pos-return-overlay" role="presentation">
     <section className="card card-pad pos-return-dialog" role="dialog" aria-modal="true" aria-labelledby="pos-return-title">
@@ -45,17 +39,14 @@ export default function PosReturnDialog({
           <table className="table">
             <thead><tr><th>{t('Mặt hàng')}</th><th>{t('Đã bán')}</th><th>{t('Còn được trả')}</th><th>{t('Số lượng trả')}</th></tr></thead>
             <tbody>{(order.lines || []).map((line, index) => {
-              const sold = Number(line.qty) || 0;
-              const already = returned.flatMap((record) => record.lines || [])
-                .filter((item) => Number(item.source_line_index) === index)
-                .reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
-              const available = Math.max(0, sold - already);
+              const sold = String(line.qty || '0');
+              const available = remainingPosReturnQuantity(order, index, returns);
               const name = line.product_name || products.get(line.product)?.name || t('Mặt hàng');
               return <tr key={`${line.product}-${index}`}>
                 <td>{name}</td>
                 <td>{sold}{line.uom_name ? ` ${line.uom_name}` : ''}</td>
                 <td>{available}{line.uom_name ? ` ${line.uom_name}` : ''}</td>
-                <td><input className="input num" aria-label={`${t('Số lượng trả')} ${name}`} type="number" min="0" max={available} step="any" disabled={available <= 0 || locked} value={quantities[index] || ''} onChange={(event) => onQuantityChange(index, event.target.value)} /></td>
+                <td><input className="input num" aria-label={`${t('Số lượng trả')} ${name}`} type="number" min="0" max={available} step="any" disabled={available === '0' || locked} value={quantities[index] || ''} onChange={(event) => onQuantityChange(index, event.target.value)} /></td>
               </tr>;
             })}</tbody>
           </table>
