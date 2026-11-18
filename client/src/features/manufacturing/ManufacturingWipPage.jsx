@@ -4,6 +4,7 @@ import { localDate } from '../../lib/dates.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtMoney, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { can, loadRefs, loadAllResponse } from '../../lib/state.js';
+import { compareDecimals } from '../../lib/decimal.js';
 import { recordHref } from '../../lib/routes.js';
 import manufacturingEnglish from './manufacturing.en.js';
 import ProductionOrderCard from './components/ProductionOrderCard.jsx';
@@ -14,6 +15,7 @@ import ConditionalAcceptancePanel from './components/ConditionalAcceptancePanel.
 import ProductionDispositionPanel from './components/ProductionDispositionPanel.jsx';
 import ReworkOrdersPanel from './components/ReworkOrdersPanel.jsx';
 import BillOfMaterialsSection from './components/BillOfMaterialsSection.jsx';
+import { isWithinFailedQty, productionOutputMatchesPlan, productionOutputQuantities, remainingFailedQty as getRemainingFailedQty } from './domain/inspectionQuantities.js';
 const t = (text) => uiTextWith(text, manufacturingEnglish);
 const today = localDate;
 const qty = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
@@ -109,16 +111,11 @@ export default function ManufacturingWipPage() {
     const baseUnit = products.get(productId)?.uom;
     return units.get(baseUnit)?.name || t(baseUnit ? 'đơn vị gốc' : 'chưa đặt đơn vị');
   };
-  const alreadyAccountedReworkQty = (inspectionId) => (
-    reworkOrders.filter((order) => order.inspection === inspectionId && order.status !== 'cancelled').reduce((total, order) => total + Number(order.qty || 0), 0)
-    + productionDispositions.filter((row) => row.inspection === inspectionId && ['draft', 'posted'].includes(row.status)).reduce((total, row) => total + Number(row.qty || 0), 0)
-    + conditionalAcceptances.filter((row) => row.inspection === inspectionId && ['draft', 'submitted', 'approved'].includes(row.status)).reduce((total, row) => total + Number(row.qty || 0), 0)
-  );
-  const remainingFailedQty = (inspection) => Math.max(0, Number(inspection?.qty || 0) - alreadyAccountedReworkQty(inspection?.id));
+  const remainingFailedQty = (inspection) => getRemainingFailedQty(inspection, reworkOrders, productionDispositions, conditionalAcceptances);
   const remainingFailedProductionInspections = inspections.filter((inspection) =>
     ['production_order', 'production_rework'].includes(inspection.source)
     && inspection.status === 'failed'
-    && remainingFailedQty(inspection) > 0.000001
+    && compareDecimals(remainingFailedQty(inspection), '0.000001') > 0
   );
   const resetBom = () => { setEditingBom(''); setBomProduct(''); setBomOutputQty('1'); setComponents([{ product: '', qty: '1', uom: '' }]); };
   const editBom = (bom) => {
@@ -154,11 +151,15 @@ export default function ManufacturingWipPage() {
     try {
       if (action === 'done') {
         const draft = outputs[order.id] || {};
-        const goodQty = Number(draft.good_qty ?? order.qty);
-        const scrapInput = draft.scrap_qty;
-        const scrapQty = scrapInput != null && String(scrapInput).trim() !== '' ? Number(scrapInput) : Math.max(0, Number(order.qty) - goodQty);
+        const { goodQty, scrapQty } = productionOutputQuantities(order.qty, draft.good_qty ?? order.qty, draft.scrap_qty);
+        if (compareDecimals(goodQty, '0') < 0 || compareDecimals(scrapQty, '0') < 0) {
+          throw new Error('Số lượng đạt và phế phẩm không được âm.');
+        }
+        if (!productionOutputMatchesPlan(order.qty, goodQty, scrapQty)) {
+          throw new Error('Tổng số lượng đạt và phế phẩm phải bằng số lượng kế hoạch (sai số tối đa 0,0001).');
+        }
         await api(dataPath('manufacturing.production_order', order.id), { method: 'PATCH', body: {
-          good_qty: goodQty, scrap_qty: scrapQty, ...(draft.scrap_reason ? { scrap_reason: draft.scrap_reason } : {}),
+          good_qty: Number(goodQty), scrap_qty: Number(scrapQty), ...(draft.scrap_reason ? { scrap_reason: draft.scrap_reason } : {}),
         } });
       }
       await api(dataPath('manufacturing.production_order', order.id, action), { method: 'POST' });
@@ -185,6 +186,7 @@ export default function ManufacturingWipPage() {
     if (!inspection) return;
     setBusy('rework'); setError('');
     try {
+      if (!isWithinFailedQty(reworkQty, remainingFailedQty(inspection))) throw new Error('Số lượng sửa vượt lượng QC lỗi còn lại.');
       await api(dataPath('manufacturing.rework_order'), { method: 'POST', body: {
         production_order: inspection.source_id, inspection: inspection.id,
         qty: Number(reworkQty), reason: reworkReason.trim(),
@@ -206,6 +208,8 @@ export default function ManufacturingWipPage() {
     if (!dispositionInspection) return;
     setBusy('production-disposition'); setError('');
     try {
+      const inspection = inspections.find((row) => row.id === dispositionInspection);
+      if (!isWithinFailedQty(dispositionQty, remainingFailedQty(inspection))) throw new Error('Số lượng loại bỏ vượt lượng QC lỗi còn lại.');
       const created = await api(dataPath('manufacturing.production_disposition'), { method: 'POST', body: {
         inspection: dispositionInspection, qty: Number(dispositionQty), note: dispositionNote.trim(), expense_account: dispositionAccount,
       } });
@@ -225,6 +229,7 @@ export default function ManufacturingWipPage() {
     if (!inspection) return;
     setBusy('conditional-acceptance'); setError(''); setNotice('');
     try {
+      if (!isWithinFailedQty(acceptanceQty, remainingFailedQty(inspection))) throw new Error('Số lượng đề nghị vượt lượng QC lỗi còn lại.');
       const created = await api(dataPath('manufacturing.conditional_acceptance'), { method: 'POST', body: {
         inspection: inspection.id,
         qty: Number(acceptanceQty),
@@ -330,9 +335,8 @@ export default function ManufacturingWipPage() {
         productName={(id) => products.get(id)?.name} baseUnitName={baseUnitName} formatQuantity={qty}
         statusLabel={statusLabel} onInspectionChange={(id) => {
           const inspection = inspections.find((row) => row.id === id);
-          const alreadyAssigned = alreadyAccountedReworkQty(id);
           setReworkInspection(id);
-          setReworkQty(inspection ? String(Math.max(0, Number(inspection.qty || 0) - alreadyAssigned)) : '');
+          setReworkQty(inspection ? String(remainingFailedQty(inspection)) : '');
         }} onQuantityChange={setReworkQty} onReasonChange={setReworkReason}
         onSubmit={createReworkOrder} onAction={operateRework} t={t}
       />}

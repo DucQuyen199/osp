@@ -26,6 +26,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Nhà thuốc chỉ ghi nhận cấp phát qua state machine sau giao dịch POS hoàn tất; timestamp, lịch sử đơn thuốc và bán hàng cùng commit/rollback.
 - Lệnh sản xuất theo dõi sản lượng đạt/phế phẩm riêng trong QC; thành phẩm theo dõi lô nhận mã lô và hạn dùng được liên kết tới phiếu QC và tồn kho.
 - Sửa hàng lỗi sản xuất theo lệnh rework: bổ sung chi phí BOM vào WIP của lệnh gốc, khóa trùng lệnh đang chạy, kiểm tra lại QC sau sửa và đóng NC liên quan khi đạt.
+- Bàn WIP sản xuất cộng lượng sửa/loại bỏ/chấp nhận có điều kiện bằng Decimal như máy chủ, kiểm tra tổng đạt và phế phẩm trước khi hoàn tất lệnh, và chặn yêu cầu xử lý vượt lượng QC lỗi còn lại.
 - Các ngày mặc định, kiểm tra nghiệp vụ theo ngày và tác vụ đến hạn trong kế toán, ngân hàng, mua hàng, nhân sự, nông nghiệp, lưu trú, bảo trì, thuê bao và các ngành khác dùng ngày lịch địa phương của tenant thay vì ngày hệ điều hành/cơ sở dữ liệu; thời điểm vẫn lưu theo UTC.
 - Các kiểm tra tồn kho hết hạn/FEFO, báo cáo lô và gợi ý mua hàng, bảng housekeeping, hiệu lực phụ lục hợp đồng và chốt tiền thuê cũng dùng ngày nghiệp vụ tenant; không còn predicate `CURRENT_DATE` trong mã Rust của server. Bảng housekeeping phân trang phòng cần xử lý và vẫn trả tổng số theo trạng thái.
 - Kiểm tra kỳ kế toán và báo cáo WIP sản xuất quy đổi dấu thời gian cũ theo múi giờ tenant khi chứng từ thiếu ngày hạch toán; ngày đến hạn khoản vay cũ được backfill theo múi giờ tenant.
