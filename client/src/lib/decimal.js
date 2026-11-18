@@ -68,6 +68,20 @@ export function roundDecimal(value, places = 2) {
   return decimalText(negative ? -rounded : rounded, places);
 }
 
+export function roundDecimalHalfEven(value, places = 2) {
+  if (!Number.isInteger(places) || places < 0) throw new RangeError('Decimal places must be a non-negative integer');
+  const { coefficient, scale } = decimalParts(value);
+  if (scale <= places) return decimalText(coefficient, scale);
+  const divisor = 10n ** BigInt(scale - places);
+  const negative = coefficient < 0n;
+  const absolute = negative ? -coefficient : coefficient;
+  let rounded = absolute / divisor;
+  const remainder = absolute % divisor;
+  const twiceRemainder = remainder * 2n;
+  if (twiceRemainder > divisor || (twiceRemainder === divisor && rounded % 2n !== 0n)) rounded += 1n;
+  return decimalText(negative ? -rounded : rounded, places);
+}
+
 export function compareDecimals(left, right) {
   const a = decimalParts(left);
   const b = decimalParts(right);

@@ -3,6 +3,7 @@ import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, fmtNumber, uiText } from '../../lib/i18n.js';
+import { addDecimals, compareDecimals, multiplyDecimals } from '../../lib/decimal.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import PurchaseOrderDraftForm from './components/PurchaseOrderDraftForm.jsx';
 import PurchaseRequisitionForm from './components/PurchaseRequisitionForm.jsx';
@@ -18,10 +19,11 @@ import {
   calculateInvoiceableLines,
   calculateReturnableLines,
   calculateSupplierInvoiceDraftTotals,
+  calculateUnreceivedPurchaseLines,
   invoiceLineForReturn as findInvoiceLineForReturn,
   keyOf,
   lineValue,
-  orderPriceKeyOf,
+  remainingInspectionBaseQuantity,
   returnSourceLineFor as findReturnSourceLine,
   returnUnitRatioFor as getReturnUnitRatio,
   selectReturnableInspections,
@@ -216,16 +218,7 @@ export default function PurchasingWorkbenchPage() {
     await run(`${row.id}:${verb}`, () => action('purchasing.purchase_order', row, verb), messages[verb]);
   }
   function prepareReceipt(row) {
-    const ordered = new Map();
-    for (const line of row.lines || []) {
-      const key = keyOf(line); const current = ordered.get(key) || { product: line.product, uom: line.uom, price: Number(line.price), qty: 0 };
-      current.qty += Number(line.qty || 0); ordered.set(key, current);
-    }
-    const received = new Map();
-    for (const receipt of receipts.filter((item) => item.purchase_order === row.id && item.status === 'received')) {
-      for (const line of receipt.lines || []) received.set(keyOf(line), (received.get(keyOf(line)) || 0) + Number(line.qty || 0));
-    }
-    const remaining = [...ordered.entries()].map(([key, line]) => ({ ...line, qty: Math.max(0, line.qty - (received.get(key) || 0)), key })).filter((line) => line.qty > 0.000001);
+    const remaining = calculateUnreceivedPurchaseLines(row, receipts);
     setReceiptOrderId(row.id); setReceiptLines(remaining.map((line) => ({ ...line, qty: String(line.qty), received: String(line.qty), lot_code: '', expiry: '' }))); setReceiptNote('');
   }
   async function receiveGoods(event) {
@@ -279,10 +272,8 @@ export default function PurchasingWorkbenchPage() {
     await run(`${invoice.id}:invoice-approved`, () => action('purchasing.supplier_invoice', invoice, 'approved'), uiText('Đã duyệt hóa đơn nhà cung cấp và ghi sổ công nợ phải trả.'));
   }
   const returnInspection = qualityInspections.find((row) => row.id === returnForm.inspection);
-  const returnAlreadyQuantity = returnInspection ? selectedReturns
-    .filter((row) => row.inspection === returnInspection.id && ['submitted', 'approved', 'dispatched'].includes(row.status))
-    .reduce((sum, row) => sum + (row.lines || []).reduce((lineSum, line) => lineSum + Number(line.base_qty ?? line.qty ?? 0), 0), 0) : 0;
-  const returnAvailableQuantity = returnInspection ? Math.max(0, Number(returnInspection.qty || 0) - returnAlreadyQuantity) / returnUnitRatioFor(returnInspection) : 0;
+  const returnAvailableBaseQuantity = remainingInspectionBaseQuantity(returnInspection, selectedReturns);
+  const returnAvailableQuantity = Number(returnAvailableBaseQuantity) / returnUnitRatioFor(returnInspection);
   async function createQualityReturn(event) {
     event.preventDefault();
     if (!selected || !returnInspection) return;
@@ -291,7 +282,8 @@ export default function PurchasingWorkbenchPage() {
     const invoiceLine = returnForm.supplier_invoice ? invoiceLineForReturn(returnForm.supplier_invoice, sourceLine) : null;
     if (returnForm.supplier_invoice && !invoiceLine) { setError(uiText('Không đối chiếu được mặt hàng QC với dòng hóa đơn nhà cung cấp.')); return; }
     const qty = Number(returnForm.qty);
-    if (!Number.isFinite(qty) || qty <= 0 || qty > returnAvailableQuantity + 0.000001) {
+    const requestedBaseQuantity = multiplyDecimals([returnForm.qty || 0, returnUnitRatioFor(returnInspection)]);
+    if (!Number.isFinite(qty) || qty <= 0 || compareDecimals(requestedBaseQuantity, addDecimals([returnAvailableBaseQuantity, '0.000001'])) > 0) {
       setError(uiText('Số lượng trả không được vượt quá lượng lỗi còn lại từ phiếu kiểm tra.')); return;
     }
     const payload = {
@@ -333,7 +325,7 @@ export default function PurchasingWorkbenchPage() {
   const updateRequisitionLine = (index, field, value) => setRequisitionLines((current) => current.map((line, i) => i === index ? { ...line, [field]: value } : line));
   const removeRequisitionLine = (index) => setRequisitionLines((current) => current.filter((_, i) => i !== index));
   const canReceive = (row) => ['approved','partially_received'].includes(row.status) && can('purchasing.purchase_receipt.create');
-  const orderLinesTotal = lines.reduce((sum, line) => sum + lineValue(line, taxById), 0);
+  const orderLinesTotal = Number(addDecimals(lines.map((line) => lineValue(line, taxById))));
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Mua hàng và nhận hàng')}</h1><p className="sub">{uiText('Lập đơn mua, gửi duyệt, nhận đủ hoặc từng phần vào kho và theo dõi hóa đơn nhà cung cấp.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{uiText('Làm mới')}</button></div>
     {can('purchasing.rfq.read') && <div className="row u-legacy-41bc5191db" ><a className="btn btn-secondary btn-sm" href="#/sourcing">{uiText('RFQ và so sánh báo giá')}</a></div>}
@@ -439,8 +431,8 @@ export default function PurchasingWorkbenchPage() {
           canCancel={can('purchasing.purchase_return.cancelled')}
           onInspectionChange={(id) => {
             const inspection = qualityInspections.find((row) => row.id === id);
-            const reserved = inspection ? purchaseReturns.filter((row) => row.inspection === inspection.id && ['submitted', 'approved', 'dispatched'].includes(row.status)).reduce((sum, row) => sum + (row.lines || []).reduce((lineSum, line) => lineSum + Number(line.base_qty ?? line.qty ?? 0), 0), 0) : 0;
-            setReturnForm((current) => ({ ...current, inspection: id, qty: inspection ? String(Math.max(0, Number(inspection.qty || 0) - reserved) / returnUnitRatioFor(inspection)) : '' }));
+            const availableBase = remainingInspectionBaseQuantity(inspection, selectedReturns);
+            setReturnForm((current) => ({ ...current, inspection: id, qty: inspection ? String(Number(availableBase) / returnUnitRatioFor(inspection)) : '' }));
           }}
           onReturnFormChange={(field, value) => setReturnForm((current) => ({ ...current, [field]: value }))}
           onGeneralReturnFormChange={(field, value) => setGeneralReturnForm((current) => ({ ...current, [field]: value, ...(field === 'lineKey' ? { qty: '' } : {}) }))}
