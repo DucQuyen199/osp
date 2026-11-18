@@ -1,4 +1,5 @@
 const clinicEnglish = {
+  'Không tải được một phần dữ liệu phòng khám.': 'Could not load some clinic data.',
   'Nam': 'Male',
   'Đơn vị thuốc': 'Medicine unit', 'Kết quả': 'Result', 'Thuốc dòng': 'Medicine row', 'Xóa thuốc': 'Remove medicine',
   'đơn vị gốc': 'base unit', 'Liều dùng': 'Dosage', 'Liều dùng / hướng dẫn': 'Dosage / instructions', 'Nhập kết quả xét nghiệm': 'Enter test result', 'Số lượng': 'Quantity',

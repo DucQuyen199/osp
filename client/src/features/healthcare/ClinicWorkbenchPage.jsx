@@ -4,7 +4,7 @@ import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { compareDecimals } from '../../lib/decimal.js';
-import { app, can, loadAll, loadRefs, recordLabel } from '../../lib/state.js';
+import { app, can, loadAll, loadIndependentData, loadRefs, recordLabel } from '../../lib/state.js';
 import clinicEnglish from './clinic.en.js';
 import EncounterPrescriptionsPanel from './components/EncounterPrescriptionsPanel.jsx';
 const t = (text) => uiTextWith(text, clinicEnglish);
@@ -39,21 +39,25 @@ export default function ClinicWorkbenchPage() {
   const load = useCallback(async (preserveNotice = false) => {
     setLoading(true); setError(''); if (!preserveNotice) setNotice('');
     try {
-      const [patientRows, partyMap, encounterRows, prescriptionRows, labRows, productMap, unitMap, warehouseMap] = await Promise.all([
-        can('clinic.patient.read') ? loadAll('clinic.patient') : Promise.resolve([]),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('clinic.encounter.read') ? loadAll('clinic.encounter') : Promise.resolve([]),
-        can('clinic.prescription.read') ? loadAll('clinic.prescription') : Promise.resolve([]),
-        can('clinic.lab_order.read') ? loadAll('clinic.lab_order') : Promise.resolve([]),
-        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
-        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
-        can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
-      ]);
-      const encounterItems = encounterRows.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
-      setPatients(patientRows); setParties(partyMap); setEncounters(encounterItems);
-      setPrescriptions(prescriptionRows); setLabOrders(labRows);
-      setProducts(productMap); setUnits(unitMap); setWarehouses(warehouseMap);
+      const { data, errors } = await loadIndependentData({
+        patients: can('clinic.patient.read') ? loadAll('clinic.patient') : Promise.resolve([]),
+        parties: can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
+        encounters: can('clinic.encounter.read') ? loadAll('clinic.encounter') : Promise.resolve([]),
+        prescriptions: can('clinic.prescription.read') ? loadAll('clinic.prescription') : Promise.resolve([]),
+        labOrders: can('clinic.lab_order.read') ? loadAll('clinic.lab_order') : Promise.resolve([]),
+        products: can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
+        units: can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
+        warehouses: can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
+      }, {
+        patients: [], parties: new Map(), encounters: [], prescriptions: [], labOrders: [],
+        products: new Map(), units: new Map(), warehouses: new Map(),
+      });
+      const encounterItems = data.encounters.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+      setPatients(data.patients); setParties(data.parties); setEncounters(encounterItems);
+      setPrescriptions(data.prescriptions); setLabOrders(data.labOrders);
+      setProducts(data.products); setUnits(data.units); setWarehouses(data.warehouses);
       setSelectedId((current) => encounterItems.some((item) => item.id === current) ? current : encounterItems.find((item) => item.status === 'open')?.id || encounterItems[0]?.id || '');
+      if (errors.length) setError(errors.map((reason) => reason?.message || t("Không tải được một phần dữ liệu phòng khám.")).join(' · '));
     } catch (reason) { setError(reason.message || t("Không tải được dữ liệu phòng khám.")); }
     finally { setLoading(false); }
   }, []);
