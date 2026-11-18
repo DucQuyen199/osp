@@ -8,6 +8,7 @@ import { can, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import agricultureEnglish from './agriculture.en.js';
 import { AgricultureHarvestForm, AgricultureInputForm } from './components/AgricultureFieldworkForms.jsx';
+import AgricultureCycleHistory from './components/AgricultureCycleHistory.jsx';
 import { useAgricultureData } from './hooks/useAgricultureData.js';
 const t = (text) => uiTextWith(text, agricultureEnglish);
 const today = localDate;
@@ -233,8 +234,7 @@ export default function AgricultureOperationsPage() {
             recordLabel={recordLabel} t={t}
           />
         </div>}
-        <div className="agriculture-history-grid"><article className="card agriculture-panel"><h3>{t('Lịch sử thu hoạch')}</h3>{cycleHarvests.length ? <div className="agriculture-history">{cycleHarvests.map((harvest) => { const lot = [...lots.values()].find((item) => item.product === harvest.product && item.code === harvest.lot_code); return <div className="agriculture-history-row" key={harvest.id}><div><strong>{products.get(harvest.product)?.name || t('Nông sản')} · {fmtNumber(harvest.qty)} {unitLabel(harvest)}{harvest.base_qty != null && harvest.uom_ratio > 1 ? ` (${fmtNumber(harvest.base_qty)} ${t('base')})` : ""}</strong><div className="small muted">{fmtDate(harvest.date)}{harvest.grade ? ` · ${harvest.grade}` : ''}{harvest.lot_code ? ` · ${t('Lô')} ${harvest.lot_code}` : ''}</div></div>{lot && can('inventory.stock_move.read') && <a className="small" href={recordHref('inventory.lot', lot.id)}>{t('Truy xuất lô')}</a>}</div>; })}</div> : <div className="empty">{t('Chưa ghi nhận thu hoạch.')}</div>}</article>
-          <article className="card agriculture-panel"><h3>{t('Nhật ký vật tư')}</h3>{cycleInputs.length ? <div className="agriculture-history">{cycleInputs.map((record) => <div className="agriculture-history-row" key={record.id}><div><strong>{t(inputKinds.find(([value]) => value === record.kind)?.[1] || record.kind)}{record.product ? ` · ${products.get(record.product)?.name || t('Sản phẩm')}` : ''}</strong><div className="small muted">{fmtDate(record.date)} · {fmtNumber(record.qty)} {unitLabel(record)}{record.base_qty != null && record.uom_ratio > 1 ? ` (${fmtNumber(record.base_qty)} ${t('base')})` : ""}{record.kind === 'pesticide' && record.preharvest_interval_days != null ? ` · ${t('Cách ly trước thu hoạch')} ${fmtNumber(record.preharvest_interval_days)} ${t('ngày')}` : ''}{record.warehouse ? ` · ${warehouses.get(record.warehouse)?.name || t('Kho')}` : ''}</div></div></div>)}</div> : <div className="empty">{t('Chưa ghi nhận vật tư.')}</div>}</article></div>
+        <AgricultureCycleHistory harvests={cycleHarvests} inputs={cycleInputs} lots={lots} products={products} warehouses={warehouses} inputKinds={inputKinds} unitLabel={unitLabel} canViewLots={can('inventory.stock_move.read')} lotHref={(lotId) => recordHref('inventory.lot', lotId)} fmtDate={fmtDate} fmtNumber={fmtNumber} t={t} />
       </> : <div className="empty card-pad">{t('Chọn vụ mùa để xem nhật ký, nhập vật tư và sản lượng.')}</div>}</section></div>
     </>}
   </div>;

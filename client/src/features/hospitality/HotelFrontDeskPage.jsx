@@ -8,6 +8,7 @@ import { recordHref } from '../../lib/routes.js';
 import hotelEnglish from './hotel.en.js';
 import ReservationCreateForm from './components/ReservationCreateForm.jsx';
 import ReservationDatesForm from './components/ReservationDatesForm.jsx';
+import ReservationListCards from './components/ReservationListCards.jsx';
 import { useHotelFrontDeskData } from './hooks/useHotelFrontDeskData.js';
 const t = (text) => uiTextWith(text, hotelEnglish);
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
@@ -177,7 +178,7 @@ export default function HotelFrontDeskPage() {
         onSubmit={createReservation}
       /></section>}
       <div className="hotel-frontdesk-layout"><section className="hotel-reservation-list"><header className="hotel-list-head"><h2>{t('Đặt phòng')}</h2><select className="select" aria-label={t("Lọc đặt phòng")} value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">{t('Tất cả')}</option><option value="arrivals">{t('Nhận hôm nay')}</option><option value="departures">{t('Trả hôm nay')}</option><option value="booked">{t('Đã đặt')}</option><option value="checked_in">{t('Đang lưu trú')}</option><option value="checked_out">{t('Đã trả')}</option><option value="no_show">{t('Vắng mặt')}</option><option value="cancelled">{t('Đã hủy')}</option></select></header>
-        {visible.length ? <div className="hotel-reservation-cards">{visible.map((reservation) => <button className={`card hotel-reservation-card${selectedId === reservation.id ? ' selected' : ''}`} type="button" key={reservation.id} onClick={() => { setSelectedId(reservation.id); setAssignment(reservation.room || ''); }}><strong>{recordLabel('master-data.party', parties.get(reservation.party))}</strong><span>{fmtDate(reservation.check_in)} → {fmtDate(reservation.check_out)} · {reservation.nights || '—'} {t("đêm")} · {reservation.guest_count || 1} {t("khách")}</span><span className="small muted">{roomTypes.get(reservation.room_type)?.name || t('Chưa rõ loại phòng')}{reservation.room ? ` · ${t("Phòng")} ${rooms.get(reservation.room)?.number || ''}` : ` · ${t("Chưa phân phòng")}`}</span><span className={`badge ${reservationStatus(reservation.status)}`}>{statusLabel(reservation.status)}</span><strong className="num">{fmtMoney(reservation.total || 0)}</strong></button>)}</div> : <div className="empty">{t('Không có đặt phòng theo bộ lọc.')}</div>}
+        <ReservationListCards reservations={visible} selectedId={selectedId} parties={parties} rooms={rooms} roomTypes={roomTypes} onSelect={(reservation) => { setSelectedId(reservation.id); setAssignment(reservation.room || ''); }} recordLabel={recordLabel} fmtDate={fmtDate} fmtMoney={fmtMoney} statusLabel={statusLabel} reservationStatus={reservationStatus} t={t} />
       </section>
       <section className="hotel-reservation-detail">{selected ? <>
         {selected.status === 'booked' && can('hotel.reservation.update') && reservationEdit?.reservationId !== selected.id && <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => startReservationEdit(selected)}>{t('Chỉnh sửa đặt phòng')}</button>}
