@@ -5,7 +5,7 @@ import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
-import { addDecimals, compareDecimals } from '../../lib/decimal.js';
+import { addDecimals, compareDecimals, multiplyDecimals } from '../../lib/decimal.js';
 import QuotationComposer from './components/QuotationComposer.jsx';
 import { eligibleWholesaleReturnLines, estimateWholesaleSubtotal, remainingWholesaleShipmentLines, wholesalePrice } from './domain/wholesaleSelectors.js';
 import wholesaleEnglish from './wholesale.en.js';
@@ -77,10 +77,15 @@ export default function WholesaleSalesDeskPage() {
   const activeProducts = [...products.values()].filter((product) => product.active !== false).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
   const selectedList = priceLists.find((item) => item.id === priceList);
   const unitsFor = (product) => product?.uom ? [...units.values()].filter((unit) => unit.id === product.uom || unit.base_uom === product.uom) : [];
-  const cart = Object.entries(quantities).map(([id, qty]) => ({ product: products.get(id), qty: Number(qty), uom: selectedUnits[id] || products.get(id)?.uom })).filter((line) => line.product && line.qty > 0);
+  const cart = Object.entries(quantities).map(([id, qty]) => ({ product: products.get(id), qty: String(qty), uom: selectedUnits[id] || products.get(id)?.uom })).filter((line) => line.product && compareDecimals(line.qty, 0) > 0);
   const getPrice = (product, uomId) => wholesalePrice(product, uomId, selectedList, units);
   const estimate = estimateWholesaleSubtotal(cart, selectedList, units);
-  const setQuantity = (id, value) => setQuantities((current) => { const next = { ...current }; const qty = Math.max(0, Number(value) || 0); if (qty) next[id] = qty; else delete next[id]; return next; });
+  const setQuantity = (id, value) => setQuantities((current) => {
+    const next = { ...current };
+    try { if (compareDecimals(value || 0, 0) > 0) next[id] = String(value); else delete next[id]; }
+    catch { delete next[id]; }
+    return next;
+  });
   const createQuote = async (event) => {
     event.preventDefault(); if (!party || !warehouse || !cart.length) return;
     setBusy('create'); setError(''); setNotice('');
@@ -134,9 +139,9 @@ export default function WholesaleSalesDeskPage() {
       product: line.product,
       price: line.price,
       uom: line.uom,
-      qty: Number(shipmentQuantities[order.id]?.[line.key]) || 0,
+      qty: shipmentQuantities[order.id]?.[line.key] || '0',
       remaining: line.remaining,
-    })).filter((line) => line.qty > 0);
+    })).filter((line) => compareDecimals(line.qty, 0) > 0);
     if (!lines.length || lines.some((line) => compareDecimals(line.qty, addDecimals([line.remaining, '0.000001'])) > 0)) return;
     setBusy(`${order.id}:shipment`); setError(''); setNotice('');
     try {
@@ -154,7 +159,7 @@ export default function WholesaleSalesDeskPage() {
     } finally { setBusy(''); }
   };
   const createReturn = async (order) => {
-    const lines = eligibleReturnLines(order).map((line) => ({ ...line, qty: Number(returnQuantities[`${order.id}:${line.key}`]) || 0 })).filter((line) => line.qty > 0).map(({ product, price, qty, uom, discount_pct, tax, tax_rate }) => ({ product, price, qty, uom, discount_pct, tax, tax_rate }));
+    const lines = eligibleReturnLines(order).map((line) => ({ ...line, qty: returnQuantities[`${order.id}:${line.key}`] || '0' })).filter((line) => compareDecimals(line.qty, 0) > 0).map(({ product, price, qty, uom, discount_pct, tax, tax_rate }) => ({ product, price, qty, uom, discount_pct, tax, tax_rate }));
     if (!lines.length || !returnReasons[order.id]?.trim()) return;
     setBusy(`${order.id}:return`); setError(''); setNotice('');
     try {
@@ -195,7 +200,7 @@ export default function WholesaleSalesDeskPage() {
         const customer = parties.get(quote.party); const order = orderForQuote(quote);
         return <article className="card wholesale-document" key={quote.id}>
           <header><div><strong>{recordLabel('master-data.party', customer)}</strong><div className="small muted">{t('Báo giá')} {String(quote.id).slice(0, 8)} · {quote.valid_until ? `${t('hết hạn')} ${fmtDate(quote.valid_until)}` : t('không đặt ngày hết hạn')}</div></div><span className={`badge ${expired(quote) ? 'danger' : quote.status === 'accepted' ? 'success' : 'warning'}`}>{expired(quote) && quote.status === 'sent' ? t('Quá hạn') : statusLabel(quote.status)}</span></header>
-          <ul>{(quote.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{products.get(line.product)?.name || t('Mặt hàng')} × {line.qty} {line.uom_name || units.get(line.uom)?.name || ''}</span><strong className="num">{fmtMoney(line.line_total ?? Number(line.qty || 0) * Number(line.price || 0))}</strong></li>)}</ul>
+          <ul>{(quote.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{products.get(line.product)?.name || t('Mặt hàng')} × {line.qty} {line.uom_name || units.get(line.uom)?.name || ''}</span><strong className="num">{fmtMoney(line.line_total ?? multiplyDecimals([line.qty || 0, line.price || 0]))}</strong></li>)}</ul>
           <div className="wholesale-total"><span>{t('Tổng gồm thuế')}</span><strong className="num">{fmtMoney(quote.total || 0)}</strong></div>
           <footer>{quote.status === 'draft' && can('sales.quotation.sent') && <button className="btn" disabled={!!busy || expired(quote)} onClick={() => transition('sales.quotation', quote, 'sent')}>{t('Gửi báo giá')}</button>}
             {quote.status === 'sent' && !expired(quote) && can('sales.quotation.accepted') && <button className="btn btn-primary" disabled={!!busy} onClick={() => transition('sales.quotation', quote, 'accepted')}>{t('Khách duyệt')}</button>}
@@ -212,13 +217,13 @@ export default function WholesaleSalesDeskPage() {
         const shipmentsForOrder = shipmentForOrder(order); const invoice = invoiceForOrder(order);
         return <article className="card wholesale-document" key={order.id}>
           <header><div><strong>{recordLabel('master-data.party', parties.get(order.party))}</strong><div className="small muted">{t('Đơn')} {String(order.id).slice(0, 8)} · {order.shipping_address || t('Bán trực tiếp')}</div></div><span className={`badge ${order.status === 'delivered' ? 'success' : order.status === 'cancelled' ? 'plain' : 'warning'}`}>{statusLabel(order.status)}</span></header>
-          <ul>{(order.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{products.get(line.product)?.name || t('Mặt hàng')} × {line.qty} {line.uom_name || units.get(line.uom)?.name || ''}</span><strong className="num">{fmtMoney(line.line_total ?? Number(line.qty || 0) * Number(line.price || 0))}</strong></li>)}</ul>
+          <ul>{(order.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{products.get(line.product)?.name || t('Mặt hàng')} × {line.qty} {line.uom_name || units.get(line.uom)?.name || ''}</span><strong className="num">{fmtMoney(line.line_total ?? multiplyDecimals([line.qty || 0, line.price || 0]))}</strong></li>)}</ul>
           <div className="wholesale-total"><span>{t('Tổng gồm thuế')}</span><strong className="num">{fmtMoney(order.total || 0)}</strong></div>
           {app.meta?.modules?.some((module) => module.id === 'loyalty') && order.status === 'draft' && can('sales.sales_order.update') && <div className="wholesale-related"><label className="field grow"><span className="label">{t('Voucher thành viên')}</span><input className="input" maxLength="80" autoCapitalize="characters" value={orderVoucherCodes[order.id] ?? order.voucher_code ?? ''} onChange={(event) => setOrderVoucherCodes((current) => ({ ...current, [order.id]: event.target.value.toUpperCase() }))}/></label><button className="btn" type="button" disabled={Boolean(busy)} onClick={() => applyVoucher(order)}>{t(order.voucher_code ? 'Cập nhật voucher' : 'Áp dụng voucher')}</button>{order.voucher_discount > 0 && <span className="small muted">{t('Giảm trước thuế')} {fmtMoney(order.voucher_discount)}</span>}</div>}
           {shipmentsForOrder.map((shipment) => <div className="wholesale-related" key={shipment.id}><span>{t('Chuyến giao')} · {statusLabel(shipment.status)}</span><a href={recordHref('logistics.shipment', shipment.id)}>{t('Mở')} {String(shipment.id).slice(0, 8)}</a></div>)}
           {app.meta?.modules?.some((module) => module.id === 'logistics') && can('logistics.shipment.read') && can('logistics.shipment.create') && order.shipping_address?.trim() && ['confirmed', 'partially_delivered'].includes(order.status) && <div className="wholesale-related wholesale-shipment-create">
             <div><strong>{t('Giao phần hàng còn lại')}</strong><div className="small muted">{t('Chỉ tính các vận đơn đang mở hoặc đã giao; vận đơn thất bại không giữ số lượng.')}</div></div>
-            {remainingShipmentLines(order).length ? <div className="wholesale-shipment-lines">{remainingShipmentLines(order).map((line) => <label className="field" key={line.key}><span>{products.get(line.product)?.name || t('Mặt hàng')} · {t('còn')} {line.remaining} {line.uom_name || units.get(line.uom)?.name || ''}</span><input className="input num" aria-label={`${t('Số lượng giao')} ${products.get(line.product)?.name || line.product}`} type="number" min="0" max={line.remaining} step="any" value={shipmentQuantities[order.id]?.[line.key] || ''} onChange={(event) => setShipmentQuantities((current) => ({ ...current, [order.id]: { ...current[order.id], [line.key]: event.target.value } }))}/></label>)}<button className="btn btn-primary" type="button" disabled={Boolean(busy) || !remainingShipmentLines(order).some((line) => Number(shipmentQuantities[order.id]?.[line.key]) > 0)} onClick={() => createShipment(order)}>{t('Tạo vận đơn đã chọn')}</button></div> : <span className="small muted">{t('Hàng đã được phân công hết. Muốn tách chuyến chưa xuất phát, mở vận đơn nháp và giảm số lượng trước khi điều phối.')}</span>}
+            {remainingShipmentLines(order).length ? <div className="wholesale-shipment-lines">{remainingShipmentLines(order).map((line) => <label className="field" key={line.key}><span>{products.get(line.product)?.name || t('Mặt hàng')} · {t('còn')} {line.remaining} {line.uom_name || units.get(line.uom)?.name || ''}</span><input className="input num" aria-label={`${t('Số lượng giao')} ${products.get(line.product)?.name || line.product}`} type="number" min="0" max={line.remaining} step="any" value={shipmentQuantities[order.id]?.[line.key] || ''} onChange={(event) => setShipmentQuantities((current) => ({ ...current, [order.id]: { ...current[order.id], [line.key]: event.target.value } }))}/></label>)}<button className="btn btn-primary" type="button" disabled={Boolean(busy) || !remainingShipmentLines(order).some((line) => { try { return compareDecimals(shipmentQuantities[order.id]?.[line.key] || 0, 0) > 0; } catch { return false; } })} onClick={() => createShipment(order)}>{t('Tạo vận đơn đã chọn')}</button></div> : <span className="small muted">{t('Hàng đã được phân công hết. Muốn tách chuyến chưa xuất phát, mở vận đơn nháp và giảm số lượng trước khi điều phối.')}</span>}
           </div>}
           <footer>{order.status === 'draft' && can('sales.sales_order.confirmed') && <button className="btn btn-primary" disabled={!!busy} onClick={() => transition('sales.sales_order', order, 'confirmed')}>{t('Xác nhận đơn, giữ tồn và tạo hóa đơn')}</button>}
             {invoice && <a className="btn" href={recordHref('accounting.invoice', invoice.id)}>{t('Mở hóa đơn')}</a>}
@@ -235,7 +240,7 @@ export default function WholesaleSalesDeskPage() {
           {returnables.length ? <>
             <div className="wholesale-return-lines">{returnables.map((line) => <label className="wholesale-return-line" key={line.key}><span>{line.name} · {t('đã giao')} {line.eligible} · {t('còn trả')} {line.remaining}</span><input className="input" type="number" min="0" max={line.remaining} step="any" aria-label={`${t('Số lượng trả')} ${line.name}`} value={returnQuantities[`${order.id}:${line.key}`] || ''} onChange={(event) => setReturnQuantities((current) => ({ ...current, [`${order.id}:${line.key}`]: event.target.value }))} /></label>)}</div>
             <label className="field"><span>{t('Lý do trả hàng')}</span><textarea className="input textarea" value={returnReasons[order.id] || ''} onChange={(event) => setReturnReasons((current) => ({ ...current, [order.id]: event.target.value }))} /></label>
-            <button className="btn" disabled={!!busy || !returnables.some((line) => Number(returnQuantities[`${order.id}:${line.key}`]) > 0) || !returnReasons[order.id]?.trim()} onClick={() => createReturn(order)}>{t('Lập phiếu trả nháp')}</button>
+            <button className="btn" disabled={!!busy || !returnables.some((line) => { try { return compareDecimals(returnQuantities[`${order.id}:${line.key}`] || 0, 0) > 0; } catch { return false; } }) || !returnReasons[order.id]?.trim()} onClick={() => createReturn(order)}>{t('Lập phiếu trả nháp')}</button>
           </> : <p className="small muted">{t('Chưa có số lượng đủ điều kiện trả. Đơn giao hàng chỉ nhận trả hàng đã giao thành công.')}</p>}
         </article>;
       })}{!orders.some((order) => ['confirmed', 'partially_delivered', 'delivered'].includes(order.status)) && <div className="card-pad muted">{t('Chưa có đơn đủ điều kiện trả hàng.')}</div>}</div>
@@ -246,7 +251,7 @@ export default function WholesaleSalesDeskPage() {
         const creditNote = creditNotes.find((item) => item.source === 'sales_return' && item.source_id === record.id);
         return <article className="card wholesale-document" key={record.id}>
           <header><div><strong>{t('Phiếu trả')} {String(record.id).slice(0, 8)}</strong><div className="small muted">{t('Đơn')} {String(record.sales_order).slice(0, 8)} · {record.reason || t('Không ghi lý do')}</div></div><span className={`badge ${record.status === 'received' ? 'success' : record.status === 'rejected' || record.status === 'cancelled' ? 'plain' : 'warning'}`}>{statusLabel(record.status)}</span></header>
-          <ul>{(record.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{products.get(line.product)?.name || t('Mặt hàng')} × {line.qty}</span><strong className="num">{fmtMoney(line.line_total ?? Number(line.qty || 0) * Number(line.price || 0))}</strong></li>)}</ul>
+          <ul>{(record.lines || []).map((line, index) => <li key={`${line.product}:${index}`}><span>{products.get(line.product)?.name || t('Mặt hàng')} × {line.qty}</span><strong className="num">{fmtMoney(line.line_total ?? multiplyDecimals([line.qty || 0, line.price || 0]))}</strong></li>)}</ul>
           <div className="wholesale-total"><span>{t('Giá trị giảm trừ')}</span><strong className="num">{fmtMoney(record.total || 0)}</strong></div>
           {request && <div className="wholesale-approval"><span>{t('Yêu cầu phê duyệt đang chờ')}</span>{can('workflow-approval.approval_request.approved') && <button className="btn btn-primary" disabled={!!busy} onClick={() => decideApproval(request, 'approved')}>{t('Duyệt')}</button>}{can('workflow-approval.approval_request.rejected') && <button className="btn" disabled={!!busy} onClick={() => decideApproval(request, 'rejected')}>{t('Từ chối')}</button>}</div>}
           <footer>{['draft', 'rejected'].includes(record.status) && can('sales.sales_return.submitted') && <button className="btn" disabled={!!busy} onClick={() => transition('sales.sales_return', record, 'submitted')}>{t('Gửi phê duyệt')}</button>}

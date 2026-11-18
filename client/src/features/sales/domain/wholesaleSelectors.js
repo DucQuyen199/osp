@@ -33,11 +33,11 @@ export function eligibleWholesaleReturnLines(order, shipments, returns, products
   const groups = new Map();
   for (const line of linesOf(order)) {
     const product = line.product;
-    const price = Number(line.price || 0);
+    const price = line.price || 0;
     const uom = line.uom || products.get(product)?.uom || '';
-    const discount_pct = Number(discountOf(line));
+    const discount_pct = discountOf(line);
     const tax = line.tax ?? null;
-    const tax_rate = Number(taxRateOf(line));
+    const tax_rate = taxRateOf(line);
     const key = [product, priceKey(price), uom, discount_pct, tax || '', tax_rate].join(':');
     const current = groups.get(key) || { key, product, price, uom: uom || undefined, uom_name: line.uom_name, discount_pct, tax, tax_rate, ordered: '0', name: products.get(product)?.name || 'Mặt hàng' };
     current.ordered = addDecimals([current.ordered, line.qty || 0]);
@@ -52,8 +52,8 @@ export function eligibleWholesaleReturnLines(order, shipments, returns, products
     const reserved = quantitySum(returns.filter((record) => record.sales_order === order.id && ['submitted', 'approved', 'received'].includes(record.status)).flatMap((record) => linesOf(record)).filter((item) => item.product === line.product && (item.uom || '') === (line.uom || '') && sameReturnTerms(item, line)));
     const eligible = minDecimal(line.ordered, delivered);
     const remaining = subtractDecimals(eligible, reserved);
-    return { ...line, eligible: Number(eligible), remaining: compareDecimals(remaining, 0) > 0 ? Number(remaining) : 0 };
-  }).filter((line) => line.remaining > 0);
+    return { ...line, eligible, remaining: compareDecimals(remaining, 0) > 0 ? remaining : '0' };
+  }).filter((line) => compareDecimals(line.remaining, 0) > 0);
 }
 
 export function remainingWholesaleShipmentLines(order, shipments, products) {
@@ -61,7 +61,7 @@ export function remainingWholesaleShipmentLines(order, shipments, products) {
   for (const line of linesOf(order)) {
     if (['service', 'digital'].includes(line.kind)) continue;
     const product = line.product;
-    const price = Number(line.price || 0);
+    const price = line.price || 0;
     const uom = line.uom || products.get(product)?.uom || '';
     const key = `${product}:${priceKey(price)}:${uom}`;
     const current = groups.get(key) || { key, product, price, uom: uom || undefined, uom_name: line.uom_name, ordered: '0' };
@@ -80,6 +80,6 @@ export function remainingWholesaleShipmentLines(order, shipments, products) {
   }
   return [...groups.values()].map((line) => {
     const remaining = subtractDecimals(line.ordered, reserved.get(line.key) || '0');
-    return { ...line, remaining: compareDecimals(remaining, 0) > 0 ? Number(remaining) : 0 };
-  }).filter((line) => line.remaining > 0.000001);
+    return { ...line, remaining: compareDecimals(remaining, 0) > 0 ? remaining : '0' };
+  }).filter((line) => compareDecimals(line.remaining, '0.000001') > 0);
 }
