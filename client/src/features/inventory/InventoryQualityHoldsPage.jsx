@@ -2,8 +2,10 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtMoney, fmtNumber, uiText } from '../../lib/i18n.js';
+import { compareDecimals } from '../../lib/decimal.js';
 import { can, loadRefs } from '../../lib/state.js';
 const quantity = (value) => fmtNumber(Number(value || 0), { maximumFractionDigits: 3 });
+const validReleaseQuantity = (qty, maximum) => { try { return compareDecimals(qty || 0, 0) > 0 && compareDecimals(qty, maximum) <= 0; } catch { return false; } };
 const unitName = (item) => item.unit || uiText('Chưa đặt đơn vị');
 const statusLabel = (value) => uiText(value === 'failed' ? 'Không đạt' : 'Chờ kiểm tra');
 const sourceLabel = (value) => uiText(value === 'purchase_receipt' ? 'Phiếu nhận mua' : value === 'purchase_order' ? 'Đơn mua' : value);
@@ -62,8 +64,8 @@ export default function InventoryQualityHoldsPage() {
     setBusy(`${item.inspectionId}:release`); setError('');
     try {
       const note = draft.note?.trim() || '';
-      const releaseQty = Number(draft.qty);
-      if (!note || !Number.isFinite(releaseQty) || releaseQty <= 0) throw new Error(uiText('Nhập số lượng và lý do giải phóng hợp lệ.'));
+      const releaseQty = String(draft.qty || '');
+      if (!note || !validReleaseQuantity(releaseQty, item.heldQty)) throw new Error(uiText('Nhập số lượng và lý do giải phóng hợp lệ.'));
       const disposition = await api(dataPath('quality.inspection_disposition'), { method: 'POST', body: { inspection: item.inspectionId, qty: releaseQty, note } });
       await api(dataPath('quality.inspection_disposition', disposition.id, 'posted'), { method: 'POST' });
       await load();
@@ -106,7 +108,7 @@ export default function InventoryQualityHoldsPage() {
             {item.inspectionStatus === 'pending' && can('quality.inspection_disposition.create') && can('quality.inspection_disposition.posted') && <div className="quality-partial-release">
               <label className="field"><span className="small muted">{uiText('Số lượng giải phóng')} ({unitName(item)})</span><input className="input" aria-label={`${uiText('Số lượng giải phóng')} (${unitName(item)})`} type="number" min="0.001" max={item.heldQty} step="any" placeholder={`${uiText('Tối đa')} ${quantity(item.heldQty)} ${unitName(item)}`} value={releaseDrafts[item.inspectionId]?.qty || ''} onChange={(event) => setReleaseDrafts((rows) => ({ ...rows, [item.inspectionId]: { ...rows[item.inspectionId], qty: event.target.value } }))} /></label>
               <input className="input" aria-label={uiText('Lý do giải phóng một phần')} placeholder={uiText('Lý do giải phóng')} maxLength={500} value={releaseDrafts[item.inspectionId]?.note || ''} onChange={(event) => setReleaseDrafts((rows) => ({ ...rows, [item.inspectionId]: { ...rows[item.inspectionId], note: event.target.value } }))} />
-              <button className="btn btn-ghost btn-sm" type="button" disabled={Boolean(busy) || !releaseDrafts[item.inspectionId]?.note?.trim() || !(Number(releaseDrafts[item.inspectionId]?.qty) > 0)} onClick={() => releasePartial(item)}>{uiText('Giải phóng một phần')}</button>
+              <button className="btn btn-ghost btn-sm" type="button" disabled={Boolean(busy) || !releaseDrafts[item.inspectionId]?.note?.trim() || !validReleaseQuantity(releaseDrafts[item.inspectionId]?.qty, item.heldQty)} onClick={() => releasePartial(item)}>{uiText('Giải phóng một phần')}</button>
             </div>}
           </div></td>
         </tr>)}</tbody>

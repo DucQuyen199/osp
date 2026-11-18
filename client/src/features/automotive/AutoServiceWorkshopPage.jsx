@@ -116,7 +116,7 @@ export default function AutoServiceWorkshopPage() {
     try {
       const created = await api(dataPath('auto-service.repair_order'), { method: 'POST', body: {
         vehicle: vehicleId, party: vehicle.party, odometer_reading: Number(intakeOdometer), warehouse: warehouseId || undefined, complaint: complaint.trim() || undefined,
-        lines: draftLines.map((line) => ({ product: line.product, qty: Number(line.qty), ...(line.uom ? { uom: line.uom } : {}) })),
+        lines: draftLines.map((line) => ({ product: line.product, qty: String(line.qty), ...(line.uom ? { uom: line.uom } : {}) })),
       } });
       setDraftLines([]); setComplaint(''); await load(true); setSelectedId(created.id);
       setNotice(`${t('Đã lập lệnh')} ${String(created.id).slice(0, 8)}${t('. Đơn giá và tổng tiền do server lấy theo danh mục sản phẩm.')}`);
@@ -172,7 +172,7 @@ export default function AutoServiceWorkshopPage() {
         body: {
           complaint: quoteDraft.complaint.trim(),
           warehouse: quoteDraft.warehouseId || null,
-          lines: quoteDraft.lines.map((line) => ({ product: line.product, qty: Number(line.qty), ...(line.uom ? { uom: line.uom } : {}) })),
+          lines: quoteDraft.lines.map((line) => ({ product: line.product, qty: String(line.qty), ...(line.uom ? { uom: line.uom } : {}) })),
         },
       });
       setQuoteDraft(null);
