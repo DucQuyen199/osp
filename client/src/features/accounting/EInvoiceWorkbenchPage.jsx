@@ -1,45 +1,23 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath } from '../../lib/api.js';
 import { statusLabel, fmtDateTime, uiText, uiLocale } from '../../lib/i18n.js';
-import { app, can, loadAll } from '../../lib/state.js';
+import { app, can } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
-const timestamp = (row) => row.updatedAt || row.updated_at || row.createdAt || row.created_at || '';
+import { useEInvoiceWorkbenchData } from './hooks/useEInvoiceWorkbenchData.js';
 const formatDateTime = (value) => value ? fmtDateTime(value) : '—';
 const statusTone = (status) => status === 'issued' || status === 'cancelled' ? 'success' : status === 'failed' ? 'danger' : status === 'withdrawn' ? 'muted' : 'warning';
 export default function EInvoiceWorkbenchPage() {
   useDocumentTitle(`${uiText('Hóa đơn điện tử')} · OSP Suite`);
-  const [rows, setRows] = useState([]);
-  const [invoices, setInvoices] = useState(new Map());
+  const { rows, invoices, loading, error, setError, load } = useEInvoiceWorkbenchData();
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState('');
   const [reason, setReason] = useState('');
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const [requests, invoiceRows] = await Promise.all([
-        loadAll('einvoice.einvoice'),
-        can('accounting.invoice.read') ? loadAll('accounting.invoice') : Promise.resolve([]),
-      ]);
-      requests.sort((a, b) => String(timestamp(b)).localeCompare(String(timestamp(a))));
-      setRows(requests);
-      setInvoices(new Map(invoiceRows.map((invoice) => [invoice.id, invoice])));
-      setSelectedId((current) => requests.some((row) => row.id === current) ? current : requests[0]?.id || '');
-    } catch (reason) {
-      setError(reason.message || uiText('Không tải được danh sách hóa đơn điện tử.'));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-  useEffect(() => { load();
-  }, [load]);
+  useEffect(() => { setSelectedId((current) => current && rows.some((row) => row.id === current) ? current : rows[0]?.id || ''); }, [rows]);
   const counts = useMemo(() => rows.reduce((result, row) => {
     result.all += 1;
     result[row.status] = (result[row.status] || 0) + 1;
