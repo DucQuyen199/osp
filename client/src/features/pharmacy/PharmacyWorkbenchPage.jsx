@@ -81,10 +81,11 @@ export default function PharmacyWorkbenchPage() {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
       const items = activeLines.map((line) => ({ product: line.product, qty: String(line.qty), ...(line.uom ? { uom: line.uom } : {}), dosage: line.dosage.trim() }));
+      const payload = { ...form, prescription_no: form.prescription_no.trim(), items };
       if (editingId) {
-        await api(dataPath('pharmacy.prescription', editingId), { method: 'PATCH', body: { ...form, items } });
+        await api(dataPath('pharmacy.prescription', editingId), { method: 'PATCH', body: payload });
       } else {
-        await api(dataPath('pharmacy.prescription'), { method: 'POST', body: { ...form, items, status: 'draft' } });
+        await api(dataPath('pharmacy.prescription'), { method: 'POST', body: { ...payload, status: 'draft' } });
       }
       const wasEditing = Boolean(editingId);
       setEditingId('');

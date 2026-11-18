@@ -305,7 +305,7 @@ pub async fn validate_persistence(
             &[&tenant.id, &no],
         ).await?;
         let current = id(doc, "id");
-        if tx.query_opt("SELECT id FROM pharmacy__prescription WHERE tenant_id=$1 AND lower(prescription_no)=lower($2) AND ($3::uuid IS NULL OR id<>$3) LIMIT 1 FOR UPDATE", &[&tenant.id, &no, &current]).await?.is_some() { errors.push("Số đơn thuốc đã được ghi nhận".into()); }
+        if tx.query_opt("SELECT id FROM pharmacy__prescription WHERE tenant_id=$1 AND lower(btrim(prescription_no))=lower(btrim($2)) AND ($3::uuid IS NULL OR id<>$3) LIMIT 1 FOR UPDATE", &[&tenant.id, &no, &current]).await?.is_some() { errors.push("Số đơn thuốc đã được ghi nhận".into()); }
         if doc
             .get("valid_until")
             .and_then(Value::as_str)

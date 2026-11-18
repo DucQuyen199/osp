@@ -18,6 +18,14 @@ pub async fn prepare_document(
     if entity != "prescription" {
         return Ok(Vec::new());
     }
+    if let Some(prescription_no) = document
+        .get("prescription_no")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .map(str::to_owned)
+    {
+        document.insert("prescription_no".into(), Value::String(prescription_no));
+    }
     let Some(items) = document.get_mut("items").and_then(Value::as_array_mut) else {
         return Ok(Vec::new());
     };
