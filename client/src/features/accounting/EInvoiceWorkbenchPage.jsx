@@ -73,11 +73,11 @@ export default function EInvoiceWorkbenchPage() {
     <div className="page-head"><div><h1>{uiText("Hóa đơn điện tử")}</h1><p className="sub">{uiText("Theo dõi yêu cầu phát hành từ hóa đơn kế toán đã ghi sổ, xử lý lỗi provider và lưu dấu vết hủy theo từng ngành hàng.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={load}>{uiText("Làm mới")}</button></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
     {!enabled && <div className="alert warning" role="status">{uiText("Module hóa đơn điện tử hiện không nằm trong gói ngành của tenant.")}</div>}
-    <div className="stats u-legacy-bf4a218e05" >
+    <div className="stats u-mb-16" >
       {filterOptions.map(([key, label]) => <button key={key} className={`card stat einvoice-filter${filter === key ? ' is-active' : ''}`} type="button" onClick={() => setFilter(key)} aria-pressed={filter === key}><span className="stat-label">{uiText(label)}</span><strong className="stat-value">{counts[key] || 0}</strong></button>)}
     </div>
     <section className="card card-pad">
-      <div className="row wrap u-legacy-b56987dbcb" ><h2>{uiText("Hàng đợi phát hành")}</h2><span className="grow"/><input className="input u-legacy-75c5924920"  aria-label={uiText('Tìm hóa đơn điện tử')} placeholder={uiText('Tìm số hóa đơn, provider, lỗi…')} value={search} onChange={(event) => setSearch(event.target.value)}/></div>
+      <div className="row wrap u-mb-12" ><h2>{uiText("Hàng đợi phát hành")}</h2><span className="grow"/><input className="input u-max-w-340"  aria-label={uiText('Tìm hóa đơn điện tử')} placeholder={uiText('Tìm số hóa đơn, provider, lỗi…')} value={search} onChange={(event) => setSearch(event.target.value)}/></div>
       {loading ? <div className="skeleton" data-h="row"/> : !visibleRows.length ? <div className="empty">{rows.length ? uiText('Không có yêu cầu phù hợp bộ lọc.') : uiText('Chưa có yêu cầu. Hệ thống tạo yêu cầu sau khi hóa đơn kế toán được ghi sổ.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{uiText("Hóa đơn điện tử")}</th><th>{uiText("Hóa đơn kế toán")}</th><th>{uiText("Provider")}</th><th>{uiText("Trạng thái")}</th><th>{uiText("Lần thử / cập nhật")}</th><th>{uiText("Thao tác")}</th></tr></thead><tbody>{visibleRows.map((row) => {
         const invoice = invoices.get(row.invoice);
         const retryAction = row.operation === 'cancel' ? 'retry_cancellation' : 'retry';
@@ -96,7 +96,7 @@ export default function EInvoiceWorkbenchPage() {
         </tr>;
       })}</tbody></table></div>}
     </section>
-    {selected && <section className="card card-pad u-legacy-92c18f6bda" >
+    {selected && <section className="card card-pad u-mt-16" >
       <div className="row wrap"><div><h2>{uiText("Chi tiết yêu cầu")}</h2><p className="small muted">{uiText('Mã yêu cầu:')} {selected.id}</p></div><span className="grow"/><span className={`badge ${statusTone(selected.status)}`}>{statusLabel(selected.status)}</span></div>
       <div className="form-grid">
         <div><span className="label">{uiText("Hóa đơn nguồn")}</span><p>{selectedInvoice ? <a href={recordHref('accounting.invoice', selectedInvoice.id)}>{selectedInvoice.number || selectedInvoice.id}</a> : selected.invoice || '—'}</p></div>
@@ -109,13 +109,13 @@ export default function EInvoiceWorkbenchPage() {
         {selected.provider_error && <div className="full"><span className="label">{uiText("Lỗi gần nhất")}</span><div className="alert danger">{selected.provider_error}</div></div>}
         {selected.cancellation_reason && <div className="full"><span className="label">{uiText("Lý do hủy")}</span><p>{selected.cancellation_reason}</p></div>}
       </div>
-      {selected.status === 'issued' && can('einvoice.einvoice.cancel_requested') && can('einvoice.einvoice.update') && <form className="form-grid u-legacy-92c18f6bda"  onSubmit={(event) => { event.preventDefault(); requestCancellation(selected); }}>
+      {selected.status === 'issued' && can('einvoice.einvoice.cancel_requested') && can('einvoice.einvoice.update') && <form className="form-grid u-mt-16"  onSubmit={(event) => { event.preventDefault(); requestCancellation(selected); }}>
         <label className="field full"><span className="label">{uiText("Lý do yêu cầu hủy *")}</span><textarea id="einvoice-cancellation-reason" className="input" rows="3" maxLength="2000" required value={reason} onChange={(event) => setReason(event.target.value)} placeholder={uiText('Nêu lý do nghiệp vụ để gửi đến nhà cung cấp hóa đơn điện tử.')}/></label>
         <div className="row full"><span className="small muted">{uiText("Yêu cầu chỉ chuyển sang đã hủy sau khi provider xác nhận.")}</span><span className="grow"/><button className="btn btn-secondary" disabled={Boolean(busy) || !reason.trim()}>{uiText("Gửi yêu cầu hủy")}</button></div>
       </form>}
-      {(selected.provider_response || selected.cancellation_response) && <details className="u-legacy-92c18f6bda"><summary>{uiText("Phản hồi nhà cung cấp")}</summary><pre className="code-block u-legacy-1dcaf1af29" >{JSON.stringify({ issuance: selected.provider_response, cancellation: selected.cancellation_response }, null, 2)}</pre></details>}
-      {Array.isArray(selected.attempt_history) && selected.attempt_history.length > 0 && <details className="u-legacy-0ee7f66ad9"><summary>{uiText('Lịch sử lần thử')} ({selected.attempt_history.length})</summary><ol>{selected.attempt_history.map((attempt, index) => <li key={`${attempt.attempt || index}:${index}`}><strong>{uiText('Lần')} {attempt.attempt || index + 1}</strong> · {uiText(attempt.operation === 'cancel' ? 'Hủy' : 'Phát hành')} · {attempt.error || uiText('Không có chi tiết lỗi')}</li>)}</ol></details>}
+      {(selected.provider_response || selected.cancellation_response) && <details className="u-mt-16"><summary>{uiText("Phản hồi nhà cung cấp")}</summary><pre className="code-block u-pre-wrap-break-words" >{JSON.stringify({ issuance: selected.provider_response, cancellation: selected.cancellation_response }, null, 2)}</pre></details>}
+      {Array.isArray(selected.attempt_history) && selected.attempt_history.length > 0 && <details className="u-mt-12"><summary>{uiText('Lịch sử lần thử')} ({selected.attempt_history.length})</summary><ol>{selected.attempt_history.map((attempt, index) => <li key={`${attempt.attempt || index}:${index}`}><strong>{uiText('Lần')} {attempt.attempt || index + 1}</strong> · {uiText(attempt.operation === 'cancel' ? 'Hủy' : 'Phát hành')} · {attempt.error || uiText('Không có chi tiết lỗi')}</li>)}</ol></details>}
     </section>}
-    <p className="small muted u-legacy-0ee7f66ad9" >{uiText('Worker chỉ xử lý yêu cầu khi máy chủ đã cấu hình HTTPS provider. Hợp đồng REST chung cần được ánh xạ và xác nhận với nhà cung cấp thực tế trước khi dùng phát hành chính thức.')}</p>
+    <p className="small muted u-mt-12" >{uiText('Worker chỉ xử lý yêu cầu khi máy chủ đã cấu hình HTTPS provider. Hợp đồng REST chung cần được ánh xạ và xác nhận với nhà cung cấp thực tế trước khi dùng phát hành chính thức.')}</p>
   </div>;
 }

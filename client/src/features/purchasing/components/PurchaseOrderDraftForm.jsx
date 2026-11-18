@@ -36,9 +36,9 @@ export default function PurchaseOrderDraftForm({
         <label className="field"><span className="label">{t('Kho nhận *')}</span><select className="select" required value={form.warehouse} onChange={(event) => onFormChange('warehouse', event.target.value)}><option value="">{t('Chọn kho')}</option>{[...warehouses.values()].filter((row) => row.active !== false).map((row) => <option key={row.id} value={row.id}>{label('inventory.warehouse', row)}</option>)}</select></label>
         <label className="field"><span className="label">{t('Ngày giao dự kiến')}</span><input className="input" type="date" value={form.expected_date} onChange={(event) => onFormChange('expected_date', event.target.value)} /></label>
       </div>
-      <div className="row wrap u-legacy-c53ea1da23"><strong>{t('Vật tư / hàng hóa')}</strong><span className="grow" /><button className="btn btn-secondary btn-sm" type="button" disabled={!products.size} onClick={onAddLine}>{t('Thêm dòng')}</button></div>
+      <div className="row wrap u-mt-14"><strong>{t('Vật tư / hàng hóa')}</strong><span className="grow" /><button className="btn btn-secondary btn-sm" type="button" disabled={!products.size} onClick={onAddLine}>{t('Thêm dòng')}</button></div>
       <PurchaseOrderLinesEditor lines={lines} products={products} unitsFor={unitsFor} taxes={taxes} taxById={taxById} onUpdate={onLineChange} onRemove={onRemoveLine} lineValue={lineValue} />
-      <div className="row wrap u-legacy-0ee7f66ad9"><span className="grow" /><strong>{t('Tổng dự kiến có thuế:')} {formatMoney(total)}</strong><button className="btn btn-primary" disabled={Boolean(busy) || !products.size || !warehouses.size || total <= 0}>{t(editingId ? 'Lưu đơn mua nháp' : 'Tạo đơn mua nháp')}</button></div>
+      <div className="row wrap u-mt-12"><span className="grow" /><strong>{t('Tổng dự kiến có thuế:')} {formatMoney(total)}</strong><button className="btn btn-primary" disabled={Boolean(busy) || !products.size || !warehouses.size || total <= 0}>{t(editingId ? 'Lưu đơn mua nháp' : 'Tạo đơn mua nháp')}</button></div>
     </form>
   </section>;
 }

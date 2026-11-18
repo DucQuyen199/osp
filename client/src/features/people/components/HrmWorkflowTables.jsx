@@ -95,7 +95,7 @@ export function SalaryRevisionsTable({
 }) {
   const currentPage = Math.min(page, Math.max(0, Math.ceil(salaryRevisions.length / pageSize) - 1));
   const visibleRevisions = salaryRevisions.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
-  return <section className="card card-pad u-legacy-92c18f6bda">
+  return <section className="card card-pad u-mt-16">
     <h2>{t('Điều chỉnh lương theo hiệu lực')}</h2>
     {!salaryRevisions.length ? <div className="empty">{t('Chưa có đề nghị điều chỉnh lương.')}</div>
       : <div className="table-wrap"><table className="table">

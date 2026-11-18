@@ -149,7 +149,7 @@ export default function LogisticsDeliveryBoardPage() {
     <div className="delivery-route"><span>{shipment.origin || t('Kho')}</span><span aria-hidden="true">→</span><strong>{shipment.destination || t('Chưa khai báo điểm giao')}</strong></div>
     {shipment.status === 'partial' && <div className="alert warning delivery-alert">
       <strong>{t('Lý do giao thiếu:')}</strong> {shipment.shortDeliveryReason || t('Chưa ghi lý do')}
-      <div className="small u-legacy-301647f506" ><strong>{t('Đã nhận thực tế:')}</strong> {(shipment.deliveredLines || []).map((line, index) => {
+      <div className="small u-mt-6" ><strong>{t('Đã nhận thực tế:')}</strong> {(shipment.deliveredLines || []).map((line, index) => {
         const sourceLine = (shipment.lines || []).find((item) => sameDeliveryLine(item, line));
         return <span key={`${line.product}-${index}`}> {sourceLine?.productName || line.name || line.product} {fmtNumber(line.qty || 0, { maximumFractionDigits: 6 })} {line.uom_name || ''}{index < shipment.deliveredLines.length - 1 ? ' ·' : ''}</span>;
       })}</div>

@@ -44,7 +44,7 @@ export default function PurchaseOrderSummary({
       <span className="badge warning">{statusLabel(order.status)}</span>
     </div>
 
-    <div className="table-wrap u-legacy-0ee7f66ad9">
+    <div className="table-wrap u-mt-12">
       <table className="table">
         <thead><tr><th>{uiText('Hàng')}</th><th>{uiText('Đặt')}</th><th>{uiText('Đã nhận')}</th><th>{uiText('Đơn giá')}</th><th>{uiText('Thành tiền')}</th></tr></thead>
         <tbody>{(order.lines || []).map((line, index) => {
@@ -61,11 +61,11 @@ export default function PurchaseOrderSummary({
       </table>
     </div>
 
-    {order.status === 'submitted' && workflowApproval && approvalRequest && <p className="small muted u-legacy-df928149c5">
+    {order.status === 'submitted' && workflowApproval && approvalRequest && <p className="small muted u-mt-10">
       {uiText('Yêu cầu phê duyệt:')} <a href={`#/e/workflow-approval/approval_request/${approvalRequest.id}`}>{statusLabel(approvalRequest.status)} · {uiText('mở yêu cầu')}</a>
     </p>}
 
-    <div className="row wrap u-legacy-0ee7f66ad9">
+    <div className="row wrap u-mt-12">
       {canEdit && <button className="btn btn-secondary btn-sm" type="button" disabled={Boolean(busy)} onClick={onEdit}>{uiText('Sửa nháp')}</button>}
       {canSubmit && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy) || !(order.lines || []).length || compareDecimals(order.total || 0, 0) <= 0} onClick={onSubmit}>{uiText('Gửi duyệt')}</button>}
       {canApprove && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy)} onClick={onApprove}>{uiText('Duyệt đơn')}</button>}

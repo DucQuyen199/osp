@@ -36,7 +36,7 @@ export default function ConditionalAcceptancePanel({
       <label className="field"><span>{t('Căn cứ đề nghị *')}</span><textarea className="input" rows="2" minLength="5" maxLength="2000" required value={justification} onChange={(event) => onJustificationChange(event.target.value)} placeholder={t('Ghi kết quả đánh giá rủi ro và căn cứ kỹ thuật')} /></label>
       <button className="btn btn-primary btn-sm" type="submit" disabled={Boolean(busy) || !inspectionId || !isPositiveQuantity(quantity) || condition.trim().length < 5 || justification.trim().length < 5}>{busy === 'conditional-acceptance' ? t('Đang gửi…') : t('Gửi phê duyệt')}</button>
     </form>}
-    <div className="stack-sm u-legacy-92c18f6bda">{acceptances.map((row) => {
+    <div className="stack-sm u-mt-16">{acceptances.map((row) => {
       const inspection = inspections.find((item) => item.id === row.inspection);
       return <article className="manufacturing-order-card" key={row.id}>
         <div className="manufacturing-order-summary"><strong>{products.get(inspection?.product)?.name || t('Thành phẩm QC lỗi')}</strong><span className={`badge ${row.status === 'approved' ? 'success' : row.status === 'rejected' ? 'danger' : 'warning'}`}>{statusLabel(row.status)}</span><span className="small muted">{t('Lệnh')} {String(inspection?.source_id || '').slice(0, 8)} · {formatQuantity(row.qty)} {baseUnitName(inspection?.product)} · {row.condition}</span><span className="small muted">{t('Căn cứ')}: {row.justification}</span></div>

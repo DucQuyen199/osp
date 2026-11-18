@@ -19,7 +19,7 @@ export default function ContractRegisterTable({ canRead, loading, contracts, sel
         {...selectableTableRowProps}
         key={contract.id}
         aria-selected={selectedId === contract.id}
-        className={[selectedId === contract.id ? 'selected' : '', 'u-legacy-9463ff4798'].filter(Boolean).join(' ')}
+        className={[selectedId === contract.id ? 'selected' : '', 'u-pointer'].filter(Boolean).join(' ')}
         onClick={() => onSelect(contract.id)}
       >
         <td><strong>{contract.title}</strong><div className="small muted">{partyName(contract.party)}</div></td>

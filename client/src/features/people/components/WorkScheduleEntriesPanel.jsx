@@ -18,7 +18,7 @@ export default function WorkScheduleEntriesPanel({
   formatDate,
   formatTime,
 }) {
-  return <section className="card card-pad u-legacy-92c18f6bda">
+  return <section className="card card-pad u-mt-16">
     <h2>{uiText('Lịch ca theo ngày')}</h2>
     <p className="small muted">{uiText('Mỗi dòng ghi đè lịch tuần của nhân viên trong đúng một ngày. Bỏ lịch để trở về lịch tuần; ca qua đêm được hỗ trợ.')}</p>
     {canCreate && <form className="form-grid" onSubmit={onSubmit}>
@@ -33,7 +33,7 @@ export default function WorkScheduleEntriesPanel({
         <span className="label">{uiText('Ngày làm việc *')}</span>
         <input className="input" required type="date" value={scheduleForm.work_date} onChange={(event) => onFormChange('work_date', event.target.value)} />
       </label>
-      <label className="row small u-legacy-eee80941ee">
+      <label className="row small u-align-end-pb-10">
         <input type="checkbox" checked={scheduleForm.is_working} onChange={(event) => onFormChange('is_working', event.target.checked)} />
         {uiText('Có ca làm việc trong ngày này')}
       </label>
@@ -59,7 +59,7 @@ export default function WorkScheduleEntriesPanel({
       </div>
     </form>}
     {canRead && <>
-      <h3 className="u-legacy-2bdf8e45fd">{uiText('Ngoại lệ trong tháng')} {scheduleForm.work_date.slice(0, 7)}</h3>
+      <h3 className="u-mt-18">{uiText('Ngoại lệ trong tháng')} {scheduleForm.work_date.slice(0, 7)}</h3>
       {scheduleEntriesThisMonth.length ? <div className="table-wrap">
         <table className="table">
           <thead><tr><th scope="col">{uiText('Ngày')}</th><th scope="col">{uiText('Nhân viên')}</th><th scope="col">{uiText('Lịch áp dụng')}</th><th scope="col"><span className={canDelete ? '' : 'sr-only'}>{uiText('Thao tác')}</span></th></tr></thead>

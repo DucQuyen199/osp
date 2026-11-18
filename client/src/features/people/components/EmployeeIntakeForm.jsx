@@ -12,7 +12,7 @@ export default function EmployeeIntakeForm({
   recordLabel,
   t,
 }) {
-  return <section className="card card-pad u-legacy-92c18f6bda">
+  return <section className="card card-pad u-mt-16">
     <h2>{t('Tiếp nhận nhân viên')}</h2>
     <form onSubmit={onSubmit}>
       <div className="form-grid">
@@ -25,15 +25,15 @@ export default function EmployeeIntakeForm({
         <label className="field"><span className="label">{t('Ngày vào làm')}</span><input className="input" type="date" value={form.hire_date} onChange={(event) => onFieldChange('hire_date', event.target.value)} /></label>
         <label className="field"><span className="label">{t('Lương cơ bản ban đầu')}</span><input className="input num" type="number" min="0" step="any" value={form.base_salary} onChange={(event) => onFieldChange('base_salary', event.target.value)} /></label>
       </div>
-      <div className="field u-legacy-75be3216d0">
+      <div className="field u-grid-column-full">
         <label className="row small"><input type="checkbox" checked={form.customSchedule} onChange={(event) => onFieldChange('customSchedule', event.target.checked)} />{t('Lịch tuần và giờ chuẩn riêng cho nhân viên')}</label>
-        {form.customSchedule && <div className="form-grid u-legacy-43a97fe494">
+        {form.customSchedule && <div className="form-grid u-mt-8">
           <label className="field"><span className="label">{t('Giờ chuẩn mỗi ngày')}</span><input className="input num" type="number" min="1" max="24" step="0.25" value={form.standard_hours_per_day} onChange={(event) => onFieldChange('standard_hours_per_day', event.target.value)} /></label>
-          <fieldset className="field u-legacy-d865c2ed50"><legend className="label">{t('Ngày làm việc')}</legend><div className="row wrap u-legacy-297096a428">{weekdays.map(([day, label]) => <label className="row small u-legacy-0d6046eefe" key={day}><input type="checkbox" checked={form.work_weekdays.includes(day)} onChange={() => onWeekdayToggle(day)} />{label}</label>)}</div></fieldset>
-          <span className="small muted u-legacy-75be3216d0">{t('Nếu không bật, nhân viên dùng lịch làm việc và giờ chuẩn của kỳ lương.')}</span>
+          <fieldset className="field u-box-reset"><legend className="label">{t('Ngày làm việc')}</legend><div className="row wrap u-gap-10">{weekdays.map(([day, label]) => <label className="row small u-gap-5" key={day}><input type="checkbox" checked={form.work_weekdays.includes(day)} onChange={() => onWeekdayToggle(day)} />{label}</label>)}</div></fieldset>
+          <span className="small muted u-grid-column-full">{t('Nếu không bật, nhân viên dùng lịch làm việc và giờ chuẩn của kỳ lương.')}</span>
         </div>}
       </div>
-      <div className="row u-legacy-0ee7f66ad9"><span className="grow" /><button className="btn btn-primary" disabled={Boolean(busy) || (form.customSchedule && !form.work_weekdays.length)}>{t('Tạo hồ sơ')}</button></div>
+      <div className="row u-mt-12"><span className="grow" /><button className="btn btn-primary" disabled={Boolean(busy) || (form.customSchedule && !form.work_weekdays.length)}>{t('Tạo hồ sơ')}</button></div>
     </form>
   </section>;
 }

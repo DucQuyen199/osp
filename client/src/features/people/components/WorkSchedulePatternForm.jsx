@@ -20,10 +20,10 @@ export default function WorkSchedulePatternForm({
   onCycleDayAdd,
 }) {
   return <form className="form-grid" onSubmit={onSubmit}>
-    <fieldset className="field u-legacy-d865c2ed50">
+    <fieldset className="field u-box-reset">
       <legend className="label">{uiText('Nhân viên trong đội * (')}{patternForm.employees.length}/50)</legend>
       <input className="input" value={employeeFilter} onChange={(event) => onEmployeeFilterChange(event.target.value)} placeholder={uiText('Tìm theo tên hoặc mã nhân viên')}/>
-      <div className="row wrap u-legacy-b1279b10ef">{matchingEmployees.map((employee) => <label className="row small" key={employee.id}>
+      <div className="row wrap u-mt-8-gap-12">{matchingEmployees.map((employee) => <label className="row small" key={employee.id}>
         <input type="checkbox" checked={patternForm.employees.includes(employee.id)} disabled={!patternForm.employees.includes(employee.id) && patternForm.employees.length >= 50} onChange={(event) => onEmployeeToggle(employee.id, event.target.checked)}/>
         {recordLabel('hrm.employee', employee)}
       </label>)}</div>
@@ -33,8 +33,8 @@ export default function WorkSchedulePatternForm({
     <label className="field"><span className="label">{uiText('Ngày bắt đầu chu kỳ *')}</span><input className="input" required type="date" value={patternForm.start_date} onChange={(event) => onStartDateChange(event.target.value)}/></label>
     <label className="field"><span className="label">{uiText('Sinh lịch đến ngày *')}</span><input className="input" required min={patternForm.start_date} max={maxEndDate} type="date" value={patternForm.end_date} onChange={(event) => onFieldChange('end_date', event.target.value)}/></label>
     <label className="field"><span className="label">{uiText('Múi giờ IANA *')}</span><input className="input" required value={patternForm.timezone} onChange={(event) => onFieldChange('timezone', event.target.value)} placeholder="Asia/Ho_Chi_Minh"/></label>
-    <div className="field u-legacy-75be3216d0"><span className="label">{uiText('Các ngày trong chu kỳ (lặp từ ngày bắt đầu)')}</span><div className="stack u-legacy-43a97fe494">
-      {patternForm.cycle.map((day, index) => <div className="row wrap card card-pad u-legacy-d5a33b90d3" key={day.rowId}>
+    <div className="field u-grid-column-full"><span className="label">{uiText('Các ngày trong chu kỳ (lặp từ ngày bắt đầu)')}</span><div className="stack u-mt-8">
+      {patternForm.cycle.map((day, index) => <div className="row wrap card card-pad u-gap-12" key={day.rowId}>
         <strong>{uiText('Ngày')}{index + 1}</strong>
         <label className="row small"><input type="checkbox" checked={day.is_working} onChange={(event) => onCycleDayToggle(index, event.target.checked)}/>{uiText('Có ca làm')}</label>
         {day.is_working && <>

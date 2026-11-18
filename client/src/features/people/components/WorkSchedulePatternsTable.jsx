@@ -17,7 +17,7 @@ export default function WorkSchedulePatternsTable({
   statusLabel,
   recordLabel,
 }) {
-  return <div className="table-wrap u-legacy-2bdf8e45fd">
+  return <div className="table-wrap u-mt-18">
     <table className="table">
       <thead><tr>
         <th scope="col">{uiText('Nhân viên')}</th>

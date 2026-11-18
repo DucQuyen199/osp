@@ -41,7 +41,7 @@ export default function RestaurantReservationsPanel({
       </div>
     </form>}
     {!reservations.length ? <div className="empty">{t('Chưa có yêu cầu đặt bàn.')}</div>
-      : <div className="table-wrap u-legacy-c53ea1da23"><table className="table">
+      : <div className="table-wrap u-mt-14"><table className="table">
         <thead><tr>
           <th>{t('Thời gian')}</th><th>{t('Khách')}</th><th>{t('Bàn')}</th>
           <th>{t('Số khách')}</th><th>{t('Trạng thái')}</th><th>{t('Thao tác')}</th>

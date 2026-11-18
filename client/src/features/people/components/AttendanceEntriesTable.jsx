@@ -3,7 +3,7 @@ import { fmtTime, uiText } from '../../../lib/i18n.js';
 import { recordLabel } from '../../../lib/state.js';
 
 export default function AttendanceEntriesTable({ attendance, employees, busy, canPunchOut, onPunchOut }) {
-  return <div className="table-wrap u-legacy-0ee7f66ad9" ><table className="table">
+  return <div className="table-wrap u-mt-12" ><table className="table">
     <thead><tr><th>{uiText('Nhân viên')}</th><th>{uiText('Giờ vào')}</th><th>{uiText('Giờ ra')}</th><th scope="col">{uiText('Thao tác')}</th></tr></thead>
     <tbody>{attendance.map((row) => <tr key={row.id}>
       <td>{employees.get(row.employee) ? recordLabel('hrm.employee', employees.get(row.employee)) : uiText('Nhân viên')}</td>

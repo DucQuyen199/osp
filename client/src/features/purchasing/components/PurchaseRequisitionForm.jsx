@@ -35,12 +35,12 @@ export default function PurchaseRequisitionForm({
         <label className="field"><span className="label">{t('Người yêu cầu')}</span><input className="input" maxLength="160" value={form.requested_by} onChange={(event) => onFormChange('requested_by', event.target.value)} /></label>
         <label className="field"><span className="label">{t('Lý do / mục đích')}</span><input className="input" maxLength="500" value={form.reason} onChange={(event) => onFormChange('reason', event.target.value)} /></label>
       </div>
-      <div className="row wrap u-legacy-0ee7f66ad9">
+      <div className="row wrap u-mt-12">
         <strong>{t('Danh sách hàng cần mua')}</strong><span className="grow" />
         <button className="btn btn-secondary btn-sm" type="button" disabled={!products.size} onClick={onAddLine}>{t('Thêm dòng')}</button>
       </div>
       <RequisitionLinesEditor lines={lines} products={products} unitsFor={unitsFor} onProductChange={onProductChange} onChange={onLineChange} onRemove={onRemoveLine} />
-      <div className="row u-legacy-0ee7f66ad9"><span className="grow" /><button className="btn btn-primary" disabled={Boolean(busy) || !products.size || !warehouses.size}>{t(editingId ? 'Lưu đề nghị nháp' : 'Tạo đề nghị nháp')}</button></div>
+      <div className="row u-mt-12"><span className="grow" /><button className="btn btn-primary" disabled={Boolean(busy) || !products.size || !warehouses.size}>{t(editingId ? 'Lưu đề nghị nháp' : 'Tạo đề nghị nháp')}</button></div>
     </form>
   </section>;
 }

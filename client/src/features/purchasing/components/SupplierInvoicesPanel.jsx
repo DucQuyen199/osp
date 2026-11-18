@@ -7,7 +7,7 @@ export default function SupplierInvoicesPanel({
   onDisputeReasonChange, onResolutionNoteChange, onDispute, onResolve, onSubmit, onApprove,
 }) {
   if (!invoices.length) return null;
-  return <section className="card card-pad u-legacy-c53ea1da23">
+  return <section className="card card-pad u-mt-14">
     <h3>{uiText('Hóa đơn nhà cung cấp')}</h3>
     {invoices.map((invoice) => {
       const bill = bills.find((row) => row.supplier_invoice_id === invoice.id);
@@ -15,7 +15,7 @@ export default function SupplierInvoicesPanel({
       const variance = Number(invoice.price_variance || 0);
       const invoiceCurrencyCode = currencies.get(invoice.currency)?.code || baseCurrencyCode;
       const adjustmentSummary = (invoice.adjustments || []).map((item) => `${uiText(item.kind === 'discount' ? 'Chiết khấu' : 'Phí')}: ${item.description} ${fmtMoney(item.amount, invoiceCurrencyCode)}`).join(' · ');
-      return <div className="row wrap u-legacy-a1f0ee6f62" key={invoice.id}>
+      return <div className="row wrap u-list-row-divider" key={invoice.id}>
         <div className="grow"><strong>{invoice.invoice_number}</strong>
           <div className="small muted">{fmtDate(invoice.issue_date)} · {fmtMoney(invoice.total, invoiceCurrencyCode)}{invoiceCurrencyCode !== baseCurrencyCode && invoice.base_total != null ? ` (${fmtMoney(invoice.base_total, baseCurrencyCode)})` : ''} · {statusLabel(invoice.status)}{Math.abs(variance) > 0.000001 ? <> · {uiText('Chênh lệch ròng sau quy đổi:')} {fmtMoney(variance, baseCurrencyCode)}</> : null}</div>
           {adjustmentSummary && <div className="small muted">{adjustmentSummary}</div>}
