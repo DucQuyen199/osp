@@ -7,10 +7,11 @@ import Icon from '../components/Icon.jsx';
 import Sidebar from '../components/Sidebar.jsx';
 import AccountMenu from '../components/AccountMenu.jsx';
 import useAppNavigation from './useAppNavigation.js';
+import useAppPreferences from './useAppPreferences.js';
 import { api, onUnauthorized, session } from '../lib/api.js';
 import { setBusinessTimezone } from '../lib/dates.js';
 import { enhanceScrollableRegions } from '../lib/scrollableRegions.js';
-import { ensureUiTranslations, formatLocale, setFormatLocale, setUiLocale, uiLocale, uiText } from '../lib/i18n.js';
+import { ensureUiTranslations, uiLocale, uiText } from '../lib/i18n.js';
 import { app, getAppStateRevision, loadMeta, loadSummary, publishAppState, resetAppState, subscribeAppState } from '../lib/state.js';
 export default function App() {
   useSyncExternalStore(subscribeAppState, getAppStateRevision, getAppStateRevision);
@@ -18,16 +19,10 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
   const { open: navOpen, mobile: mobileNav, toggleRef: navToggleRef, toggle: toggleNav, close: closeNav } = useAppNavigation();
-  const [theme, setTheme] = useState(() => { try { return localStorage.getItem('osp.theme') || ''; } catch { return ''; } });
-  const [numberLocale, setNumberLocale] = useState(formatLocale);
-  const [interfaceLanguage, setInterfaceLanguage] = useState(uiLocale);
+  const { theme, numberLocale, interfaceLanguage, toggleTheme, changeNumberLocale, changeInterfaceLanguage } = useAppPreferences(setError);
   const meta = app.meta;
   const user = app.user;
 
-
-  useEffect(() => {
-    document.documentElement.lang = interfaceLanguage === 'en-US' ? 'en' : 'vi';
-  }, [interfaceLanguage]);
 
   useEffect(() => {
     if (!ready || !meta || !user) return undefined;
@@ -57,10 +52,9 @@ export default function App() {
     };
     window.addEventListener('hashchange', changed);
     window.addEventListener('osp:meta', metaChanged);
-    document.documentElement.dataset.theme = theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     const stop = onUnauthorized(() => { session.clear(); resetAppState(); setError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'); location.hash = '#/login'; });
     return () => { window.removeEventListener('hashchange', changed); window.removeEventListener('osp:meta', metaChanged); stop?.(); };
-  }, [theme, closeNav]);
+  }, [closeNav]);
 
   useEffect(() => {
     let alive = true;
@@ -98,26 +92,6 @@ export default function App() {
     }
     if (!session.current() && !['login', 'signup', 'forgot-password', 'reset-password', 'verify-email'].includes(route.name)) setRoute({ name: 'login' });
   }, [ready, route]);
-
-  const toggleTheme = () => {
-    const next = (document.documentElement.dataset.theme || 'light') === 'dark' ? 'light' : 'dark';
-    document.documentElement.dataset.theme = next;
-    try { localStorage.setItem('osp.theme', next); } catch { /* theme remains active in memory */ }
-    setTheme(next);
-  };
-
-  const changeNumberLocale = (next) => {
-    setFormatLocale(next);
-    setNumberLocale(next);
-    try { localStorage.setItem('osp.formatLocale', next); } catch { /* preference remains active in memory */ }
-  };
-
-  const changeInterfaceLanguage = async (next) => {
-    try { if (!await setUiLocale(next)) return; }
-    catch { setError('Không tải được dữ liệu ngôn ngữ.'); return; }
-    setInterfaceLanguage(next);
-    try { localStorage.setItem('osp.uiLocale', next); } catch { /* preference remains active in memory */ }
-  };
 
   const logout = async () => {
     try { await api('/api/auth/logout', { method: 'POST' }); } catch { /* session may have expired */ }
