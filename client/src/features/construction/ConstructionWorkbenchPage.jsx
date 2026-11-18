@@ -95,7 +95,7 @@ export default function ConstructionWorkbenchPage() {
   async function createBoq(event) {
     event.preventDefault();
     await run('boq', async () => {
-      const payload = { ...boqForm, project: boqForm.project, supersedes: boqForm.supersedes || undefined, revision_reason: boqForm.revision_reason || undefined, items: boqLines.map((line) => ({ description: line.description.trim(), unit: line.unit.trim(), qty: Number(line.qty), unit_price: Number(line.unit_price) })) };
+      const payload = { ...boqForm, project: boqForm.project, supersedes: boqForm.supersedes || undefined, revision_reason: boqForm.revision_reason || undefined, items: boqLines.map((line) => ({ description: line.description.trim(), unit: line.unit.trim(), qty: String(line.qty), unit_price: String(line.unit_price) })) };
       delete payload.revision;
       await api(dataPath('construction.boq'), { method: 'POST', body: payload });
     }, 'Đã lập dự toán BOQ nháp; tổng giá trị được máy chủ tính từ khối lượng và đơn giá.');
@@ -104,14 +104,14 @@ export default function ConstructionWorkbenchPage() {
   }
   async function createSubcontract(event) {
     event.preventDefault();
-    await run('subcontract', () => api(dataPath('construction.subcontract'), { method: 'POST', body: { ...subcontractForm, project: projectId, value: Number(subcontractForm.value) } }), 'Đã lập dự thảo hợp đồng thầu phụ.');
+    await run('subcontract', () => api(dataPath('construction.subcontract'), { method: 'POST', body: { ...subcontractForm, project: projectId, value: String(subcontractForm.value) } }), 'Đã lập dự thảo hợp đồng thầu phụ.');
     setSubcontractForm((current) => ({ ...current, value: '', scope: '' }));
   }
   async function createClaim(event) {
     event.preventDefault();
     const contract = subcontracts.find((row) => row.id === claimForm.subcontract);
     if (!contract) return;
-    await run('claim', () => api(dataPath('construction.progress_claim'), { method: 'POST', body: { ...claimForm, vendor: contract.vendor, amount: Number(claimForm.amount), notes: claimForm.notes || undefined } }), 'Đã lập hồ sơ nghiệm thu/đề nghị thanh toán nháp.');
+    await run('claim', () => api(dataPath('construction.progress_claim'), { method: 'POST', body: { ...claimForm, vendor: contract.vendor, amount: String(claimForm.amount), notes: claimForm.notes || undefined } }), 'Đã lập hồ sơ nghiệm thu/đề nghị thanh toán nháp.');
     setClaimForm((current) => ({ ...current, amount: '', notes: '' }));
   }
   async function transition(entity, row, verb, success) {
