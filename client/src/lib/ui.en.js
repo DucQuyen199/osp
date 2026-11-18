@@ -489,7 +489,7 @@ const uiTextEnglish = {
   'Lọc trạng thái': 'Filter by status', 'Đang mở': 'Open', 'Đã đóng': 'Closed', 'Tất cả': 'All', 'Không có hồ sơ NCR trong bộ lọc này.': 'No NCR records match this filter.',
   'Tiêu đề / thời điểm': 'Title / date', 'Phiếu QC / sản phẩm': 'Inspection / product', 'Mô tả': 'Description', 'Trạng thái': 'Status', 'Thao tác': 'Actions',
   'Phiếu kiểm tra': 'Inspection', 'Không liên kết': 'Not linked', 'Đóng NCR': 'Close NCR',
-  'Nhật ký kiểm toán': 'Audit log', 'Không tải được nhật ký kiểm toán.': 'Could not load the audit log.',
+  'Nhật ký kiểm toán': 'Audit log', 'Không tải được nhật ký kiểm toán.': 'Could not load the audit log.', 'Phân trang nhật ký kiểm toán': 'Audit log pagination',
   'Chỉ quản trị viên mới được xem nhật ký kiểm toán.': 'Only administrators can view the audit log.',
   'Nhật ký hoạt động của doanh nghiệp': 'Company activity log', 'Chưa có hoạt động nào.': 'No activity yet.',
   'Thời gian': 'Time', 'Người thực hiện': 'Actor', 'Hành động': 'Action', 'Đối tượng': 'Target', 'Chi tiết': 'Details',

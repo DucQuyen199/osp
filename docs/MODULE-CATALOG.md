@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **51 module**, **207 loại dữ liệu**, **942 sự kiện**.
+Tổng: **51 module**, **208 loại dữ liệu**, **948 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -285,6 +285,7 @@ Tổng: **51 module**, **207 loại dữ liệu**, **942 sự kiện**.
 | `shared_company` Đơn vị đã chia sẻ | `active` → **revoked** (active→revoked) |
 | `report_grant` Quyền xem báo cáo tập đoàn | `active` → **revoked** (active→revoked) |
 | `report_snapshot` Báo cáo hợp nhất đã lưu | — |
+| `elimination_journal` Bút toán loại trừ nội bộ | `draft` → **posted** (submitted→posted), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 
 ### einvoice
 **Hóa đơn điện tử** — Tạo yêu cầu phát hành khi hóa đơn kế toán ghi sổ; worker Rust phát hành hoặc hủy qua provider HTTPS đã cấu hình và lưu kết quả trong PostgreSQL.

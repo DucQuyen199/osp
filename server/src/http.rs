@@ -1788,6 +1788,12 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
         (&Method::GET, ["audit"]) => {
             return json_ok(k.audit_log(&actor, &t, qnum("limit", 200)).await?);
         }
+        (&Method::GET, ["audit", "page"]) => {
+            return json_ok(
+                k.audit_log_page(&actor, &t, qnum("limit", 50), qnum("offset", 0))
+                    .await?,
+            );
+        }
         (&Method::GET, ["alerts"]) => {
             let n = if k.can(&t, &actor, "tenant.admin") {
                 k.open_failure_count(&t).await?

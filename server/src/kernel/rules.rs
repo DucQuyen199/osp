@@ -380,6 +380,38 @@ impl Kernel {
         Ok(Value::Array(rows))
     }
 
+    pub async fn audit_log_page(
+        &self,
+        actor: &Actor,
+        t: &Tenant,
+        limit: i64,
+        offset: i64,
+    ) -> R<Value> {
+        self.authorize(t, actor, "tenant.audit")?;
+        let page_size = limit.clamp(1, 100);
+        let offset = offset.max(0).min(i64::MAX - page_size);
+        let mut conn = self.pool.get().await?;
+        let tx = Tx::begin_snapshot(&mut conn, &t.id).await?;
+        let total: i64 = tx
+            .query_one_row(
+                "SELECT count(*) FROM osp_audit WHERE tenant_id = $1",
+                &[&t.id],
+            )
+            .await?
+            .get(0);
+        let items = tx
+            .query_json(
+                "SELECT jsonb_build_object('id', id, 'at', at, 'userId', user_id, 'action', action, 'target', target, 'detail', detail) \
+                 FROM osp_audit WHERE tenant_id = $1 ORDER BY seq DESC LIMIT $2 OFFSET $3",
+                &[&t.id, &page_size, &offset],
+            )
+            .await?;
+        let has_more = offset + (items.len() as i64) < total;
+        Ok(
+            json!({ "items": items, "total": total, "pageSize": page_size, "offset": offset, "hasMore": has_more }),
+        )
+    }
+
     pub async fn list_failures(&self, actor: &Actor, t: &Tenant, status: &str) -> R<Value> {
         let page = self.list_failure_page(actor, t, status, 100, 0).await?;
         Ok(page["items"].clone())

@@ -476,6 +476,25 @@ async fn run(k: Arc<Kernel>, url: String, defs: PathBuf) {
                 .iter()
                 .any(|e| e["action"] == "qualified" && e["detail"] == "new→qualified")
         );
+        let audit_page = k.audit_log_page(&t.a, &t.t, 1, 0).await.unwrap();
+        assert_eq!(audit_page["pageSize"], 1);
+        assert_eq!(audit_page["offset"], 0);
+        assert!(audit_page["total"].as_i64().unwrap() >= 1);
+        assert_eq!(audit_page["items"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            audit_page["hasMore"],
+            audit_page["total"].as_i64().unwrap() > 1
+        );
+        assert_eq!(
+            k.audit_log_page(&va, &t.t, 1, 0).await.unwrap_err().code,
+            "FORBIDDEN"
+        );
+        let (audit_status, audit_response) = t
+            .api("GET", "/audit/page?limit=1&offset=0", json!(null))
+            .await;
+        assert_eq!(audit_status, 200, "{audit_response}");
+        assert_eq!(audit_response["items"].as_array().unwrap().len(), 1);
+        assert!(audit_response["total"].as_i64().unwrap() >= 1);
         assert_eq!(
             k.create(&t.a, &t.t, "utilities.meter", o(json!({})))
                 .await

@@ -1245,6 +1245,14 @@ pub fn build(reg: &Registry) -> Value {
         } }),
     );
     paths.insert(
+        "/api/t/{tenantId}/audit/page".into(),
+        json!({ "get": {
+            "tags": ["tenant operations"], "summary": "Paginated tenant audit history", "security": sec,
+            "parameters": [tid, { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 } }, { "name": "offset", "in": "query", "schema": { "type": "integer", "minimum": 0, "default": 0 } }],
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Tenant-scoped audit page with total and snapshot-consistent pagination metadata", "content": { "application/json": { "schema": { "type": "object", "required": ["items", "total", "pageSize", "offset", "hasMore"], "properties": { "items": { "type": "array", "items": { "type": "object" } }, "total": { "type": "integer" }, "pageSize": { "type": "integer" }, "offset": { "type": "integer" }, "hasMore": { "type": "boolean" } } } } } })), ("403".to_string(), err("Requires tenant.audit"))]))
+        } }),
+    );
+    paths.insert(
         "/api/t/{tenantId}/outbox".into(),
         json!({ "get": {
             "tags": ["integration-hub"], "summary": "Tenant webhook delivery queue", "security": sec,

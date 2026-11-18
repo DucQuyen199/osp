@@ -154,7 +154,8 @@ curl -X POST $BASE/api/t/$T/data/sales/sales_order/bulk/confirmed \
 | `POST /api/t/:tid/reports/inventory/replenishment/purchase-requisitions` | `inventory.reorder_rule.read`, `purchasing.purchase_requisition.create` | Body `{ "warehouseId": "<uuid>" }`; tính lại tồn đề xuất và tạo một đề nghị mua nháp cho các dòng còn thiếu tại kho đó trong cùng transaction. |
 | `GET /api/t/:tid/reports/budget/variance?period=` | `budget.budget.read` | So sánh ngân sách đã duyệt với sổ cái; kỳ lọc dùng `YYYY` hoặc `YYYY-MM`. Khi bỏ kỳ, response có `periodSummaries` để giữ tổng năm và tháng tách riêng; các trường tổng ở cấp response là `null`. |
 | `GET /api/t/:tid/events?limit=` | đăng nhập | Nhật ký sự kiện (≤ 1000): `type`, `at`, `depth`, `recordId`, `causationId`, `handled[]` (module, `ok`/`skipped`/`error`, `detail`) |
-| `GET /api/t/:tid/audit?limit=` | `tenant.audit` | Nhật ký kiểm toán: ai, làm gì, trên bản ghi nào |
+| `GET /api/t/:tid/audit?limit=` | `tenant.audit` | Nhật ký kiểm toán tương thích cũ: ai, làm gì, trên bản ghi nào; tối đa 1.000 dòng gần nhất. |
+| `GET /api/t/:tid/audit/page?limit=&offset=` | `tenant.audit` | Một trang nhật ký kiểm toán, tổng số bản ghi và metadata phân trang lấy trong cùng snapshot; `limit` tối đa 100. |
 
 ## 5. Quản trị (cần `tenant.admin`)
 
