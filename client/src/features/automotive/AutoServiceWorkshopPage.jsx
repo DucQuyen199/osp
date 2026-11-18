@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, fmtNumber, statusLabel, uiTextWith } from '../../lib/i18n.js';
-import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { app, can, loadRefs, recordLabel, loadAllResponse, loadIndependentData } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import autoServiceEnglish from './auto-service.en.js';
 import { repairQuoteLineTotal, storedRepairLineTotal } from './domain/repairQuoteTotals.js';
@@ -41,21 +41,25 @@ export default function AutoServiceWorkshopPage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const showInvoices = app.meta?.modules?.some((module) => module.id === 'accounting') && can('accounting.invoice.read');
-      const [vehicleResponse, orderResponse, partyMap, productMap, unitMap, warehouseMap, invoiceResponse] = await Promise.all([
-        can('auto-service.vehicle.read') ? loadAllResponse('auto-service.vehicle') : Promise.resolve({ items: [] }),
-        can('auto-service.repair_order.read') ? loadAllResponse('auto-service.repair_order') : Promise.resolve({ items: [] }),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
-        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
-        can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
-        showInvoices ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
-      ]);
-      const nextVehicles = itemsOf(vehicleResponse).sort((a, b) => String(a.plate || '').localeCompare(String(b.plate || '')));
-      const nextOrders = itemsOf(orderResponse).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
-      setVehicles(nextVehicles); setOrders(nextOrders); setParties(partyMap); setProducts(productMap); setUnits(unitMap); setWarehouses(warehouseMap);
-      setInvoices(itemsOf(invoiceResponse));
+      const { data, errors } = await loadIndependentData({
+        vehicles: can('auto-service.vehicle.read') ? loadAllResponse('auto-service.vehicle') : Promise.resolve({ items: [] }),
+        orders: can('auto-service.repair_order.read') ? loadAllResponse('auto-service.repair_order') : Promise.resolve({ items: [] }),
+        parties: can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
+        products: can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
+        units: can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
+        warehouses: can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
+        invoices: showInvoices ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
+      }, {
+        vehicles: { items: [] }, orders: { items: [] }, parties: new Map(), products: new Map(),
+        units: new Map(), warehouses: new Map(), invoices: { items: [] },
+      });
+      const nextVehicles = itemsOf(data.vehicles).sort((a, b) => String(a.plate || '').localeCompare(String(b.plate || '')));
+      const nextOrders = itemsOf(data.orders).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+      setVehicles(nextVehicles); setOrders(nextOrders); setParties(data.parties); setProducts(data.products); setUnits(data.units); setWarehouses(data.warehouses);
+      setInvoices(itemsOf(data.invoices));
       setSelectedId((current) => nextOrders.some((item) => item.id === current) ? current : nextOrders[0]?.id || '');
       setVehicleId((current) => nextVehicles.some((item) => item.id === current) ? current : nextVehicles[0]?.id || '');
+      if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được dữ liệu xưởng sửa chữa.')).join(' · '));
     } catch (reason) { setError(reason.message || t('Không tải được dữ liệu xưởng sửa chữa.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
