@@ -172,10 +172,8 @@ impl Kernel {
             ));
         }
         let from_text = from.map(|date| date.to_string());
-        let to_text = Some(
-            to.map(|date| date.to_string())
-                .unwrap_or_else(|| owner.business_today().to_string()),
-        );
+        let report_end = to.unwrap_or_else(|| owner.business_today());
+        let to_text = Some(report_end.to_string());
 
         let mut owner_conn = self.pool.get().await?;
         let owner_tx = Tx::begin(&mut owner_conn, &owner.id, false).await?;
@@ -356,7 +354,7 @@ impl Kernel {
         let elimination_tx = Tx::begin(&mut elimination_conn, &owner.id, false).await?;
         let elimination_rows = elimination_tx.query(
             "SELECT posting_date::text, memo, lines, matching_evidence FROM consolidation__elimination_journal WHERE tenant_id=$1 AND \"group\"=$2 AND status='posted' AND posting_date <= $3::date ORDER BY posting_date, created_at, id",
-            &[&owner.id, &group_id, &to_text],
+            &[&owner.id, &group_id, &report_end],
         ).await?;
         let chart_rows = elimination_tx
             .query(

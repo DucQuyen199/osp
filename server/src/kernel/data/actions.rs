@@ -176,10 +176,17 @@ impl Kernel {
                     .ok_or_else(|| {
                         ApiError::validation(&qname, vec!["A posting date is required".into()])
                     })?;
+            let posting_date_value = chrono::NaiveDate::parse_from_str(posting_date, "%Y-%m-%d")
+                .map_err(|_| {
+                    ApiError::validation(
+                        &qname,
+                        vec!["Posting date must use YYYY-MM-DD format".into()],
+                    )
+                })?;
             if tx
                 .query_opt(
                     "SELECT id FROM accounting__period WHERE tenant_id=$1 AND status='period_closed' AND start_date <= $2::date AND end_date >= $2::date LIMIT 1 FOR SHARE",
-                    &[&t.id, &posting_date],
+                    &[&t.id, &posting_date_value],
                 )
                 .await?
                 .is_some()

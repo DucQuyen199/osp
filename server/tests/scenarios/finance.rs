@@ -591,6 +591,183 @@ async fn company_group_consent(kernel: &Arc<Kernel>) {
         .await
         .expect("revoked members are excluded from the consolidated report");
     assert!(revoked_report["companies"].as_array().unwrap().is_empty());
+
+    // Keep the elimination workflow isolated from the FX and member-consent
+    // scenario above so its approval module cannot alter those report fixtures.
+    let owner = Ctx::new(kernel, None, &["consolidation", "workflow-approval"]).await;
+    let reporting_currency = owner
+        .list("master-data.currency", &[])
+        .await
+        .into_iter()
+        .find(|currency| currency["code"] == "VND")
+        .expect("owner VND currency seed");
+    let group = owner
+        .create(
+            "consolidation.company_group",
+            json!({ "name": "Elimination Test Group", "reporting_currency": reporting_currency["id"], "max_rate_age_days": 30 }),
+        )
+        .await;
+    kernel
+        .grant_consolidated_report(
+            &owner.a,
+            &owner.t,
+            &id(&group),
+            owner.a.user_id(),
+            "trial_balance",
+        )
+        .await
+        .expect("grant report access for elimination assertions");
+    let (reviewer, reviewer_token) = kernel
+        .add_user(
+            &owner.t,
+            "Independent elimination reviewer",
+            None,
+            None,
+            &["admin".into()],
+        )
+        .await
+        .expect("create independent elimination reviewer");
+    let (_, reviewer_actor, _) = kernel
+        .authenticate(&reviewer_token.expect("reviewer API token"))
+        .await
+        .expect("authenticate elimination reviewer");
+    owner
+        .create(
+            "workflow-approval.approval_rule",
+            json!({
+                "name": "Independent elimination review",
+                "entity": "consolidation.elimination_journal",
+                "min_amount": 0,
+                "approvers": { "users": [reviewer.id] }
+            }),
+        )
+        .await;
+    let posting_date = owner.t.business_today().to_string();
+    assert!(
+        owner
+            .try_create(
+                "consolidation.elimination_journal",
+                json!({
+                    "group": id(&group),
+                    "posting_date": posting_date,
+                    "memo": "Unbalanced elimination should fail",
+                    "lines": [
+                        { "accountCode": "642", "debit": 10, "credit": 0 },
+                        { "accountCode": "112", "debit": 0, "credit": 9 }
+                    ],
+                    "matching_evidence": ["IC-INV-001"]
+                }),
+            )
+            .await
+            .is_err(),
+        "unbalanced elimination drafts must be rejected"
+    );
+    let elimination = owner
+        .create(
+            "consolidation.elimination_journal",
+            json!({
+                "group": id(&group),
+                "posting_date": posting_date,
+                "memo": "Eliminate matched intercompany balance",
+                "lines": [
+                    { "accountCode": "642", "debit": 10, "credit": 0 },
+                    { "accountCode": "112", "debit": 0, "credit": 10 }
+                ],
+                "matching_evidence": ["IC-INV-001"]
+            }),
+        )
+        .await;
+    owner
+        .act(
+            "consolidation.elimination_journal",
+            &id(&elimination),
+            "submitted",
+        )
+        .await;
+    let pending = owner
+        .list(
+            "workflow-approval.approval_request",
+            &[("record_id", &id(&elimination)), ("status", "pending")],
+        )
+        .await
+        .remove(0);
+    assert!(
+        kernel
+            .act(
+                &owner.a,
+                &owner.t,
+                "workflow-approval.approval_request",
+                &id(&pending),
+                "approved",
+            )
+            .await
+            .is_err(),
+        "the submitter cannot approve their own elimination journal"
+    );
+    assert!(
+        kernel
+            .update(
+                &owner.a,
+                &owner.t,
+                "consolidation.elimination_journal",
+                &id(&elimination),
+                o(json!({ "memo": "Changed after submission" })),
+            )
+            .await
+            .is_err(),
+        "submitted elimination journals must be immutable"
+    );
+    kernel
+        .act(
+            &reviewer_actor,
+            &owner.t,
+            "workflow-approval.approval_request",
+            &id(&pending),
+            "approved",
+        )
+        .await
+        .expect("independent reviewer approves elimination journal");
+    assert_eq!(
+        owner
+            .get("consolidation.elimination_journal", &id(&elimination))
+            .await["status"],
+        "posted"
+    );
+    assert!(
+        kernel
+            .remove(
+                &owner.a,
+                &owner.t,
+                "consolidation.elimination_journal",
+                &id(&elimination),
+            )
+            .await
+            .is_err(),
+        "posted elimination journals must remain immutable"
+    );
+    let final_report = kernel
+        .consolidated_trial_balance(&owner.a, &owner.t, &id(&group), None, None)
+        .await
+        .expect("approved elimination appears in consolidated report");
+    assert_eq!(final_report["eliminations"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        final_report["eliminations"][0]["matchingEvidence"][0],
+        "IC-INV-001"
+    );
+    assert!(
+        owner
+            .k
+            .update(
+                &owner.a,
+                &owner.t,
+                "consolidation.company_group",
+                &id(&group),
+                o(json!({ "reporting_currency": "USD" })),
+            )
+            .await
+            .is_err(),
+        "the reporting currency cannot change after elimination activity"
+    );
 }
 
 async fn manual_journal_approvals(kernel: &Arc<Kernel>) {
