@@ -3,7 +3,6 @@ import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localMonth } from '../../lib/dates.js';
-import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { addDecimals, compareDecimals, minDecimal } from '../../lib/decimal.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
@@ -11,15 +10,10 @@ import { listHref } from '../../lib/routes.js';
 import payrollEnglish from './payroll.en.js';
 import PayrollAnnualReportPanel from './components/PayrollAnnualReportPanel.jsx';
 import PayrollRunPayslipsTable from './components/PayrollRunPayslipsTable.jsx';
+import { usePayrollWorkflow } from './hooks/usePayrollWorkflow.js';
 const t = (text) => uiTextWith(text, payrollEnglish);
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
-const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
 const weekdayOptions = [[1, 'T2'], [2, 'T3'], [3, 'T4'], [4, 'T5'], [5, 'T6'], [6, 'T7'], [7, 'CN']];
-const csvCell = (value) => {
-  const text = String(value ?? '');
-  const safe = typeof value === 'string' && (/^[\s]*[=+@]/.test(text) || /^[\s]*-/.test(text)) ? `'${text}` : text;
-  return `"${safe.replaceAll('"', '""')}"`;
-};
 export default function PayrollWorkbenchPage() {
   useDocumentTitle(`${t('Bảng lương')} · OSP Suite`);
   const [runs, setRuns] = useState([]);
@@ -29,11 +23,8 @@ export default function PayrollWorkbenchPage() {
   const [employees, setEmployees] = useState(new Map());
   const [approvalRequests, setApprovalRequests] = useState([]);
   const [selectedId, setSelectedId] = useState('');
-  const [form, setForm] = useState({ period: localMonth(), hours_per_day: '8', working_weekdays: [1, 2, 3, 4, 5], payment_date: '', payment_method: 'bank' });
-  const [busy, setBusy] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [reportYear, setReportYear] = useState(localMonth().slice(0, 4));
   const workflowApproval = app.meta?.modules?.some((module) => module.id === 'workflow-approval') || false;
   const latestRequest = useLatestRequest();
@@ -104,6 +95,8 @@ export default function PayrollWorkbenchPage() {
         ? null
         : addDecimals(annualReport.map((row) => row[field] || 0))]),
   ), [annualReport]);
+  const workflow = usePayrollWorkflow({ load, setSelectedId, setError, annualReport, employees, reportYear, t });
+  const { form, setForm, busy, notice, createRun, doAction, exportAnnualReport } = workflow;
   const reportYears = useMemo(() => {
     const years = new Set([localMonth().slice(0, 4), ...runs.map((row) => String(row.period || '').slice(0, 4)), ...taxDeductions.map((row) => String(row.tax_year || ''))].filter((year) => /^\d{4}$/.test(year)));
     return [...years].sort((a, b) => b.localeCompare(a));
@@ -115,42 +108,6 @@ export default function PayrollWorkbenchPage() {
     approved: runs.filter((row) => row.status === 'approved').length,
     paid: runs.filter((row) => row.status === 'paid').length,
   }), [runs]);
-  async function run(key, operation, success) {
-    setBusy(key); setError(''); setNotice('');
-    try { await operation(); setNotice(t(success)); await load(true); }
-    catch (reason) { setError(t(reason.message || 'Thao tác không thành công.')); await load(true); }
-    finally { setBusy(''); }
-  }
-  async function createRun(event) {
-    event.preventDefault();
-    await run('create', async () => {
-      const row = await api(dataPath('payroll.payroll_run'), { method: 'POST', body: { period: form.period, hours_per_day: Number(form.hours_per_day || 8), working_weekdays: form.working_weekdays, payment_date: form.payment_date, payment_method: form.payment_method } });
-      setSelectedId(row.id); setForm((current) => ({ ...current, period: '', payment_date: '' }));
-    }, 'Đã mở bảng lương nháp. Hãy hoàn tất chấm công, nghỉ phép và các khoản điều chỉnh trước khi tính.');
-  }
-  async function doAction(row, verb) {
-    const messages = {
-      calculated: 'Đã tính phiếu lương theo nhân viên, lương hiệu lực, chấm công, nghỉ phép, ngày lễ, tăng ca và chính sách thuế/đóng góp đã duyệt.',
-      submitted: 'Đã khóa bảng lương và gửi duyệt. Không thể thay đổi dữ liệu đầu vào trong kỳ sau bước này.',
-      approved: 'Đã duyệt bảng lương; hệ thống ghi nhận bút toán chi phí và công nợ lương.',
-      rejected: 'Bảng lương bị từ chối. Hãy hủy bản nháp này, điều chỉnh dữ liệu đầu vào rồi lập kỳ thay thế.',
-      paid: 'Đã ghi nhận thanh toán lương qua tài khoản đã chọn.',
-      cancelled: 'Đã hủy bảng lương nháp.',
-    };
-    await run(`${row.id}:${verb}`, () => action('payroll.payroll_run', row, verb), messages[verb]);
-  }
-  function exportAnnualReport() {
-    const columns = ['Mã nhân viên', 'Nhân viên', 'Số bảng lương đã chi', 'Lương gộp', 'Thu nhập tính thuế', 'Thuế TNCN đã khấu trừ', 'Khoản đóng góp của nhân viên', 'Thực nhận', 'Giảm trừ y tế đã duyệt', 'Giảm trừ giáo dục đã duyệt'].map(t);
-    const rows = annualReport.map((row) => {
-      const employee = employees.get(row.employee);
-      return [employee?.code || '', employee?.name || t('Nhân viên'), row.paidRuns, row.gross, row.taxable_income, row.income_tax, row.employee_contribution, row.net, row.medical_deduction ?? '', row.education_deduction ?? ''].map(csvCell).join(',');
-    });
-    const blob = new Blob([`\uFEFF${[columns.map(csvCell).join(','), ...rows].join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url; link.download = `payroll-withholding-${reportYear}.csv`; link.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
   const runApproval = (row) => approvalRequests.find((item) => item.entity === 'payroll.payroll_run' && item.record_id === row.id);
   const canDirectApprove = !workflowApproval && can('payroll.payroll_run.approved');
   const inputLinks = [

@@ -2,12 +2,12 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
-import { localDate as businessDate, localDateTime as businessDateTime, localDateTimeToIso } from '../../lib/dates.js';
-import { api, dataPath } from '../../lib/api.js';
+import { localDate as businessDate } from '../../lib/dates.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import wellnessEnglish from './wellness.en.js';
 import BookingRequestForm from './components/BookingRequestForm.jsx';
+import { useWellnessBookingWorkflow } from './hooks/useWellnessBookingWorkflow.js';
 const t = (text) => uiTextWith(text, wellnessEnglish);
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const localDate = (value) => {
@@ -15,7 +15,6 @@ const localDate = (value) => {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? '' : businessDate(date);
 };
-const action = (row, verb) => api(dataPath('booking.booking', row.id, verb), { method: 'POST' });
 export default function WellnessBookingPage({ healthcare = false }) {
   useDocumentTitle(`${t(healthcare ? 'Lịch hẹn khám' : 'Lịch dịch vụ và hội viên')} · OSP Suite`);
   const [bookings, setBookings] = useState([]);
@@ -25,15 +24,8 @@ export default function WellnessBookingPage({ healthcare = false }) {
   const [parties, setParties] = useState(new Map());
   const [invoices, setInvoices] = useState([]);
   const [selectedId, setSelectedId] = useState('');
-  const [form, setForm] = useState({ party: '', resource: '', service: '', starts_at: businessDateTime(new Date(Date.now() + 3600000)), ends_at: '', price: '', note: '' });
-  const [editingBooking, setEditingBooking] = useState(false);
-  const [editForm, setEditForm] = useState({ resource: '', service: '', starts_at: '', ends_at: '', price: '', note: '' });
-  const [resourceForm, setResourceForm] = useState({ name: '', kind: 'staff' });
-  const [serviceForm, setServiceForm] = useState({ name: '', duration_min: '', price: '' });
-  const [busy, setBusy] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const latestRequest = useLatestRequest();
   const load = useCallback(async (quiet = false) => {
     const isLatest = latestRequest();
@@ -53,9 +45,6 @@ export default function WellnessBookingPage({ healthcare = false }) {
         setBookings(rows); setResources(resourceRows); setServices(serviceRows); setParties(partyMap); setInvoices(itemsOf(invoiceRes));
         setClinicPatients(itemsOf(clinicPatientRes));
         setSelectedId((current) => rows.some((row) => row.id === current) ? current : rows[0]?.id || '');
-        const patientPartyIds = new Set(itemsOf(clinicPatientRes).map((patient) => patient.party).filter(Boolean));
-        const availableParties = healthcare ? [...patientPartyIds].filter((id) => partyMap.has(id)) : [...partyMap.keys()];
-        setForm((current) => ({ ...current, party: availableParties.includes(current.party) ? current.party : availableParties[0] || '', resource: current.resource || resourceRows[0]?.id || '', service: current.service || serviceRows[0]?.id || '' }));
       }
     } catch (reason) { if (isLatest()) setError(t(reason.message || 'Không tải được lịch hẹn.')); }
     finally { if (isLatest()) setLoading(false); }
@@ -65,84 +54,21 @@ export default function WellnessBookingPage({ healthcare = false }) {
   const serviceById = useMemo(() => new Map(services.map((row) => [row.id, row])), [services]);
   const invoiceByBooking = useMemo(() => new Map(invoices.filter((row) => row.source === 'booking').map((row) => [row.source_id, row])), [invoices]);
   const selected = bookings.find((row) => row.id === selectedId);
-  const bookableParties = healthcare
+  const bookableParties = useMemo(() => healthcare
     ? [...new Set(clinicPatients.map((patient) => patient.party).filter(Boolean))].map((id) => parties.get(id)).filter(Boolean)
-    : [...parties.values()];
+    : [...parties.values()], [healthcare, clinicPatients, parties]);
   const today = localDate(new Date());
   const todays = bookings.filter((row) => localDate(row.starts_at) === today);
   const confirmed = todays.filter((row) => row.status === 'confirmed').length;
   const inProgress = todays.filter((row) => row.status === 'checked_in').length;
   const completed = todays.filter((row) => row.status === 'completed').length;
+  const workflow = useWellnessBookingWorkflow({ healthcare, resources, services, clinicPatients, parties, bookableParties, selected, load, setError, t });
+  const {
+    form, setForm, editingBooking, setEditingBooking, editForm, setEditForm,
+    resourceForm, setResourceForm, serviceForm, setServiceForm, busy, notice,
+    createBooking, createResource, createService, change, startEditBooking, saveBooking,
+  } = workflow;
   const selectedService = serviceById.get(form.service);
-  async function run(key, operation, success) {
-    setBusy(key); setError(''); setNotice('');
-    try { await operation(); setNotice(t(success)); await load(true); }
-    catch (reason) { setError(t(reason.message || 'Thao tác không thành công.')); await load(true); }
-    finally { setBusy(''); }
-  }
-  async function createBooking(event) {
-    event.preventDefault();
-    await run('booking', async () => {
-      if (healthcare && !bookableParties.some((party) => party.id === form.party)) throw new Error(t('Chọn hồ sơ bệnh nhân đã đăng ký trước khi đặt lịch khám.'));
-      const startsAt = localDateTimeToIso(form.starts_at);
-      const endsAt = form.ends_at ? localDateTimeToIso(form.ends_at) : undefined;
-      if (!startsAt || (form.ends_at && !endsAt)) throw new Error(t('Giờ hẹn không hợp lệ trong múi giờ kinh doanh.'));
-      const body = { resource: form.resource, service: form.service || undefined, party: form.party || undefined, starts_at: startsAt, note: form.note.trim() || undefined };
-      if (endsAt) body.ends_at = endsAt;
-      if (form.price !== '') body.price = String(form.price).trim();
-      await api(dataPath('booking.booking'), { method: 'POST', body });
-    }, 'Đã tiếp nhận lịch hẹn. Tài nguyên và khung giờ sẽ được kiểm tra trùng lịch ở máy chủ.');
-    setForm((current) => ({ ...current, note: '', price: '', ends_at: '' }));
-  }
-  async function createResource(event) {
-    event.preventDefault();
-    await run('resource', () => api(dataPath('booking.resource'), { method: 'POST', body: resourceForm }), 'Đã thêm kỹ thuật viên hoặc phòng vào danh mục tài nguyên.');
-    setResourceForm({ name: '', kind: 'staff' });
-  }
-  async function createService(event) {
-    event.preventDefault();
-    await run('service', () => api(dataPath('booking.service'), { method: 'POST', body: { ...serviceForm, duration_min: Number(serviceForm.duration_min), price: String(serviceForm.price) } }), 'Đã thêm dịch vụ và giá niêm yết.');
-    setServiceForm({ name: '', duration_min: '', price: '' });
-  }
-  async function change(row, verb) {
-    const messages = { confirmed: 'Đã xác nhận lịch và khóa khung giờ tài nguyên.', checked_in: healthcare ? 'Đã check-in và tạo lượt khám trong hồ sơ phòng khám.' : 'Đã check-in khách.', completed: 'Đã hoàn tất dịch vụ; hóa đơn được tạo theo cấu hình kế toán.', cancelled: 'Đã hủy lịch.', no_show: 'Đã ghi nhận khách vắng mặt.', expired: 'Đã đóng yêu cầu lịch chưa xác nhận sau khi hết khung giờ.' };
-    await run(`${row.id}:${verb}`, () => action(row, verb), messages[verb]);
-  }
-  function startEditBooking(row) {
-    setEditForm({
-      resource: row.resource || '',
-      service: row.service || '',
-      starts_at: row.starts_at ? businessDateTime(new Date(row.starts_at)) : '',
-      ends_at: row.ends_at ? businessDateTime(new Date(row.ends_at)) : '',
-      price: row.price ?? '',
-      note: row.note || '',
-    });
-    setEditingBooking(true);
-  }
-  async function saveBooking(event) {
-    event.preventDefault();
-    if (!selected) return;
-    await run(`${selected.id}:update`, async () => {
-      const startsAt = localDateTimeToIso(editForm.starts_at);
-      const endsAt = localDateTimeToIso(editForm.ends_at);
-      if (!startsAt || !endsAt || new Date(endsAt).getTime() <= new Date(startsAt).getTime()) {
-        throw new Error(t('Giờ bắt đầu và kết thúc không hợp lệ.'));
-      }
-      const body = {
-        resource: editForm.resource,
-        service: editForm.service || null,
-        starts_at: startsAt,
-        note: editForm.note.trim(),
-      };
-      const originalEnd = selected.ends_at ? businessDateTime(new Date(selected.ends_at)) : '';
-      const editService = services.find((row) => row.id === editForm.service);
-      const serviceHasDuration = Number(editService?.duration_min) > 0;
-      if (editForm.ends_at !== originalEnd || !serviceHasDuration) body.ends_at = endsAt;
-      if (editForm.price !== '') body.price = String(editForm.price).trim();
-      await api(dataPath('booking.booking', selected.id), { method: 'PATCH', body });
-    }, 'Đã cập nhật lịch chờ; máy chủ đã tính lại thời lượng dịch vụ và kiểm tra xung đột tài nguyên.');
-    setEditingBooking(false);
-  }
   const canNoShow = (row) => row.status === 'confirmed' && row.ends_at && new Date(row.ends_at).getTime() <= Date.now();
   const canExpire = (row) => row.status === 'requested' && row.ends_at && new Date(row.ends_at).getTime() <= Date.now();
   const kindLabel = (kind) => (healthcare

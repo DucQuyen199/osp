@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { localDate } from '../../lib/dates.js';
-import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { addDecimals } from '../../lib/decimal.js';
 import { can, loadRefs, loadIndependentData, recordLabel, loadAllResponse } from '../../lib/state.js';
@@ -10,11 +9,10 @@ import { boqLineValue, boqTotal } from './domain/boqTotals.js';
 import constructionEnglish from './construction.en.js';
 import ConstructionSiteDiaryPanel from './components/ConstructionSiteDiaryPanel.jsx';
 import ProgressClaimsPanel from './components/ProgressClaimsPanel.jsx';
+import { useConstructionWorkflow } from './hooks/useConstructionWorkflow.js';
 const t = (text) => uiTextWith(text, constructionEnglish);
 const today = localDate;
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
-const blankBoqLine = () => ({ rowId: crypto.randomUUID(), description: '', unit: '', qty: '1', unit_price: '' });
-const runAction = (entity, row, action) => api(dataPath(entity, row.id, action), { method: 'POST' });
 export default function ConstructionWorkbenchPage() {
   useDocumentTitle(`${t('Điều hành công trường')} · OSP Suite`);
   const [projects, setProjects] = useState([]);
@@ -26,16 +24,8 @@ export default function ConstructionWorkbenchPage() {
   const [bills, setBills] = useState([]);
   const [parties, setParties] = useState(new Map());
   const [projectId, setProjectId] = useState('');
-  const [siteForm, setSiteForm] = useState({ name: '', project: '', address: '' });
-  const [diaryForm, setDiaryForm] = useState({ site: '', date: today(), weather: '', notes: '' });
-  const [boqForm, setBoqForm] = useState({ project: '', supersedes: '', revision_reason: '' });
-  const [boqLines, setBoqLines] = useState(() => [blankBoqLine()]);
-  const [subcontractForm, setSubcontractForm] = useState({ project: '', vendor: '', value: '', scope: '' });
-  const [claimForm, setClaimForm] = useState({ subcontract: '', period: today(), amount: '', notes: '' });
-  const [busy, setBusy] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const latestRequest = useLatestRequest();
   const load = useCallback(async (quiet = false) => {
     const isLatest = latestRequest();
@@ -63,11 +53,6 @@ export default function ConstructionWorkbenchPage() {
         setProjects(projectRows); setSites(siteRows); setDiaries(itemsOf(diaryRes)); setBoqs(boqRows);
         setSubcontracts(itemsOf(subcontractRes)); setClaims(itemsOf(claimRes)); setBills(itemsOf(billRes)); setParties(partyMap);
         setProjectId((current) => projectRows.some((row) => row.id === current) ? current : projectRows[0]?.id || '');
-        setSiteForm((current) => ({ ...current, project: current.project || projectRows.find((row) => ['planned', 'active'].includes(row.status))?.id || '' }));
-        setDiaryForm((current) => ({ ...current, site: current.site || siteRows.find((site) => site.project === projectRows[0]?.id)?.id || siteRows.find((site) => !site.project)?.id || '' }));
-        setBoqForm((current) => ({ ...current, project: current.project || projectRows.find((row) => ['planned', 'active'].includes(row.status))?.id || '' }));
-        setSubcontractForm((current) => ({ ...current, project: current.project || projectRows.find((row) => row.status === 'active')?.id || '', vendor: current.vendor || [...partyMap.keys()][0] || '' }));
-        setClaimForm((current) => ({ ...current, subcontract: current.subcontract || itemsOf(subcontractRes).find((row) => row.status === 'signed')?.id || '' }));
         if (errors.length) setError(errors[0]?.message || t('Một số dữ liệu công trường không tải được.'));
       }
     } catch (reason) { if (isLatest()) setError(t(reason.message || 'Không tải được dữ liệu công trường.')); }
@@ -98,54 +83,18 @@ export default function ConstructionWorkbenchPage() {
     };
   });
   const revisionSource = boqs.find((row) => row.id === boqForm.supersedes);
-  async function run(key, operation, success) {
-    setBusy(key); setError(''); setNotice('');
-    try { await operation(); setNotice(t(success)); await load(true); }
-    catch (reason) { setError(t(reason.message || 'Thao tác không thành công.')); await load(true); }
-    finally { setBusy(''); }
-  }
-  async function createSite(event) {
-    event.preventDefault();
-    await run('site', () => api(dataPath('construction.site'), { method: 'POST', body: { ...siteForm, project: projectId || undefined } }), 'Đã tạo hồ sơ công trường.');
-    setSiteForm((current) => ({ ...current, name: '', address: '' }));
-  }
-  async function createDiary(event) {
-    event.preventDefault();
-    await run('diary', () => api(dataPath('construction.site_diary'), { method: 'POST', body: { ...diaryForm, weather: diaryForm.weather || undefined, notes: diaryForm.notes || undefined } }), 'Đã ghi nhật ký thi công. Nhật ký được lưu thành lịch sử không thể sửa.');
-    setDiaryForm((current) => ({ ...current, weather: '', notes: '' }));
-  }
-  async function createBoq(event) {
-    event.preventDefault();
-    await run('boq', async () => {
-      const payload = { ...boqForm, project: boqForm.project, supersedes: boqForm.supersedes || undefined, revision_reason: boqForm.revision_reason || undefined, items: boqLines.map((line) => ({ description: line.description.trim(), unit: line.unit.trim(), qty: String(line.qty), unit_price: String(line.unit_price) })) };
-      delete payload.revision;
-      await api(dataPath('construction.boq'), { method: 'POST', body: payload });
-    }, 'Đã lập dự toán BOQ nháp; tổng giá trị được máy chủ tính từ khối lượng và đơn giá.');
-    setBoqLines([blankBoqLine()]);
-    setBoqForm((current) => ({ ...current, supersedes: '', revision_reason: '' }));
-  }
-  async function createSubcontract(event) {
-    event.preventDefault();
-    await run('subcontract', () => api(dataPath('construction.subcontract'), { method: 'POST', body: { ...subcontractForm, project: projectId, value: String(subcontractForm.value) } }), 'Đã lập dự thảo hợp đồng thầu phụ.');
-    setSubcontractForm((current) => ({ ...current, value: '', scope: '' }));
-  }
-  async function createClaim(event) {
-    event.preventDefault();
-    const contract = subcontracts.find((row) => row.id === claimForm.subcontract);
-    if (!contract) return;
-    await run('claim', () => api(dataPath('construction.progress_claim'), { method: 'POST', body: { ...claimForm, vendor: contract.vendor, amount: String(claimForm.amount), notes: claimForm.notes || undefined } }), 'Đã lập hồ sơ nghiệm thu/đề nghị thanh toán nháp.');
-    setClaimForm((current) => ({ ...current, amount: '', notes: '' }));
-  }
-  async function transition(entity, row, verb, success) {
-    await run(`${row.id}:${verb}`, () => runAction(entity, row, verb), success);
-  }
-  const addBoqLine = () => setBoqLines((current) => [...current, blankBoqLine()]);
-  const updateBoqLine = (index, field, value) => setBoqLines((current) => current.map((line, i) => i === index ? { ...line, [field]: value } : line));
+  const workflow = useConstructionWorkflow({ load, projectId, setProjectId, projects, sites, subcontracts, parties, setError, t, today });
+  const {
+    siteForm, setSiteForm, diaryForm, setDiaryForm, boqForm, setBoqForm, boqLines,
+    subcontractForm, setSubcontractForm, claimForm, setClaimForm, busy, notice,
+    createSite, createDiary, createBoq, createSubcontract, createClaim, transition,
+    selectProject, addBoqLine, updateBoqLine, removeBoqLine, reviseBoq,
+  } = workflow;
   return <div className="page">
     <div className="page-head"><div><h1>{t("Điều hành công trường")}</h1><p className="sub">{t("Quản lý tiến độ dự án, dự toán BOQ theo phiên bản, nhật ký công trường và cam kết chi phí thầu phụ.")}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t("Làm mới")}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     {loading ? <div className="skeleton" data-h="row" /> : !projects.length ? <div className="card card-pad empty">{t("Chưa có dự án. Hãy tạo dự án trong module Quản lý dự án trước khi lập dự toán hoặc công trường.")}</div> : <>
-      <section className="card card-pad"><div className="form-grid"><label className="field"><span className="label">{t("Công trình đang xem")}</span><select className="select" value={projectId} onChange={(e) => { const id = e.target.value; setProjectId(id); setSiteForm((current) => ({ ...current, project: id })); setSubcontractForm((current) => ({ ...current, project: id })); setDiaryForm((current) => ({ ...current, site: sites.find((site) => site.project === id)?.id || sites.find((site) => !site.project)?.id || '' })); }}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name} · {statusLabel(project.status)}</option>)}</select></label><div className="field"><span className="label">{t("Ngân sách dự án")}</span><strong>{fmtMoney(selectedProject?.budget || 0)}</strong></div><div className="field"><span className="label">{t("Cam kết thầu phụ")}</span><strong>{fmtMoney(committedValue)}</strong></div><div className="field"><span className="label">{t("Dự toán đã duyệt")}</span><strong>{currentBoq ? fmtMoney(currentBoq.total || 0) : t('Chưa có baseline')}</strong></div></div>
+      <section className="card card-pad"><div className="form-grid"><label className="field"><span className="label">{t("Công trình đang xem")}</span><select className="select" value={projectId} onChange={(e) => selectProject(e.target.value)}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name} · {statusLabel(project.status)}</option>)}</select></label><div className="field"><span className="label">{t("Ngân sách dự án")}</span><strong>{fmtMoney(selectedProject?.budget || 0)}</strong></div><div className="field"><span className="label">{t("Cam kết thầu phụ")}</span><strong>{fmtMoney(committedValue)}</strong></div><div className="field"><span className="label">{t("Dự toán đã duyệt")}</span><strong>{currentBoq ? fmtMoney(currentBoq.total || 0) : t('Chưa có baseline')}</strong></div></div>
         {selectedProject?.status === 'planned' && can('project.project.started') && <button className="btn btn-primary btn-sm u-mt-12"  disabled={Boolean(busy)} onClick={() => transition('project.project', selectedProject, 'started', 'Đã khởi công dự án; có thể ký hợp đồng thầu phụ.')}>{t("Khởi công dự án")}</button>}
       </section>
       <div className="layout-split u-mt-16" >
@@ -155,10 +104,10 @@ export default function ConstructionWorkbenchPage() {
               {revisionSource && <label className="field full"><span className="label">{t("Lý do điều chỉnh *")}</span><input className="input" required value={boqForm.revision_reason} onChange={(e) => setBoqForm({ ...boqForm, revision_reason: e.target.value })}/></label>}
             </div>
             <div className="row wrap u-mt-12" ><strong>{t("Hạng mục")}</strong><span className="grow"/><button className="btn btn-secondary btn-sm" type="button" onClick={addBoqLine}>{t("Thêm hạng mục")}</button></div>
-            {boqLines.map((line, index) => <div className="row wrap u-mt-8" key={line.rowId} ><input className="input" aria-label={t('Mô tả hạng mục')} placeholder={t('Mô tả công tác / vật tư')} required value={line.description} onChange={(e) => updateBoqLine(index, 'description', e.target.value)}/><input className="input" aria-label={t('Đơn vị tính')} placeholder={t('m², m³, m, kg, ngày công')} required maxLength={32} value={line.unit} onChange={(e) => updateBoqLine(index, 'unit', e.target.value)}/><input className="input num u-max-w-110" aria-label={t('Khối lượng')} type="number" min="0.001" step="any" required value={line.qty} onChange={(e) => updateBoqLine(index, 'qty', e.target.value)} /><input className="input num u-max-w-150" aria-label={t('Đơn giá')} type="number" min="0" step="any" required value={line.unit_price} onChange={(e) => updateBoqLine(index, 'unit_price', e.target.value)} /><strong>{fmtMoney(boqLineValue(line))}</strong>{boqLines.length > 1 && <button className="btn btn-ghost btn-sm" type="button" aria-label={t('Xóa hạng mục')} onClick={() => setBoqLines((current) => current.filter((_, i) => i !== index))}>{t("Bỏ")}</button>}</div>)}
+            {boqLines.map((line, index) => <div className="row wrap u-mt-8" key={line.rowId} ><input className="input" aria-label={t('Mô tả hạng mục')} placeholder={t('Mô tả công tác / vật tư')} required value={line.description} onChange={(e) => updateBoqLine(index, 'description', e.target.value)}/><input className="input" aria-label={t('Đơn vị tính')} placeholder={t('m², m³, m, kg, ngày công')} required maxLength={32} value={line.unit} onChange={(e) => updateBoqLine(index, 'unit', e.target.value)}/><input className="input num u-max-w-110" aria-label={t('Khối lượng')} type="number" min="0.001" step="any" required value={line.qty} onChange={(e) => updateBoqLine(index, 'qty', e.target.value)} /><input className="input num u-max-w-150" aria-label={t('Đơn giá')} type="number" min="0" step="any" required value={line.unit_price} onChange={(e) => updateBoqLine(index, 'unit_price', e.target.value)} /><strong>{fmtMoney(boqLineValue(line))}</strong>{boqLines.length > 1 && <button className="btn btn-ghost btn-sm" type="button" aria-label={t('Xóa hạng mục')} onClick={() => removeBoqLine(index)}>{t("Bỏ")}</button>}</div>)}
             <div className="row u-mt-10" ><span className="grow"/><strong>Ước tính: {fmtMoney(boqTotal(boqLines))}</strong><button className="btn btn-primary" disabled={Boolean(busy) || !boqForm.project}>{t("Lưu BOQ nháp")}</button></div>
           </form>}
-          <div className="table-wrap u-mt-16" ><table className="table"><thead><tr><th>{t("Mã BOQ")}</th><th>{t("Phiên bản")}</th><th>{t("Tổng dự toán")}</th><th>{t("Trạng thái")}</th><th>{t("Thao tác")}</th></tr></thead><tbody>{projectBoqs.map((row) => <tr key={row.id}><td><strong>{row.number}</strong>{Number(row.revision) > 1 && <div className="small muted">{row.revision_reason}</div>}{(row.items || []).map((item, index) => <div className="small muted" key={index}>{item.description} {'\u00b7'} {item.qty} {item.unit} {'\u00d7'} {fmtMoney(item.unit_price)}</div>)}</td><td>R{row.revision}</td><td>{fmtMoney(row.total || 0)}</td><td>{statusLabel(row.status)}</td><td>{row.status === 'draft' && can('construction.boq.approved') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => transition('construction.boq', row, 'approved', 'Đã duyệt BOQ và xác lập baseline dự toán cho công trình.')}>{t("Duyệt baseline")}</button>}{row.status === 'approved' && can('construction.boq.create') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => { setBoqForm({ project: row.project, supersedes: row.id, revision_reason: '' }); setBoqLines((row.items || []).map((item) => ({ ...blankBoqLine(), description: item.description || '', unit: item.unit || '', qty: String(item.qty || 1), unit_price: String(item.unit_price || 0) }))); }}>{t("Lập phiên bản điều chỉnh")}</button>}</td></tr>)}</tbody></table></div>
+          <div className="table-wrap u-mt-16" ><table className="table"><thead><tr><th>{t("Mã BOQ")}</th><th>{t("Phiên bản")}</th><th>{t("Tổng dự toán")}</th><th>{t("Trạng thái")}</th><th>{t("Thao tác")}</th></tr></thead><tbody>{projectBoqs.map((row) => <tr key={row.id}><td><strong>{row.number}</strong>{Number(row.revision) > 1 && <div className="small muted">{row.revision_reason}</div>}{(row.items || []).map((item, index) => <div className="small muted" key={index}>{item.description} {'\u00b7'} {item.qty} {item.unit} {'\u00d7'} {fmtMoney(item.unit_price)}</div>)}</td><td>R{row.revision}</td><td>{fmtMoney(row.total || 0)}</td><td>{statusLabel(row.status)}</td><td>{row.status === 'draft' && can('construction.boq.approved') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => transition('construction.boq', row, 'approved', 'Đã duyệt BOQ và xác lập baseline dự toán cho công trình.')}>{t("Duyệt baseline")}</button>}{row.status === 'approved' && can('construction.boq.create') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => reviseBoq(row)}>{t("Lập phiên bản điều chỉnh")}</button>}</td></tr>)}</tbody></table></div>
         </section>
         <ConstructionSiteDiaryPanel
           projects={projects} projectSites={projectSites} projectDiaries={projectDiaries}
