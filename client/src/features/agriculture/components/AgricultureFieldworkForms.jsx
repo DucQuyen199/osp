@@ -52,10 +52,10 @@ export function AgricultureInputForm({
 
 export function AgricultureHarvestForm({
   harvestSafety, legacyPesticideApplications, harvestRestriction, harvestDate, products,
-  harvestProduct, harvestUom, harvestWarehouse, harvestQty, harvestGrade, harvestLotCode,
+  harvestProduct, harvestUom, harvestWarehouse, harvestQty, harvestGrade, harvestLotCode, harvestExpiry,
   warehouses, unitsFor, busy, canCreate, today, plantedOn, formatDate,
   onSubmit, onProductChange, onUomChange, onWarehouseChange, onQtyChange, onDateChange,
-  onGradeChange, onLotCodeChange, recordLabel, t,
+  onGradeChange, onLotCodeChange, onExpiryChange, recordLabel, t,
 }) {
   return <form className="card agriculture-panel" onSubmit={onSubmit}>
     <h3>{t('Nhập sản lượng thu hoạch')}</h3>
@@ -105,6 +105,9 @@ export function AgricultureHarvestForm({
         <input className="input" required={Boolean(products.get(harvestProduct)?.lot_tracked)} value={harvestLotCode} onChange={(event) => onLotCodeChange(event.target.value)}/>
       </label>
     </div>
+    {products.get(harvestProduct)?.lot_tracked && <label className="field"><span className="label">{t('Hạn dùng')}{products.get(harvestProduct)?.expiry_required ? ' *' : ''}</span>
+      <input className="input" type="date" min={harvestDate} required={Boolean(products.get(harvestProduct)?.expiry_required)} value={harvestExpiry} onChange={(event) => onExpiryChange(event.target.value)}/>
+    </label>}
     <button className="btn btn-primary" type="submit" disabled={Boolean(busy) || harvestSafety.unknownProducts.length > 0 || Boolean(harvestRestriction && harvestDate < harvestRestriction) || !canCreate}>
       {busy === 'harvest' ? t('Đang nhập kho…') : t('Ghi nhận thu hoạch')}
     </button>

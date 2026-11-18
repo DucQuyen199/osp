@@ -20,11 +20,12 @@ export default function AgricultureCycleHistory({
       <h3>{t('Lịch sử thu hoạch')}</h3>
       {harvests.length ? <div className="agriculture-history">
         {harvests.map((harvest) => {
-          const lot = [...lots.values()].find((item) => item.product === harvest.product && item.code === harvest.lot_code);
+          const lotCode = harvest.lot_code?.trim().toLowerCase();
+          const lot = lotCode && [...lots.values()].find((item) => item.product === harvest.product && item.code?.trim().toLowerCase() === lotCode);
           return <div className="agriculture-history-row" key={harvest.id}>
             <div>
               <strong>{products.get(harvest.product)?.name || t('Nông sản')} · {fmtNumber(harvest.qty)} {unitLabel(harvest)}{harvest.base_qty != null && harvest.uom_ratio > 1 ? ` (${fmtNumber(harvest.base_qty)} ${t('base')})` : ''}</strong>
-              <div className="small muted">{fmtDate(harvest.date)}{harvest.grade ? ` · ${harvest.grade}` : ''}{harvest.lot_code ? ` · ${t('Lô')} ${harvest.lot_code}` : ''}</div>
+              <div className="small muted">{fmtDate(harvest.date)}{harvest.grade ? ` · ${harvest.grade}` : ''}{harvest.lot_code ? ` · ${t('Lô')} ${harvest.lot_code}` : ''}{(harvest.expiry || lot?.expiry) ? ` · ${t('Hạn dùng')} ${fmtDate(harvest.expiry || lot.expiry)}` : ''}</div>
             </div>
             {lot && canViewLots && <a className="small" href={lotHref(lot.id)}>{t('Truy xuất lô')}</a>}
           </div>;

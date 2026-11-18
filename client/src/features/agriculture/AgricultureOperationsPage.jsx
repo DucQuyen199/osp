@@ -38,6 +38,7 @@ export default function AgricultureOperationsPage() {
   const [harvestQty, setHarvestQty] = useState('');
   const [harvestGrade, setHarvestGrade] = useState('');
   const [harvestLotCode, setHarvestLotCode] = useState('');
+  const [harvestExpiry, setHarvestExpiry] = useState('');
   const [harvestDate, setHarvestDate] = useState(today());
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -156,8 +157,8 @@ export default function AgricultureOperationsPage() {
     event.preventDefault(); if (!selectedCycle) return;
     setBusy('harvest'); setError(''); setNotice('');
     try {
-      await api(dataPath('agriculture.harvest'), { method: 'POST', body: { cycle: selectedCycle.id, product: harvestProduct, warehouse: harvestWarehouse, qty: String(harvestQty), ...(unitsFor(harvestProduct).length ? { uom: harvestUom || products.get(harvestProduct)?.uom } : {}), date: harvestDate, grade: harvestGrade.trim() || undefined, lot_code: harvestLotCode.trim() || undefined } });
-      setHarvestQty(''); setHarvestGrade(''); setHarvestLotCode(''); await load(true); setNotice(t('Đã nhập sản lượng thu hoạch vào kho; mã lô được gắn cho truy xuất khi sản phẩm yêu cầu.'));
+      await api(dataPath('agriculture.harvest'), { method: 'POST', body: { cycle: selectedCycle.id, product: harvestProduct, warehouse: harvestWarehouse, qty: String(harvestQty), ...(unitsFor(harvestProduct).length ? { uom: harvestUom || products.get(harvestProduct)?.uom } : {}), date: harvestDate, expiry: harvestExpiry || undefined, grade: harvestGrade.trim() || undefined, lot_code: harvestLotCode.trim() || undefined } });
+      setHarvestQty(''); setHarvestGrade(''); setHarvestLotCode(''); setHarvestExpiry(''); await load(true); setNotice(t('Đã nhập sản lượng thu hoạch vào kho; mã lô được gắn cho truy xuất khi sản phẩm yêu cầu.'));
     } catch (reason) { setError(reason.message || t('Không ghi nhận được thu hoạch. Kiểm tra ngày vụ mùa và kho nhận.')); }
     finally { setBusy(''); }
   };
@@ -223,14 +224,14 @@ export default function AgricultureOperationsPage() {
             harvestSafety={harvestSafety} legacyPesticideApplications={legacyPesticideApplications}
             harvestRestriction={harvestRestriction} harvestDate={harvestDate} harvestProduct={harvestProduct}
             harvestUom={harvestUom} harvestWarehouse={harvestWarehouse} harvestQty={harvestQty}
-            harvestGrade={harvestGrade} harvestLotCode={harvestLotCode} products={products}
+            harvestGrade={harvestGrade} harvestLotCode={harvestLotCode} harvestExpiry={harvestExpiry} products={products}
             warehouses={warehouses} unitsFor={unitsFor} busy={busy}
             canCreate={can('agriculture.harvest.create')} today={today()} plantedOn={selectedCycle.planted_on}
             formatDate={fmtDate} onSubmit={createHarvest}
-            onProductChange={(value) => { setHarvestProduct(value); setHarvestUom(''); }}
+            onProductChange={(value) => { setHarvestProduct(value); setHarvestUom(''); setHarvestExpiry(''); }}
             onUomChange={setHarvestUom} onWarehouseChange={setHarvestWarehouse}
             onQtyChange={setHarvestQty} onDateChange={setHarvestDate}
-            onGradeChange={setHarvestGrade} onLotCodeChange={setHarvestLotCode}
+            onGradeChange={setHarvestGrade} onLotCodeChange={setHarvestLotCode} onExpiryChange={setHarvestExpiry}
             recordLabel={recordLabel} t={t}
           />
         </div>}

@@ -165,6 +165,12 @@
           "required": true
         },
         {
+          "name": "expiry",
+          "label": "Ngày hết hạn lô",
+          "type": "date",
+          "required": false
+        },
+        {
           "name": "lot_code",
           "type": "string",
           "required": false

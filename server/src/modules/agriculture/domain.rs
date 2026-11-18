@@ -66,6 +66,13 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
             if date(document, "date").is_none() {
                 errors.push("Ngày thu hoạch phải hợp lệ".into());
             }
+            if document.get("expiry").is_some_and(|value| !value.is_null()) {
+                match (date(document, "date"), date(document, "expiry")) {
+                    (Some(harvested), Some(expiry)) if expiry >= harvested => {}
+                    _ => errors
+                        .push("Ngày hết hạn lô phải hợp lệ và không trước ngày thu hoạch".into()),
+                }
+            }
         }
         "input_application" => {
             if !document

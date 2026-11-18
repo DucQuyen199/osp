@@ -277,14 +277,35 @@ async fn validate_harvest(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<V
             ));
         }
     }
-    if tx
+    if let Some(product_policy) = tx
         .query_opt(
-            "SELECT id FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+            "SELECT COALESCE(expiry_required, false), COALESCE(lot_tracked, false) FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
             &[&tenant.id, &product],
         )
         .await?
-        .is_none()
     {
+        let expiry_required: bool = product_policy.get(0);
+        let lot_tracked: bool = product_policy.get(1);
+        if expiry_required && !lot_tracked {
+            errors.push("Sản phẩm yêu cầu hạn dùng phải bật quản lý lô".into());
+        }
+        if !lot_tracked
+            && document
+                .get("expiry")
+                .and_then(Value::as_str)
+                .is_some_and(|expiry| !expiry.is_empty())
+        {
+            errors.push("Chỉ sản phẩm quản lý lô mới được ghi ngày hết hạn".into());
+        }
+        if expiry_required
+            && document
+                .get("expiry")
+                .and_then(Value::as_str)
+                .is_none_or(str::is_empty)
+        {
+            errors.push("Sản phẩm này yêu cầu ngày hết hạn trên từng lô thu hoạch".into());
+        }
+    } else {
         errors.push("Sản phẩm thu hoạch không tồn tại trong doanh nghiệp".into());
     }
     if tx

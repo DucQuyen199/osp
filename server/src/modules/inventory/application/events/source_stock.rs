@@ -356,6 +356,11 @@ pub async fn handle_source_stock_event(
                         vec!["Lot-tracked harvests require a lot code".into()],
                     )
                 })?;
+            let expiry = line
+                .get("expiry")
+                .and_then(Value::as_str)
+                .filter(|value| !value.is_empty())
+                .map(str::to_owned);
             let lock_key = format!(
                 "inventory.harvest-lot:{}:{}:{}",
                 tenant.id,
@@ -369,16 +374,29 @@ pub async fn handle_source_stock_event(
             .await?;
             let lot_id = if let Some(row) = tx
                 .query_opt(
-                    "SELECT id FROM inventory__lot WHERE tenant_id = $1 AND product = $2 AND lower(btrim(code)) = lower(btrim($3)) FOR SHARE",
+                    "SELECT id, expiry::text FROM inventory__lot WHERE tenant_id = $1 AND product = $2 AND lower(btrim(code)) = lower(btrim($3)) FOR SHARE",
                     &[&tenant.id, &product_id, &code],
                 )
                 .await?
             {
+                let existing_expiry: Option<String> = row.get(1);
+                if expiry
+                    .as_deref()
+                    .is_some_and(|value| Some(value) != existing_expiry.as_deref())
+                {
+                    return Err(crate::error::ApiError::validation(
+                        event_type,
+                        vec!["Mã lô thu hoạch đã tồn tại với ngày hết hạn khác".into()],
+                    ));
+                }
                 row.get::<_, Uuid>(0)
             } else {
                 let mut lot_data = Map::new();
                 lot_data.insert("product".into(), json!(product_id));
                 lot_data.insert("code".into(), json!(code));
+                if let Some(expiry) = &expiry {
+                    lot_data.insert("expiry".into(), json!(expiry));
+                }
                 let lot = kernel
                     .create_in(
                         tx,

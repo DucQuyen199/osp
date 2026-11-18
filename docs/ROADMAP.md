@@ -58,6 +58,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Nhật ký thuốc bảo vệ thực vật lưu snapshot số ngày cách ly trước thu hoạch; không cho ghi lần phun khi sản phẩm chưa có thời gian cách ly được khai báo rõ (0 ngày vẫn hợp lệ theo nhãn), và máy chủ chặn nhập kho thu hoạch trước hạn hoặc khi hồ sơ thuốc cũ chưa xác minh được.
 - Báo cáo mùa vụ tính chi phí phân bón/thuốc/giống theo giá trị xuất kho đã định giá và chi phí trên hecta; chỉ hiện khi người dùng có quyền xem stock move, không tính nước/nhân công chưa ghi nhận chi phí kho.
 - Sản lượng thu hoạch cộng theo Decimal trên đơn vị gốc và theo từng sản phẩm; danh sách vụ mùa hiển thị số lần thu thay vì cộng chung các mặt hàng khác đơn vị.
+- Phiếu thu hoạch sản phẩm quản lý lô lưu ngày hết hạn; bắt buộc theo policy sản phẩm, không trước ngày thu hoạch, truyền nguyên tử sang lô tồn kho và từ chối tái dùng mã lô với hạn dùng khác.
 - Đề xuất bổ sung tồn kho dùng cùng ngưỡng Decimal của máy chủ khi xác định dòng cần mua.
 - Hóa đơn điện tử lưu lý do hủy cùng giao dịch chuyển sang chờ provider xử lý hủy.
 - POS ghi nhận số tiền khách đưa, tự tính/in tiền thối và chặn hoàn tất giao dịch tiền mặt khi nhận thiếu; tiền thực đếm và chốt ca dùng cùng giao dịch sau khi kiểm tra đơn/phiếu quỹ nháp và tính chênh lệch tiền. Ước tính giỏ hàng trên quầy dùng Decimal, làm tròn từng dòng 4 chữ số như máy chủ trước khi cộng tổng và thuế.
