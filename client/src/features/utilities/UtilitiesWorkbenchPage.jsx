@@ -70,7 +70,7 @@ export default function UtilitiesWorkbenchPage() {
   async function createReading(event) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
-      await api(dataPath('utilities.meter_reading'), { method: 'POST', body: { meter: selectedMeter, period, reading: Number(readingValue) } });
+      await api(dataPath('utilities.meter_reading'), { method: 'POST', body: { meter: selectedMeter, period, reading: String(readingValue) } });
       setNotice(t("Đã ghi nhận chỉ số; mức tiêu thụ và tiền được tính theo dữ liệu công tơ.")); setReadingValue(''); await load();
     } catch (reason) { setError(reason.message || t("Không thể ghi chỉ số.")); }
     finally { setBusy(false); }
@@ -79,10 +79,10 @@ export default function UtilitiesWorkbenchPage() {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
       const created = await api(dataPath('utilities.meter'), { method: 'POST', body: {
-        party: meterForm.party, code: meterForm.code.trim(), kind: meterForm.kind, rate: Number(meterForm.rate),
-        fixed_charge: Number(meterForm.fixed_charge || 0),
-        tariff_tiers: meterForm.tariff_tiers.map((tier) => ({ up_to: tier.up_to === '' ? null : Number(tier.up_to), rate: Number(tier.rate) })),
-        ...(meterForm.opening_reading !== '' ? { opening_reading: Number(meterForm.opening_reading) } : {}),
+        party: meterForm.party, code: meterForm.code.trim(), kind: meterForm.kind, rate: String(meterForm.rate),
+        fixed_charge: String(meterForm.fixed_charge || 0),
+        tariff_tiers: meterForm.tariff_tiers.map((tier) => ({ up_to: tier.up_to === '' ? null : String(tier.up_to), rate: String(tier.rate) })),
+        ...(meterForm.opening_reading !== '' ? { opening_reading: String(meterForm.opening_reading) } : {}),
         ...(meterForm.address.trim() ? { address: meterForm.address.trim() } : {}),
       } });
       setMeterForm((current) => ({ ...current, code: '', rate: '', fixed_charge: '0', tariff_tiers: [], opening_reading: '', address: '' }));
@@ -95,8 +95,8 @@ export default function UtilitiesWorkbenchPage() {
     setBusy(true); setError(''); setNotice('');
     try {
       await api(dataPath('utilities.meter', meter.id), { method: 'PATCH', body: {
-        rate: Number(rateDraft), fixed_charge: Number(fixedChargeDraft || 0),
-        tariff_tiers: tariffTiersDraft.map((tier) => ({ up_to: tier.up_to === '' ? null : Number(tier.up_to), rate: Number(tier.rate) })),
+        rate: String(rateDraft), fixed_charge: String(fixedChargeDraft || 0),
+        tariff_tiers: tariffTiersDraft.map((tier) => ({ up_to: tier.up_to === '' ? null : String(tier.up_to), rate: String(tier.rate) })),
       } });
       setNotice(t("Đã cập nhật đơn giá. Giá mới áp dụng cho lần ghi chỉ số tiếp theo; các kỳ đã ghi giữ nguyên đơn giá lịch sử.")); await load();
     } catch (reason) { setError(reason.message || t("Không thể cập nhật đơn giá.")); }
