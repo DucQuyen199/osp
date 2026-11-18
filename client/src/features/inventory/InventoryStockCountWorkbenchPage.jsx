@@ -1,12 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, statusLabel, uiText } from '../../lib/i18n.js';
 import { compareDecimals } from '../../lib/decimal.js';
-import { app, can, loadAll, recordLabel } from '../../lib/state.js';
+import { app, can, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import StockCountLinesEditor from './components/StockCountLinesEditor.jsx';
+import { useStockCountData } from './hooks/useStockCountData.js';
 
-async function listMap(qname) { return new Map((await loadAll(qname)).map((row) => [row.id, row])); }
 const blankLine = () => ({ rowId: crypto.randomUUID(), product: '', lot: '', location: '', counted_qty: '' });
 const cleanLines = (lines) => lines.map(({ product, lot, location, counted_qty }) => ({
   product,
@@ -17,13 +17,8 @@ const cleanLines = (lines) => lines.map(({ product, lot, location, counted_qty }
 const action = (row, verb) => api(dataPath('inventory.stock_count', row.id, verb), { method: 'POST' });
 
 export default function InventoryStockCountWorkbenchPage() {
-  const [counts, setCounts] = useState([]);
-  const [warehouses, setWarehouses] = useState(new Map());
-  const [products, setProducts] = useState(new Map());
-  const [units, setUnits] = useState(new Map());
-  const [lots, setLots] = useState(new Map());
-  const [locations, setLocations] = useState(new Map());
-  const [approvalRequests, setApprovalRequests] = useState([]);
+  const workflowApproval = app.meta?.modules?.some((module) => module.id === 'workflow-approval') || false;
+  const { counts, warehouses, products, units, lots, locations, approvalRequests, loading, error, setError, load } = useStockCountData(workflowApproval);
   const [selectedId, setSelectedId] = useState('');
   const [warehouse, setWarehouse] = useState('');
   const [reason, setReason] = useState('cycle_count');
@@ -31,31 +26,10 @@ export default function InventoryStockCountWorkbenchPage() {
   const [lines, setLines] = useState([blankLine()]);
   const [productSearch, setProductSearch] = useState('');
   const [productSuggestionLimit, setProductSuggestionLimit] = useState(100);
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
-  const workflowApproval = app.meta?.modules?.some((module) => module.id === 'workflow-approval') || false;
-  const load = useCallback(async () => {
-    setLoading(true); setError('');
-    try {
-      const [countRows, warehouseMap, productMap, unitMap, lotMap, locationMap, requestRows] = await Promise.all([
-        can('inventory.stock_count.read') ? loadAll('inventory.stock_count') : Promise.resolve([]),
-        can('inventory.warehouse.read') ? listMap('inventory.warehouse') : Promise.resolve(new Map()),
-        can('master-data.product.read') ? listMap('master-data.product') : Promise.resolve(new Map()),
-        can('master-data.uom.read') ? listMap('master-data.uom') : Promise.resolve(new Map()),
-        can('inventory.lot.read') ? listMap('inventory.lot') : Promise.resolve(new Map()),
-        can('inventory.warehouse_location.read') ? listMap('inventory.warehouse_location') : Promise.resolve(new Map()),
-        workflowApproval && can('workflow-approval.approval_request.read') ? loadAll('workflow-approval.approval_request') : Promise.resolve([]),
-      ]);
-      countRows.sort((a, b) => String(b.updated_at || b.created_at || '').localeCompare(String(a.updated_at || a.created_at || '')));
-      setCounts(countRows); setWarehouses(warehouseMap); setProducts(productMap); setUnits(unitMap); setLots(lotMap); setLocations(locationMap); setApprovalRequests(requestRows);
-      setSelectedId((current) => countRows.some((row) => row.id === current) ? current : '');
-    } catch (e) { setError(e.message || uiText('Không tải được danh sách kiểm kê.')); }
-    finally { setLoading(false); }
-  }, [workflowApproval]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { setSelectedId((current) => counts.some((row) => row.id === current) ? current : ''); }, [counts]);
 
   const selected = counts.find((row) => row.id === selectedId);
   const editable = !selected || ['draft', 'rejected'].includes(selected.status);
