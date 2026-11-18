@@ -1,58 +1,32 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { addDecimals } from '../../lib/decimal.js';
-import { can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { can, recordLabel } from '../../lib/state.js';
+import { useCharityWorkbenchData } from './hooks/useCharityWorkbenchData.js';
 import charityEnglish from './charity.en.js';
 const t = (text) => uiTextWith(text, charityEnglish);
-const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { method: 'POST' });
 const methods = [['cash','Tiền mặt'],['bank','Ngân hàng'],['transfer','Chuyển khoản'],['card','Thẻ'],['ewallet','Ví điện tử']];
 export default function CharityWorkbenchPage() {
   useDocumentTitle(`${t('Điều hành chương trình và quỹ')} · OSP Suite`);
-  const [programs, setPrograms] = useState([]);
-  const [beneficiaries, setBeneficiaries] = useState([]);
-  const [donations, setDonations] = useState([]);
-  const [disbursements, setDisbursements] = useState([]);
-  const [parties, setParties] = useState(new Map());
-  const [accounts, setAccounts] = useState([]);
+  const { programs, beneficiaries, donations, disbursements, parties, accounts, loading, error, setError, load } = useCharityWorkbenchData();
   const [programId, setProgramId] = useState('');
   const [programForm, setProgramForm] = useState({ name: '', budget: '' });
   const [beneficiaryForm, setBeneficiaryForm] = useState({ party: '', program: '' });
   const [donationForm, setDonationForm] = useState({ donor: '', program: '', amount: '', method: 'bank', note: '' });
   const [disbursementForm, setDisbursementForm] = useState({ beneficiary: '', program: '', expense_account: '', amount: '', method: 'bank', purpose: '' });
   const [busy, setBusy] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const [programRes, beneficiaryRes, donationRes, disbursementRes, partyMap, accountRes] = await Promise.all([
-        can('charity.program.read') ? loadAllResponse('charity.program') : Promise.resolve({ items: [] }),
-        can('charity.beneficiary.read') ? loadAllResponse('charity.beneficiary') : Promise.resolve({ items: [] }),
-        can('charity.donation.read') ? loadAllResponse('charity.donation') : Promise.resolve({ items: [] }),
-        can('charity.disbursement.read') ? loadAllResponse('charity.disbursement') : Promise.resolve({ items: [] }),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('accounting.account.read') ? loadAllResponse('accounting.account') : Promise.resolve({ items: [] }),
-      ]);
-      const programRows = itemsOf(programRes);
-      const beneficiaryRows = itemsOf(beneficiaryRes);
-      const accountsRows = itemsOf(accountRes).filter((row) => row.kind === 'expense');
-      setPrograms(programRows); setBeneficiaries(beneficiaryRows); setDonations(itemsOf(donationRes)); setDisbursements(itemsOf(disbursementRes));
-      setParties(partyMap); setAccounts(accountsRows);
-      setProgramId((current) => programRows.some((row) => row.id === current) ? current : programRows[0]?.id || '');
-      setProgramForm((current) => ({ ...current }));
-      const firstProgram = programRows[0]?.id || '';
-      const firstParty = [...partyMap.keys()][0] || '';
-      setBeneficiaryForm((current) => ({ ...current, program: current.program || firstProgram, party: current.party || firstParty }));
-      setDonationForm((current) => ({ ...current, program: current.program || firstProgram, donor: current.donor || firstParty }));
-      setDisbursementForm((current) => ({ ...current, program: current.program || firstProgram, expense_account: current.expense_account || accountsRows[0]?.id || '', beneficiary: current.beneficiary || beneficiaryRows.find((row) => row.program === firstProgram)?.id || '' }));
-    } catch (reason) { setError(t(reason.message || 'Không tải được dữ liệu chương trình.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    setProgramId((current) => programs.some((row) => row.id === current) ? current : programs[0]?.id || '');
+    const firstProgram = programs[0]?.id || '';
+    const firstParty = [...parties.keys()][0] || '';
+    setBeneficiaryForm((current) => ({ ...current, program: current.program || firstProgram, party: current.party || firstParty }));
+    setDonationForm((current) => ({ ...current, program: current.program || firstProgram, donor: current.donor || firstParty }));
+    setDisbursementForm((current) => ({ ...current, program: current.program || firstProgram, expense_account: current.expense_account || accounts[0]?.id || '', beneficiary: current.beneficiary || beneficiaries.find((row) => row.program === firstProgram)?.id || '' }));
+  }, [programs, parties, accounts, beneficiaries]);
   const selectedProgram = programs.find((row) => row.id === programId);
   const programBeneficiaries = useMemo(() => beneficiaries.filter((row) => row.program === programId), [beneficiaries, programId]);
   const programDonations = useMemo(() => donations.filter((row) => row.program === programId), [donations, programId]);
