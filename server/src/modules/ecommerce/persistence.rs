@@ -124,8 +124,8 @@ async fn validate_web_order(
             errors.push(format!("{label} không tồn tại trong doanh nghiệp"));
         }
     }
-    let is_cart_write = action == "created"
-        || document.get("status").and_then(Value::as_str) == Some("cart");
+    let is_cart_write =
+        action == "created" || document.get("status").and_then(Value::as_str) == Some("cart");
     if is_cart_write && action != "cancelled" {
         if let Some(storefront_id) = document
             .get("storefront")
@@ -140,7 +140,9 @@ async fn validate_web_order(
                 .await?
                 .and_then(|row| row.get::<_, Option<bool>>(0));
             if paused == Some(true) {
-                errors.push("Gian hàng đang tạm dừng, không thể tạo hoặc cập nhật giỏ đơn online".into());
+                errors.push(
+                    "Gian hàng đang tạm dừng, không thể tạo hoặc cập nhật giỏ đơn online".into(),
+                );
             }
         }
     }
@@ -162,7 +164,9 @@ async fn validate_web_order(
                     .await?;
                 match active {
                     Some(row) if row.get::<_, Option<bool>>(0) != Some(false) => {}
-                    Some(_) => errors.push(format!("Sản phẩm dòng {} đã ngừng hoạt động", index + 1)),
+                    Some(_) => {
+                        errors.push(format!("Sản phẩm dòng {} đã ngừng hoạt động", index + 1))
+                    }
                     None => errors.push(format!(
                         "Sản phẩm dòng {} không tồn tại trong doanh nghiệp",
                         index + 1

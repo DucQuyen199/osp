@@ -167,7 +167,8 @@ async fn replenishment_rows(
          LEFT JOIN incoming ON incoming.product = rule.product AND incoming.warehouse = rule.warehouse \
          LEFT JOIN open_requisitions ON open_requisitions.product = rule.product AND open_requisitions.warehouse = rule.warehouse \
          LEFT JOIN sales_demand ON sales_demand.product = rule.product AND sales_demand.warehouse = rule.warehouse \
-         WHERE rule.tenant_id = $1 AND ($2::uuid IS NULL OR rule.warehouse = $2) \
+         WHERE rule.tenant_id = $1 AND COALESCE(product.active, true) = true \
+           AND ($2::uuid IS NULL OR rule.warehouse = $2) \
            AND COALESCE(balance.available_qty, 0) + COALESCE(incoming.qty, 0) \
              + COALESCE(open_requisitions.qty, 0) - COALESCE(sales_demand.qty, 0) < rule.minimum_qty \
          ORDER BY product.name, warehouse.name, rule.id",

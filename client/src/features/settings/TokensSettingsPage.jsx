@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { confirmDialog, toast } from '../../lib/feedback.js';
@@ -6,6 +7,7 @@ import { fmtDateTime, uiText } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
 import SettingsTabs from './SettingsTabs.jsx';
 export default function TokensSettingsPage() {
+  const latestRequest = useLatestRequest();
   useDocumentTitle(`${uiText('API token')} · ${uiText('Cài đặt')} · OSP Suite`);
   const [tokens, setTokens] = useState([]);
   const [users, setUsers] = useState([]);
@@ -15,12 +17,14 @@ export default function TokensSettingsPage() {
   const [revealed, setRevealed] = useState(null);
   const [tokenMode, setTokenMode] = useState('scoped');
   const reload = async () => {
+    const isLatest = latestRequest();
     setError('');
     try {
       const [tokenRows, userRows] = await Promise.all([api(tenantPath('/tokens')), api(tenantPath('/users'))]);
+      if (!isLatest()) return;
       setTokens(tokenRows);
       setUsers(userRows);
-    } catch (reason) { setError(reason.message || uiText('Không tải được token.')); }
+    } catch (reason) { if (isLatest()) setError(reason.message || uiText('Không tải được token.')); }
   };
   useEffect(() => {  reload(); }, []);
   const create = async (event) => {

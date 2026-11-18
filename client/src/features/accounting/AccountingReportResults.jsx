@@ -1,13 +1,13 @@
 import React from 'react';
 import { fmtMoney, fmtNumber, uiText } from '../../lib/i18n.js';
-const num = (value) => Number(value) || 0;
+const num = (value) => ({ type: 'money', value: String(value ?? 0) });
 
 function ReportTable({ headers, rows }) {
   if (!rows.length) return <div className="empty"><h3>{uiText("Chưa có phát sinh")}</h3><p>{uiText("Không có dữ liệu trong khoảng ngày đã chọn.")}</p></div>;
   return <div className="table-wrap"><table className="table">
     <caption className="sr-only">{headers.map((header) => uiText(header)).join(' · ')}</caption>
     <thead><tr>{headers.map((header) => <th key={header} scope="col">{uiText(header)}</th>)}</tr></thead>
-    <tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, index) => <td key={index} className={typeof cell === 'number' ? 'right money' : ''}>{typeof cell === 'number' ? fmtMoney(cell) : cell}</td>)}</tr>)}</tbody>
+    <tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, index) => { const isMoney = cell?.type === 'money'; return <td key={index} className={isMoney || typeof cell === 'number' ? 'right money' : ''}>{isMoney ? fmtMoney(cell.value) : typeof cell === 'number' ? fmtMoney(cell) : cell}</td>; })}</tr>)}</tbody>
   </table></div>;
 }
 function Stat({ label, value }) {
@@ -57,10 +57,10 @@ export default function AccountingReportResults({ mode, report, income, expense,
       {mode === 'balance' && <>
         <div className="stats"><Stat label="Tổng tài sản" value={report.totalAssets} /><Stat label="Nợ phải trả" value={report.totalLiabilities} /><Stat label="Vốn chủ sở hữu" value={report.totalEquity} /><Stat label="Lợi nhuận lũy kế" value={report.currentEarnings} /><Stat label="Nợ và vốn" value={report.liabilitiesAndEquity} /></div>
         {!report.complete && <div className="alert warning" role="status">{uiText("Có tài khoản chưa phân loại; bảng cân đối chưa đầy đủ.")}</div>}
-        {report.complete && !report.balanced && <div className="alert danger" role="alert">{uiText('Bảng cân đối đang lệch {difference}. Hãy kiểm tra số dư đầu kỳ và các bút toán.').replace('{difference}', fmtMoney(num(report.difference)))}</div>}
+        {report.complete && !report.balanced && <div className="alert danger" role="alert">{uiText('Bảng cân đối đang lệch {difference}. Hãy kiểm tra số dư đầu kỳ và các bút toán.').replace('{difference}', fmtMoney(num(report.difference).value))}</div>}
         {[
           ['Tài sản', report.assets, report.totalAssets], ['Nợ phải trả', report.liabilities, report.totalLiabilities], ['Vốn chủ sở hữu', report.equity, report.totalEquity],
-        ].map(([title, rows, total]) => <section key={title} className="card report-section"><div className="card-head"><h2>{uiText(title)}</h2><strong className="num">{fmtMoney(num(total))}</strong></div><div className="card-pad"><ReportTable headers={['Mã tài khoản', 'Tài khoản', 'Số dư']} rows={(rows || []).map((row) => [row.code, row.name, num(row.balance)])} /></div></section>)}
+        ].map(([title, rows, total]) => <section key={title} className="card report-section"><div className="card-head"><h2>{uiText(title)}</h2><strong className="num">{fmtMoney(num(total).value)}</strong></div><div className="card-pad"><ReportTable headers={['Mã tài khoản', 'Tài khoản', 'Số dư']} rows={(rows || []).map((row) => [row.code, row.name, num(row.balance)])} /></div></section>)}
         {!report.complete && <section className="card report-section"><div className="card-head"><h2>{uiText("Tài khoản chưa phân loại")}</h2></div><div className="card-pad"><ReportTable headers={['Mã tài khoản', 'Tài khoản', 'Nợ trừ Có']} rows={unclassified.map((row) => [row.code, row.name, num(row.balance)])} /></div></section>}
         <p className="muted small">{uiText('Lợi nhuận/lỗ lũy kế đến {date} được cộng vào phần vốn để đối chiếu.').replace('{date}', report.asOf || uiText('hôm nay'))}</p>
       </>}
@@ -83,9 +83,9 @@ export default function AccountingReportResults({ mode, report, income, expense,
             <thead><tr><th scope="col">{uiText("Loại")}</th><th scope="col">{uiText("Đồng tiền")}</th><th scope="col" className="right">{uiText("Số dư ngoại tệ")}</th><th scope="col" className="right">{uiText("Giá trị ghi sổ")}</th><th scope="col" className="right">{uiText("Tỷ giá cuối kỳ")}</th><th scope="col" className="right">{uiText("Số tiền quy đổi mục tiêu")}</th><th scope="col" className="right">{uiText("Điều chỉnh đề xuất")}</th></tr></thead>
             <tbody>{report.positions.map((position) => <tr key={`${position.side}:${position.currencyId}`}>
               <td>{uiText(position.side === 'receivable' ? 'Khoản phải thu' : 'Khoản phải trả')}</td><td>{position.currency} · {position.currencyName}</td>
-              <td className="right">{fmtNumber(Number(position.foreignBalance || 0))} {position.currency}</td><td className="right money">{fmtMoney(num(position.carryingBase))}</td>
-              <td className="right">{position.closingRate == null ? uiText('Missing') : fmtNumber(Number(position.closingRate), { maximumFractionDigits: 8 })}{position.rateDate ? ` · ${position.rateDate}` : ''}</td>
-              <td className="right money">{position.targetBase == null ? '—' : fmtMoney(num(position.targetBase))}</td><td className="right money">{position.adjustment == null ? '—' : fmtMoney(num(position.adjustment))}</td>
+              <td className="right">{fmtNumber(String(position.foreignBalance || 0))} {position.currency}</td><td className="right money">{fmtMoney(num(position.carryingBase).value)}</td>
+              <td className="right">{position.closingRate == null ? uiText('Missing') : fmtNumber(String(position.closingRate), { maximumFractionDigits: 8 })}{position.rateDate ? ` · ${position.rateDate}` : ''}</td>
+              <td className="right money">{position.targetBase == null ? '—' : fmtMoney(num(position.targetBase).value)}</td><td className="right money">{position.adjustment == null ? '—' : fmtMoney(num(position.adjustment).value)}</td>
             </tr>)}</tbody>
           </table></div>}
         </div></section>

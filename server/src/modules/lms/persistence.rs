@@ -33,6 +33,13 @@ async fn validate_course(
     let Some(course) = parse_id(document, "id") else {
         return Ok(Vec::new());
     };
+    // Serialize lifecycle changes with lesson edits and new enrollments. Those
+    // workflows lock this same course row before changing dependent records.
+    tx.query_opt(
+        "SELECT id FROM lms__course WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+        &[&tenant.id, &course],
+    )
+    .await?;
     match action {
         "published" => {
             let required: i64 = tx
@@ -127,6 +134,36 @@ async fn validate_lesson(
         .is_some()
     {
         return Ok(vec!["Lessons are frozen after learners enroll in the course".into()]);
+    }
+    if action == "removed" || action == "updated" {
+        let course_status = tx
+            .query_opt(
+                "SELECT status FROM lms__course WHERE tenant_id = $1 AND id = $2",
+                &[&tenant.id, &course],
+            )
+            .await?
+            .map(|row| row.get::<_, String>(0));
+        if course_status.as_deref() == Some("published") {
+            let lesson = parse_id(document, "id");
+            let retained_required: i64 = tx
+                .query_opt(
+                    "SELECT count(*) FROM lms__lesson WHERE tenant_id = $1 AND course = $2 AND COALESCE(required, true) AND ($3::uuid IS NULL OR id <> $3)",
+                    &[&tenant.id, &course, &lesson],
+                )
+                .await?
+                .map(|row| row.get(0))
+                .unwrap_or_default();
+            let remains_required = action == "updated"
+                && document
+                    .get("required")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(true);
+            if retained_required == 0 && !remains_required {
+                return Ok(vec![
+                    "A published course must keep at least one required lesson".into(),
+                ]);
+            }
+        }
     }
     if action == "removed"
         && let Some(lesson) = parse_id(document, "id")
