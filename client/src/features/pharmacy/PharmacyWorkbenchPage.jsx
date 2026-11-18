@@ -6,6 +6,7 @@ import { textDialog } from '../../lib/feedback.js';
 import { fmtDateTime, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { addDecimals, compareDecimals, subtractDecimals } from '../../lib/decimal.js';
 import { can, loadRefs, recordLabel, loadAllResponse, loadIndependentData } from '../../lib/state.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import pharmacyEnglish from './pharmacy.en.js';
 import PrescriptionForm from './components/PrescriptionForm.jsx';
 const t = (text) => uiTextWith(text, pharmacyEnglish);
@@ -28,7 +29,9 @@ export default function PharmacyWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const beginRequest = useLatestRequest();
   const load = useCallback(async () => {
+    const isCurrent = beginRequest();
     setLoading(true); setError('');
     try {
       const { data, errors } = await loadIndependentData({
@@ -43,6 +46,7 @@ export default function PharmacyWorkbenchPage() {
         products: new Map(), parties: new Map(), units: new Map(), prescriptions: { items: [] },
         orders: { items: [] }, inspections: { items: [] }, dispositions: { items: [] },
       });
+      if (!isCurrent()) return;
       const { products: productMap, parties: partyMap, units: unitMap, prescriptions: rxResponse, orders: orderResponse, inspections: inspectionResponse, dispositions: dispositionResponse } = data;
       setProducts([...productMap.values()].filter((p) => p.active !== false && (p.kind || 'goods') === 'goods' && p.tracked !== false && p.requires_prescription === true).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi')));
       setUnits(unitMap);
@@ -62,9 +66,9 @@ export default function PharmacyWorkbenchPage() {
       }
       setDispensedByPrescription(dispensed);
       if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được một phần dữ liệu nhà thuốc.')).join(' · '));
-    } catch (reason) { setError(t(reason.message || 'Không tải được danh sách đơn thuốc.')); }
-    finally { setLoading(false); }
-  }, []);
+    } catch (reason) { if (isCurrent()) setError(t(reason.message || 'Không tải được danh sách đơn thuốc.')); }
+    finally { if (isCurrent()) setLoading(false); }
+  }, [beginRequest]);
   useEffect(() => { load(); }, [load]);
   const activeLines = useMemo(() => lines.filter((line) => line.product), [lines]);
   const updateForm = (field, value) => setForm((current) => ({ ...current, [field]: value }));
