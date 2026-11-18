@@ -108,6 +108,7 @@ Run `npm run lint:translations` while changing a screen or dictionary. The check
 - Lending principal and interest rate, insurance premium and coverage limit, and approved claim amounts stay Decimal strings through submission; claim approval bounds compare exact decimal values.
 - Utility meter readings, opening balances, flat and tiered rates, consumption thresholds, and fixed charges stay Decimal strings through API submission and match the workbench's Decimal tariff estimate.
 - Real-estate property areas and lease rent amounts remain Decimal strings through API submission, preserving measurement and recurring billing precision.
+- Project and professional-service timesheet hours and hourly rates remain Decimal strings through API submission; project hour totals use exact Decimal addition, and project budgets retain input precision.
 - Automotive repair and field-service quantities retain entered Decimal values through work-order creation and edits; quality-hold partial releases validate against held stock and submit exact quantities.
 - POS partial-return quantities, remaining eligible amounts, and refund estimates use Decimal arithmetic; submitted quantities preserve entered precision, with the final refund total taken from the server result.
 - Ecommerce cart quantities remain Decimal strings through web-order submission; invalid or temporarily empty quantity drafts stay editable but cannot be submitted, and POS recent-return totals use exact Decimal addition.

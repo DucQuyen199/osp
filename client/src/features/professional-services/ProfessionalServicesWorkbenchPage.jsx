@@ -73,7 +73,7 @@ export default function ProfessionalServicesWorkbenchPage() {
   }
   async function createTime(event) {
     event.preventDefault();
-    await run('time', () => api(dataPath('case-management.time_entry'), { method: 'POST', body: { case: caseId, who: timeForm.who.trim(), date: timeForm.date, hours: Number(timeForm.hours), rate: Number(timeForm.rate), status: 'recorded' } }), 'Đã ghi giờ công. Khách hàng và phí được chụp từ hồ sơ và đơn giá giờ.');
+    await run('time', () => api(dataPath('case-management.time_entry'), { method: 'POST', body: { case: caseId, who: timeForm.who.trim(), date: timeForm.date, hours: String(timeForm.hours), rate: String(timeForm.rate), status: 'recorded' } }), 'Đã ghi giờ công. Khách hàng và phí được chụp từ hồ sơ và đơn giá giờ.');
     setTimeForm((current) => ({ ...current, hours: '' }));
   }
   async function changeCase(row, verb) {

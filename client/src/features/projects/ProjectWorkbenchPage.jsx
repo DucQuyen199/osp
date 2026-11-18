@@ -67,7 +67,7 @@ export default function ProjectWorkbenchPage() {
   async function createProject(event) {
     event.preventDefault();
     await run('project', async () => {
-      const project = await api(dataPath('project.project'), { method: 'POST', body: { name: projectForm.name.trim(), ...(projectForm.party ? { party: projectForm.party } : {}), ...(projectForm.budget !== '' ? { budget: Number(projectForm.budget) } : {}), status: 'planned' } });
+      const project = await api(dataPath('project.project'), { method: 'POST', body: { name: projectForm.name.trim(), ...(projectForm.party ? { party: projectForm.party } : {}), ...(projectForm.budget !== '' ? { budget: String(projectForm.budget) } : {}), status: 'planned' } });
       setProjectId(project.id); setProjectForm(emptyProject);
     }, t("Đã tạo dự án ở trạng thái dự kiến."));
   }
@@ -118,8 +118,8 @@ export default function ProjectWorkbenchPage() {
         ...(employees.get(timesheetForm.employee_ref)
           ? { employee_ref: timesheetForm.employee_ref, employee: employees.get(timesheetForm.employee_ref).name }
           : (timesheetForm.employee.trim() ? { employee: timesheetForm.employee.trim() } : {})),
-        hours: Number(timesheetForm.hours), date: timesheetForm.date,
-        ...(timesheetForm.rate !== '' ? { rate: Number(timesheetForm.rate) } : {}),
+        hours: String(timesheetForm.hours), date: timesheetForm.date,
+        ...(timesheetForm.rate !== '' ? { rate: String(timesheetForm.rate) } : {}),
       } });
       setTimesheetForm({ ...emptyTimesheet, employee: app.user?.name || '' });
     }, t("Đã ghi timesheet; thành tiền được máy chủ tính theo số giờ và đơn giá."));
@@ -137,7 +137,7 @@ export default function ProjectWorkbenchPage() {
     </form></section>}
     <section className="card card-pad u-legacy-92c18f6bda" >
       {!projects.length ? <div className="empty">{t("Chưa có dự án. Tạo dự án ở trên để lập kế hoạch và ghi nhận giờ công.")}</div> : <>
-        <div className="form-grid"><label className="field"><span className="label">{t("Dự án")}</span><select className="select" value={projectId} onChange={(event) => setProjectId(event.target.value)}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name} · {statusLabel(project.status)}</option>)}</select></label><div className="field"><span className="label">{t("Ngân sách")}</span><strong>{fmtMoney(selectedProject?.budget || 0)}</strong></div><div className="field"><span className="label">{t("Công việc hoàn tất")}</span><strong>{projectTasks.length - incompleteTasks}/{projectTasks.length}</strong></div><div className="field"><span className="label">{t("Tổng giờ ghi nhận")}</span><strong>{fmtNumber(projectTimesheets.reduce((sum, entry) => sum + Number(entry.hours || 0), 0))}</strong></div>{can('project.timesheet.read') && <><div className="field"><span className="label">{t("Chi phí nhân công")}</span><strong>{fmtMoney(projectLaborCost)}</strong></div>{projectBudget > 0 && <div className="field"><span className="label">{t("Ngân sách sau nhân công")}</span><strong>{fmtMoney(subtractDecimals(projectBudget, projectLaborCost))}</strong></div>}</>}</div>
+        <div className="form-grid"><label className="field"><span className="label">{t("Dự án")}</span><select className="select" value={projectId} onChange={(event) => setProjectId(event.target.value)}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name} · {statusLabel(project.status)}</option>)}</select></label><div className="field"><span className="label">{t("Ngân sách")}</span><strong>{fmtMoney(selectedProject?.budget || 0)}</strong></div><div className="field"><span className="label">{t("Công việc hoàn tất")}</span><strong>{projectTasks.length - incompleteTasks}/{projectTasks.length}</strong></div><div className="field"><span className="label">{t("Tổng giờ ghi nhận")}</span><strong>{fmtNumber(addDecimals(projectTimesheets.map((entry) => entry.hours || 0)))}</strong></div>{can('project.timesheet.read') && <><div className="field"><span className="label">{t("Chi phí nhân công")}</span><strong>{fmtMoney(projectLaborCost)}</strong></div>{projectBudget > 0 && <div className="field"><span className="label">{t("Ngân sách sau nhân công")}</span><strong>{fmtMoney(subtractDecimals(projectBudget, projectLaborCost))}</strong></div>}</>}</div>
         {selectedProject?.status === 'planned' && can('project.project.started') && <button className="btn btn-primary btn-sm u-legacy-0ee7f66ad9"  disabled={Boolean(busy)} onClick={() => changeStatus('project.project', selectedProject, 'started', 'Đã khởi động dự án. Có thể bắt đầu công việc và ghi giờ.')}>{t("Khởi động")}</button>}
         {selectedProject?.status === 'active' && <div className="row wrap u-legacy-0ee7f66ad9" >{can('project.project.completed') && <button className="btn btn-primary btn-sm" disabled={Boolean(busy) || incompleteTasks > 0} title={incompleteTasks ? t('Hoàn tất các công việc còn mở trước.') : ''} onClick={() => changeStatus('project.project', selectedProject, 'completed', 'Đã hoàn tất dự án.')}>{t("Hoàn tất dự án")}</button>}{can('project.project.cancelled') && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => changeStatus('project.project', selectedProject, 'cancelled', 'Đã hủy dự án.')}>{t("Hủy dự án")}</button>}</div>}
       </>}
