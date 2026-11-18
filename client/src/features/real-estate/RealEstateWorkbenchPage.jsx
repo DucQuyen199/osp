@@ -70,7 +70,7 @@ export default function RealEstateWorkbenchPage() {
   }
   async function createProperty(event) {
     event.preventDefault();
-    await run('property', () => api(dataPath('real-estate.property'), { method: 'POST', body: { ...propertyForm, area: propertyForm.area ? Number(propertyForm.area) : undefined, price: propertyForm.price ? String(propertyForm.price) : undefined } }), 'Đã thêm bất động sản vào giỏ hàng.');
+    await run('property', () => api(dataPath('real-estate.property'), { method: 'POST', body: { ...propertyForm, area: propertyForm.area ? String(propertyForm.area) : undefined, price: propertyForm.price ? String(propertyForm.price) : undefined } }), 'Đã thêm bất động sản vào giỏ hàng.');
     setPropertyForm({ title: '', kind: 'apartment', address: '', area: '', price: '' });
   }
   async function createViewing(event) {
@@ -90,7 +90,7 @@ export default function RealEstateWorkbenchPage() {
   }
   async function createLease(event) {
     event.preventDefault();
-    await run('lease', () => api(dataPath('real-estate.lease'), { method: 'POST', body: { ...leaseForm, property: selectedProperty, rent: Number(leaseForm.rent), status: 'draft' } }), 'Đã tạo dự thảo hợp đồng thuê. Kích hoạt hợp đồng sau khi chốt điều khoản.');
+    await run('lease', () => api(dataPath('real-estate.lease'), { method: 'POST', body: { ...leaseForm, property: selectedProperty, rent: String(leaseForm.rent), status: 'draft' } }), 'Đã tạo dự thảo hợp đồng thuê. Kích hoạt hợp đồng sau khi chốt điều khoản.');
     setLeaseForm((current) => ({ ...current, rent: '', end_date: '' }));
   }
   async function transition(entity, row, verb, success) {
