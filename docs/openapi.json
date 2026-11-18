@@ -3661,6 +3661,9 @@
             "readOnly": true,
             "type": "string"
           },
+          "no_charge_reason": {
+            "type": "string"
+          },
           "party": {
             "description": "Tham chiếu tới master-data.party",
             "format": "uuid",
@@ -3708,6 +3711,9 @@
           },
           "fee": {
             "type": "number"
+          },
+          "no_charge_reason": {
+            "type": "string"
           },
           "party": {
             "description": "Tham chiếu tới master-data.party",

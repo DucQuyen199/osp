@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 ### Added
+- Unmatched bank credits can suggest open invoices and prefill a reviewable receipt draft; the statement line remains unmatched until its posted payment or journal is selected.
+- CAMT.053 imports now require the user-confirmed IBAN or `Acct/Id` value and reject files whose account identity does not match.
+- Clinic encounters may now complete with a zero patient fee only when a documented no-charge reason is supplied; these visits remain in the clinical record without creating a receivable.
+- HRM rotating schedule and reusable template state now lives in a feature hook, leaving the workbench to compose its controlled form/table and workflow actions.
 - React routes now use a keyed error boundary so failed lazy-loaded screens show recovery actions and can reset when users navigate to another screen.
 - Automotive repair orders now require an integer intake odometer snapshot and the server prevents mileage from moving backward across workshop history or vehicle updates.
 - Retail demo orders now provide valid cash tender and CRM opportunities include the required warehouse and sales lines before converting into draft orders.
@@ -266,6 +270,7 @@
 - Moved sales discount/VAT/line-total calculations into a focused Rust pricing submodule while retaining the kernel-facing recalculation API.
 
 ### Fixed
+- Sales shipment matching now preserves discount and tax terms, and rejects ambiguous matches when duplicate order lines have different fiscal terms.
 - Prevented cancellation of a purchase order with an open shared-approval request, avoiding orphaned approvals that would later attempt to approve a cancelled order.
 - Serialized case-insensitive insurance policy and claim number uniqueness checks by tenant with PostgreSQL advisory locks, preventing duplicate identifiers under concurrent writes.
 - Serialized case-management daily-hour validation with a tenant/date/person PostgreSQL advisory lock, preventing concurrent entries on separate matters from exceeding 24 hours; capped computed time-entry fees to the supported PostgreSQL money range.

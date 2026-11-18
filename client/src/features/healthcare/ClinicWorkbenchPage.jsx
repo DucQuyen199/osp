@@ -31,6 +31,7 @@ export default function ClinicWorkbenchPage() {
   const [complaint, setComplaint] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
   const [fee, setFee] = useState('');
+  const [noChargeReason, setNoChargeReason] = useState('');
   const [testName, setTestName] = useState('');
   const [testEncounterId, setTestEncounterId] = useState('');
   const [testResult, setTestResult] = useState({});
@@ -89,6 +90,7 @@ export default function ClinicWorkbenchPage() {
     setDoctor(selected.doctor || app.user?.name || '');
     setDiagnosis(selected.diagnosis || '');
     setFee(selected.fee ?? '');
+    setNoChargeReason(selected.no_charge_reason || '');
   }, [selectedId]);
   useEffect(() => {
     setPatientRecordForm({ dob: patient?.dob || '', gender: patient?.gender || '', blood_type: patient?.blood_type || '', allergies: patient?.allergies || '', insurance_no: patient?.insurance_no || '' });
@@ -143,9 +145,10 @@ export default function ClinicWorkbenchPage() {
     event.preventDefault(); if (!selected) return;
     setBusy(true); setError(''); setNotice('');
     try {
-      await api(dataPath('clinic.encounter', selected.id, 'completed'), { method: 'POST', body: { doctor: doctor.trim(), diagnosis: diagnosis.trim(), fee: String(fee).trim() } });
-      await load(true); setNotice(t("Đã hoàn tất lượt khám và tạo khoản phải thu theo phí khám."));
-    } catch (reason) { setError(reason.message || t("Chưa thể hoàn tất lượt khám. Hãy nhập bác sĩ, chẩn đoán và phí khám.")); }
+      const isNoCharge = compareDecimals(fee, 0) === 0;
+      await api(dataPath('clinic.encounter', selected.id, 'completed'), { method: 'POST', body: { doctor: doctor.trim(), diagnosis: diagnosis.trim(), fee: String(fee).trim(), no_charge_reason: isNoCharge ? noChargeReason.trim() : null } });
+      await load(true); setNotice(isNoCharge ? t('Đã hoàn tất lượt khám miễn phí và lưu lý do; không tạo khoản phải thu.') : t("Đã hoàn tất lượt khám và tạo khoản phải thu theo phí khám."));
+    } catch (reason) { setError(reason.message || t("Chưa thể hoàn tất lượt khám. Nhập bác sĩ, chẩn đoán, phí dương hoặc lý do miễn phí.")); }
     finally { setBusy(false); }
   };
   const createPrescription = async (event) => {
@@ -208,10 +211,10 @@ export default function ClinicWorkbenchPage() {
       <section className="clinic-records">{selected ? <>
         <PatientEncounterSummary
           patientLabel={recordLabel('master-data.party', patientParty)} patient={patient} encounter={selected}
-          doctor={doctor} diagnosis={diagnosis} fee={fee} busy={busy}
+          doctor={doctor} diagnosis={diagnosis} fee={fee} noChargeReason={noChargeReason} noChargeRequired={fee.trim() !== '' && compareDecimals(fee, 0) === 0} busy={busy}
           canCompleteEncounter={can('clinic.encounter.update') && can('clinic.encounter.completed')}
           fmtMoney={fmtMoney} statusLabel={statusLabel}
-          onEncounterFieldChange={(field, value) => ({ doctor: setDoctor, diagnosis: setDiagnosis, fee: setFee }[field](value))}
+          onEncounterFieldChange={(field, value) => ({ doctor: setDoctor, diagnosis: setDiagnosis, fee: setFee, no_charge_reason: setNoChargeReason }[field](value))}
           onCompleteEncounter={completeEncounter} t={t}
         >{patient && can('clinic.patient.update') && <details className="u-margin-12-0"><summary className="btn btn-ghost btn-sm u-inline-pointer" >{t("Cập nhật hồ sơ y tế")}</summary><form className="form-grid u-mt-12"  onSubmit={updatePatientRecord}>
             <label className="field"><span className="label">{t("Ngày sinh")}</span><input className="input" type="date" max={localDate()} value={patientRecordForm.dob} onChange={(event) => setPatientRecordForm((current) => ({ ...current, dob: event.target.value }))} /></label>

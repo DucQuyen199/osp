@@ -7,6 +7,8 @@ export default function PatientEncounterSummary({
   doctor,
   diagnosis,
   fee,
+  noChargeReason,
+  noChargeRequired,
   busy,
   canCompleteEncounter,
   fmtMoney,
@@ -31,12 +33,14 @@ export default function PatientEncounterSummary({
       <div><dt>{t('Chẩn đoán')}</dt><dd>{encounter.diagnosis || t('Chưa ghi nhận')}</dd></div>
       <div><dt>{t('Bác sĩ')}</dt><dd>{encounter.doctor || t('Chưa phân công')}</dd></div>
       <div><dt>{t('Phí khám')}</dt><dd>{encounter.fee != null ? fmtMoney(encounter.fee) : t('Chưa lập')}</dd></div>
+      {encounter.no_charge_reason && <div><dt>{t('Lý do miễn/không thu phí')}</dt><dd>{encounter.no_charge_reason}</dd></div>}
     </dl>
     {encounter.status === 'open' && <form className="clinic-complete-form" onSubmit={onCompleteEncounter}>
       <h3>{t('Chẩn đoán và hoàn tất')}</h3>
       <label className="field"><span className="label">{t('Bác sĩ phụ trách *')}</span><input className="input" required value={doctor} onChange={(event) => onEncounterFieldChange('doctor', event.target.value)} /></label>
       <label className="field"><span className="label">{t('Chẩn đoán *')}</span><textarea className="textarea" required value={diagnosis} onChange={(event) => onEncounterFieldChange('diagnosis', event.target.value)} /></label>
-      <label className="field"><span className="label">{t('Phí khám *')}</span><input className="input num" required type="number" min="0.01" step="any" value={fee} onChange={(event) => onEncounterFieldChange('fee', event.target.value)} /></label>
+      <label className="field"><span className="label">{t('Phí khám *')}</span><input className="input num" required type="number" min="0" step="any" value={fee} onChange={(event) => onEncounterFieldChange('fee', event.target.value)} /></label>
+      {noChargeRequired && <label className="field"><span className="label">{t('Lý do miễn/không thu phí *')}</span><textarea className="textarea" required maxLength={500} value={noChargeReason} onChange={(event) => onEncounterFieldChange('no_charge_reason', event.target.value)} /><span className="small muted">{t('Lượt khám phí 0 không tạo khoản phải thu; lý do sẽ được lưu trong hồ sơ.')}</span></label>}
       <button className="btn btn-primary" type="submit" disabled={busy || !canCompleteEncounter}>{t('Hoàn tất lượt khám')}</button>
     </form>}
   </article>;

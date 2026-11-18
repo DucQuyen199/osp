@@ -102,6 +102,12 @@
      "required": false
     },
     {
+     "name": "no_charge_reason",
+     "label": "Lý do miễn/không thu phí",
+     "type": "text",
+     "required": false
+    },
+    {
      "name": "status",
      "type": "enum",
      "required": false,

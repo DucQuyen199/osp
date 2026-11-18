@@ -1,4 +1,10 @@
 const clinicEnglish = {
+  'Lý do miễn/không thu phí': 'No-charge reason',
+  'Lý do miễn/không thu phí *': 'No-charge reason *',
+  'Lượt khám phí 0 không tạo khoản phải thu; lý do sẽ được lưu trong hồ sơ.': 'A zero-fee encounter creates no receivable; its reason is saved in the medical record.',
+  'Đã hoàn tất lượt khám miễn phí và lưu lý do; không tạo khoản phải thu.': 'Completed the no-charge encounter and saved the reason; no receivable was created.',
+  'Lượt khám cần phí lớn hơn 0 hoặc phí 0 kèm lý do miễn/không thu (tối đa 500 ký tự)': 'An encounter requires a positive fee or a zero fee with a no-charge reason (up to 500 characters).',
+  'Chưa thể hoàn tất lượt khám. Nhập bác sĩ, chẩn đoán, phí dương hoặc lý do miễn phí.': 'Cannot complete the encounter yet. Enter the doctor, diagnosis, a positive fee, or a reason for waiving it.',
   'Không tải được một phần dữ liệu phòng khám.': 'Could not load some clinic data.',
   'Nam': 'Male',
   'Đơn vị thuốc': 'Medicine unit', 'Kết quả': 'Result', 'Thuốc dòng': 'Medicine row', 'Xóa thuốc': 'Remove medicine',

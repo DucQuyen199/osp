@@ -4,10 +4,22 @@ use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use serde_json::Value;
 
-fn positive(value: Option<&Value>) -> bool {
-    value
-        .and_then(money::decimal)
-        .is_some_and(|amount| amount > Decimal::ZERO)
+fn valid_encounter_fee(document: &Value) -> bool {
+    let Some(fee) = document.get("fee").and_then(money::decimal) else {
+        return false;
+    };
+    let reason = document
+        .get("no_charge_reason")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .unwrap_or("");
+    if fee > Decimal::ZERO {
+        reason.is_empty()
+    } else if fee == Decimal::ZERO {
+        !reason.is_empty() && reason.chars().count() <= 500
+    } else {
+        false
+    }
 }
 
 pub fn validate(entity: &str, document: &Value) -> Vec<String> {
@@ -40,9 +52,9 @@ pub fn validate_at(entity: &str, document: &Value, today: chrono::NaiveDate) -> 
                 .get("status")
                 .and_then(Value::as_str)
                 .is_some_and(|status| status == "completed")
-                && !positive(document.get("fee"))
+                && !valid_encounter_fee(document)
             {
-                errors.push("Lượt khám hoàn tất cần phí khám lớn hơn 0".into());
+                errors.push("Lượt khám cần phí lớn hơn 0 hoặc phí 0 kèm lý do miễn/không thu (tối đa 500 ký tự)".into());
             }
         }
         "prescription" => {
@@ -117,8 +129,8 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
             {
                 errors.push("Cần ghi nhận chẩn đoán trước khi hoàn tất lượt khám".into());
             }
-            if !positive(document.get("fee")) {
-                errors.push("Lượt khám hoàn tất cần phí khám lớn hơn 0".into());
+            if !valid_encounter_fee(document) {
+                errors.push("Lượt khám cần phí lớn hơn 0 hoặc phí 0 kèm lý do miễn/không thu (tối đa 500 ký tự)".into());
             }
             errors
         }
