@@ -17,6 +17,8 @@ export default function BankStatementLinesTable({
   journalLabel,
   matcherOpen,
   candidateLoading,
+  invoiceSuggestions,
+  invoiceSuggestionLoading,
   matchChoices,
   ignoreOpen,
   ignoreReasons,
@@ -24,6 +26,8 @@ export default function BankStatementLinesTable({
   onAutoMatch,
   onDeleteLine,
   onFindCandidates,
+  onSuggestInvoices,
+  settlementHref,
   onMatchChoiceChange,
   onManualMatch,
   onToggleIgnore,
@@ -46,8 +50,16 @@ export default function BankStatementLinesTable({
             {line.status === 'unmatched' && draft && <>
               <div className="row wrap">
                 <button className="btn btn-primary btn-sm" disabled={Boolean(busy) || !permissions.match} onClick={() => onAutoMatch(line)}>{t('Tự khớp duy nhất')}</button>
+                {permissions.invoiceSuggestions && line.direction === 'credit' && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy) || invoiceSuggestionLoading[line.id]} onClick={() => onSuggestInvoices(line)}>{invoiceSuggestionLoading[line.id] ? t('Đang tìm hóa đơn…') : t('Gợi ý hóa đơn còn nợ')}</button>}
                 <button className="btn btn-ghost btn-sm" disabled={Boolean(busy) || !permissions.delete} onClick={() => onDeleteLine(line)}>{t('Xóa dòng')}</button>
               </div>
+              {invoiceSuggestions[line.id] && <div className="stack-sm" aria-live="polite">
+                {!invoiceSuggestions[line.id].length ? <span className="small muted">{t('Không tìm thấy hóa đơn còn dư khớp số tiền hoặc mã tham chiếu.')}</span> : invoiceSuggestions[line.id].map(({ invoice, referenceMatch, amountMatch }) => <div className="row wrap" key={invoice.id}>
+                  <span className="small">{invoice.number || String(invoice.id).slice(0, 8)} · {fmtMoney(invoice.balance_due, currencyCode)}{referenceMatch ? ` · ${t('Khớp mã tham chiếu')}` : ''}{amountMatch ? ` · ${t('Khớp số tiền')}` : ''}</span>
+                  <a className="btn btn-secondary btn-sm" href={settlementHref(line, invoice)}>{t('Lập phiếu thu nháp')}</a>
+                </div>)}
+                <span className="small muted">{t('Gợi ý chỉ tham khảo. Phiếu thu phải được rà soát và duyệt; dòng sao kê vẫn chưa được khớp.')}</span>
+              </div>}
               {!matcherOpen[line.id]
                 ? <button className="btn btn-ghost btn-sm" disabled={Boolean(busy) || !permissions.findCandidates} onClick={() => onFindCandidates(line)}>{t('Tìm chứng từ quanh ngày để khớp')}</button>
                 : candidateLoading[line.id]

@@ -9,9 +9,12 @@ import { recordHref } from '../../lib/routes.js';
 import { useAccountingSettlementData } from './hooks/useAccountingSettlementData.js';
 const today = localDate;
 export default function AccountingSettlementWorkbenchPage() {
+  const query = new URLSearchParams(window.location.hash.split('?')[1] || '');
+  const suggestedInvoice = query.get('invoice') || '';
+  const suggestedAmount = query.get('amount') || '';
   useDocumentTitle(`${uiText('Thu/chi phân bổ công nợ')} · OSP Suite`);
-  const [form, setForm] = useState({ direction: 'receipt', party: '', currency: '', method: 'bank', payment_date: today(), reference: '' });
-  const [allocations, setAllocations] = useState({});
+  const [form, setForm] = useState(() => ({ direction: 'receipt', party: query.get('party') || '', currency: query.get('currency') || '', method: 'bank', payment_date: query.get('date') || today(), reference: query.get('reference') || '' }));
+  const [allocations, setAllocations] = useState(() => suggestedInvoice && suggestedAmount ? { [suggestedInvoice]: suggestedAmount } : {});
   const [busy, setBusy] = useState('');
   const [notice, setNotice] = useState('');
   const workflowApproval = app.meta?.modules?.some((module) => module.id === 'workflow-approval');

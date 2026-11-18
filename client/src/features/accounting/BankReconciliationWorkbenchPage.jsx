@@ -6,8 +6,8 @@ import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { confirmDialog } from '../../lib/feedback.js';
 import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { absDecimal, compareDecimals, subtractDecimals } from '../../lib/decimal.js';
-import { app, can, recordLabel } from '../../lib/state.js';
-import { recordHref } from '../../lib/routes.js';
+import { app, can, loadAllResponse, recordLabel } from '../../lib/state.js';
+import { recordHref, workbenchHref } from '../../lib/routes.js';
 import { amountsEqualWithin, calculateBankNet, calculateStatementTotals } from './domain/bankReconciliation.js';
 import bankReconciliationEnglish from './bank-reconciliation.en.js';
 import { useBankReconciliationData } from './hooks/useBankReconciliationData.js';
@@ -23,6 +23,8 @@ export default function BankReconciliationWorkbenchPage() {
   useDocumentTitle(`${t('Đối soát ngân hàng')} · OSP Suite`);
   const [matchCandidates, setMatchCandidates] = useState({});
   const [candidateLoading, setCandidateLoading] = useState({});
+  const [invoiceSuggestions, setInvoiceSuggestions] = useState({});
+  const [invoiceSuggestionLoading, setInvoiceSuggestionLoading] = useState({});
   const [matcherOpen, setMatcherOpen] = useState({});
   const [statementId, setStatementId] = useState('');
   const { statements, allLines, linesLoading, accounts, currencies, parties, baseCurrency, loading, error: dataError, setError: setDataError, load: loadData, loadLines } = useBankReconciliationData(statementId, t);
@@ -137,6 +139,43 @@ export default function BankReconciliationWorkbenchPage() {
     } catch (reason) { setError(reason.message || t('Không tải được chứng từ để khớp giao dịch.')); }
     finally { setCandidateLoading((current) => ({ ...current, [line.id]: false })); }
   }
+  async function suggestInvoices(line) {
+    setInvoiceSuggestionLoading((current) => ({ ...current, [line.id]: true }));
+    setError('');
+    try {
+      const response = await loadAllResponse('accounting.invoice');
+      const amount = line.amount;
+      const statementCurrency = selected?.currency || baseCurrency?.id;
+      const reference = `${line.reference || ''} ${line.description || ''}`.toLocaleLowerCase();
+      const invoices = (response.items || []).filter((invoice) => {
+        const invoiceCurrency = invoice.currency || baseCurrency?.id;
+        return ['posted', 'partially_paid', 'partially_settled'].includes(invoice.status)
+          && compareDecimals(invoice.balance_due || 0, '0.005') > 0
+          && invoiceCurrency === statementCurrency;
+      }).map((invoice) => {
+        const number = String(invoice.number || '').trim().toLocaleLowerCase();
+        return { invoice, referenceMatch: Boolean(number && reference.includes(number)), amountMatch: sameAmount(invoice.balance_due, amount) };
+      }).filter(({ referenceMatch, amountMatch }) => referenceMatch || amountMatch)
+        .sort((a, b) => Number(b.referenceMatch) - Number(a.referenceMatch) || Number(b.amountMatch) - Number(a.amountMatch))
+        .slice(0, 8);
+      setInvoiceSuggestions((current) => ({ ...current, [line.id]: invoices }));
+    } catch (reason) {
+      setError(reason.message || t('Không tải được hóa đơn còn dư để gợi ý.'));
+    } finally {
+      setInvoiceSuggestionLoading((current) => ({ ...current, [line.id]: false }));
+    }
+  }
+  function settlementHref(line, invoice) {
+    const params = new URLSearchParams({
+      invoice: invoice.id,
+      party: invoice.party || '',
+      currency: invoice.currency || selected?.currency || baseCurrency?.id || '',
+      amount: String(compareDecimals(invoice.balance_due || 0, line.amount) < 0 ? invoice.balance_due : line.amount),
+      date: line.transaction_date || today(),
+      reference: line.reference || '',
+    });
+    return `${workbenchHref('settlements')}?${params.toString()}`;
+  }
   async function autoMatch(line) {
     await run(`${line.id}:matched`, () => action('accounting.bank_statement_line', line, 'matched'), t('Đã tự khớp dòng với bút toán ngân hàng duy nhất phù hợp.'));
   }
@@ -197,17 +236,20 @@ export default function BankReconciliationWorkbenchPage() {
           currencyCode={currencyCode} t={t} fmtDate={fmtDate} fmtMoney={fmtMoney} statusLabel={statusLabel}
           candidatesFor={candidatesFor} paymentLabel={paymentLabel} journalLabel={journalLabel}
           matcherOpen={matcherOpen} candidateLoading={candidateLoading} matchChoices={matchChoices}
+          invoiceSuggestions={invoiceSuggestions} invoiceSuggestionLoading={invoiceSuggestionLoading}
           ignoreOpen={ignoreOpen} ignoreReasons={ignoreReasons}
           permissions={{
             match: can('accounting.bank_statement_line.matched'),
             delete: can('accounting.bank_statement_line.delete'),
             findCandidates: can('accounting.payment.read') && can('accounting.journal_entry.read'),
+            invoiceSuggestions: can('accounting.invoice.read') && can('accounting.settlement_batch.create'),
             ignore: can('accounting.bank_statement_line.ignored'),
             update: can('accounting.bank_statement_line.update'),
           }}
           onAutoMatch={autoMatch} onDeleteLine={deleteLine} onFindCandidates={findCandidates}
           onMatchChoiceChange={(line, value) => setMatchChoices((current) => ({ ...current, [line.id]: value }))}
           onManualMatch={manualMatch}
+          onSuggestInvoices={suggestInvoices} settlementHref={settlementHref}
           onToggleIgnore={(line) => setIgnoreOpen((current) => ({ ...current, [line.id]: !current[line.id] }))}
           onIgnoreReasonChange={(line, value) => setIgnoreReasons((current) => ({ ...current, [line.id]: value }))}
           onIgnoreLine={ignoreLine}

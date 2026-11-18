@@ -1,4 +1,5 @@
 export default {
+  'Không tải được hóa đơn còn dư để gợi ý.': 'Could not load open invoices for suggestions.',
   'Bỏ qua có giải trình': 'Ignore with explanation',
   'Bút toán': 'Journal entry',
   'Bút toán ngân hàng đã ghi sổ': 'Posted bank journal entries',

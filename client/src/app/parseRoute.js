@@ -1,7 +1,7 @@
 import { WORKBENCH_ROUTES } from '../lib/routes.js';
 
 export function parseRoute(hash = location.hash) {
-  const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
+  const parts = hash.split('?')[0].replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
   const [a, b, c, d] = parts;
   if (!a) return { name: 'home' };
   if (a === 'login' || a === 'signup') return { name: a };
