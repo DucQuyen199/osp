@@ -15,6 +15,122 @@ pub(super) async fn run(kernel: &Arc<Kernel>) {
     services(kernel).await;
     recruitment(kernel).await;
     pharmacy(kernel).await;
+    automotive(kernel).await;
+}
+
+async fn automotive(kernel: &Arc<Kernel>) {
+    let t = Ctx::new(kernel, Some("automotive"), &[]).await;
+    let warehouse = t.warehouse().await;
+    let customer = t
+        .create("master-data.party", json!({ "name": "Garage customer" }))
+        .await;
+    let part = t
+        .create(
+            "master-data.product",
+            json!({ "sku": "GARAGE-FILTER", "name": "Oil filter", "kind": "goods", "tracked": true, "cost": 10, "price": 20 }),
+        )
+        .await;
+    t.create(
+        "inventory.stock_move",
+        json!({ "product": id(&part), "warehouse": warehouse, "qty": 2, "direction": "in" }),
+    )
+    .await;
+    let vehicle = t
+        .create(
+            "auto-service.vehicle",
+            json!({ "party": id(&customer), "plate": " 51a-12345 ", "vin": "garage-vin-001", "odometer": 103000 }),
+        )
+        .await;
+    assert_eq!(vehicle["plate"], "51A-12345");
+    assert_eq!(vehicle["vin"], "GARAGE-VIN-001");
+    assert!(
+        t.try_create(
+            "auto-service.vehicle",
+            json!({ "party": id(&customer), "plate": "51a-12345", "vin": "another-vin", "odometer": 0 }),
+        )
+        .await
+        .is_err(),
+        "vehicle plates must be unique independent of case and surrounding spaces"
+    );
+    let order = t
+        .create(
+            "auto-service.repair_order",
+            json!({
+                "vehicle": id(&vehicle),
+                "party": id(&customer),
+                "odometer_reading": 105000,
+                "warehouse": warehouse,
+                "complaint": "Replace oil filter",
+                "lines": [{ "product": id(&part), "qty": 1 }]
+            }),
+        )
+        .await;
+    assert_eq!(order["status"], "intake");
+    assert_eq!(order["total"], 20.0);
+    assert_eq!(order["lines"][0]["price"], 20.0);
+    assert!(
+        t.try_create(
+            "auto-service.repair_order",
+            json!({
+                "vehicle": id(&vehicle), "party": id(&customer), "odometer_reading": 104000,
+                "lines": [{ "product": id(&part), "qty": 1 }]
+            }),
+        )
+        .await
+        .is_err(),
+        "a vehicle cannot have concurrent open repairs or a mileage rollback"
+    );
+    t.act("auto-service.repair_order", &id(&order), "approved")
+        .await;
+    assert!(
+        t.k.update(
+            &t.a,
+            &t.t,
+            "auto-service.repair_order",
+            &id(&order),
+            o(json!({ "lines": [{ "product": id(&part), "qty": 2 }] })),
+        )
+        .await
+        .is_err(),
+        "a customer-approved quote cannot be changed"
+    );
+    t.act("auto-service.repair_order", &id(&order), "started")
+        .await;
+    t.act("auto-service.repair_order", &id(&order), "completed")
+        .await;
+    assert_eq!(t.stock(&id(&part)).await, 1.0);
+    let invoices = t
+        .list(
+            "accounting.invoice",
+            &[("source", "repair_order"), ("source_id", &id(&order))],
+        )
+        .await;
+    assert_eq!(invoices.len(), 1);
+    assert_eq!(invoices[0]["status"], "posted");
+    assert_eq!(invoices[0]["total"], 20.0);
+    t.act("auto-service.repair_order", &id(&order), "delivered")
+        .await;
+    assert!(
+        t.k.remove(&t.a, &t.t, "auto-service.repair_order", &id(&order))
+            .await
+            .is_err(),
+        "delivered repair history cannot be deleted"
+    );
+    assert!(
+        t.k.update(
+            &t.a,
+            &t.t,
+            "auto-service.vehicle",
+            &id(&vehicle),
+            o(json!({ "odometer": 104000 })),
+        )
+        .await
+        .is_err(),
+        "vehicle mileage cannot be reduced below its repair history"
+    );
+    println!(
+        "âœ” automotive: normalized vehicle identity, monotonic mileage, approved quote, stock issue, posted invoice and immutable delivery history"
+    );
 }
 
 async fn pharmacy(kernel: &Arc<Kernel>) {
