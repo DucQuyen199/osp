@@ -1,33 +1,25 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
-import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { app, can, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import { addDecimals, compareDecimals, multiplyDecimals } from '../../lib/decimal.js';
 import QuotationComposer from './components/QuotationComposer.jsx';
 import { eligibleWholesaleReturnLines, estimateWholesaleSubtotal, remainingWholesaleShipmentLines, wholesalePrice } from './domain/wholesaleSelectors.js';
 import wholesaleEnglish from './wholesale.en.js';
-const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
+import { useWholesaleSalesData } from './hooks/useWholesaleSalesData.js';
 const today = localDate;
 const t = (text) => uiTextWith(text, wholesaleEnglish);
 export default function WholesaleSalesDeskPage() {
   useDocumentTitle(`${t('Bán hàng và báo giá')} · OSP Suite`);
   const emailQueueEnabled = app.meta?.modules?.some((module) => module.id === 'communication') || false;
-  const [parties, setParties] = useState(new Map());
-  const [products, setProducts] = useState(new Map());
-  const [units, setUnits] = useState(new Map());
+  const logisticsEnabled = app.meta?.modules?.some((module) => module.id === 'logistics') || false;
+  const accountingEnabled = app.meta?.modules?.some((module) => module.id === 'accounting') || false;
+  const approvalEnabled = app.meta?.modules?.some((module) => module.id === 'workflow-approval') || false;
+  const { parties, products, units, warehouses, priceLists, quotations, orders, shipments, invoices, returns, approvalRequests, creditNotes, loading, error, setError, load } = useWholesaleSalesData(logisticsEnabled, accountingEnabled, approvalEnabled);
   const [selectedUnits, setSelectedUnits] = useState({});
-  const [warehouses, setWarehouses] = useState(new Map());
-  const [priceLists, setPriceLists] = useState([]);
-  const [quotations, setQuotations] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [shipments, setShipments] = useState([]);
-  const [invoices, setInvoices] = useState([]);
-  const [returns, setReturns] = useState([]);
-  const [approvalRequests, setApprovalRequests] = useState([]);
-  const [creditNotes, setCreditNotes] = useState([]);
   const [party, setParty] = useState('');
   const [warehouse, setWarehouse] = useState('');
   const [priceList, setPriceList] = useState('');
@@ -40,40 +32,8 @@ export default function WholesaleSalesDeskPage() {
   const [shipmentQuantities, setShipmentQuantities] = useState({});
   const [orderVoucherCodes, setOrderVoucherCodes] = useState({});
   const [busy, setBusy] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const logisticsEnabled = app.meta?.modules?.some((module) => module.id === 'logistics') && can('logistics.shipment.read');
-      const accountingEnabled = app.meta?.modules?.some((module) => module.id === 'accounting') && can('accounting.invoice.read');
-      const approvalEnabled = app.meta?.modules?.some((module) => module.id === 'workflow-approval') && can('workflow-approval.approval_request.read');
-      const [partyMap, productMap, unitMap, warehouseMap, listResponse, quoteResponse, orderResponse, shipmentResponse, invoiceResponse, returnResponse, approvalResponse, creditResponse] = await Promise.all([
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
-        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
-        can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
-        can('sales.price_list.read') ? loadAllResponse('sales.price_list') : Promise.resolve({ items: [] }),
-        can('sales.quotation.read') ? loadAllResponse('sales.quotation') : Promise.resolve({ items: [] }),
-        can('sales.sales_order.read') ? loadAllResponse('sales.sales_order') : Promise.resolve({ items: [] }),
-        logisticsEnabled ? loadAllResponse('logistics.shipment') : Promise.resolve({ items: [] }),
-        accountingEnabled ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
-        can('sales.sales_return.read') ? loadAllResponse('sales.sales_return') : Promise.resolve({ items: [] }),
-        approvalEnabled ? loadAllResponse('workflow-approval.approval_request') : Promise.resolve({ items: [] }),
-        can('accounting.credit_note.read') ? loadAllResponse('accounting.credit_note') : Promise.resolve({ items: [] }),
-      ]);
-      setParties(partyMap); setProducts(productMap); setUnits(unitMap); setWarehouses(warehouseMap);
-      setPriceLists(itemsOf(listResponse));
-      setQuotations(itemsOf(quoteResponse).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))));
-      setOrders(itemsOf(orderResponse).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))));
-      setShipments(itemsOf(shipmentResponse)); setInvoices(itemsOf(invoiceResponse));
-      setReturns(itemsOf(returnResponse).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))));
-      setApprovalRequests(itemsOf(approvalResponse)); setCreditNotes(itemsOf(creditResponse));
-    } catch (reason) { setError(reason.message || t('Không tải được báo giá và đơn bán hàng.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
-  useEffect(() => { load(); const timer = window.setInterval(() => load(true), 20000); return () => window.clearInterval(timer); }, [load]);
+  useEffect(() => { const timer = window.setInterval(() => load(true), 20000); return () => window.clearInterval(timer); }, [load]);
   const activeProducts = [...products.values()].filter((product) => product.active !== false).sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
   const selectedList = priceLists.find((item) => item.id === priceList);
   const unitsFor = (product) => product?.uom ? [...units.values()].filter((unit) => unit.id === product.uom || unit.base_uom === product.uom) : [];
