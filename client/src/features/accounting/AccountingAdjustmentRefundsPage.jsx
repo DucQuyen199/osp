@@ -3,10 +3,11 @@ import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath, session, tenantPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
+import { compareDecimals } from '../../lib/decimal.js';
+import { calculateAdjustmentRefundable } from './domain/adjustmentRefunds.js';
 import { can, loadAll, loadRefs, recordLabel } from '../../lib/state.js';
 import { listHref, recordHref } from '../../lib/routes.js';
 const today = localDate;
-const num = (value) => Number(value || 0);
 const storageKey = `osp.adjustment-refund-requests:${session.current()?.tenantId || 'tenant'}`;
 const readRequests = () => { try { return JSON.parse(sessionStorage.getItem(storageKey) || '{}'); } catch { return {}; } };
 export default function AccountingAdjustmentRefundsPage() {
@@ -46,18 +47,20 @@ export default function AccountingAdjustmentRefundsPage() {
     ...notes.debit.map((note) => ({ ...note, kind: 'debit_note', title: 'Nhận tiền hoàn nhà cung cấp', sourceDoc: docs.bill.get(note.bill), docKind: 'bill', party: docs.bill.get(note.bill)?.supplier, refundRef: 'refund_debit_note', docRef: 'bill' })),
   ].map((note) => {
     const linkedPayments = payments.filter((payment) => payment[note.docRef] === note[note.docRef]);
-    const paid = linkedPayments.reduce((sum, payment) => sum + num(payment.amount), 0);
     const allNotes = note.kind === 'credit_note' ? notes.credit : notes.debit;
-    const adjusted = allNotes.filter((entry) => entry[note.docRef] === note[note.docRef]).reduce((sum, entry) => sum + num(entry.total), 0);
-    const documentTotal = num(note.sourceDoc?.total);
-    const availableCredit = Math.max(0, paid + adjusted - documentTotal);
-    const alreadyRefunded = payments.filter((payment) => payment[note.refundRef] === note.id).reduce((sum, payment) => sum + Math.abs(num(payment.amount)), 0);
-    return { ...note, refundable: Math.max(0, Math.min(num(note.total) - alreadyRefunded, availableCredit)), alreadyRefunded };
+    const allowance = calculateAdjustmentRefundable({
+      noteTotal: note.total,
+      paidAmounts: linkedPayments.map((payment) => payment.amount),
+      adjustmentTotals: allNotes.filter((entry) => entry[note.docRef] === note[note.docRef]).map((entry) => entry.total),
+      documentTotal: note.sourceDoc?.total,
+      refundAmounts: payments.filter((payment) => payment[note.refundRef] === note.id).map((payment) => payment.amount),
+    });
+    return { ...note, ...allowance };
   }), [notes, payments, docs]);
   const active = rows.find((row) => row.id === selected);
   const submit = async (event) => {
     event.preventDefault();
-    if (!active || Number(form.amount) <= 0 || Number(form.amount) > active.refundable) return;
+    if (!active || compareDecimals(form.amount || 0, 0) <= 0 || compareDecimals(form.amount, active.refundable) > 0) return;
     setBusy(true); setError(''); setNotice('');
     const requestId = requestIds[active.id] || crypto.randomUUID();
     const pendingRequests = { ...requestIds, [active.id]: requestId };
@@ -77,7 +80,7 @@ export default function AccountingAdjustmentRefundsPage() {
     {error && <div className="alert error">{uiText(error)}</div>}{notice && <div className="alert success">{uiText(notice)}</div>}
     <div className="card card-pad"><div className="row wrap"><div><strong>{uiText('{count} phiếu điều chỉnh đã ghi sổ').replace('{count}', rows.length)}</strong><div className="small muted">{uiText("Số tiền có thể hoàn được tính từ tổng thanh toán thực tế và các điều chỉnh đã ghi sổ.")}</div></div><span className="grow"/><a className="small" href={listHref('accounting.payment')}>{uiText("Danh sách payment")}</a></div>
       {loading ? <p className="muted">{uiText("Đang tải công nợ và payment…")}</p> : <div className="table-wrap u-legacy-0ee7f66ad9" ><table className="table"><thead><tr><th>{uiText("Nghiệp vụ")}</th><th>{uiText("Đối tác")}</th><th>{uiText("Chứng từ gốc")}</th><th>{uiText("Giá trị phiếu")}</th><th>{uiText("Đã hoàn")}</th><th>{uiText("Còn được hoàn")}</th><th>{uiText("Thao tác")}</th></tr></thead><tbody>
-        {rows.map((row) => <tr key={row.id} className={selected === row.id ? 'selected' : ''}><td><strong>{uiText(row.title)}</strong><div className="small muted"><a href={recordHref(`accounting.${row.kind}`, row.id)}>{row.number || String(row.id).slice(0, 8)}</a> · {statusLabel(row.status)}</div></td><td>{parties.get(row.party) ? recordLabel('master-data.party', parties.get(row.party)) : '—'}</td><td>{row.sourceDoc ? <a href={recordHref(`accounting.${row.docKind}`, row.sourceDoc.id)}>{row.sourceDoc.number || String(row.sourceDoc.id).slice(0, 8)}</a> : uiText('Không tìm thấy hóa đơn gốc')}<div className="small muted">{fmtDate(row.sourceDoc?.issue_date)}</div></td><td>{fmtMoney(row.total)}</td><td>{fmtMoney(row.alreadyRefunded)}</td><td><strong>{fmtMoney(row.refundable)}</strong></td><td><button className="btn btn-secondary btn-sm" disabled={row.refundable <= .005 || !can('accounting.payment.create')} onClick={() => { setSelected(row.id); setForm((current) => ({ ...current, amount: row.refundable.toFixed(2) })); setNotice(''); }}>{uiText("Lập payment")}</button></td></tr>)}
+        {rows.map((row) => <tr key={row.id} className={selected === row.id ? 'selected' : ''}><td><strong>{uiText(row.title)}</strong><div className="small muted"><a href={recordHref(`accounting.${row.kind}`, row.id)}>{row.number || String(row.id).slice(0, 8)}</a> · {statusLabel(row.status)}</div></td><td>{parties.get(row.party) ? recordLabel('master-data.party', parties.get(row.party)) : '—'}</td><td>{row.sourceDoc ? <a href={recordHref(`accounting.${row.docKind}`, row.sourceDoc.id)}>{row.sourceDoc.number || String(row.sourceDoc.id).slice(0, 8)}</a> : uiText('Không tìm thấy hóa đơn gốc')}<div className="small muted">{fmtDate(row.sourceDoc?.issue_date)}</div></td><td>{fmtMoney(row.total)}</td><td>{fmtMoney(row.alreadyRefunded)}</td><td><strong>{fmtMoney(row.refundable)}</strong></td><td><button className="btn btn-secondary btn-sm" disabled={compareDecimals(row.refundable, '0.005') <= 0 || !can('accounting.payment.create')} onClick={() => { setSelected(row.id); setForm((current) => ({ ...current, amount: row.refundable })); setNotice(''); }}>{uiText("Lập payment")}</button></td></tr>)}
         {!rows.length && <tr><td colSpan="7" className="muted">{uiText("Chưa có credit note hoặc debit note đã ghi sổ.")}</td></tr>}
       </tbody></table></div>}
     </div>
@@ -85,7 +88,7 @@ export default function AccountingAdjustmentRefundsPage() {
       <label className="field"><span className="label">{uiText("Số tiền *")}</span><input className="input num" type="number" min="0.01" max={active.refundable} step="0.01" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })}/></label>
       <label className="field"><span className="label">{uiText("Phương thức *")}</span><select className="select" value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })}><option value="bank">{uiText("Chuyển khoản ngân hàng")}</option><option value="cash">{uiText("Tiền mặt")}</option><option value="card">{uiText("Thẻ")}</option><option value="transfer">{uiText("Chuyển khoản")}</option><option value="ewallet">{uiText("Ví điện tử")}</option></select></label>
       <label className="field"><span className="label">{uiText("Ngày thanh toán *")}</span><input className="input" type="date" required value={form.paymentDate} onChange={(e) => setForm({ ...form, paymentDate: e.target.value })}/></label>
-      <div className="row"><span className="grow"/><button className="btn btn-primary" disabled={busy || !form.amount || Number(form.amount) > active.refundable + .005}>{busy ? uiText('Đang ghi sổ…') : uiText('Ghi nhận payment')}</button><button className="btn btn-ghost" type="button" disabled={busy} onClick={() => setSelected('')}>{uiText("Đóng")}</button></div>
+      <div className="row"><span className="grow"/><button className="btn btn-primary" disabled={busy || !form.amount || compareDecimals(form.amount, active.refundable) > 0}>{busy ? uiText('Đang ghi sổ…') : uiText('Ghi nhận payment')}</button><button className="btn btn-ghost" type="button" disabled={busy} onClick={() => setSelected('')}>{uiText("Đóng")}</button></div>
     </form></section>}
   </div>;
 }

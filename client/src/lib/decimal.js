@@ -43,6 +43,11 @@ export function subtractDecimals(left, right) {
   return combine(left, right, true);
 }
 
+export function absDecimal(value) {
+  const { coefficient, scale } = decimalParts(value);
+  return decimalText(coefficient < 0n ? -coefficient : coefficient, scale);
+}
+
 export function compareDecimals(left, right) {
   const a = decimalParts(left);
   const b = decimalParts(right);
