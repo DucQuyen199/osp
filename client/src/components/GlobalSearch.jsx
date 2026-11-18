@@ -22,7 +22,7 @@ export default function GlobalSearch({ meta, onNavigate }) {
   }, [query, meta]);
   return <div className="global-search">
     <Icon name="search" />
-    <input className="input global-search-input" type="search" placeholder={uiText('Tìm module hoặc dữ liệu…')} aria-label={uiText('Tìm module hoặc dữ liệu')} aria-keyshortcuts="Control+K" value={query} onChange={(event) => setQuery(event.target.value)} />
+    <input className="input global-search-input" type="search" placeholder={uiText('Tìm module hoặc dữ liệu…')} aria-label={uiText('Tìm module hoặc dữ liệu')} aria-keyshortcuts="Control+K Meta+K" value={query} onChange={(event) => setQuery(event.target.value)} />
     {query.trim() && <>
       <div className="sr-only" role="status" aria-live="polite">
         {matches.length ? uiText('Kết quả: {count}').replace('{count}', String(matches.length)) : uiText('Không tìm thấy module hoặc dữ liệu phù hợp.')}

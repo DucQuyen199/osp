@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { localMonth } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
@@ -35,7 +36,9 @@ export default function UtilitiesWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const latestRequest = useLatestRequest();
   const load = useCallback(async () => {
+    const isLatest = latestRequest();
     setLoading(true); setError('');
     try {
       const { data, errors } = await loadIndependentData({
@@ -46,14 +49,16 @@ export default function UtilitiesWorkbenchPage() {
         invoices: can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
       }, { meters: { items: [] }, readings: { items: [] }, parties: new Map(), bills: { items: [] }, invoices: { items: [] } });
       const meterItems = data.meters.items || [];
-      setMeters(meterItems); setReadings(data.readings.items || []); setParties(data.parties);
-      setBills(data.bills.items || []); setInvoices(data.invoices.items || []);
-      setSelectedMeter((current) => current && meterItems.some((x) => x.id === current) ? current : meterItems[0]?.id || '');
-      setMeterForm((current) => ({ ...current, party: current.party || [...data.parties.keys()][0] || '' }));
-      if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được dữ liệu công tơ.')).join(' · '));
-    } catch (reason) { setError(reason.message || t("Không tải được dữ liệu công tơ.")); }
-    finally { setLoading(false); }
-  }, []);
+      if (isLatest()) {
+        setMeters(meterItems); setReadings(data.readings.items || []); setParties(data.parties);
+        setBills(data.bills.items || []); setInvoices(data.invoices.items || []);
+        setSelectedMeter((current) => current && meterItems.some((x) => x.id === current) ? current : meterItems[0]?.id || '');
+        setMeterForm((current) => ({ ...current, party: current.party || [...data.parties.keys()][0] || '' }));
+        if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được dữ liệu công tơ.')).join(' · '));
+      }
+    } catch (reason) { if (isLatest()) setError(reason.message || t("Không tải được dữ liệu công tơ.")); }
+    finally { if (isLatest()) setLoading(false); }
+  }, [latestRequest]);
   useEffect(() => { load(); }, [load]);
   const meter = meters.find((item) => item.id === selectedMeter);
   useEffect(() => {

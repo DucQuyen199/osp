@@ -20,6 +20,8 @@ const action = (entity, row, verb) => api(dataPath(entity, row.id, verb), { meth
 const MAX_ROTATION_DAYS = 3653;
 const MAX_GENERATED_SCHEDULE_ROWS = 40_000;
 const WORKFLOW_TABLE_PAGE_SIZE = 25;
+const blankScheduleCycleDay = (is_working = true) => ({ rowId: crypto.randomUUID(), is_working, start_time: is_working ? '09:00' : '', end_time: is_working ? '17:00' : '', break_minutes: is_working ? 60 : 0 });
+const serializeScheduleCycle = (cycle) => cycle.map(({ rowId, ...day }) => day);
 const rotationDayLimit = (employeeCount) => Math.min(MAX_ROTATION_DAYS, Math.floor(MAX_GENERATED_SCHEDULE_ROWS / Math.max(employeeCount, 1)));
 const nowIso = () => new Date().toISOString();
 const nextLocalDate = (date) => addCalendarDays(date, 1);
@@ -38,7 +40,7 @@ export default function HrmOperationsPage() {
   const [leaveForm, setLeaveForm] = useState({ employee: '', kind: 'annual', start_date: '', end_date: '', partial_day: 'full', pay_treatment: 'paid', reason: '' });
   const [revisionForm, setRevisionForm] = useState({ employee: '', effective_from: '', base_salary: '', reason: '' });
   const [scheduleForm, setScheduleForm] = useState({ employee: '', work_date: localDate(), is_working: true, start_time: '09:00', end_time: '17:00', break_minutes: '60' });
-  const [patternForm, setPatternForm] = useState({ employees: [], start_date: localDate(), end_date: addLocalDays(localDate(), 27), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', cycle: [{ is_working: true, start_time: '09:00', end_time: '17:00', break_minutes: 60 }, { is_working: false, start_time: '', end_time: '', break_minutes: 0 }] });
+  const [patternForm, setPatternForm] = useState(() => ({ employees: [], start_date: localDate(), end_date: addLocalDays(localDate(), 27), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', cycle: [blankScheduleCycleDay(), blankScheduleCycleDay(false)] }));
   const [scheduleTemplateName, setScheduleTemplateName] = useState('');
   const [scheduleTemplateId, setScheduleTemplateId] = useState('');
   const [patternEmployeeFilter, setPatternEmployeeFilter] = useState('');
@@ -115,7 +117,7 @@ export default function HrmOperationsPage() {
   async function createSchedulePattern(event) {
     event.preventDefault();
     await run('schedule-pattern:create', async () => {
-      const row = await api(dataPath('hrm.work_schedule_pattern'), { method: 'POST', body: patternForm });
+      const row = await api(dataPath('hrm.work_schedule_pattern'), { method: 'POST', body: { ...patternForm, cycle: serializeScheduleCycle(patternForm.cycle) } });
       if (can('hrm.work_schedule_pattern.applied')) await action('hrm.work_schedule_pattern', row, 'applied');
     }, can('hrm.work_schedule_pattern.applied') ? uiText('Đã tạo lịch luân phiên và sinh các ca theo ngày; payroll và hạn mức phép sẽ dùng lịch mới.') : uiText('Đã lưu mẫu ca nháp để người có quyền áp dụng.'));
   }
@@ -161,19 +163,19 @@ export default function HrmOperationsPage() {
     setPatternForm((form) => ({ ...form, cycle: form.cycle.filter((_, itemIndex) => itemIndex !== index) }));
   }
   function addPatternCycleDay() {
-    setPatternForm((form) => ({ ...form, cycle: [...form.cycle, { is_working: true, start_time: '09:00', end_time: '17:00', break_minutes: 60 }] }));
+    setPatternForm((form) => ({ ...form, cycle: [...form.cycle, blankScheduleCycleDay()] }));
   }
   function useScheduleTemplate(id) {
     setScheduleTemplateId(id);
     const template = scheduleTemplates.find((row) => row.id === id);
     setScheduleTemplateName(template?.name || '');
-    if (template) setPatternForm((form) => ({ ...form, timezone: template.timezone || form.timezone, cycle: Array.isArray(template.cycle) ? template.cycle.map((day) => ({ ...day })) : form.cycle }));
+    if (template) setPatternForm((form) => ({ ...form, timezone: template.timezone || form.timezone, cycle: Array.isArray(template.cycle) ? template.cycle.map((day) => ({ ...day, rowId: crypto.randomUUID() })) : form.cycle }));
   }
   async function saveScheduleTemplate() {
     const name = scheduleTemplateName.trim();
     if (!name) return;
     await run('schedule-template:save', async () => {
-      const body = { name, timezone: patternForm.timezone, cycle: patternForm.cycle };
+      const body = { name, timezone: patternForm.timezone, cycle: serializeScheduleCycle(patternForm.cycle) };
       if (scheduleTemplateId && scheduleTemplates.some((row) => row.id === scheduleTemplateId)) {
         await api(dataPath('hrm.work_schedule_template', scheduleTemplateId), { method: 'PATCH', body });
       } else {

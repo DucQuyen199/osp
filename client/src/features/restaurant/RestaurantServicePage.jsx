@@ -12,6 +12,7 @@ import RestaurantReservationsPanel from './components/RestaurantReservationsPane
 import { estimateRestaurantSubtotal, restaurantLineTotal } from './domain/restaurantTotals.js';
 const t = (text) => uiTextWith(text, restaurantEnglish);
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
+const blankRecipeIngredient = () => ({ rowId: crypto.randomUUID(), product: '', qty: '1', uom: '' });
 const isPositiveQuantity = (value) => { try { return compareDecimals(value || 0, '0') > 0; } catch { return false; } };
 const METHODS = [['cash', 'Tiền mặt'], ['card', 'Thẻ'], ['transfer', 'Chuyển khoản'], ['ewallet', 'Ví điện tử']];
 const reservationStart = () => businessDateTime(new Date(Date.now() + 60 * 60 * 1000));
@@ -42,7 +43,7 @@ export default function RestaurantServicePage() {
   const [editingRecipe, setEditingRecipe] = useState('');
   const [recipeProduct, setRecipeProduct] = useState('');
   const [recipeOutputQty, setRecipeOutputQty] = useState('1');
-  const [recipeIngredients, setRecipeIngredients] = useState([{ product: '', qty: '1', uom: '' }]);
+  const [recipeIngredients, setRecipeIngredients] = useState(() => [blankRecipeIngredient()]);
   const [reservationForm, setReservationForm] = useState({ guest_name: '', phone: '', table: '', guest_count: '2', starts_at: reservationStart(), ends_at: businessDateTime(new Date(Date.now() + 2 * 60 * 60 * 1000)), note: '' });
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
@@ -109,11 +110,11 @@ export default function RestaurantServicePage() {
     const baseUnit = products.get(productId)?.uom;
     return baseUnit ? [...units.values()].filter((unit) => unit.id === baseUnit || unit.base_uom === baseUnit) : [];
   };
-  const resetRecipe = () => { setEditingRecipe(''); setRecipeProduct(''); setRecipeOutputQty('1'); setRecipeIngredients([{ product: '', qty: '1', uom: '' }]); };
+  const resetRecipe = () => { setEditingRecipe(''); setRecipeProduct(''); setRecipeOutputQty('1'); setRecipeIngredients([blankRecipeIngredient()]); };
   const editRecipe = (recipe) => {
     setEditingRecipe(recipe.id); setRecipeProduct(recipe.product || ''); setRecipeOutputQty(String(recipe.output_qty || 1));
     const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
-    setRecipeIngredients(ingredients.length ? ingredients.map((item) => ({ product: item.product || '', qty: String(item.qty || ''), uom: item.uom || '' })) : [{ product: '', qty: '1', uom: '' }]);
+    setRecipeIngredients(ingredients.length ? ingredients.map((item) => ({ ...blankRecipeIngredient(), product: item.product || '', qty: String(item.qty || ''), uom: item.uom || '' })) : [blankRecipeIngredient()]);
   };
   const saveRecipe = async (event) => {
     event.preventDefault(); setBusy('recipe'); setError(''); setNotice('');
@@ -202,7 +203,7 @@ export default function RestaurantServicePage() {
       onSubmit={saveRecipe} onReset={resetRecipe} onProductChange={setRecipeProduct}
       onOutputQtyChange={setRecipeOutputQty}
       onIngredientChange={(index, field, value) => setRecipeIngredients((current) => current.map((item, rowIndex) => rowIndex === index ? { ...item, [field]: value, ...(field === 'product' ? { uom: '' } : {}) } : item))}
-      onAddIngredient={() => setRecipeIngredients((current) => [...current, { product: '', qty: '1', uom: '' }])}
+      onAddIngredient={() => setRecipeIngredients((current) => [...current, blankRecipeIngredient()])}
       onRemoveIngredient={(index) => setRecipeIngredients((current) => current.filter((_, rowIndex) => rowIndex !== index))}
       onEdit={editRecipe} t={t}
     />

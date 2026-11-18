@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { localDate } from '../../lib/dates.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { fmtMoney, fmtNumber, uiText } from '../../lib/i18n.js';
@@ -22,20 +23,25 @@ export default function BudgetVariancePage() {
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const latestRequest = useLatestRequest();
   const load = useCallback(async () => {
+    const isLatest = latestRequest();
     setLoading(true);
     setError('');
     try {
       const params = new URLSearchParams();
       if (period.trim()) params.set('period', period.trim());
-      setReport(await api(`${tenantPath('/reports/budget/variance')}?${params}`));
+      const nextReport = await api(`${tenantPath('/reports/budget/variance')}?${params}`);
+      if (isLatest()) setReport(nextReport);
     } catch (reason) {
-      setReport(null);
-      setError(reason.message || uiText('Không tải được báo cáo thực hiện ngân sách.'));
+      if (isLatest()) {
+        setReport(null);
+        setError(reason.message || uiText('Không tải được báo cáo thực hiện ngân sách.'));
+      }
     } finally {
-      setLoading(false);
+      if (isLatest()) setLoading(false);
     }
-  }, [period]);
+  }, [period, latestRequest]);
   useEffect(() => { load(); }, [load]);
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Thực hiện ngân sách')}</h1><p className="sub">{uiText('Đối chiếu kế hoạch doanh thu và chi phí với số phát sinh theo số dư tự nhiên trên sổ kế toán.')}</p></div></div>

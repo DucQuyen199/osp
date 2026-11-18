@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
+import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { localDate } from '../../lib/dates.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { uiText } from '../../lib/i18n.js';
@@ -26,7 +27,9 @@ export default function AccountingReportsPage() {
   const [fxJournal, setFxJournal] = useState(null);
   const [postingFx, setPostingFx] = useState(false);
   const [showChartTemplates, setShowChartTemplates] = useState(false);
+  const latestRequest = useLatestRequest();
   const load = useCallback(async () => {
+    const isLatest = latestRequest();
     setLoading(true);
     setError('');
     try {
@@ -47,14 +50,17 @@ export default function AccountingReportsPage() {
         if (to) params.set('to', to);
         path = mode === 'trial' ? '/reports/accounting/trial-balance' : mode === 'tax' ? '/reports/accounting/tax-register' : '/reports/accounting/income-statement';
       }
-      setReport(await api(`${tenantPath(path)}?${params}`));
+      const nextReport = await api(`${tenantPath(path)}?${params}`);
+      if (isLatest()) setReport(nextReport);
     } catch (reason) {
-      setReport(null);
-      setError(reason.message || uiText('Không tải được báo cáo.'));
+      if (isLatest()) {
+        setReport(null);
+        setError(reason.message || uiText('Không tải được báo cáo.'));
+      }
     } finally {
-      setLoading(false);
+      if (isLatest()) setLoading(false);
     }
-  }, [mode, from, to, asOf]);
+  }, [mode, from, to, asOf, latestRequest]);
   useEffect(() => { load(); }, [load]);
   const createFxDraft = async () => {
     setPostingFx(true);

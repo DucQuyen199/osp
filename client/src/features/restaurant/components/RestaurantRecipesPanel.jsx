@@ -25,7 +25,7 @@ export default function RestaurantRecipesPanel({
       <div className="restaurant-recipe-lines"><h3>{t('Nguyên liệu')}</h3>
         {ingredients.map((line, index) => {
           const lineUnits = unitsFor(line.product);
-          return <div className="row wrap" key={index}>
+          return <div className="row wrap" key={line.rowId}>
             <select className="select" required aria-label={`${t('Nguyên liệu')} ${index + 1}`} value={line.product} onChange={(event) => onIngredientChange(index, 'product', event.target.value)}>
               <option value="">{t('Chọn nguyên liệu')}</option>
               {ingredientProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}

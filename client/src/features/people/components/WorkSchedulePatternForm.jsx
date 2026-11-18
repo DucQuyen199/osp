@@ -34,7 +34,7 @@ export default function WorkSchedulePatternForm({
     <label className="field"><span className="label">{uiText('Sinh lịch đến ngày *')}</span><input className="input" required min={patternForm.start_date} max={maxEndDate} type="date" value={patternForm.end_date} onChange={(event) => onFieldChange('end_date', event.target.value)}/></label>
     <label className="field"><span className="label">{uiText('Múi giờ IANA *')}</span><input className="input" required value={patternForm.timezone} onChange={(event) => onFieldChange('timezone', event.target.value)} placeholder="Asia/Ho_Chi_Minh"/></label>
     <div className="field u-legacy-75be3216d0"><span className="label">{uiText('Các ngày trong chu kỳ (lặp từ ngày bắt đầu)')}</span><div className="stack u-legacy-43a97fe494">
-      {patternForm.cycle.map((day, index) => <div className="row wrap card card-pad u-legacy-d5a33b90d3" key={index}>
+      {patternForm.cycle.map((day, index) => <div className="row wrap card card-pad u-legacy-d5a33b90d3" key={day.rowId}>
         <strong>{uiText('Ngày')}{index + 1}</strong>
         <label className="row small"><input type="checkbox" checked={day.is_working} onChange={(event) => onCycleDayToggle(index, event.target.checked)}/>{uiText('Có ca làm')}</label>
         {day.is_working && <>

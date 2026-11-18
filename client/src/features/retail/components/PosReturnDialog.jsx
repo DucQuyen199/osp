@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { fmtMoney } from '../../../lib/i18n.js';
 import { buildPosReturnLines, estimatePosReturnTotal, remainingPosReturnQuantity } from '../domain/posReturns.js';
 
@@ -17,11 +17,59 @@ export default function PosReturnDialog({
   onSubmit,
   t,
 }) {
+  const dialogRef = useRef(null);
+  const interactionRef = useRef({ busy, locked, onClose });
+  interactionRef.current = { busy, locked, onClose };
+
+  useEffect(() => {
+    if (!order || !dialogRef.current) return undefined;
+    const dialog = dialogRef.current;
+    const previouslyFocused = document.activeElement;
+    const focusableElements = () => [...dialog.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    )].filter((element) => element.getAttribute('aria-hidden') !== 'true');
+    const focusables = focusableElements();
+    focusables[0]?.focus();
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        const current = interactionRef.current;
+        if (!current.busy && !current.locked) {
+          event.preventDefault();
+          current.onClose();
+        }
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const currentFocusables = focusableElements();
+      if (!currentFocusables.length) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = currentFocusables[0];
+      const last = currentFocusables.at(-1);
+      if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) previouslyFocused.focus();
+    };
+  }, [order?.id]);
+
   if (!order) return null;
   const estimate = estimatePosReturnTotal(order, buildPosReturnLines(quantities));
 
   return <div className="pos-return-overlay" role="presentation">
-    <section className="card card-pad pos-return-dialog" role="dialog" aria-modal="true" aria-labelledby="pos-return-title">
+    <section ref={dialogRef} className="card card-pad pos-return-dialog" role="dialog" aria-modal="true" aria-labelledby="pos-return-title" tabIndex={-1}>
       <form onSubmit={onSubmit}>
         <div className="row wrap">
           <div>
