@@ -2,10 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate as formatLocalDate, localDateTime as businessDateTime, localDateTimeToIso } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
-import { fmtDate, fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
+import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { can, recordLabel } from '../../lib/state.js';
 import educationEnglish from './education.en.js';
-import AttendanceRosterTable from './components/AttendanceRosterTable.jsx';
+import ClassSessionRegister from './components/ClassSessionRegister.jsx';
 import StudentIntakeForm from './components/StudentIntakeForm.jsx';
 import TuitionLedgerTable from './components/TuitionLedgerTable.jsx';
 import GradebookSection from './components/GradebookSection.jsx';
@@ -249,13 +249,26 @@ export default function EducationWorkbenchPage() {
       {can('school.class_enrollment.create') && can('school.course_class.read') && can('school.student.read') && <form className="form-grid u-margin-14-0-20"  onSubmit={createEnrollment}><label className="field"><span className="label">{t("Lớp *")}</span><select className="select" required value={enrollmentForm.class} onChange={(event) => setEnrollmentForm((current) => ({ ...current, class: event.target.value, student: '' }))}><option value="">{t("Chọn lớp")}</option>{classes.map((item) => { const count = enrollments.filter((row) => row.class === item.id && row.status === 'active').length; return <option key={item.id} value={item.id}>{item.name}{item.capacity ? ` · ${count}/${item.capacity}` : ''}</option>; })}</select></label><label className="field"><span className="label">{t("Học viên *")}</span><select className="select" required value={enrollmentForm.student} onChange={(event) => setEnrollmentForm((current) => ({ ...current, student: event.target.value }))}><option value="">{t("Chọn học viên")}</option>{eligibleEnrollmentStudents.map((student) => <option key={student.id} value={student.id}>{parties.get(student.party) ? recordLabel('master-data.party', parties.get(student.party)) : student.student_code || t('Học viên')}{student.student_code ? ` · ${student.student_code}` : ''}</option>)}</select></label><div className="row full"><span className="grow small muted">{enrollmentForm.class && selectedEnrollmentClass?.capacity ? `Sĩ số hiện tại: ${enrollments.filter((row) => row.class === enrollmentForm.class && row.status === 'active').length}/${selectedEnrollmentClass.capacity}` : t('Hệ thống sẽ kiểm tra trùng ghi danh và sức chứa khi lưu.')}</span><button className="btn btn-primary" type="submit" disabled={busy || loading || !enrollmentForm.class || !enrollmentForm.student}>Ghi danh</button></div></form>}
       {!enrollmentClass ? <div className="empty">{t("Chọn lớp để xem danh sách ghi danh.")}</div> : !enrollmentRoster.length ? <div className="empty">{t("Lớp chưa có ghi danh.")}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t("Mã học viên")}</th><th>{t("Học viên")}</th><th>{t("Trạng thái")}</th><th>{t("Thao tác")}</th></tr></thead><tbody>{enrollmentRoster.map(({ enrollment, student }) => <tr key={enrollment.id}><td>{student?.student_code || '—'}</td><td>{student && parties.get(student.party) ? recordLabel('master-data.party', parties.get(student.party)) : t('Học viên')}</td><td>{statusLabel(enrollment.status)}</td><td><div className="row wrap">{enrollment.status === 'active' && can('school.class_enrollment.dropped') && <button className="btn btn-ghost btn-sm" type="button" disabled={busy} onClick={() => changeEnrollment(enrollment, 'dropped')}>{t("Rút ghi danh")}</button>}{enrollment.status === 'active' && can('school.class_enrollment.completed') && <button className="btn btn-secondary btn-sm" type="button" disabled={busy} onClick={() => changeEnrollment(enrollment, 'completed')}>{t("Hoàn thành khóa học")}</button>}</div></td></tr>)}</tbody></table></div>}
     </section>}
-    <section className="card card-pad u-mt-20" ><div className="row wrap"><h2>{t("Danh sách buổi học")}</h2><span className="grow" /><select className="select" aria-label={t('Chọn buổi học')} value={selectedId} onChange={(e) => setSelectedId(e.target.value)}><option value="">{t("Chọn buổi học")}</option>{sessions.map((item) => <option key={item.id} value={item.id}>{classes.find((c) => c.id === item.class)?.name || t('Lớp')} · {fmtDateTime(item.starts_at)} · {item.topic}</option>)}</select></div>
-      {loading ? <div className="skeleton" data-h="row" /> : !selected ? <div className="empty">{t("Chưa có buổi học.")}</div> : <>
-        <div className="row wrap u-margin-12-0" ><div><strong>{selectedClass?.name || t('Lớp học')} · {selected.topic}</strong><div className="small muted">{fmtDateTime(selected.starts_at)} – {fmtDateTime(selected.ends_at)} · {statusLabel(selected.status)}{selected.teacher_name ? ` · Giáo viên: ${selected.teacher_name}` : ''}</div></div><span className="grow" />{selected.status === 'scheduled' && can('school.class_session.completed') && <button className="btn btn-primary btn-sm" type="button" disabled={busy} onClick={() => transition(selected, 'completed')}>{t("Chốt buổi học")}</button>}{selected.status === 'scheduled' && can('school.class_session.cancelled') && <button className="btn btn-ghost btn-sm" type="button" disabled={busy} onClick={() => transition(selected, 'cancelled')}>{t("Hủy buổi")}</button>}</div>
-        {selected.status === 'cancelled' ? <div className="empty">{t("Buổi học đã hủy.")}</div> : roster.length === 0 ? <div className="empty">{t("Lớp chưa có học viên đang ghi danh.")}</div> : <AttendanceRosterTable roster={roster} marks={marks} parties={parties} busy={busy} sessionStatus={selected.status} attendanceLabels={attendanceLabels} onSave={saveMark} t={t} />}
-        <p className="small muted">{t('Đã ghi nhận {marked}/{total} học viên. Chỉ có thể điểm danh từ giờ bắt đầu; cần ghi nhận đủ học viên để chốt buổi.').replace('{marked}', String(roster.filter(({ enrollment }) => marks.has(enrollment.id)).length)).replace('{total}', String(roster.length))}</p>
-      </>}
-    </section>
+    <ClassSessionRegister
+      sessions={sessions}
+      classes={classes}
+      selectedId={selectedId}
+      selected={selected}
+      selectedClass={selectedClass}
+      loading={loading}
+      busy={busy}
+      roster={roster}
+      marks={marks}
+      parties={parties}
+      attendanceLabels={attendanceLabels}
+      canComplete={can('school.class_session.completed')}
+      canCancel={can('school.class_session.cancelled')}
+      markedCount={roster.filter(({ enrollment }) => marks.has(enrollment.id)).length}
+      onSelect={setSelectedId}
+      onTransition={transition}
+      onSaveAttendance={saveMark}
+      t={t}
+    />
     <GradebookSection canRead={can('school.grade.read')} canCreate={can('school.grade.create')} canUpdate={can('school.grade.update')} classes={classes} gradeClass={gradeClass} gradeTerm={gradeTerm} gradeSubject={gradeSubject} gradeRoster={gradeRoster} gradeMap={gradeMap} parties={parties} busy={busy} onGradeClassChange={setGradeClass} onGradeTermChange={setGradeTerm} onGradeSubjectChange={setGradeSubject} onSave={saveGrade} t={t} />
     {can('school.fee.read') && <section className="card card-pad u-mt-20" ><div className="row wrap"><div><h2>{t("Sổ học phí")}</h2><p className="small muted">{t("Học phí phát hành sẽ tạo hóa đơn phải thu. Khi hóa đơn được thanh toán đủ, trạng thái khoản học phí tự chuyển sang đã thu.")}</p></div><span className="grow"/><span className="badge warning">{fees.filter((fee) => fee.status === 'issued').length} {t('chưa thu đủ')}</span></div>
       {can('school.tuition_batch.create') && <TuitionBatchPanel
