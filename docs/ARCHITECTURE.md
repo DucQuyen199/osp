@@ -6,7 +6,7 @@ OSP là modular monolith: một tiến trình Rust/Axum, một PostgreSQL, các 
 
 ## Tenant and company boundaries
 
-Each tenant currently owns one organization's data and its users, roles, settings, audit, and row-level security context. A branch is an operational location within that tenant. Separate tenants cannot reference one another's records, and consolidated reporting across tenants is not implemented. The proposed consent and access design is recorded in [ADR-0010](adr/0010-multi-company-and-consolidation.md); it preserves tenant RLS and requires member-organization consent before any cross-tenant report access.
+Each tenant owns one organization's data and its users, roles, settings, audit, and row-level security context. A branch is an operational location within that tenant. Separate tenants cannot reference one another's records. A consent-based, read-only consolidated trial balance is implemented for company groups, with named-user report grants, FX rate-age controls, audited snapshots, and approved management elimination journals. It preserves tenant RLS and requires active member consent before each cross-tenant report access. A consolidated balance sheet, automated intercompany matching, and statutory translation remain out of scope; see [ADR-0010](adr/0010-multi-company-and-consolidation.md).
 
 ## Các lớp hệ thống
 

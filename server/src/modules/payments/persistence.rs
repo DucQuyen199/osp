@@ -178,40 +178,42 @@ async fn validate_refund(
             "Only a successful, not fully refunded payment can be refunded".into(),
         ]);
     }
-    if !matches!(action, "succeeded") {
+    if !matches!(action, "created" | "updated" | "succeeded") {
         return Ok(Vec::new());
     }
-    let Some(reference) = document
-        .get("reference")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|reference| !reference.is_empty())
-    else {
-        return Ok(vec!["Refund requires a provider refund reference".into()]);
-    };
-    let lock_key = format!("payments-refund:{}:{}:{}", tenant.id, provider, reference);
-    tx.query_opt(
-        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-        &[&lock_key],
-    )
-    .await?;
     let refund_id = document
         .get("id")
         .and_then(Value::as_str)
         .and_then(|value| Uuid::parse_str(value).ok());
-    if tx
-        .query_opt(
-            "SELECT refund.id FROM payments__payment_refund refund JOIN payments__payment_txn payment ON payment.tenant_id = refund.tenant_id AND payment.id = refund.payment_txn WHERE refund.tenant_id = $1 AND payment.provider = $2 AND refund.reference = $3 AND ($4::uuid IS NULL OR refund.id <> $4) LIMIT 1",
-            &[&tenant.id, &provider, &reference, &refund_id],
+    if action == "succeeded" {
+        let Some(reference) = document
+            .get("reference")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|reference| !reference.is_empty())
+        else {
+            return Ok(vec!["Refund requires a provider refund reference".into()]);
+        };
+        let lock_key = format!("payments-refund:{}:{}:{}", tenant.id, provider, reference);
+        tx.query_opt(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            &[&lock_key],
         )
-        .await?
-        .is_some()
-    {
-        return Ok(vec!["This provider refund reference has already been recorded".into()]);
+        .await?;
+        if tx
+            .query_opt(
+                "SELECT refund.id FROM payments__payment_refund refund JOIN payments__payment_txn payment ON payment.tenant_id = refund.tenant_id AND payment.id = refund.payment_txn WHERE refund.tenant_id = $1 AND payment.provider = $2 AND refund.reference = $3 AND ($4::uuid IS NULL OR refund.id <> $4) LIMIT 1",
+                &[&tenant.id, &provider, &reference, &refund_id],
+            )
+            .await?
+            .is_some()
+        {
+            return Ok(vec!["This provider refund reference has already been recorded".into()]);
+        }
     }
     let sum_row = tx
         .query_one_row(
-            "SELECT COALESCE(SUM(amount::numeric), 0)::text FROM payments__payment_refund WHERE tenant_id = $1 AND payment_txn = $2 AND status = 'succeeded' AND ($3::uuid IS NULL OR id <> $3)",
+            "SELECT COALESCE(SUM(amount::numeric), 0)::text FROM payments__payment_refund WHERE tenant_id = $1 AND payment_txn = $2 AND status IN ('pending', 'succeeded') AND ($3::uuid IS NULL OR id <> $3)",
             &[&tenant.id, &payment_id, &refund_id],
         )
         .await?;
@@ -236,7 +238,7 @@ async fn validate_refund(
         .is_none_or(|total| total > original + rust_decimal::Decimal::new(1, 6))
     {
         return Ok(vec![
-            "Total successful refunds cannot exceed the original payment".into(),
+            "Pending and successful refunds cannot exceed the original payment".into(),
         ]);
     }
     Ok(Vec::new())

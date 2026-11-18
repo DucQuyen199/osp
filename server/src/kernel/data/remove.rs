@@ -18,6 +18,15 @@ impl Kernel {
                 vec!["Bản ghi này chỉ được xóa từ luồng nghiệp vụ Rust của hệ thống".into()],
             ));
         }
+        if qname == "master-data.product_category" {
+            // Use the same lock order as category creation/reparenting so the
+            // tree remains acyclic while child references are checked.
+            tx.query_one_row(
+                "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                &[&format!("{}:master-data:product-category-tree", t.id)],
+            )
+            .await?;
+        }
         // Serialize deletion with updates, actions and child-record creation.
         let uid = Uuid::parse_str(id).map_err(|_| ApiError::not_found(format!("{qname} {id}")))?;
         let row = tx

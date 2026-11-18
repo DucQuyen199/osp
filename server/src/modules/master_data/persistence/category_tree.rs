@@ -16,6 +16,14 @@ pub(super) async fn validate_category_parent(
         return Ok(());
     };
     let Some(id) = parse_id(document, "id") else {
+        // Serialize child creation against reparenting of any category in this
+        // tenant. A concurrent child insert must not create a cycle invisible
+        // to the reparenting transaction's ancestor query.
+        tx.query_one_row(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            &[&format!("{}:master-data:product-category-tree", tenant.id)],
+        )
+        .await?;
         if tx
             .query_opt(
                 "SELECT id FROM master_data__product_category WHERE tenant_id = $1 AND id = $2 FOR SHARE",

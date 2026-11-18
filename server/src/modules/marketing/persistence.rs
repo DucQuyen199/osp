@@ -105,8 +105,8 @@ pub async fn validate_persistence(
         }
         let Some(allocated_amount) = document
             .get("allocated_amount")
-            .and_then(Value::as_number)
-            .map(ToString::to_string)
+            .and_then(crate::money::decimal)
+            .map(|amount| amount.normalize().to_string())
         else {
             return Ok(vec![
                 "Campaign cost requires a valid allocated amount".into(),

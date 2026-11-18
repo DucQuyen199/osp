@@ -129,6 +129,9 @@ async fn validate_time(
     if matches!(action, "created" | "updated") && case_status == "closed" {
         errors.push("Không thể ghi hoặc sửa giờ công cho vụ việc đã đóng".into());
     }
+    if matches!(action, "created" | "updated") && case_status != "open" && case_status != "closed" {
+        errors.push("Chỉ có thể ghi hoặc sửa giờ công khi vụ việc đang mở".into());
+    }
     if action == "billed" && case_status == "closed" {
         errors.push("Không thể xuất hóa đơn giờ công sau khi đóng vụ việc".into());
     }

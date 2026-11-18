@@ -30,6 +30,16 @@ impl Kernel {
         if qname.starts_with("loyalty.") {
             crate::modules::loyalty::prepare_document(ent.def.name.as_str(), &mut patch);
         }
+        if qname == "master-data.product_category" {
+            // Keep the category-tree advisory lock ahead of the target-row lock,
+            // matching category creation and deletion. This avoids deadlocks
+            // while serializing parent changes with concurrent child inserts.
+            tx.query_one_row(
+                "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                &[&format!("{}:master-data:product-category-tree", t.id)],
+            )
+            .await?;
+        }
         // Serialize updates with other updates and state transitions before
         // validating the current record.
         let uid = Uuid::parse_str(id).map_err(|_| ApiError::not_found(format!("{qname} {id}")))?;
