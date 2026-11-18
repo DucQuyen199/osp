@@ -699,6 +699,26 @@ pub fn build(reg: &Registry) -> Value {
         } }),
     );
     paths.insert(
+        "/api/t/{tenantId}/consolidation/groups/{groupId}/report-grants".into(),
+        json!({ "post": {
+            "tags": ["consolidation"], "summary": "Grant one active tenant user access to a specific group report", "security": sec,
+            "parameters": [tid, { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                "type": "object", "required": ["userId", "reportType"], "additionalProperties": false,
+                "properties": { "userId": { "type": "string" }, "reportType": { "type": "string", "enum": ["trial_balance"] } }
+            } } } },
+            "responses": with_common(Map::from_iter([("201".to_string(), json!({ "description": "User-specific report grant created and audited" })), ("404".to_string(), err("Group or active tenant user not found")), ("409".to_string(), err("An active grant already exists"))]))
+        } }),
+    );
+    paths.insert(
+        "/api/t/{tenantId}/consolidation/report-grants/{grantId}/revoke".into(),
+        json!({ "post": {
+            "tags": ["consolidation"], "summary": "Revoke a user-specific consolidated report grant", "security": sec,
+            "parameters": [tid, { "name": "grantId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Report grant revoked and audited" })), ("404".to_string(), err("Report grant not found"))]))
+        } }),
+    );
+    paths.insert(
         "/api/t/{tenantId}/consolidation/groups/{groupId}/trial-balance".into(),
         json!({ "get": {
             "tags": ["consolidation"], "summary": "Read a consent-verified, currency-converted group trial balance", "security": sec,

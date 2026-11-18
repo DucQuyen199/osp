@@ -36,14 +36,16 @@ async fn currency_rate(
     from_code: &str,
     to_code: &str,
     as_of: &str,
-) -> R<Decimal> {
+) -> R<(Decimal, String)> {
     if from_code.eq_ignore_ascii_case(to_code) {
-        return Ok(Decimal::ONE);
+        return Ok((Decimal::ONE, as_of.to_owned()));
     }
+    let as_of_date = NaiveDate::parse_from_str(as_of, "%Y-%m-%d")
+        .map_err(|_| ApiError::new(422, "INVALID_DATE", "Rate date must use YYYY-MM-DD"))?;
     let direct = tx
         .query_opt(
-            "SELECT rate::text FROM master_data__currency_rate WHERE tenant_id=$1 AND from_currency=(SELECT id FROM master_data__currency WHERE tenant_id=$1 AND upper(code)=upper($2)) AND to_currency=(SELECT id FROM master_data__currency WHERE tenant_id=$1 AND upper(code)=upper($3)) AND effective_date <= $4::date ORDER BY effective_date DESC, created_at DESC LIMIT 1",
-            &[&tenant.id, &from_code, &to_code, &as_of],
+            "SELECT rate::text, effective_date::text FROM master_data__currency_rate WHERE tenant_id=$1 AND from_currency=(SELECT id FROM master_data__currency WHERE tenant_id=$1 AND upper(code)=upper($2)) AND to_currency=(SELECT id FROM master_data__currency WHERE tenant_id=$1 AND upper(code)=upper($3)) AND effective_date <= $4::date ORDER BY effective_date DESC, created_at DESC LIMIT 1",
+            &[&tenant.id, &from_code, &to_code, &as_of_date],
         )
         .await?;
     if let Some(row) = direct {
@@ -58,15 +60,17 @@ async fn currency_rate(
                 "Currency exchange rate must be positive",
             ));
         }
-        return Ok(rate);
+        let effective_date: String = row.get(1);
+        return Ok((rate, effective_date));
     }
     let reverse = tx
         .query_opt(
-            "SELECT rate::text FROM master_data__currency_rate WHERE tenant_id=$1 AND from_currency=(SELECT id FROM master_data__currency WHERE tenant_id=$1 AND upper(code)=upper($3)) AND to_currency=(SELECT id FROM master_data__currency WHERE tenant_id=$1 AND upper(code)=upper($2)) AND effective_date <= $4::date ORDER BY effective_date DESC, created_at DESC LIMIT 1",
-            &[&tenant.id, &from_code, &to_code, &as_of],
+            "SELECT rate::text, effective_date::text FROM master_data__currency_rate WHERE tenant_id=$1 AND from_currency=(SELECT id FROM master_data__currency WHERE tenant_id=$1 AND upper(code)=upper($3)) AND to_currency=(SELECT id FROM master_data__currency WHERE tenant_id=$1 AND upper(code)=upper($2)) AND effective_date <= $4::date ORDER BY effective_date DESC, created_at DESC LIMIT 1",
+            &[&tenant.id, &from_code, &to_code, &as_of_date],
         )
         .await?
         .ok_or_else(|| ApiError::new(409, "CURRENCY_RATE_MISSING", format!("No {from_code}/{to_code} currency rate is available on or before {as_of}")))?;
+    let effective_date: String = reverse.get(1);
     let reverse_rate = reverse
         .get::<_, String>(0)
         .parse::<Decimal>()
@@ -78,9 +82,10 @@ async fn currency_rate(
             "Currency exchange rate must be positive",
         ));
     }
-    Decimal::ONE
+    let rate = Decimal::ONE
         .checked_div(reverse_rate)
-        .ok_or_else(amount_error)
+        .ok_or_else(amount_error)?;
+    Ok((rate, effective_date))
 }
 
 fn converted(value: &Value, field: &str, rate: Decimal) -> R<Decimal> {
@@ -111,7 +116,7 @@ impl Kernel {
     ) -> R<Value> {
         self.ent(owner, "consolidation.company_group")?;
         self.ent(owner, "consolidation.member")?;
-        self.authorize(owner, actor, "consolidation.member.read")?;
+        self.authorize(owner, actor, "consolidation.company_group.read")?;
         self.authorize(owner, actor, "accounting.journal_entry.read")?;
         let group_id = super::domain::parse_id(group_id, "Company group")?;
         let from = parse_date(from, "from")?;
@@ -131,6 +136,18 @@ impl Kernel {
 
         let mut owner_conn = self.pool.get().await?;
         let owner_tx = Tx::begin(&mut owner_conn, &owner.id, false).await?;
+        let grant_exists = owner_tx
+            .query_opt(
+                "SELECT id FROM consolidation__report_grant WHERE tenant_id=$1 AND \"group\"=$2 AND user_id=$3 AND report_type='trial_balance' AND status='active' LIMIT 1",
+                &[&owner.id, &group_id, &actor.user_id()],
+            )
+            .await?
+            .is_some();
+        if !grant_exists {
+            return Err(ApiError::forbidden(
+                "consolidation.report_grant.trial_balance",
+            ));
+        }
         let group_row = owner_tx.query_opt(
             "SELECT currency.code FROM consolidation__company_group group_row JOIN master_data__currency currency ON currency.tenant_id=group_row.tenant_id AND currency.id=group_row.reporting_currency WHERE group_row.tenant_id=$1 AND group_row.id=$2",
             &[&owner.id, &group_id],
@@ -193,7 +210,7 @@ impl Kernel {
                 .as_deref()
                 .map(str::to_owned)
                 .unwrap_or_else(|| tenant.business_today().to_string());
-            let rate = currency_rate(
+            let (rate, rate_effective_date) = currency_rate(
                 &member_tx,
                 &tenant,
                 local_currency,
@@ -238,7 +255,14 @@ impl Kernel {
                 for (index, field) in fields.iter().enumerate() {
                     values[index] = converted(row, field, rate)?;
                     if let Some(object) = account.as_object_mut() {
-                        object.insert((*field).into(), json_amount(values[index])?);
+                        let suffix = field
+                            .chars()
+                            .next()
+                            .unwrap()
+                            .to_ascii_uppercase()
+                            .to_string()
+                            + &field[1..];
+                        object.insert(format!("reporting{suffix}"), json_amount(values[index])?);
                     }
                 }
                 let bucket = totals
@@ -255,6 +279,7 @@ impl Kernel {
                 "localCurrency": local_currency,
                 "reportingCurrency": reporting_currency,
                 "conversionRate": json_amount(rate)?,
+                "rateEffectiveDate": rate_effective_date,
                 "accounts": accounts,
             }));
         }
@@ -274,6 +299,26 @@ impl Kernel {
                 }))
             })
             .collect::<R<Vec<_>>>()?;
+        let (debit_total, credit_total) = accounts.iter().try_fold(
+            (Decimal::ZERO, Decimal::ZERO),
+            |(debit_total, credit_total), account| {
+                let debit = account
+                    .get("closingDebit")
+                    .and_then(crate::money::decimal)
+                    .ok_or_else(amount_error)?;
+                let credit = account
+                    .get("closingCredit")
+                    .and_then(crate::money::decimal)
+                    .ok_or_else(amount_error)?;
+                Ok::<_, ApiError>((
+                    debit_total.checked_add(debit).ok_or_else(amount_error)?,
+                    credit_total.checked_add(credit).ok_or_else(amount_error)?,
+                ))
+            },
+        )?;
+        let imbalance = debit_total
+            .checked_sub(credit_total)
+            .ok_or_else(amount_error)?;
         self.audit_raw_ro(
             owner,
             actor,
@@ -288,6 +333,12 @@ impl Kernel {
             "reportingCurrency": reporting_currency,
             "rateBasis": "latest direct or inverse currency rate effective on or before the report end date; same rate applied to all balance columns",
             "consolidationMethod": "account-code roll-up; intercompany balances are not eliminated",
+            "reconciliation": {
+                "closingDebitTotal": json_amount(debit_total)?,
+                "closingCreditTotal": json_amount(credit_total)?,
+                "difference": json_amount(imbalance)?,
+                "withinCentTolerance": imbalance.abs() <= Decimal::new(1, 2),
+            },
             "companies": companies,
             "accounts": accounts,
         }))

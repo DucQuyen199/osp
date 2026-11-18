@@ -17,6 +17,9 @@ export default function ConsolidationWorkbenchPage() {
   const [groups, setGroups] = useState([]);
   const [members, setMembers] = useState([]);
   const [shares, setShares] = useState([]);
+  const [grants, setGrants] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [grantUserId, setGrantUserId] = useState('');
   const [currencies, setCurrencies] = useState([]);
   const [groupForm, setGroupForm] = useState({ name: '', reporting_currency: '' });
   const [inviteForm, setInviteForm] = useState({ groupId: '', memberTenantId: '' });
@@ -34,13 +37,15 @@ export default function ConsolidationWorkbenchPage() {
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setLoading(true); setError(''); }
     try {
-      const [groupRows, memberRows, shareRows, currencyRows] = await Promise.all([
+      const [groupRows, memberRows, shareRows, grantRows, currencyRows, userRows] = await Promise.all([
         can('consolidation.company_group.read') ? listAll('consolidation.company_group') : Promise.resolve([]),
         can('consolidation.member.read') ? listAll('consolidation.member') : Promise.resolve([]),
         can('consolidation.shared_company.read') ? listAll('consolidation.shared_company') : Promise.resolve([]),
+        can('consolidation.report_grant.read') ? listAll('consolidation.report_grant') : Promise.resolve([]),
         can('master-data.currency.read') ? listAll('master-data.currency') : Promise.resolve([]),
+        isAdmin() ? api(tenantPath('/users')) : Promise.resolve([]),
       ]);
-      setGroups(groupRows); setMembers(memberRows); setShares(shareRows); setCurrencies(currencyRows);
+      setGroups(groupRows); setMembers(memberRows); setShares(shareRows); setGrants(grantRows); setCurrencies(currencyRows); setUsers(Array.isArray(userRows) ? userRows : []);
       setInviteForm((form) => ({ ...form, groupId: groupRows.some((row) => row.id === form.groupId) ? form.groupId : groupRows[0]?.id || '' }));
       setReportGroup((id) => groupRows.some((row) => row.id === id) ? id : groupRows[0]?.id || '');
       setGroupForm((form) => ({ ...form, reporting_currency: currencies.some((row) => row.id === form.reporting_currency) ? form.reporting_currency : currencyRows[0]?.id || '' }));
@@ -77,6 +82,14 @@ export default function ConsolidationWorkbenchPage() {
   async function revokeShare(share) {
     await run(`share:${share.id}`, () => api(tenantPath('/consolidation/shared/revoke'), { method: 'POST', body: { ownerTenantId: share.owner_tenant_id, memberId: share.owner_member_id } }), t('Đã thu hồi consent chia sẻ.'));
   }
+  async function createReportGrant(event) {
+    event.preventDefault();
+    const result = await run('grant', () => api(tenantPath(`/consolidation/groups/${encodeURIComponent(reportGroup)}/report-grants`), { method: 'POST', body: { userId: grantUserId.trim(), reportType: 'trial_balance' } }), t('Đã cấp quyền xem bảng cân đối phát sinh.'));
+    if (result) setGrantUserId('');
+  }
+  async function revokeReportGrant(grant) {
+    await run(`grant:${grant.id}`, () => api(tenantPath(`/consolidation/report-grants/${encodeURIComponent(grant.id)}/revoke`), { method: 'POST' }), t('Đã thu hồi quyền xem báo cáo.'));
+  }
   async function loadReport(event) {
     event.preventDefault(); setBusy('report'); setError(''); setReport(null);
     try {
@@ -110,7 +123,12 @@ export default function ConsolidationWorkbenchPage() {
         <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy)}>{t('Chấp thuận chia sẻ')}</button></div>
       </form></section>
     </div>}
-    {can('consolidation.member.read') && can('accounting.journal_entry.read') && <section className="card card-pad"><h2>{t('Bảng cân đối phát sinh hợp nhất')}</h2><p className="sub">{t('Số dư từng tenant được đọc trong phạm vi RLS riêng, chỉ cộng sau khi xác minh consent hai chiều và quy đổi theo tỷ giá có hiệu lực cuối kỳ.')}</p><form className="form-grid" onSubmit={loadReport}>
+    {canManage && can('consolidation.report_grant.create') && <section className="card card-pad"><h2>{t('Cấp quyền xem báo cáo')}</h2><p className="sub">{t('Chỉ cấp cho người dùng đang hoạt động trong tenant này. Quyền áp dụng riêng cho bảng cân đối phát sinh của một nhóm.')}</p><form className="form-grid" onSubmit={createReportGrant}>
+      <label className="field"><span className="label">{t('Nhóm công ty')} *</span><select className="input" required value={reportGroup} onChange={(event) => setReportGroup(event.target.value)}><option value="">{t('Chọn nhóm')}</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
+      <label className="field"><span className="label">{t('Người dùng')} *</span><select className="input" required value={grantUserId} onChange={(event) => setGrantUserId(event.target.value)}><option value="">{t('Chọn người dùng')}</option>{users.filter((user) => !user.disabled).map((user) => <option key={user.id} value={user.id}>{user.name} · {user.id}</option>)}</select></label>
+      <div className="row full"><span className="grow"/><button className="btn btn-primary" disabled={Boolean(busy) || loading || !reportGroup}>{t('Cấp quyền bảng cân đối phát sinh')}</button></div>
+    </form>{grants.length > 0 && <div className="table-wrap"><table className="table"><thead><tr><th>{t('ID người dùng')}</th><th>{t('Nhóm')}</th><th>{t('Báo cáo')}</th><th>{t('Trạng thái')}</th><th>{t('Thao tác')}</th></tr></thead><tbody>{grants.map((grant) => <tr key={grant.id}><td>{grant.user_id}</td><td>{groups.find((group) => group.id === grant.group)?.name || grant.group}</td><td>{t('Bảng cân đối phát sinh')}</td><td>{t(grant.status || 'active')}</td><td>{grant.status === 'active' && <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => revokeReportGrant(grant)}>{t('Thu hồi quyền')}</button>}</td></tr>)}</tbody></table></div>}</section>}
+    {can('consolidation.company_group.read') && can('accounting.journal_entry.read') && <section className="card card-pad"><h2>{t('Bảng cân đối phát sinh hợp nhất')}</h2><p className="sub">{t('Số dư từng tenant được đọc trong phạm vi RLS riêng, chỉ cộng sau khi xác minh consent hai chiều và quy đổi theo tỷ giá có hiệu lực cuối kỳ.')}</p><form className="form-grid" onSubmit={loadReport}>
       <label className="field"><span className="label">{t('Nhóm công ty')} *</span><select className="input" required value={reportGroup} onChange={(event) => setReportGroup(event.target.value)}><option value="">{t('Chọn nhóm')}</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
       <label className="field"><span className="label">{t('Từ ngày')}</span><input className="input" type="date" value={reportFrom} onChange={(event) => setReportFrom(event.target.value)}/></label>
       <label className="field"><span className="label">{t('Đến ngày')}</span><input className="input" type="date" value={reportTo} onChange={(event) => setReportTo(event.target.value)}/></label>
@@ -118,5 +136,7 @@ export default function ConsolidationWorkbenchPage() {
     </form>{report && <><div className="row"><strong>{t('Tiền tệ báo cáo')}: {report.reportingCurrency}</strong><span className="grow"/><span className="faint">{report.companies?.length || 0} {t('tenant')}</span></div><p className="faint">{t('Cơ sở quy đổi')}: {report.rateBasis} · {t('Phương pháp')}: {report.consolidationMethod}</p><div className="table-wrap"><table className="table"><thead><tr><th>{t('Mã tài khoản')}</th><th>{t('Tài khoản')}</th><th>{t('Dư nợ đầu kỳ')}</th><th>{t('Dư có đầu kỳ')}</th><th>{t('Phát sinh nợ')}</th><th>{t('Phát sinh có')}</th><th>{t('Dư nợ cuối kỳ')}</th><th>{t('Dư có cuối kỳ')}</th></tr></thead><tbody>{report.accounts?.map((account) => <tr key={`${account.code}:${account.kind}`}><td>{account.code}</td><td>{account.name}</td><td className="num">{Number(account.openingDebit || 0).toLocaleString()}</td><td className="num">{Number(account.openingCredit || 0).toLocaleString()}</td><td className="num">{Number(account.periodDebit || 0).toLocaleString()}</td><td className="num">{Number(account.periodCredit || 0).toLocaleString()}</td><td className="num">{Number(account.closingDebit || 0).toLocaleString()}</td><td className="num">{Number(account.closingCredit || 0).toLocaleString()}</td></tr>)}</tbody></table></div></>}</section>}
     <section className="card card-pad"><h2>{t('Thành viên nhóm công ty')}</h2>{loading ? <div className="skeleton" data-h="row"/> : !members.length ? <div className="empty">{t('Chưa có tenant thành viên.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Tenant')}</th><th>{t('Nhóm')}</th><th>{t('Trạng thái')}</th>{canManage && <th>{t('Thao tác')}</th>}</tr></thead><tbody>{members.map((member) => <tr key={member.id}><td>{member.member_name}<div className="faint">{member.member_tenant_id}</div></td><td>{groups.find((group) => group.id === member.group)?.name || member.group}</td><td><span className={`badge ${member.status === 'active' ? 'success' : member.status === 'revoked' ? '' : 'warning'}`}>{t(member.status || 'invited')}</span></td>{canManage && <td>{member.status !== 'revoked' && <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => revokeMember(member)}>{t('Thu hồi')}</button>}</td>}</tr>)}</tbody></table></div>}</section>
     <section className="card card-pad"><h2>{t('Tenant đã chấp thuận chia sẻ với đơn vị này')}</h2>{loading ? <div className="skeleton" data-h="row"/> : !shares.length ? <div className="empty">{t('Chưa có consent chia sẻ nào.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Tenant chủ dữ liệu')}</th><th>{t('Trạng thái')}</th>{canManage && <th>{t('Thao tác')}</th>}</tr></thead><tbody>{shares.map((share) => <tr key={share.id}><td>{share.owner_name}<div className="faint">{share.owner_tenant_id}</div></td><td><span className={`badge ${share.status === 'active' ? 'success' : ''}`}>{t(share.status || 'active')}</span></td>{canManage && <td>{share.status === 'active' && <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => revokeShare(share)}>{t('Thu hồi consent')}</button>}</td>}</tr>)}</tbody></table></div>}</section>
+    {report?.companies?.map((company) => <details className="card card-pad" key={company.tenantId}><summary><strong>{company.name}</strong> · {t('Số gốc')} {company.localCurrency} · {t('Tỷ giá')} {Number(company.conversionRate).toLocaleString()} {t('ngày hiệu lực')} {company.rateEffectiveDate}</summary><div className="table-wrap"><table className="table"><thead><tr><th>{t('Mã tài khoản')}</th><th>{t('Tài khoản')}</th><th>{t('Dư nợ gốc')}</th><th>{t('Dư có gốc')}</th><th>{t('Dư nợ quy đổi')}</th><th>{t('Dư có quy đổi')}</th></tr></thead><tbody>{company.accounts?.map((account) => <tr key={`${account.code}:${account.kind}`}><td>{account.code}</td><td>{account.name}</td><td className="num">{Number(account.closingDebit || 0).toLocaleString()}</td><td className="num">{Number(account.closingCredit || 0).toLocaleString()}</td><td className="num">{Number(account.reportingClosingDebit || 0).toLocaleString()}</td><td className="num">{Number(account.reportingClosingCredit || 0).toLocaleString()}</td></tr>)}</tbody></table></div></details>)}
+    {report?.reconciliation && <section className="card card-pad"><h2>{t('Đối chiếu số dư')}</h2><div className="row"><span>{t('Tổng dư nợ cuối kỳ')} · {report.reportingCurrency}: {Number(report.reconciliation.closingDebitTotal).toLocaleString()}</span><span>{t('Tổng dư có cuối kỳ')} · {report.reportingCurrency}: {Number(report.reconciliation.closingCreditTotal).toLocaleString()}</span><strong>{t('Chênh lệch')}: {Number(report.reconciliation.difference).toLocaleString()}</strong><span className={`badge ${report.reconciliation.withinCentTolerance ? 'success' : 'warning'}`}>{report.reconciliation.withinCentTolerance ? t('Cân trong ngưỡng một xu') : t('Cần rà soát chênh lệch')}</span></div></section>}
   </div>;
 }

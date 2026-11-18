@@ -61,6 +61,26 @@
       },
       "computed": {},
       "constraints": []
+    },
+    {
+      "name": "report_grant",
+      "label": "Quyền xem báo cáo tập đoàn",
+      "systemManaged": true,
+      "fields": [
+        { "name": "group", "type": "ref", "required": true, "ref": "consolidation.company_group" },
+        { "name": "user_id", "type": "string", "required": true },
+        { "name": "report_type", "type": "enum", "required": true, "options": ["trial_balance"] },
+        { "name": "status", "type": "enum", "required": false, "options": ["active", "revoked"] }
+      ],
+      "states": {
+        "field": "status",
+        "initial": "active",
+        "actions": {
+          "revoked": { "from": ["active"], "to": "revoked" }
+        }
+      },
+      "computed": {},
+      "constraints": []
     }
   ]
 }

@@ -871,6 +871,26 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     .await?,
             );
         }
+        (&Method::POST, ["consolidation", "groups", group_id, "report-grants"]) => {
+            let body = json_obj(&bytes)?;
+            return Ok(Reply::Json(
+                201,
+                k.grant_consolidated_report(
+                    &actor,
+                    &t,
+                    group_id,
+                    &s(&body, "userId"),
+                    &s(&body, "reportType"),
+                )
+                .await?,
+            ));
+        }
+        (&Method::POST, ["consolidation", "report-grants", grant_id, "revoke"]) => {
+            return json_ok(
+                k.revoke_consolidated_report_grant(&actor, &t, grant_id)
+                    .await?,
+            );
+        }
         (&Method::POST, ["consolidation", "groups", group_id, "invites"]) => {
             let body = json_obj(&bytes)?;
             let result = k

@@ -42,7 +42,7 @@ pub(super) async fn validate(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> 
     let Some(effective_date) = document
         .get("effective_date")
         .and_then(Value::as_str)
-        .filter(|value| chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").is_ok())
+        .and_then(|value| chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").ok())
     else {
         return Ok(errors);
     };

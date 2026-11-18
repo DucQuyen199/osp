@@ -17,7 +17,9 @@ impl Kernel {
             && matches!(actor, Actor::User { .. })
             && matches!(
                 qname.as_str(),
-                "consolidation.member" | "consolidation.shared_company"
+                "consolidation.member"
+                    | "consolidation.shared_company"
+                    | "consolidation.report_grant"
             )
         {
             return Err(ApiError::forbidden(

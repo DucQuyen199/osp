@@ -17,7 +17,8 @@ impl Kernel {
         let qname = ent.qname();
         if matches!(actor, Actor::User { .. })
             && ((qname == "consolidation.member" && matches!(action, "accepted" | "revoked"))
-                || (qname == "consolidation.shared_company" && action == "revoked"))
+                || (qname == "consolidation.shared_company" && action == "revoked")
+                || (qname == "consolidation.report_grant" && action == "revoked"))
         {
             return Err(ApiError::forbidden(
                 "Company membership changes must use the tenant-consent endpoints",

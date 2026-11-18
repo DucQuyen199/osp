@@ -210,7 +210,54 @@ pub(super) async fn run(kernel: &Arc<Kernel>) {
 
 async fn company_group_consent(kernel: &Arc<Kernel>) {
     let owner = Ctx::new(kernel, None, &["consolidation"]).await;
-    let member = Ctx::new(kernel, None, &["consolidation"]).await;
+    let mut member = Ctx::new(kernel, None, &["consolidation"]).await;
+    let member_usd = member
+        .create(
+            "master-data.currency",
+            json!({ "code": "USD", "name": "US Dollar" }),
+        )
+        .await;
+    kernel
+        .update_settings(&member.t, &json!({ "baseCurrency": "USD" }))
+        .await
+        .expect("set member base currency");
+    member.refresh().await;
+    let local_vnd = member
+        .list("master-data.currency", &[])
+        .await
+        .into_iter()
+        .find(|currency| currency["code"] == "VND")
+        .expect("member VND seed");
+    let rate = member
+        .create(
+            "master-data.currency_rate",
+            json!({ "from_currency": local_vnd["id"], "to_currency": id(&member_usd), "effective_date": "2020-01-01", "rate": 0.00004 }),
+        )
+        .await;
+    let expense_account = member
+        .list("accounting.account", &[("code", "642")])
+        .await
+        .remove(0);
+    let cash_account = member
+        .list("accounting.account", &[("code", "112")])
+        .await
+        .remove(0);
+    let journal = member
+        .create(
+            "accounting.journal_entry",
+            json!({
+                "memo": "Group report FX fixture",
+                "amount": 10,
+                "lines": [
+                    { "account": id(&expense_account), "debit": 10, "credit": 0 },
+                    { "account": id(&cash_account), "debit": 0, "credit": 10 }
+                ]
+            }),
+        )
+        .await;
+    member
+        .act("accounting.journal_entry", &id(&journal), "posted")
+        .await;
     let currencies = owner.list("master-data.currency", &[]).await;
     let usd = currencies
         .iter()
@@ -241,6 +288,31 @@ async fn company_group_consent(kernel: &Arc<Kernel>) {
             .await
             .is_err()
     );
+    let denied = kernel
+        .consolidated_trial_balance(&owner.a, &owner.t, &id(&group), None, None)
+        .await
+        .expect_err("accounting access alone must not grant group reports");
+    assert_eq!(denied.code, "FORBIDDEN");
+    let grant = kernel
+        .grant_consolidated_report(
+            &owner.a,
+            &owner.t,
+            &id(&group),
+            owner.a.user_id(),
+            "trial_balance",
+        )
+        .await
+        .expect("grant named owner user access to trial balance");
+    let unconsented_report = kernel
+        .consolidated_trial_balance(&owner.a, &owner.t, &id(&group), None, None)
+        .await
+        .expect("read group report before member consent");
+    assert!(
+        unconsented_report["companies"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
     kernel
         .accept_company_group_invite(&member.a, &member.t, &owner.t.id, member_id, token)
         .await
@@ -258,6 +330,86 @@ async fn company_group_consent(kernel: &Arc<Kernel>) {
     assert_eq!(report["reportingCurrency"], "VND");
     assert_eq!(report["companies"].as_array().unwrap().len(), 1);
     assert_eq!(report["companies"][0]["tenantId"], member.t.id);
+    assert_eq!(report["companies"][0]["localCurrency"], "USD");
+    assert_eq!(report["companies"][0]["conversionRate"], 25000.0);
+    assert_eq!(report["companies"][0]["rateEffectiveDate"], "2020-01-01");
+    let source_expense = report["companies"][0]["accounts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|account| account["code"] == "642")
+        .unwrap();
+    assert_eq!(source_expense["closingDebit"], 10.0);
+    assert_eq!(source_expense["reportingClosingDebit"], 250000.0);
+    assert_eq!(report["reconciliation"]["difference"], 0.0);
+    assert_eq!(report["reconciliation"]["withinCentTolerance"], true);
+    kernel
+        .remove(
+            &member.a,
+            &member.t,
+            "master-data.currency_rate",
+            &id(&rate),
+        )
+        .await
+        .expect("remove rate to check fail-closed behavior");
+    let missing_rate = kernel
+        .consolidated_trial_balance(&owner.a, &owner.t, &id(&group), None, None)
+        .await
+        .expect_err("report must fail if the member has no rate on or before period end");
+    assert_eq!(missing_rate.code, "CURRENCY_RATE_MISSING");
+    member
+        .create(
+            "master-data.currency_rate",
+            json!({ "from_currency": local_vnd["id"], "to_currency": id(&member_usd), "effective_date": "2020-01-01", "rate": 0.00004 }),
+        )
+        .await;
+    let (_, ungranted_token) = kernel
+        .add_user(&owner.t, "Ungrantable user", None, None, &["admin".into()])
+        .await
+        .expect("create another tenant user");
+    let (_, ungranted_actor, _) = kernel
+        .authenticate(&ungranted_token.expect("API token"))
+        .await
+        .expect("authenticate ungranted user");
+    let denied_user = kernel
+        .consolidated_trial_balance(&ungranted_actor, &owner.t, &id(&group), None, None)
+        .await
+        .expect_err("a different admin must not inherit another user's report grant");
+    assert_eq!(denied_user.code, "FORBIDDEN");
+    assert!(
+        owner
+            .k
+            .act(
+                &owner.a,
+                &owner.t,
+                "consolidation.report_grant",
+                grant["grantId"].as_str().unwrap(),
+                "revoked",
+            )
+            .await
+            .is_err(),
+        "generic state actions must not bypass the audited grant endpoint"
+    );
+    kernel
+        .revoke_consolidated_report_grant(&owner.a, &owner.t, grant["grantId"].as_str().unwrap())
+        .await
+        .expect("revoke named report access");
+    assert!(
+        kernel
+            .consolidated_trial_balance(&owner.a, &owner.t, &id(&group), None, None)
+            .await
+            .is_err()
+    );
+    kernel
+        .grant_consolidated_report(
+            &owner.a,
+            &owner.t,
+            &id(&group),
+            owner.a.user_id(),
+            "trial_balance",
+        )
+        .await
+        .expect("restore named report access for remaining flow assertions");
 
     assert!(
         kernel
