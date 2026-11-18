@@ -4,6 +4,7 @@ import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
+import { compareDecimals } from '../../lib/decimal.js';
 import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
 import MaintenancePartsEditor from './components/MaintenancePartsEditor.jsx';
 import maintenanceEnglish from './maintenance.en.js';
@@ -77,7 +78,7 @@ export default function MaintenanceWorkbenchPage() {
   }
   async function createRequest(event) {
     event.preventDefault();
-    const materialLines = parts.filter((line) => line.product && Number(line.qty) > 0).map((line) => ({ product: line.product, qty: Number(line.qty), ...(line.uom ? { uom: line.uom } : {}) }));
+    const materialLines = parts.filter((line) => line.product && compareDecimals(line.qty || 0, 0) > 0).map((line) => ({ product: line.product, qty: String(line.qty), ...(line.uom ? { uom: line.uom } : {}) }));
     await run('create', async () => {
       const row = await api(dataPath('maintenance.maintenance_request'), { method: 'POST', body: {
         asset: assetId, description: description.trim() || undefined, priority,

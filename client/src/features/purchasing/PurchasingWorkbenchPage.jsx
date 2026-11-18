@@ -237,9 +237,9 @@ export default function PurchasingWorkbenchPage() {
     if (!sourceLine) { setError(uiText('Không đối chiếu được dòng QC với dòng đơn mua tương ứng.')); return; }
     const invoiceLine = returnForm.supplier_invoice ? invoiceLineForReturn(returnForm.supplier_invoice, sourceLine) : null;
     if (returnForm.supplier_invoice && !invoiceLine) { setError(uiText('Không đối chiếu được mặt hàng QC với dòng hóa đơn nhà cung cấp.')); return; }
-    const qty = Number(returnForm.qty);
+    const qty = String(returnForm.qty || '0');
     const requestedBaseQuantity = multiplyDecimals([returnForm.qty || 0, returnUnitRatioFor(returnInspection)]);
-    if (!Number.isFinite(qty) || qty <= 0 || compareDecimals(requestedBaseQuantity, addDecimals([returnAvailableBaseQuantity, '0.000001'])) > 0) {
+    if (compareDecimals(qty, 0) <= 0 || compareDecimals(requestedBaseQuantity, addDecimals([returnAvailableBaseQuantity, '0.000001'])) > 0) {
       setError(uiText('Số lượng trả không được vượt quá lượng lỗi còn lại từ phiếu kiểm tra.')); return;
     }
     const payload = {
@@ -255,8 +255,8 @@ export default function PurchasingWorkbenchPage() {
   async function createGeneralReturn(event) {
     event.preventDefault();
     if (!selected || !generalReturnLine) return;
-    const qty = Number(generalReturnForm.qty);
-    if (!Number.isFinite(qty) || qty <= 0 || qty > generalReturnLine.qty + 0.000001) {
+    const qty = String(generalReturnForm.qty || '0');
+    if (compareDecimals(qty, 0) <= 0 || compareDecimals(qty, addDecimals([generalReturnLine.qty, '0.000001'])) > 0) {
       setError(uiText('Số lượng trả phải lớn hơn 0 và không vượt quá lượng thực nhận còn lại.')); return;
     }
     const invoiceLine = generalReturnForm.supplier_invoice ? invoiceLineForReturn(generalReturnForm.supplier_invoice, generalReturnLine) : null;

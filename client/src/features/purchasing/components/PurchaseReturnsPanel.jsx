@@ -1,5 +1,15 @@
 import React from 'react';
 import { fmtMoney, fmtNumber, statusLabel, uiText } from '../../../lib/i18n.js';
+import { addDecimals, compareDecimals } from '../../../lib/decimal.js';
+
+const exceedsAvailable = (value, available) => {
+  try { return compareDecimals(value || 0, addDecimals([available || 0, '0.000001'])) > 0; }
+  catch { return true; }
+};
+const hasPositiveQuantity = (value) => {
+  try { return compareDecimals(value || 0, 0) > 0; }
+  catch { return false; }
+};
 
 export default function PurchaseReturnsPanel({
   selected,
@@ -61,7 +71,7 @@ export default function PurchaseReturnsPanel({
       </label>
       <div className="row full">
         <span className="grow small muted">{uiText('Hàng chỉ được xuất sau khi phiếu trả được duyệt.')}</span>
-        <button className="btn btn-primary" type="submit" disabled={Boolean(busy) || !returnInspection || !(Number(returnForm.qty) > 0) || Number(returnForm.qty) > returnAvailableQuantity + 0.000001}>
+        <button className="btn btn-primary" type="submit" disabled={Boolean(busy) || !returnInspection || !hasPositiveQuantity(returnForm.qty) || exceedsAvailable(returnForm.qty, returnAvailableQuantity)}>
           {busy === 'return:create' ? uiText('Đang lập phiếu…') : uiText('Lập phiếu trả nháp')}
         </button>
       </div>
@@ -96,7 +106,7 @@ export default function PurchaseReturnsPanel({
         </label>
         <div className="row full">
           <span className="grow small muted">{uiText('Số lượng được đối chiếu theo phiếu nhận và các phiếu trả đang xử lý.')}</span>
-          <button className="btn btn-primary" type="submit" disabled={Boolean(busy) || !generalReturnLine || !(Number(generalReturnForm.qty) > 0) || Number(generalReturnForm.qty) > generalReturnLine.qty + 0.000001}>
+          <button className="btn btn-primary" type="submit" disabled={Boolean(busy) || !generalReturnLine || !hasPositiveQuantity(generalReturnForm.qty) || exceedsAvailable(generalReturnForm.qty, generalReturnLine.qty)}>
             {busy === 'return:general:create' ? uiText('Đang lập phiếu…') : uiText('Lập phiếu trả nháp')}
           </button>
         </div>

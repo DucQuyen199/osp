@@ -96,8 +96,7 @@ export function calculateReturnableLines(receipts, returns) {
   }
   return [...received.entries()]
     .map(([key, line]) => ({ ...line, key }))
-    .filter((line) => compareDecimals(line.qty, '0.000001') > 0)
-    .map((line) => ({ ...line, qty: Number(line.qty) }));
+    .filter((line) => compareDecimals(line.qty, '0.000001') > 0);
 }
 
 export function selectReturnableInspections(inspections, orderId, receipts, returns) {

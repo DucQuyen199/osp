@@ -3,6 +3,7 @@ import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
+import { compareDecimals } from '../../lib/decimal.js';
 import { app, can, loadAll, loadRefs, recordLabel } from '../../lib/state.js';
 import clinicEnglish from './clinic.en.js';
 import EncounterPrescriptionsPanel from './components/EncounterPrescriptionsPanel.jsx';
@@ -140,7 +141,7 @@ export default function ClinicWorkbenchPage() {
     event.preventDefault(); if (!selected) return;
     setBusy(true); setError(''); setNotice('');
     try {
-      await api(dataPath('clinic.prescription'), { method: 'POST', body: { encounter: selected.id, warehouse: rxWarehouse, items: rxItems.filter((item) => item.product && Number(item.qty) > 0).map((item) => ({ product: item.product, qty: Number(item.qty), ...(item.uom ? { uom: item.uom } : {}), dosage: item.dosage.trim() })) } });
+      await api(dataPath('clinic.prescription'), { method: 'POST', body: { encounter: selected.id, warehouse: rxWarehouse, items: rxItems.filter((item) => item.product && compareDecimals(item.qty || 0, 0) > 0).map((item) => ({ product: item.product, qty: String(item.qty), ...(item.uom ? { uom: item.uom } : {}), dosage: item.dosage.trim() })) } });
       await load(true); setRxItems([{ product: '', qty: 1, dosage: '', uom: '' }]); setNotice(t("Đã lưu đơn thuốc nháp. Chỉ có thể phát sau khi hoàn tất lượt khám."));
     } catch (reason) { setError(reason.message || t("Không lưu được đơn thuốc.")); }
     finally { setBusy(false); }
