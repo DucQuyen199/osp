@@ -1,47 +1,26 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath } from '../../lib/api.js';
 import { textDialog } from '../../lib/feedback.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
 import { addDecimals, compareDecimals, subtractDecimals } from '../../lib/decimal.js';
-import { can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
-const rows = (response) => Array.isArray(response?.items) ? response.items : [];
+import { can, recordLabel } from '../../lib/state.js';
+import { usePaymentsWorkbenchData } from './hooks/usePaymentsWorkbenchData.js';
 const providerLabels = { vnpay: 'VNPay', momo: 'MoMo', zalopay: 'ZaloPay', stripe: 'Stripe', bank: 'Ngân hàng' };
 const methodLabels = { cash: 'Tiền mặt', card: 'Thẻ', transfer: 'Chuyển khoản', ewallet: 'Ví điện tử', bank: 'Ngân hàng' };
 const transactionLabels = { pending: 'Chờ xác nhận', succeeded: 'Thành công', failed: 'Thất bại', partially_refunded: 'Hoàn một phần', refunded: 'Đã hoàn' };
 const refundLabels = { pending: 'Chờ xử lý', succeeded: 'Đã hoàn', failed: 'Thất bại' };
 export default function PaymentsWorkbenchPage() {
   useDocumentTitle(`${uiText('Giao dịch thanh toán')} · OSP Suite`);
-  const [transactions, setTransactions] = useState([]);
-  const [refunds, setRefunds] = useState([]);
-  const [parties, setParties] = useState(new Map());
-  const [invoices, setInvoices] = useState(new Map());
-  const [bills, setBills] = useState(new Map());
+  const { transactions, refunds, parties, invoices, bills, loading, error, setError, load } = usePaymentsWorkbenchData();
   const [form, setForm] = useState({ provider: 'bank', method: 'transfer', party: '', amount: '', invoice: '', bill: '', reference: '' });
   const [refundForm, setRefundForm] = useState({ payment_txn: '', amount: '', reference: '' });
   const [filter, setFilter] = useState('all');
   const [busy, setBusy] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const load = useCallback(async (quiet = false) => {
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const [txnRes, refundRes, partyMap, invoiceMap, billMap] = await Promise.all([
-        can('payments.payment_txn.read') ? loadAllResponse('payments.payment_txn') : Promise.resolve({ items: [] }),
-        can('payments.payment_refund.read') ? loadAllResponse('payments.payment_refund') : Promise.resolve({ items: [] }),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('accounting.invoice.read') ? loadRefs('accounting.invoice') : Promise.resolve(new Map()),
-        can('accounting.bill.read') ? loadRefs('accounting.bill') : Promise.resolve(new Map()),
-      ]);
-      setTransactions(rows(txnRes).sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))));
-      setRefunds(rows(refundRes).sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))));
-      setParties(partyMap); setInvoices(invoiceMap); setBills(billMap);
-      setForm((current) => ({ ...current, party: current.party && partyMap.has(current.party) ? current.party : [...partyMap.keys()][0] || '' }));
-    } catch (reason) { setError(reason.message || uiText('Không tải được giao dịch thanh toán.')); }
-    finally { if (!quiet) setLoading(false); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    setForm((current) => ({ ...current, party: current.party && parties.has(current.party) ? current.party : [...parties.keys()][0] || '' }));
+  }, [parties]);
   const visible = useMemo(() => transactions.filter((row) => filter === 'all' || row.status === filter), [transactions, filter]);
   const paidCount = transactions.filter((row) => row.status === 'succeeded').length;
   const pendingCount = transactions.filter((row) => row.status === 'pending').length;
