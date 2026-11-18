@@ -9,6 +9,16 @@ use rust_decimal::Decimal;
 use serde_json::Value;
 use uuid::Uuid;
 
+fn tenant_local_date(timestamp: &str, tenant: &Tenant) -> Option<chrono::NaiveDate> {
+    chrono::DateTime::parse_from_rfc3339(timestamp)
+        .ok()
+        .map(|value| {
+            value
+                .with_timezone(&tenant.business_timezone())
+                .date_naive()
+        })
+}
+
 pub async fn validate_persistence(
     tx: &Tx<'_>,
     tenant: &Tenant,
@@ -61,7 +71,9 @@ async fn validate_class_session(
     let mut errors = Vec::new();
     if class_start
         .as_deref()
-        .is_some_and(|date| starts_at.get(..10).is_some_and(|start| start < date))
+        .and_then(|value| chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").ok())
+        .zip(tenant_local_date(starts_at, tenant))
+        .is_some_and(|(class_start, starts_on)| starts_on < class_start)
     {
         errors.push("Buổi học không thể nằm trước ngày bắt đầu lớp".into());
     }
@@ -377,8 +389,8 @@ async fn validate_class(
             (id, document.get("start_date").and_then(Value::as_str))
         {
             if tx.query_opt(
-                "SELECT id FROM school__class_session WHERE tenant_id=$1 AND \"class\"=$2 AND status<>'cancelled' AND starts_at::date < $3::date LIMIT 1 FOR UPDATE",
-                &[&tenant.id, &id, &start_date],
+                "SELECT id FROM school__class_session WHERE tenant_id=$1 AND \"class\"=$2 AND status<>'cancelled' AND (starts_at AT TIME ZONE $4)::date < $3::date LIMIT 1 FOR UPDATE",
+                &[&tenant.id, &id, &start_date, &tenant.business_timezone().to_string()],
             ).await?.is_some() {
                 errors.push("Cannot move class start date past a scheduled session".into());
             }
