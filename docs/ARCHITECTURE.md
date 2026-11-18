@@ -31,7 +31,7 @@ Dependency direction flows inward: domain policy does not depend on HTTP or SQL 
 
 `definitions/modules/<id>.json` declares entities, fields, states, dependencies, scheduled jobs, and declarative event reactions. `definitions/verticals/<id>.json` selects modules and configures terminology, extensions, roles, and KPIs. Rust validates and loads both catalogs; Rust catalog CLI produces lint results, OpenAPI, and module documentation.
 
-Computed fields, numeric rule increments, schema minimums, CSV imports, KPI formulas, and financial preview/reconciliation paths use Decimal. JSON amount values pass through the shared serializer so arbitrary-precision decimal values remain numeric in API responses.
+Computed fields, numeric rule increments, schema minimums, CSV imports, KPI formulas, and financial preview/reconciliation paths use Decimal. The server emits JSON numbers; the browser response parser preserves values beyond JavaScript's safe precision as decimal strings so Decimal calculations do not receive rounded values.
 
 Scheduled job actions run in tenant-scoped PostgreSQL transactions under tenant and row locks; each worker rechecks the due predicate and retry cooldown after acquiring the tenant lock, so candidates selected by concurrent scheduler instances cannot bypass a newly recorded failure. Failed retries update one open failure record per tenant/job/entity instead of creating a row every scheduler tick. The scheduler delays retries with capped exponential backoff (one minute to six hours) and skips records whose failure is still cooling down, so permanently invalid early records cannot occupy the first 500 due slots on every tick; a successful retry resolves the failure in the same transaction as the action.
 

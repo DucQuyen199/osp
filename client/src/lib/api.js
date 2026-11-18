@@ -36,19 +36,59 @@ export const session = {
 };
 let memory = null;
 
-function parseResponseJson(text) {
-  return JSON.parse(text, (_key, value, context) => {
-    if (typeof value !== 'number' || typeof context?.source !== 'string') return value;
+// Quote number tokens whose precision JavaScript Number could round; leave strings
+// and ordinary numeric fields unchanged for existing UI consumers.
+function preservePreciseJsonNumbers(text) {
+  let output = '';
+  let inString = false;
+  let escaped = false;
+  for (let index = 0; index < text.length;) {
+    const character = text[index];
+    if (inString) {
+      output += character;
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === '"') inString = false;
+      index += 1;
+      continue;
+    }
+    if (character === '"') {
+      inString = true;
+      output += character;
+      index += 1;
+      continue;
+    }
+    if (character !== '-' && (character < '0' || character > '9')) {
+      output += character;
+      index += 1;
+      continue;
+    }
 
-    // Keep JSON numbers with more precision than a JavaScript Number can safely
-    // carry as text. Decimal helpers can then use the original server value.
-    const source = context.source;
+    const start = index;
+    if (text[index] === '-') index += 1;
+    while (text[index] >= '0' && text[index] <= '9') index += 1;
+    if (text[index] === '.') {
+      index += 1;
+      while (text[index] >= '0' && text[index] <= '9') index += 1;
+    }
+    if (text[index] === 'e' || text[index] === 'E') {
+      index += 1;
+      if (text[index] === '+' || text[index] === '-') index += 1;
+      while (text[index] >= '0' && text[index] <= '9') index += 1;
+    }
+    const source = text.slice(start, index);
     const mantissa = source.split(/[eE]/, 1)[0].replace(/^[+-]/, '').replace('.', '');
     const significantDigits = mantissa.replace(/^0+/, '').replace(/0+$/, '').length;
-    return significantDigits > 15 || (Number.isInteger(value) && !Number.isSafeInteger(value))
-      ? source
-      : value;
-  });
+    const number = Number(source);
+    const preserveAsText = significantDigits > 15
+      || (Number.isInteger(number) && !Number.isSafeInteger(number));
+    output += preserveAsText ? JSON.stringify(source) : source;
+  }
+  return output;
+}
+
+function parseResponseJson(text) {
+  return JSON.parse(preservePreciseJsonNumbers(text));
 }
 
 const listeners = new Set();
