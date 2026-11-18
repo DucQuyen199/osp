@@ -3,7 +3,7 @@ import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDateTime as businessDateTime, localDateTimeToIso } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
-import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { app, can, loadRefs, recordLabel, loadAllResponse, loadIndependentData } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import { compareDecimals } from '../../lib/decimal.js';
 import restaurantEnglish from './restaurant.en.js';
@@ -50,21 +50,29 @@ export default function RestaurantServicePage() {
       const canReadTickets = can('restaurant.kitchen_ticket.read');
       const canReadInvoices = app.meta?.modules?.some((module) => module.id === 'accounting') && can('accounting.payment.read');
       const canReadReservations = can('restaurant.reservation.read');
-      const [tableResponse, menuResponse, recipeResponse, orderResponse, productMap, unitMap, warehouseMap, ticketResponse, invoiceResponse, reservationResponse] = await Promise.all([
-        can('restaurant.table.read') ? loadAllResponse('restaurant.table') : Promise.resolve({ items: [] }),
-        can('restaurant.menu_item.read') ? loadAllResponse('restaurant.menu_item') : Promise.resolve({ items: [] }),
-        can('restaurant.recipe.read') ? loadAllResponse('restaurant.recipe') : Promise.resolve({ items: [] }),
-        can('restaurant.table_order.read') ? loadAllResponse('restaurant.table_order') : Promise.resolve({ items: [] }),
-        can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
-        can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
-        can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
-        canReadTickets ? loadAllResponse('restaurant.kitchen_ticket') : Promise.resolve({ items: [] }),
-        canReadInvoices ? loadAllResponse('accounting.payment') : Promise.resolve({ items: [] }),
-        canReadReservations ? loadAllResponse('restaurant.reservation') : Promise.resolve({ items: [] }),
-      ]);
+      const { data, errors } = await loadIndependentData({
+        tables: can('restaurant.table.read') ? loadAllResponse('restaurant.table') : Promise.resolve({ items: [] }),
+        menu: can('restaurant.menu_item.read') ? loadAllResponse('restaurant.menu_item') : Promise.resolve({ items: [] }),
+        recipes: can('restaurant.recipe.read') ? loadAllResponse('restaurant.recipe') : Promise.resolve({ items: [] }),
+        orders: can('restaurant.table_order.read') ? loadAllResponse('restaurant.table_order') : Promise.resolve({ items: [] }),
+        products: can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
+        units: can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
+        warehouses: can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
+        tickets: canReadTickets ? loadAllResponse('restaurant.kitchen_ticket') : Promise.resolve({ items: [] }),
+        payments: canReadInvoices ? loadAllResponse('accounting.payment') : Promise.resolve({ items: [] }),
+        reservations: canReadReservations ? loadAllResponse('restaurant.reservation') : Promise.resolve({ items: [] }),
+      }, {
+        tables: { items: [] }, menu: { items: [] }, recipes: { items: [] }, orders: { items: [] },
+        products: new Map(), units: new Map(), warehouses: new Map(), tickets: { items: [] },
+        payments: { items: [] }, reservations: { items: [] },
+      });
+      const { tables: tableResponse, menu: menuResponse, recipes: recipeResponse, orders: orderResponse,
+        products: productMap, units: unitMap, warehouses: warehouseMap, tickets: ticketResponse,
+        payments: invoiceResponse, reservations: reservationResponse } = data;
       const nextOrders = itemsOf(orderResponse).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
       setTables(itemsOf(tableResponse)); setMenuItems(itemsOf(menuResponse)); setRecipes(itemsOf(recipeResponse)); setOrders(nextOrders); setProducts(productMap); setUnits(unitMap); setWarehouses(warehouseMap); setTickets(itemsOf(ticketResponse)); setInvoices(itemsOf(invoiceResponse)); setReservations(itemsOf(reservationResponse).sort((a, b) => String(a.starts_at || '').localeCompare(String(b.starts_at || ''))));
       setSelectedId((current) => nextOrders.some((order) => order.id === current) ? current : nextOrders[0]?.id || '');
+      if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được dữ liệu nhà hàng.')).join(' · '));
     } catch (reason) { setError(reason.message || t('Không tải được dữ liệu nhà hàng.')); }
     finally { if (!quiet) setLoading(false); }
   }, []);
