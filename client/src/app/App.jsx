@@ -5,6 +5,7 @@ import { parseRoute } from './parseRoute.js';
 import GlobalSearch from '../components/GlobalSearch.jsx';
 import Icon from '../components/Icon.jsx';
 import Sidebar from '../components/Sidebar.jsx';
+import AccountMenu from '../components/AccountMenu.jsx';
 import { api, onUnauthorized, session } from '../lib/api.js';
 import { setBusinessTimezone } from '../lib/dates.js';
 import { enhanceScrollableRegions } from '../lib/scrollableRegions.js';
@@ -18,7 +19,6 @@ export default function App() {
   const [navOpen, setNavOpen] = useState(false);
   const [mobileNav, setMobileNav] = useState(() => window.matchMedia('(max-width: 960px)').matches);
   const navToggleRef = useRef(null);
-  const [accountOpen, setAccountOpen] = useState(false);
   const [theme, setTheme] = useState(() => { try { return localStorage.getItem('osp.theme') || ''; } catch { return ''; } });
   const [numberLocale, setNumberLocale] = useState(formatLocale);
   const [interfaceLanguage, setInterfaceLanguage] = useState(uiLocale);
@@ -141,7 +141,6 @@ export default function App() {
     try { await api('/api/auth/logout', { method: 'POST' }); } catch { /* session may have expired */ }
     session.clear();
     resetAppState();
-    setAccountOpen(false);
     location.hash = '#/login';
   };
 
@@ -152,7 +151,6 @@ export default function App() {
         document.querySelector('.global-search-input')?.focus();
       }
       if (event.key === 'Escape') {
-        setAccountOpen(false);
         if (mobileNav && navOpen) {
           setNavOpen(false);
           navToggleRef.current?.focus();
@@ -192,7 +190,6 @@ export default function App() {
   </>;
   if (!meta || !user) return <div className="page"><div className="alert danger">{uiText('Không tải được dữ liệu doanh nghiệp. Vui lòng tải lại trang.')}</div></div>;
 
-  const initials = (user.name || '?').split(' ').slice(-2).map((part) => part[0]).join('').toUpperCase();
   return <>
     <a className="skip-link" href="#main">{uiText('Bỏ qua điều hướng')}</a>
     <div className="app">
@@ -203,24 +200,7 @@ export default function App() {
         <span className="grow" />
         <GlobalSearch meta={meta} onNavigate={() => setNavOpen(false)} />
         <button className="btn btn-ghost btn-icon" type="button" aria-label={uiText(theme === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối')} title={uiText(theme === 'dark' ? 'Giao diện sáng' : 'Giao diện tối')} onClick={toggleTheme}><Icon name={theme === 'dark' ? 'sun' : 'moon'} /></button>
-        <div className="menu">
-          <button className="btn btn-ghost" type="button" aria-haspopup="menu" aria-expanded={accountOpen} aria-label={`${uiText('Tài khoản')} ${user.name}`} onClick={() => setAccountOpen((open) => !open)}><span className="avatar">{initials}</span></button>
-          {accountOpen && <div className="menu-pop" role="menu">
-            <div className="menu-item" role="none"><div><strong>{user.name}</strong><div className="faint">{user.email || uiText('Tài khoản máy')}</div></div></div>
-            <div className="menu-item" role="none"><strong>{uiText('Ngôn ngữ giao diện')}</strong></div>
-            <div role="group" aria-label={uiText('Ngôn ngữ giao diện')}>
-              <button className="menu-item" role="menuitemradio" aria-checked={interfaceLanguage === 'vi-VN'} type="button" onClick={() => changeInterfaceLanguage('vi-VN')}>{uiText('Tiếng Việt')}</button>
-              <button className="menu-item" role="menuitemradio" aria-checked={interfaceLanguage === 'en-US'} type="button" onClick={() => changeInterfaceLanguage('en-US')}>{uiText('Tiếng Anh')}</button>
-            </div>
-            <div className="menu-item" role="none"><strong>{uiText('Định dạng ngày và số')}</strong></div>
-            <div role="group" aria-label={uiText('Định dạng ngày và số')}>
-              <button className="menu-item" role="menuitemradio" aria-checked={numberLocale === 'vi-VN'} type="button" onClick={() => changeNumberLocale('vi-VN')}>{uiText('Việt Nam · ngày/tháng/năm')}</button>
-              <button className="menu-item" role="menuitemradio" aria-checked={numberLocale === 'en-US'} type="button" onClick={() => changeNumberLocale('en-US')}>{uiText('Hoa Kỳ · tháng/ngày/năm')}</button>
-            </div>
-            <a className="menu-item" role="menuitem" href="#/account/security" onClick={() => setAccountOpen(false)}>{uiText('Bảo mật tài khoản')}</a>
-            <button className="menu-item" role="menuitem" type="button" onClick={logout}><Icon name="logout" />{uiText('Đăng xuất')}</button>
-          </div>}
-        </div>
+        <AccountMenu user={user} interfaceLanguage={interfaceLanguage} numberLocale={numberLocale} onInterfaceLanguageChange={changeInterfaceLanguage} onNumberLocaleChange={changeNumberLocale} onLogout={logout} />
       </header>
       <Sidebar meta={meta} route={route} open={navOpen} mobile={mobileNav} onNavigate={() => setNavOpen(false)} />
       <main className="main" id="main" tabIndex="-1">
