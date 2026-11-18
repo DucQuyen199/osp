@@ -4,19 +4,9 @@ import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
-import { app, can, loadRefs, recordLabel } from '../../lib/state.js';
+import { app, can, loadAll, loadRefs, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
-const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const number = (value) => Number(value || 0);
-async function listAll(qname) {
-  const rows = [];
-  for (let offset = 0; ; offset += 1000) {
-    const response = await api(`${dataPath(qname)}?${new URLSearchParams({ limit: '1000', offset: String(offset) })}`);
-    const items = itemsOf(response); rows.push(...items);
-    if (items.length < 1000 || rows.length >= Number(response?.total ?? rows.length)) break;
-  }
-  return rows;
-}
 const action = (row, verb) => api(dataPath('purchasing.rfq', row.id, verb), { method: 'POST' });
 export default function PurchasingSourcingWorkbenchPage() {
   useDocumentTitle(`${uiText('RFQ và so sánh báo giá')} · OSP Suite`);
@@ -41,13 +31,13 @@ export default function PurchasingSourcingWorkbenchPage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [requisitionRows, rfqRows, orderRows, supplierMap, productMap, unitMap, taxRows] = await Promise.all([
-        can('purchasing.purchase_requisition.read') ? listAll('purchasing.purchase_requisition') : Promise.resolve([]),
-        can('purchasing.rfq.read') ? listAll('purchasing.rfq') : Promise.resolve([]),
-        can('purchasing.purchase_order.read') ? listAll('purchasing.purchase_order') : Promise.resolve([]),
+        can('purchasing.purchase_requisition.read') ? loadAll('purchasing.purchase_requisition') : Promise.resolve([]),
+        can('purchasing.rfq.read') ? loadAll('purchasing.rfq') : Promise.resolve([]),
+        can('purchasing.purchase_order.read') ? loadAll('purchasing.purchase_order') : Promise.resolve([]),
         can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
         can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
         can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
-        can('master-data.tax.read') ? listAll('master-data.tax') : Promise.resolve([]),
+        can('master-data.tax.read') ? loadAll('master-data.tax') : Promise.resolve([]),
       ]);
       const activeRequisitions = requisitionRows.filter((row) => row.sourcing_method === 'competitive' && ['approved', 'sourced'].includes(row.status)).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
       setRequisitions(activeRequisitions); setRfqs(rfqRows); setOrders(orderRows);

@@ -1,22 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, statusLabel, uiText } from '../../lib/i18n.js';
-import { app, can, recordLabel } from '../../lib/state.js';
+import { app, can, loadAll, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import StockCountLinesEditor from './components/StockCountLinesEditor.jsx';
 
-const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
-async function listAll(qname) {
-  const rows = [];
-  for (let offset = 0; ; offset += 1000) {
-    const response = await api(`${dataPath(qname)}?${new URLSearchParams({ limit: '1000', offset: String(offset) })}`);
-    const items = itemsOf(response);
-    rows.push(...items);
-    if (items.length < 1000 || rows.length >= Number(response?.total ?? 0)) break;
-  }
-  return rows;
-}
-async function listMap(qname) { return new Map((await listAll(qname)).map((row) => [row.id, row])); }
+async function listMap(qname) { return new Map((await loadAll(qname)).map((row) => [row.id, row])); }
 const blankLine = () => ({ rowId: crypto.randomUUID(), product: '', lot: '', location: '', counted_qty: '' });
 const cleanLines = (lines) => lines.map(({ product, lot, location, counted_qty }) => ({
   product,
@@ -51,13 +40,13 @@ export default function InventoryStockCountWorkbenchPage() {
     setLoading(true); setError('');
     try {
       const [countRows, warehouseMap, productMap, unitMap, lotMap, locationMap, requestRows] = await Promise.all([
-        can('inventory.stock_count.read') ? listAll('inventory.stock_count') : Promise.resolve([]),
+        can('inventory.stock_count.read') ? loadAll('inventory.stock_count') : Promise.resolve([]),
         can('inventory.warehouse.read') ? listMap('inventory.warehouse') : Promise.resolve(new Map()),
         can('master-data.product.read') ? listMap('master-data.product') : Promise.resolve(new Map()),
         can('master-data.uom.read') ? listMap('master-data.uom') : Promise.resolve(new Map()),
         can('inventory.lot.read') ? listMap('inventory.lot') : Promise.resolve(new Map()),
         can('inventory.warehouse_location.read') ? listMap('inventory.warehouse_location') : Promise.resolve(new Map()),
-        workflowApproval && can('workflow-approval.approval_request.read') ? listAll('workflow-approval.approval_request') : Promise.resolve([]),
+        workflowApproval && can('workflow-approval.approval_request.read') ? loadAll('workflow-approval.approval_request') : Promise.resolve([]),
       ]);
       countRows.sort((a, b) => String(b.updated_at || b.created_at || '').localeCompare(String(a.updated_at || a.created_at || '')));
       setCounts(countRows); setWarehouses(warehouseMap); setProducts(productMap); setUnits(unitMap); setLots(lotMap); setLocations(locationMap); setApprovalRequests(requestRows);

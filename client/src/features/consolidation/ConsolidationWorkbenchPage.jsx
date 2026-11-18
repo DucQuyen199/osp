@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
-import { can, isAdmin } from '../../lib/state.js';
+import { can, isAdmin, loadAll } from '../../lib/state.js';
 import { uiTextWith } from '../../lib/i18n.js';
 import consolidationEnglish from './consolidation.en.js';
 import EliminationJournalForm from './components/EliminationJournalForm.jsx';
@@ -9,18 +9,6 @@ import EliminationJournalsTable from './components/EliminationJournalsTable.jsx'
 
 const t = (text) => uiTextWith(text, consolidationEnglish);
 const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
-async function listAll(qname) {
-  const rows = [];
-  let total = Number.POSITIVE_INFINITY;
-  for (let offset = 0; offset < total; offset += 1000) {
-    const response = await api(`${dataPath(qname)}?limit=1000&offset=${offset}`);
-    const page = itemsOf(response);
-    rows.push(...page);
-    total = Number(response?.total ?? rows.length);
-    if (!page.length) break;
-  }
-  return rows;
-}
 
 export default function ConsolidationWorkbenchPage() {
   useDocumentTitle(`${t('Quản lý tập đoàn')} · OSP Suite`);
@@ -54,14 +42,14 @@ export default function ConsolidationWorkbenchPage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [groupRows, memberRows, shareRows, grantRows, currencyRows, userRows, eliminationRows, accountRows] = await Promise.all([
-        can('consolidation.company_group.read') ? listAll('consolidation.company_group') : Promise.resolve([]),
-        can('consolidation.member.read') ? listAll('consolidation.member') : Promise.resolve([]),
-        can('consolidation.shared_company.read') ? listAll('consolidation.shared_company') : Promise.resolve([]),
-        can('consolidation.report_grant.read') ? listAll('consolidation.report_grant') : Promise.resolve([]),
-        can('master-data.currency.read') ? listAll('master-data.currency') : Promise.resolve([]),
+        can('consolidation.company_group.read') ? loadAll('consolidation.company_group') : Promise.resolve([]),
+        can('consolidation.member.read') ? loadAll('consolidation.member') : Promise.resolve([]),
+        can('consolidation.shared_company.read') ? loadAll('consolidation.shared_company') : Promise.resolve([]),
+        can('consolidation.report_grant.read') ? loadAll('consolidation.report_grant') : Promise.resolve([]),
+        can('master-data.currency.read') ? loadAll('master-data.currency') : Promise.resolve([]),
         isAdmin() ? api(tenantPath('/users')) : Promise.resolve([]),
-        can('consolidation.elimination_journal.read') ? listAll('consolidation.elimination_journal') : Promise.resolve([]),
-        can('accounting.account.read') ? listAll('accounting.account') : Promise.resolve([]),
+        can('consolidation.elimination_journal.read') ? loadAll('consolidation.elimination_journal') : Promise.resolve([]),
+        can('accounting.account.read') ? loadAll('accounting.account') : Promise.resolve([]),
       ]);
       setGroups(groupRows); setMembers(memberRows); setShares(shareRows); setGrants(grantRows); setCurrencies(currencyRows); setUsers(Array.isArray(userRows) ? userRows : []); setEliminationJournals(eliminationRows); setAccounts(accountRows);
       setInviteForm((form) => ({ ...form, groupId: groupRows.some((row) => row.id === form.groupId) ? form.groupId : groupRows[0]?.id || '' }));

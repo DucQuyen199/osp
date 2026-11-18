@@ -3,7 +3,7 @@ import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { addCalendarDays, addCalendarMonths, localDate, localDateTimeToIso, localTime } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
-import { app, can, loadRefs, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { app, can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
 import { listHref, recordHref } from '../../lib/routes.js';
 import AttendanceEntriesTable from './components/AttendanceEntriesTable.jsx';
 import WorkSchedulePatternForm from './components/WorkSchedulePatternForm.jsx';
@@ -25,19 +25,6 @@ const nowIso = () => new Date().toISOString();
 const nextLocalDate = (date) => addCalendarDays(date, 1);
 const addLocalDays = addCalendarDays;
 const nextMonthStart = (date) => addCalendarMonths(`${date.slice(0, 7)}-01`, 1);
-async function listAllRows(entity, filters = {}) {
-  const rows = [];
-  let total = Number.POSITIVE_INFINITY;
-  for (let offset = 0; offset < total; offset += 1000) {
-    const query = new URLSearchParams({ ...filters, limit: '1000', offset: String(offset) });
-    const response = await api(`${dataPath(entity)}?${query}`);
-    const items = itemsOf(response);
-    rows.push(...items);
-    total = Number(response?.total ?? rows.length);
-    if (!items.length) break;
-  }
-  return { items: rows, total };
-}
 export default function HrmOperationsPage() {
   useDocumentTitle(`${uiText('Vận hành nhân sự')} · OSP Suite`);
   const weekdayOptions = [[1, uiText('T2')], [2, uiText('T3')], [3, uiText('T4')], [4, uiText('T5')], [5, uiText('T6')], [6, uiText('T7')], [7, uiText('CN')]];
@@ -81,12 +68,12 @@ export default function HrmOperationsPage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [employeeRes, leaveRes, attendanceRes, revisionRes, allocationRes, scheduleRes, patternRes, templateRes, departmentMap, positionMap, requestRes] = await Promise.all([
-        can('hrm.employee.read') ? listAllRows('hrm.employee') : Promise.resolve({ items: [] }),
-        can('hrm.leave_request.read') ? listAllRows('hrm.leave_request') : Promise.resolve({ items: [] }),
-        can('hrm.attendance.read') ? listAllRows('hrm.attendance', { date: attendanceDate }) : Promise.resolve({ items: [] }),
+        can('hrm.employee.read') ? loadAllResponse('hrm.employee') : Promise.resolve({ items: [] }),
+        can('hrm.leave_request.read') ? loadAllResponse('hrm.leave_request') : Promise.resolve({ items: [] }),
+        can('hrm.attendance.read') ? loadAllResponse('hrm.attendance', { date: attendanceDate }) : Promise.resolve({ items: [] }),
         can('hrm.salary_revision.read') ? loadAllResponse('hrm.salary_revision') : Promise.resolve({ items: [] }),
-        can('hrm.leave_allocation.read') ? listAllRows('hrm.leave_allocation') : Promise.resolve({ items: [] }),
-        can('hrm.work_schedule_entry.read') ? listAllRows('hrm.work_schedule_entry', { work_date__gte: scheduleMonthStart, work_date__lt: scheduleMonthEnd, sort: 'work_date' }) : Promise.resolve({ items: [] }),
+        can('hrm.leave_allocation.read') ? loadAllResponse('hrm.leave_allocation') : Promise.resolve({ items: [] }),
+        can('hrm.work_schedule_entry.read') ? loadAllResponse('hrm.work_schedule_entry', { work_date__gte: scheduleMonthStart, work_date__lt: scheduleMonthEnd, sort: 'work_date' }) : Promise.resolve({ items: [] }),
         can('hrm.work_schedule_pattern.read') ? loadAllResponse('hrm.work_schedule_pattern') : Promise.resolve({ items: [] }),
         can('hrm.work_schedule_template.read') ? loadAllResponse('hrm.work_schedule_template') : Promise.resolve({ items: [] }),
         can('hrm.department.read') ? loadRefs('hrm.department') : Promise.resolve(new Map()),

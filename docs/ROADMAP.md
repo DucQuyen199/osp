@@ -110,3 +110,4 @@ Các module CRM/Marketing, bán hàng, mua hàng, loyalty, logistics, field serv
 - Webhook outbox có phân trang 50 delivery mỗi trang, tổng đếm theo trạng thái và metadata; hàng dead-letter cũ vẫn có thể mở để thử lại hoặc bỏ qua.
 - Luồng lỗi tích hợp cũng có phân trang theo trạng thái, giữ tổng đếm nhất quán trong snapshot và cho phép retry/đóng các lỗi cũ ngoài 200 dòng đầu; hai màn hình quản trị dùng chung component điều hướng trang.
 - Màn kiểm kê tồn kho cho biết số SKU phù hợp và tải thêm lựa chọn theo từng nhóm 100, tránh bỏ sót sản phẩm khi danh mục lớn.
+- Các workbench kế toán, kiểm kê, HRM, sourcing và hợp nhất dùng chung `loadAll`/`loadAllResponse` của lớp state để đọc đủ trang và giữ hành vi lọc thống nhất.

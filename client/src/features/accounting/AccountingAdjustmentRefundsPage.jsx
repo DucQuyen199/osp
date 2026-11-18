@@ -3,19 +3,8 @@ import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath, session, tenantPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
-import { can, loadRefs, recordLabel } from '../../lib/state.js';
+import { can, loadAll, loadRefs, recordLabel } from '../../lib/state.js';
 import { listHref, recordHref } from '../../lib/routes.js';
-const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
-async function listAll(qname) {
-  const rows = [];
-  for (let offset = 0; ; offset += 1000) {
-    const response = await api(`${dataPath(qname)}?${new URLSearchParams({ limit: '1000', offset: String(offset) })}`);
-    const items = itemsOf(response);
-    rows.push(...items);
-    if (items.length < 1000 || rows.length >= Number(response?.total ?? 0)) break;
-  }
-  return rows;
-}
 const today = localDate;
 const num = (value) => Number(value || 0);
 const storageKey = `osp.adjustment-refund-requests:${session.current()?.tenantId || 'tenant'}`;
@@ -38,11 +27,11 @@ export default function AccountingAdjustmentRefundsPage() {
     setLoading(true); setError('');
     try {
       const [creditRows, debitRows, invoiceRows, billRows, paymentRows, partyMap] = await Promise.all([
-        can('accounting.credit_note.read') ? listAll('accounting.credit_note') : Promise.resolve([]),
-        can('accounting.debit_note.read') ? listAll('accounting.debit_note') : Promise.resolve([]),
-        can('accounting.invoice.read') ? listAll('accounting.invoice') : Promise.resolve([]),
-        can('accounting.bill.read') ? listAll('accounting.bill') : Promise.resolve([]),
-        can('accounting.payment.read') ? listAll('accounting.payment') : Promise.resolve([]),
+        can('accounting.credit_note.read') ? loadAll('accounting.credit_note') : Promise.resolve([]),
+        can('accounting.debit_note.read') ? loadAll('accounting.debit_note') : Promise.resolve([]),
+        can('accounting.invoice.read') ? loadAll('accounting.invoice') : Promise.resolve([]),
+        can('accounting.bill.read') ? loadAll('accounting.bill') : Promise.resolve([]),
+        can('accounting.payment.read') ? loadAll('accounting.payment') : Promise.resolve([]),
         can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
       ]);
       setNotes({ credit: creditRows.filter((row) => row.status === 'posted'), debit: debitRows.filter((row) => row.status === 'posted') });

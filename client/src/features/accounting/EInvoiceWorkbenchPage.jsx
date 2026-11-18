@@ -3,19 +3,8 @@ import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { api, dataPath } from '../../lib/api.js';
 import { statusLabel, fmtDateTime, uiText, uiLocale } from '../../lib/i18n.js';
-import { app, can } from '../../lib/state.js';
+import { app, can, loadAll } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
-const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
-async function listAll(qname) {
-  const rows = [];
-  for (let offset = 0; ; offset += 1000) {
-    const response = await api(`${dataPath(qname)}?${new URLSearchParams({ limit: '1000', offset: String(offset) })}`);
-    const items = itemsOf(response);
-    rows.push(...items);
-    if (items.length < 1000 || rows.length >= Number(response?.total ?? rows.length)) break;
-  }
-  return rows;
-}
 const timestamp = (row) => row.updatedAt || row.updated_at || row.createdAt || row.created_at || '';
 const formatDateTime = (value) => value ? fmtDateTime(value) : '—';
 const statusTone = (status) => status === 'issued' || status === 'cancelled' ? 'success' : status === 'failed' ? 'danger' : status === 'withdrawn' ? 'muted' : 'warning';
@@ -36,8 +25,8 @@ export default function EInvoiceWorkbenchPage() {
     setError('');
     try {
       const [requests, invoiceRows] = await Promise.all([
-        listAll('einvoice.einvoice'),
-        can('accounting.invoice.read') ? listAll('accounting.invoice') : Promise.resolve([]),
+        loadAll('einvoice.einvoice'),
+        can('accounting.invoice.read') ? loadAll('accounting.invoice') : Promise.resolve([]),
       ]);
       requests.sort((a, b) => String(timestamp(b)).localeCompare(String(timestamp(a))));
       setRows(requests);

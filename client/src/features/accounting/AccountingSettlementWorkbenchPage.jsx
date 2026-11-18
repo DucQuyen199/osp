@@ -3,20 +3,10 @@ import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
-import { app, can, loadRefs, recordLabel } from '../../lib/state.js';
+import { app, can, loadAll, loadRefs, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
-const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const today = localDate;
 const num = (value) => Number(value || 0);
-async function listAll(qname) {
-  const rows = [];
-  for (let offset = 0; ; offset += 1000) {
-    const response = await api(`${dataPath(qname)}?${new URLSearchParams({ limit: '1000', offset: String(offset) })}`);
-    const items = itemsOf(response); rows.push(...items);
-    if (items.length < 1000 || rows.length >= Number(response?.total ?? rows.length)) break;
-  }
-  return rows;
-}
 export default function AccountingSettlementWorkbenchPage() {
   useDocumentTitle(`${uiText('Thu/chi phân bổ công nợ')} · OSP Suite`);
   const [batches, setBatches] = useState([]);
@@ -37,13 +27,13 @@ export default function AccountingSettlementWorkbenchPage() {
     setLoading(true); setError('');
     try {
       const [batchRows, invoiceRows, billRows, paymentRows, partyMap, currencyRows, approvalRows] = await Promise.all([
-        can('accounting.settlement_batch.read') ? listAll('accounting.settlement_batch') : Promise.resolve([]),
-        can('accounting.invoice.read') ? listAll('accounting.invoice') : Promise.resolve([]),
-        can('accounting.bill.read') ? listAll('accounting.bill') : Promise.resolve([]),
-        can('accounting.payment.read') ? listAll('accounting.payment') : Promise.resolve([]),
+        can('accounting.settlement_batch.read') ? loadAll('accounting.settlement_batch') : Promise.resolve([]),
+        can('accounting.invoice.read') ? loadAll('accounting.invoice') : Promise.resolve([]),
+        can('accounting.bill.read') ? loadAll('accounting.bill') : Promise.resolve([]),
+        can('accounting.payment.read') ? loadAll('accounting.payment') : Promise.resolve([]),
         can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('master-data.currency.read') ? listAll('master-data.currency') : Promise.resolve([]),
-        workflowApproval && can('workflow-approval.approval_request.read') ? listAll('workflow-approval.approval_request') : Promise.resolve([]),
+        can('master-data.currency.read') ? loadAll('master-data.currency') : Promise.resolve([]),
+        workflowApproval && can('workflow-approval.approval_request.read') ? loadAll('workflow-approval.approval_request') : Promise.resolve([]),
       ]);
       batchRows.sort((a, b) => String(b.payment_date || '').localeCompare(String(a.payment_date || '')) || String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
       setBatches(batchRows); setInvoices(invoiceRows); setBills(billRows); setPayments(paymentRows); setParties(partyMap || new Map());

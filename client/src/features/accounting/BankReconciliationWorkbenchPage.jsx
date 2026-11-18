@@ -5,24 +5,10 @@ import { localDate } from '../../lib/dates.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { confirmDialog } from '../../lib/feedback.js';
 import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
-import { app, can, loadRefs, recordLabel } from '../../lib/state.js';
+import { app, can, loadAll, loadRefs, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import bankReconciliationEnglish from './bank-reconciliation.en.js';
 const t = (text) => uiTextWith(text, bankReconciliationEnglish);
-const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
-async function listAll(qname, filters = {}) {
-  const rows = [];
-  let total = Number.POSITIVE_INFINITY;
-  for (let offset = 0; offset < total; offset += 1000) {
-    const query = new URLSearchParams({ ...filters, limit: '1000', offset: String(offset) });
-    const response = await api(`${dataPath(qname)}?${query}`);
-    const items = itemsOf(response);
-    rows.push(...items);
-    total = Number(response?.total ?? rows.length);
-    if (!items.length) break;
-  }
-  return rows;
-}
 const today = localDate;
 const shiftDate = (value, days) => { const date = new Date(`${value}T00:00:00Z`); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0, 10); };
 const money = (value) => Number(value || 0);
@@ -58,7 +44,7 @@ export default function BankReconciliationWorkbenchPage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [statementRows, accountMap, currencyMap, partyMap] = await Promise.all([
-        can('accounting.bank_statement.read') ? listAll('accounting.bank_statement') : Promise.resolve([]),
+        can('accounting.bank_statement.read') ? loadAll('accounting.bank_statement') : Promise.resolve([]),
         can('accounting.account.read') ? loadRefs('accounting.account') : Promise.resolve(new Map()),
         can('master-data.currency.read') ? loadRefs('master-data.currency') : Promise.resolve(new Map()),
         can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
@@ -76,7 +62,7 @@ export default function BankReconciliationWorkbenchPage() {
     const version = ++lineLoadVersion.current;
     if (!id || !can('accounting.bank_statement_line.read')) { setAllLines([]); setLinesLoading(false); return; }
     setLinesLoading(true);
-    try { const rows = await listAll('accounting.bank_statement_line', { statement: id }); if (version === lineLoadVersion.current) setAllLines(rows); }
+    try { const rows = await loadAll('accounting.bank_statement_line', { statement: id }); if (version === lineLoadVersion.current) setAllLines(rows); }
     catch (reason) { if (version === lineLoadVersion.current) setError(reason.message || t('Không tải được các dòng trong sao kê.')); }
     finally { if (version === lineLoadVersion.current) setLinesLoading(false); }
   }, []);
@@ -158,9 +144,9 @@ export default function BankReconciliationWorkbenchPage() {
     try {
       const loadDate = async (date) => {
         const [bankPayments, transferPayments, dateJournals] = await Promise.all([
-          listAll('accounting.payment', { payment_date: date, method: 'bank' }),
-          listAll('accounting.payment', { payment_date: date, method: 'transfer' }),
-          listAll('accounting.journal_entry', { posting_date: date, status: 'posted' }),
+          loadAll('accounting.payment', { payment_date: date, method: 'bank' }),
+          loadAll('accounting.payment', { payment_date: date, method: 'transfer' }),
+          loadAll('accounting.journal_entry', { posting_date: date, status: 'posted' }),
         ]);
         return { payments: [...new Map([...bankPayments, ...transferPayments].map((payment) => [payment.id, payment])).values()], journals: dateJournals };
       };

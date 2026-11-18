@@ -5,25 +5,11 @@ import { localDate } from '../../lib/dates.js';
 import { api, dataPath } from '../../lib/api.js';
 import { confirmDialog } from '../../lib/feedback.js';
 import { fmtDate, fmtMoney, statusLabel, uiText } from '../../lib/i18n.js';
-import { app, can } from '../../lib/state.js';
+import { app, can, loadAll } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
-const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 const today = localDate;
 const monthStart = () => `${today().slice(0, 7)}-01`;
 const monthEnd = () => new Date(Date.UTC(Number(today().slice(0, 4)), Number(today().slice(5, 7)), 0)).toISOString().slice(0, 10);
-async function listAll(qname, filters = {}) {
-  const rows = [];
-  let total = Number.POSITIVE_INFINITY;
-  for (let offset = 0; offset < total; offset += 1000) {
-    const query = new URLSearchParams({ ...filters, limit: '1000', offset: String(offset) });
-    const response = await api(`${dataPath(qname)}?${query}`);
-    const items = itemsOf(response);
-    rows.push(...items);
-    total = Number(response?.total ?? rows.length);
-    if (!items.length) break;
-  }
-  return rows;
-}
 const dateForJournal = (row) => row.posting_date || String(row.createdAt || '').slice(0, 10);
 const inPeriod = (date, period) => Boolean(date && period && date >= period.start_date && date <= period.end_date);
 export default function AccountingPeriodClosePage() {
@@ -41,9 +27,9 @@ export default function AccountingPeriodClosePage() {
     if (!quiet) { setLoading(true); setError(''); }
     try {
       const [periodRows, statementRows, journalRows] = await Promise.all([
-        can('accounting.period.read') ? listAll('accounting.period') : Promise.resolve([]),
-        can('accounting.bank_statement.read') ? listAll('accounting.bank_statement', { status: 'draft' }) : Promise.resolve([]),
-        can('accounting.journal_entry.read') ? listAll('accounting.journal_entry', { status: 'draft' }) : Promise.resolve([]),
+        can('accounting.period.read') ? loadAll('accounting.period') : Promise.resolve([]),
+        can('accounting.bank_statement.read') ? loadAll('accounting.bank_statement', { status: 'draft' }) : Promise.resolve([]),
+        can('accounting.journal_entry.read') ? loadAll('accounting.journal_entry', { status: 'draft' }) : Promise.resolve([]),
       ]);
       periodRows.sort((a, b) => String(b.start_date || '').localeCompare(String(a.start_date || '')));
       setPeriods(periodRows); setDraftStatements(statementRows); setDraftJournals(journalRows);
