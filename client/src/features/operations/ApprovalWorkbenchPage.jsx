@@ -60,6 +60,8 @@ export default function ApprovalWorkbenchPage() {
         <button ref={(node) => { tabRefs.current[0] = node; }} id={`${tabBaseId}-inbox-tab`} className="tab" type="button" role="tab" data-tab="inbox" aria-selected={tab === 'inbox'} aria-controls={`${tabBaseId}-inbox-panel`} tabIndex={tab === 'inbox' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setTab('inbox')}>{t('Hàng chờ')} ({pendingCount})</button>
         <button ref={(node) => { tabRefs.current[1] = node; }} id={`${tabBaseId}-rules-tab`} className="tab" type="button" role="tab" data-tab="rules" aria-selected={tab === 'rules'} aria-controls={`${tabBaseId}-rules-panel`} tabIndex={tab === 'rules' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setTab('rules')}>{t("Quy tắc phê duyệt")}</button>
       </div>
+      {tab !== 'inbox' && <div id={`${tabBaseId}-inbox-panel`} role="tabpanel" aria-labelledby={`${tabBaseId}-inbox-tab`} hidden />}
+      {tab !== 'rules' && <div id={`${tabBaseId}-rules-panel`} role="tabpanel" aria-labelledby={`${tabBaseId}-rules-tab`} hidden />}
       <div id={`${tabBaseId}-${tab}-panel`} role="tabpanel" aria-labelledby={`${tabBaseId}-${tab}-tab`} tabIndex={0}>
       {tab === 'inbox' && <div className="u-mt-12">
         <div className="row wrap"><h2>{t("Yêu cầu phê duyệt")}</h2><span className="grow"/><label className="field"><span className="label">{t("Lọc trạng thái")}</span><select className="select" value={requestFilter} onChange={(event) => setRequestFilter(event.target.value)}><option value="pending">{t("Đang chờ")}</option><option value="approved">{t("Đã duyệt")}</option><option value="rejected">{t("Đã từ chối")}</option><option value="cancelled">{t("Đã hủy")}</option><option value="all">{t("Tất cả")}</option></select></label></div>

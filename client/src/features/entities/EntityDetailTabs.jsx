@@ -63,6 +63,8 @@ export default function EntityDetailTabs({
       <button ref={(node) => { tabRefs.current[0] = node; }} id={`${tabBaseId}-info-tab`} className="tab" type="button" role="tab" data-tab="info" aria-selected={tab === 'info'} aria-controls={`${tabBaseId}-info-panel`} tabIndex={activeTabIndex === 0 ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => onTabChange('info')}>{uiText('Thông tin')}</button>
       <button ref={(node) => { tabRefs.current[1] = node; }} id={`${tabBaseId}-flow-tab`} className="tab" type="button" role="tab" data-tab="flow" aria-selected={tab === 'flow'} aria-controls={`${tabBaseId}-flow-panel`} tabIndex={activeTabIndex === 1 ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => onTabChange('flow')}>{uiText('Hệ quả liên mô-đun')}</button>
     </div>
+    {tab !== 'info' && <div id={`${tabBaseId}-info-panel`} role="tabpanel" aria-labelledby={`${tabBaseId}-info-tab`} hidden />}
+    {tab !== 'flow' && <div id={`${tabBaseId}-flow-panel`} role="tabpanel" aria-labelledby={`${tabBaseId}-flow-tab`} hidden />}
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
     <div id={`${tabBaseId}-${tab}-panel`} role="tabpanel" aria-labelledby={activeTabId} tabIndex={0}>
     {tab === 'info' ? <dl className="dl">{fields.map((field) => <React.Fragment key={field.name}>

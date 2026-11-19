@@ -3,6 +3,7 @@ export default function ProductionOrderForm({
   products,
   warehouses,
   workCenters,
+  units,
   accounts,
   values,
   lotTracked,
@@ -16,7 +17,7 @@ export default function ProductionOrderForm({
     <label className="field"><span>{t('BOM *')}</span><select className="select" required value={values.bom} onChange={(event) => onChange('bom', event.target.value)}><option value="">{t('Chọn BOM')}</option>{boms.map((bom) => <option key={bom.id} value={bom.id}>{products.get(bom.product)?.name || bom.product}</option>)}</select></label>
     <label className="field"><span>{t('Số lượng *')}</span><input className="input num" type="number" min="0.000001" step="any" required value={values.qty} onChange={(event) => onChange('qty', event.target.value)}/></label>
     <label className="field"><span>{t('Kho xuất / nhập *')}</span><select className="select" required value={values.warehouse} onChange={(event) => onChange('warehouse', event.target.value)}><option value="">{t('Chọn kho')}</option>{[...warehouses.values()].filter((warehouse) => warehouse.active !== false).map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}</select></label>
-    <label className="field"><span>{t('Trung tâm sản xuất')}</span><select className="select" value={values.center} onChange={(event) => onChange('center', event.target.value)}><option value="">{t('Không lập lịch trung tâm')}</option>{[...workCenters.values()].map((center) => <option key={center.id} value={center.id}>{center.name}{center.capacity_per_day ? ` · ${center.capacity_per_day} ${t('đơn vị gốc/ngày')}` : ''}</option>)}</select><span className="hint">{t('Công suất được tính theo đơn vị gốc của thành phẩm. Không thể xếp chung một ngày các sản phẩm có đơn vị gốc khác nhau.')}</span></label>
+    <label className="field"><span>{t('Trung tâm sản xuất')}</span><select className="select" value={values.center} onChange={(event) => onChange('center', event.target.value)}><option value="">{t('Không lập lịch trung tâm')}</option>{[...workCenters.values()].map((center) => <option key={center.id} value={center.id}>{center.name}{center.capacity_per_day ? ` · ${center.capacity_per_day} ${units.get(center.capacity_uom)?.name || t('chưa đặt đơn vị')}/${t('ngày')}` : ''}</option>)}</select><span className="hint">{t('Công suất trung tâm được gắn với một đơn vị gốc; thành phẩm lập lịch phải dùng đúng đơn vị đó.')}</span></label>
     {values.center && <label className="field"><span>{t('Ngày dự kiến bắt đầu *')}</span><input className="input" type="date" required value={values.date} onChange={(event) => onChange('date', event.target.value)}/></label>}
     {lotTracked && <label className="field"><span>{t('Mã lô thành phẩm *')}</span><input className="input" required maxLength="120" value={values.outputLot} onChange={(event) => onChange('outputLot', event.target.value)}/></label>}
     {lotTracked && <label className="field"><span>{t('Hạn dùng thành phẩm')}</span><input className="input" type="date" value={values.outputExpiry} onChange={(event) => onChange('outputExpiry', event.target.value)}/></label>}

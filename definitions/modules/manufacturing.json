@@ -233,10 +233,18 @@
     },
     {
      "name": "capacity_per_day",
-      "label": "Công suất theo đơn vị gốc mỗi ngày",
-      "description": "Sản lượng tối đa/ngày theo đơn vị gốc của thành phẩm. Các lệnh cùng trung tâm và ngày phải dùng chung đơn vị cơ sở để cộng công suất.",
+      "label": "Công suất mỗi ngày",
+      "description": "Sản lượng tối đa mỗi ngày theo đơn vị công suất đã chọn.",
      "type": "number",
      "required": false
+    },
+    {
+     "name": "capacity_uom",
+     "label": "Đơn vị công suất",
+     "description": "Đơn vị gốc của thành phẩm dùng để lập lịch; bắt buộc khi có công suất/ngày.",
+     "type": "ref",
+     "required": false,
+     "ref": "master-data.uom"
     }
    ],
    "states": null,

@@ -73,7 +73,7 @@ async fn validate_work_center_schedule(
     };
     let center = tx
         .query_opt(
-            "SELECT capacity_per_day::text FROM manufacturing__work_center WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+            "SELECT capacity_per_day::text, capacity_uom FROM manufacturing__work_center WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
             &[&tenant.id, &center_id],
         )
         .await?;
@@ -81,6 +81,7 @@ async fn validate_work_center_schedule(
         return Ok(vec!["Work center does not belong to this tenant".into()]);
     };
     let capacity = optional_decimal_column(&center, 0, "work-center capacity")?;
+    let capacity_uom: Option<Uuid> = center.get(1);
     if matches!(action, "created" | "updated" | "started") {
         let requested = document
             .get("qty")
@@ -88,14 +89,26 @@ async fn validate_work_center_schedule(
             .filter(|quantity| *quantity > Decimal::ZERO)
             .unwrap_or_default();
         if let Some(capacity) = capacity {
+            let Some(capacity_uom) = capacity_uom else {
+                return Ok(vec![
+                    "Trung tâm sản xuất cần có đơn vị gốc khi khai báo công suất/ngày".into(),
+                ]);
+            };
+            if tx.query_opt(
+                "SELECT id FROM master_data__uom WHERE tenant_id = $1 AND id = $2 AND base_uom IS NULL FOR SHARE",
+                &[&tenant.id, &capacity_uom],
+            ).await?.is_none() {
+                return Ok(vec!["Đơn vị công suất phải là đơn vị gốc thuộc doanh nghiệp".into()]);
+            }
             let Some(product_id) = id(document, "product") else {
                 return Ok(vec![
-                    "A valid finished product is required for work-center capacity planning".into(),
+                    "Trung tâm sản xuất cần thành phẩm có đơn vị gốc hợp lệ để lập lịch công suất"
+                        .into(),
                 ]);
             };
             let Some(product) = tx
                 .query_opt(
-                    "SELECT uom FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                    "SELECT product.uom, EXISTS (SELECT 1 FROM master_data__uom unit WHERE unit.tenant_id = product.tenant_id AND unit.id = product.uom AND unit.base_uom IS NULL) FROM master_data__product product WHERE product.tenant_id = $1 AND product.id = $2 FOR SHARE OF product",
                     &[&tenant.id, &product_id],
                 )
                 .await?
@@ -103,16 +116,22 @@ async fn validate_work_center_schedule(
                 return Ok(vec!["Finished product does not belong to this tenant".into()]);
             };
             let product_uom: Option<Uuid> = product.get(0);
+            let has_tenant_base_unit: bool = product.get(1);
+            if product_uom.is_none() || !has_tenant_base_unit || product_uom != Some(capacity_uom) {
+                return Ok(vec![
+                    "Thành phẩm phải dùng đúng đơn vị công suất của trung tâm sản xuất".into(),
+                ]);
+            }
             let order_id = id(document, "id");
             if tx
                 .query_opt(
                     "SELECT 1 FROM manufacturing__production_order scheduled JOIN master_data__product scheduled_product ON scheduled_product.tenant_id = scheduled.tenant_id AND scheduled_product.id = scheduled.product WHERE scheduled.tenant_id = $1 AND scheduled.work_center = $2 AND scheduled.planned_start = $3 AND scheduled.status IN ('planned', 'in_progress') AND ($4::uuid IS NULL OR scheduled.id <> $4) AND scheduled_product.uom IS DISTINCT FROM $5 LIMIT 1",
-                    &[&tenant.id, &center_id, &planned_start, &order_id, &product_uom],
+                    &[&tenant.id, &center_id, &planned_start, &order_id, &capacity_uom],
                 )
                 .await?
                 .is_some()
             {
-                return Ok(vec!["Orders scheduled on the same work center and day must use products with the same base unit before their quantities can be compared to capacity".into()]);
+                return Ok(vec!["Các lệnh trên trung tâm phải dùng đúng đơn vị công suất đã chọn".into()]);
             }
             let scheduled = tx
                 .query_one_row(
@@ -253,11 +272,79 @@ async fn validate_work_center_update(
     tx: &Tx<'_>,
     tenant: &Tenant,
     document: &Value,
+    action: &str,
 ) -> R<Vec<String>> {
+    let capacity = document
+        .get("capacity_per_day")
+        .filter(|value| !value.is_null())
+        .and_then(money::decimal);
+    let capacity_uom = id(document, "capacity_uom");
+    if capacity.is_some() && capacity_uom.is_none() {
+        return Ok(vec![
+            "Trung tâm sản xuất cần có đơn vị gốc khi khai báo công suất/ngày".into(),
+        ]);
+    }
+    if capacity.is_none() && capacity_uom.is_some() {
+        return Ok(vec![
+            "Chỉ chọn đơn vị công suất khi đã khai báo công suất mỗi ngày".into(),
+        ]);
+    }
+    if let Some(capacity_uom) = capacity_uom {
+        if tx
+            .query_opt(
+                "SELECT id FROM master_data__uom WHERE tenant_id = $1 AND id = $2 AND base_uom IS NULL FOR SHARE",
+                &[&tenant.id, &capacity_uom],
+            )
+            .await?
+            .is_none()
+        {
+            return Ok(vec![
+                "Đơn vị công suất phải là đơn vị gốc thuộc doanh nghiệp".into(),
+            ]);
+        }
+    }
+    if action == "created" {
+        return Ok(Vec::new());
+    }
     let Some(center_id) = id(document, "id") else {
         return Ok(vec!["Work center id is required".into()]);
     };
-    let Some(capacity) = document.get("capacity_per_day").and_then(money::decimal) else {
+    let Some(current_center) = tx
+        .query_opt(
+            "SELECT capacity_per_day::text, capacity_uom FROM manufacturing__work_center WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+            &[&tenant.id, &center_id],
+        )
+        .await?
+    else {
+        return Ok(vec!["Work center does not belong to this tenant".into()]);
+    };
+    let current_capacity = optional_decimal_column(&current_center, 0, "work-center capacity")?;
+    let current_capacity_uom: Option<Uuid> = current_center.get(1);
+    if current_capacity != capacity || current_capacity_uom != capacity_uom {
+        if let Some(capacity_uom) = capacity_uom {
+            let schedule_units = tx
+                .query_one_row(
+                    "SELECT COUNT(*) FILTER (WHERE unit.id IS NULL)::bigint, COUNT(*) FILTER (WHERE product.uom IS DISTINCT FROM $3)::bigint FROM manufacturing__production_order scheduled JOIN master_data__product product ON product.tenant_id = scheduled.tenant_id AND product.id = scheduled.product LEFT JOIN master_data__uom unit ON unit.tenant_id = product.tenant_id AND unit.id = product.uom AND unit.base_uom IS NULL WHERE scheduled.tenant_id = $1 AND scheduled.work_center = $2 AND scheduled.status IN ('planned', 'in_progress')",
+                    &[&tenant.id, &center_id, &capacity_uom],
+                )
+                .await?;
+            let missing_units: i64 = schedule_units.get(0);
+            let mismatched_units: i64 = schedule_units.get(1);
+            if missing_units > 0 {
+                return Ok(vec![
+                    "Không thể đặt công suất khi các lệnh đang chạy chưa có đơn vị gốc hợp lệ"
+                        .into(),
+                ]);
+            }
+            if mismatched_units > 0 {
+                return Ok(vec![
+                    "Các lệnh đang chạy phải dùng đơn vị công suất trước khi thay đổi công suất"
+                        .into(),
+                ]);
+            }
+        }
+    }
+    let Some(capacity) = capacity else {
         return Ok(Vec::new());
     };
     let scheduled = tx
@@ -265,8 +352,7 @@ async fn validate_work_center_update(
             "SELECT COALESCE(MAX(daily_load), 0)::text FROM (SELECT SUM(qty::numeric) AS daily_load FROM manufacturing__production_order WHERE tenant_id = $1 AND work_center = $2 AND status IN ('planned', 'in_progress') GROUP BY planned_start) schedule",
             &[&tenant.id, &center_id],
         )
-        .await?
-        ;
+        .await?;
     let scheduled = decimal_column(&scheduled, 0, "scheduled daily load")?;
     if scheduled > capacity.checked_add(Decimal::new(1, 6)).unwrap_or(capacity) {
         return Ok(vec![format!(
@@ -425,15 +511,8 @@ pub async fn validate_persistence(
                 errors.push(format!("Rework quantity exceeds the remaining failed quantity ({})", (inspection_qty - committed_qty).max(Decimal::ZERO)));
             }
         }
-        ("work_center", "updated") => {
-            if let Some(center_id) = id(document, "id") {
-                tx.query_opt(
-                    "SELECT id FROM manufacturing__work_center WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
-                    &[&tenant.id, &center_id],
-                )
-                .await?;
-                errors.extend(validate_work_center_update(tx, tenant, document).await?);
-            }
+        ("work_center", "created" | "updated") => {
+            errors.extend(validate_work_center_update(tx, tenant, document, action).await?);
         }
         ("work_center", "removed") => {
             if let Some(center_id) = id(document, "id")

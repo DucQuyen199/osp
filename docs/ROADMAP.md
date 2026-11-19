@@ -27,6 +27,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Thuê bao lưu ngày bắt đầu mặc định và neo ngày thu theo lịch gốc, tránh trôi lịch tháng/quý/năm qua các tháng ngắn; kỳ đến hạn tiếp tục tự lập hóa đơn bằng scheduler.
 - Nhà thuốc chỉ ghi nhận cấp phát qua state machine sau giao dịch POS hoàn tất; timestamp, lịch sử đơn thuốc và bán hàng cùng commit/rollback.
 - Lệnh sản xuất theo dõi sản lượng đạt/phế phẩm riêng trong QC; thành phẩm theo dõi lô nhận mã lô và hạn dùng được liên kết tới phiếu QC và tồn kho.
+- Lập lịch trung tâm sản xuất lưu đơn vị gốc công suất riêng trên trung tâm; sản phẩm được lập lịch phải cùng đơn vị đó, và sửa đơn vị/công suất sẽ kiểm tra lại các lệnh đang hoạt động cùng tải/ngày. Trung tâm cũ có công suất nhưng chưa gắn đơn vị phải được bổ sung đơn vị trước khi nhận lệnh mới.
 - Sửa hàng lỗi sản xuất theo lệnh rework: bổ sung chi phí BOM vào WIP của lệnh gốc, khóa trùng lệnh đang chạy, kiểm tra lại QC sau sửa và đóng NC liên quan khi đạt.
 - Bàn WIP sản xuất cộng lượng sửa/loại bỏ/chấp nhận có điều kiện bằng Decimal như máy chủ, kiểm tra tổng đạt và phế phẩm trước khi hoàn tất lệnh, và chặn yêu cầu xử lý vượt lượng QC lỗi còn lại.
 - Các ngày mặc định, kiểm tra nghiệp vụ theo ngày và tác vụ đến hạn trong kế toán, ngân hàng, mua hàng, nhân sự, nông nghiệp, lưu trú, bảo trì, thuê bao và các ngành khác dùng ngày lịch địa phương của tenant thay vì ngày hệ điều hành/cơ sở dữ liệu; thời điểm vẫn lưu theo UTC.
@@ -65,6 +66,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - POS ghi nhận số tiền khách đưa, tự tính/in tiền thối và chặn hoàn tất giao dịch tiền mặt khi nhận thiếu; tiền thực đếm và chốt ca dùng cùng giao dịch sau khi kiểm tra đơn/phiếu quỹ nháp và tính chênh lệch tiền. Ước tính giỏ hàng trên quầy dùng Decimal, làm tròn từng dòng 4 chữ số như máy chủ trước khi cộng tổng và thuế.
 - Nhà thuốc cộng lượng kê, đã cấp, còn lại và lượng thuốc trả cách ly bằng Decimal để giữ đúng hạn mức theo đơn và số lượng được hủy.
 - Báo giá dịch vụ hiện trường quy đổi đơn giá theo đơn vị và làm tròn từng dòng bằng Decimal như máy chủ trước khi cộng tổng.
+- Vận đơn có thể gắn tuyến và điểm dừng theo thứ tự; máy chủ kiểm tra tuyến trong cùng tenant, yêu cầu điểm dừng trước khi xuất phát, khóa đổi tuyến/điểm sau điều phối và giữ nguyên danh sách điểm khi đã có vận đơn tham chiếu.
 - Ước tính phí giờ công dịch vụ chuyên môn nhân và làm tròn đến hai chữ số như khoản phí máy chủ lưu.
 - Bảo trì lưu kết quả sửa chữa và cặp giờ công/đơn giá đầy đủ cùng lần hoàn tất, xuất vật tư và cập nhật lịch định kỳ.
 - Bảo trì có danh mục kỹ thuật viên nội bộ/nhà thầu, chuyên môn và liên hệ; lệnh mở có thể được phân công và chỉ gán kỹ thuật viên còn hoạt động thuộc tenant.

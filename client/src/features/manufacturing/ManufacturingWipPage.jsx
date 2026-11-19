@@ -104,6 +104,7 @@ export default function ManufacturingWipPage() {
         products={products}
         warehouses={warehouses}
         workCenters={workCenters}
+        units={units}
         accounts={accounts}
         values={orderValues}
         lotTracked={Boolean(products.get(selectedBom?.product)?.lot_tracked)}
