@@ -1,64 +1,26 @@
+import React, { useMemo } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
-import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { fmtNumber, uiText } from '../../lib/i18n.js';
-import React, { useCallback, useEffect, useState } from 'react';
-import { api, tenantPath } from '../../lib/api.js';
 import { can } from '../../lib/state.js';
 import { compareDecimals } from '../../lib/decimal.js';
+import { useInventoryReplenishmentData } from './hooks/useInventoryReplenishmentData.js';
+import { useInventoryReplenishmentWorkflow } from './hooks/useInventoryReplenishmentWorkflow.js';
 const quantity = (value) => fmtNumber(String(value || 0), { maximumFractionDigits: 3 });
 export default function InventoryReplenishmentPage() {
   useDocumentTitle(`${uiText('Đề xuất bổ sung tồn kho')} · OSP Suite`);
-  const [report, setReport] = useState(null);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [creatingWarehouse, setCreatingWarehouse] = useState('');
-  const [notice, setNotice] = useState(null);
-  const latestRequest = useLatestRequest();
-  const load = useCallback(async () => {
-    const isLatest = latestRequest();
-    setLoading(true);
-    setError('');
-    try {
-      const nextReport = await api(tenantPath('/reports/inventory/replenishment'));
-      if (isLatest()) setReport(nextReport);
-    } catch (reason) {
-      if (isLatest()) {
-        setReport(null);
-        setError(reason.message || uiText('Không tải được đề xuất bổ sung tồn kho.'));
-      }
-    } finally {
-      if (isLatest()) setLoading(false);
-    }
-  }, [latestRequest]);
-  useEffect(() => { load(); }, [load]);
-  const createRequisition = async (warehouseId) => {
-    setCreatingWarehouse(warehouseId);
-    setError('');
-    setNotice(null);
-    try {
-      const requisition = await api(tenantPath('/reports/inventory/replenishment/purchase-requisitions'), {
-        method: 'POST', body: { warehouseId },
-      });
-      setNotice(requisition?.id ? {
-        id: requisition.id,
-        message: `${uiText('Đã tạo đề nghị mua nháp')} ${requisition.id}. ${uiText('Hãy bổ sung nhà cung cấp và đơn giá trước khi gửi duyệt.')}`,
-      } : { message: uiText('Đã tạo đề nghị mua nháp.') });
-      await load();
-    } catch (reason) {
-      await load();
-      setError(reason.message || uiText('Không tạo được đề nghị mua.'));
-    } finally {
-      setCreatingWarehouse('');
-    }
-  };
-  const suggestedByWarehouse = (report?.items || []).reduce((groups, item) => {
+  const data = useInventoryReplenishmentData();
+  const workflow = useInventoryReplenishmentWorkflow({ load: data.load, clearLoadError: () => data.setError('') });
+  const { report, error: loadError, loading, load } = data;
+  const { creatingWarehouse, error: workflowError, notice, createRequisition } = workflow;
+  const error = loadError || workflowError;
+  const suggestedByWarehouse = useMemo(() => (report?.items || []).reduce((groups, item) => {
     if (compareDecimals(item.suggestedQty || 0, '0.000001') > 0) {
       const group = groups.get(item.warehouseId) || { id: item.warehouseId, name: item.warehouse, count: 0 };
       group.count += 1;
       groups.set(item.warehouseId, group);
     }
     return groups;
-  }, new Map());
+  }, new Map()), [report]);
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Đề xuất bổ sung tồn kho')}</h1><p className="sub">{uiText('Tồn khả dụng loại trừ lô hết hạn và hàng giữ để kiểm tra chất lượng; tồn dự kiến tính thêm đơn bán còn phải giao, đơn mua chờ nhận và đề nghị mua mở.')}</p></div><a className="btn btn-secondary" href="#/e/inventory/reorder_rule">{uiText('Định mức bổ sung')}</a></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}

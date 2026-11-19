@@ -37,7 +37,7 @@ impl Kernel {
         let tx = Tx::begin(&mut conn, &owner.id, true).await?;
         if tx
             .query_opt(
-                "SELECT id FROM consolidation__company_group WHERE tenant_id=$1 AND id=$2 FOR SHARE",
+                "SELECT id FROM consolidation__company_group WHERE tenant_id=$1 AND id=$2 FOR UPDATE",
                 &[&owner.id, &group_id],
             )
             .await?

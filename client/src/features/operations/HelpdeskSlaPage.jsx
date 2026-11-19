@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
-import { api, tenantPath } from '../../lib/api.js';
 import { fmtDateTime, fmtNumber, uiTextWith } from '../../lib/i18n.js';
+import { HELPDESK_SLA_PAGE_SIZE, useHelpdeskSlaData } from './hooks/useHelpdeskSlaData.js';
 const helpdeskSlaEnglish = {
   'Đạt': 'Met', 'Đang trong hạn': 'Within target', 'Quá hạn': 'Breached', 'Chưa gán SLA': 'No SLA assigned',
   'Mở': 'Open', 'Đang xử lý': 'In progress', 'Đã xử lý': 'Resolved', 'Đã đóng': 'Closed',
@@ -28,20 +28,8 @@ const labels = {
 };
 export default function HelpdeskSlaPage() {
   useDocumentTitle(`${t('SLA hỗ trợ')} · OSP Suite`);
-  const pageSize = 50;
   const [offset, setOffset] = useState(0);
-  const [report, setReport] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    api(tenantPath(`/reports/helpdesk/sla?limit=${pageSize}&offset=${offset}`))
-      .then((data) => { if (active) { setReport(data); setError(''); } })
-      .catch((reason) => { if (active) setError(t(reason.message || 'Không tải được báo cáo SLA.')); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [offset]);
+  const { report, loading, error } = useHelpdeskSlaData({ offset, t });
   const stats = report ? [
     [t('Phản hồi đạt'), report.responseMet],
     [t('Phản hồi đang trong hạn'), report.responsePending],
@@ -74,10 +62,10 @@ export default function HelpdeskSlaPage() {
         </tr>)}</tbody>
       </table></div>}
       <nav className="row wrap" aria-label={t('Phân trang ticket SLA')}>
-        <span className="small muted" aria-live="polite">{t('Trang {current} / {total}').replace('{current}', String(Math.floor(offset / pageSize) + 1)).replace('{total}', String(Math.max(1, Math.ceil(Number(report.totalTickets || 0) / pageSize))))}{loading ? ` · ${t('Đang tải trang')}` : ''}</span>
+        <span className="small muted" aria-live="polite">{t('Trang {current} / {total}').replace('{current}', String(Math.floor(offset / HELPDESK_SLA_PAGE_SIZE) + 1)).replace('{total}', String(Math.max(1, Math.ceil(Number(report.totalTickets || 0) / HELPDESK_SLA_PAGE_SIZE))))}{loading ? ` · ${t('Đang tải trang')}` : ''}</span>
         <span className="grow" />
-        <button className="btn btn-secondary btn-sm" type="button" disabled={loading || offset === 0} onClick={() => setOffset((current) => Math.max(0, current - pageSize))}>{t('Trang trước')}</button>
-        <button className="btn btn-secondary btn-sm" type="button" disabled={loading || !report.hasMore} onClick={() => setOffset((current) => current + pageSize)}>{t('Trang sau')}</button>
+        <button className="btn btn-secondary btn-sm" type="button" disabled={loading || offset === 0} onClick={() => setOffset((current) => Math.max(0, current - HELPDESK_SLA_PAGE_SIZE))}>{t('Trang trước')}</button>
+        <button className="btn btn-secondary btn-sm" type="button" disabled={loading || !report.hasMore} onClick={() => setOffset((current) => current + HELPDESK_SLA_PAGE_SIZE)}>{t('Trang sau')}</button>
       </nav>
     </div>}
   </div>;

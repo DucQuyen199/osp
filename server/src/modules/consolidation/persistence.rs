@@ -6,7 +6,7 @@ use uuid::Uuid;
 pub(super) async fn lock_group(tx: &Tx<'_>, tenant_id: &str, group_id: Uuid) -> R<bool> {
     Ok(tx
         .query_opt(
-            "SELECT id FROM consolidation__company_group WHERE tenant_id=$1 AND id=$2 FOR SHARE",
+            "SELECT id FROM consolidation__company_group WHERE tenant_id=$1 AND id=$2 FOR UPDATE",
             &[&tenant_id, &group_id],
         )
         .await?
