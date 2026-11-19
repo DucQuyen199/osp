@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { localDateTime as businessDateTime, localDateTimeToIso } from '../../../lib/dates.js';
-import { api, dataPath } from '../../../lib/api.js';
+import { api, dataPath, session } from '../../../lib/api.js';
 import { compareDecimals } from '../../../lib/decimal.js';
+import { clearPersistentIdempotencyRequest, getPersistentIdempotencyRequest } from '../../../lib/idempotency.js';
 
 const blankRecipeIngredient = () => ({ rowId: crypto.randomUUID(), product: '', qty: '1', uom: '' });
 const reservationStart = () => businessDateTime(new Date(Date.now() + 60 * 60 * 1000));
@@ -22,6 +23,17 @@ export function useRestaurantServiceWorkflow({ load, setSelectedId, t }) {
   const [recipeOutputQty, setRecipeOutputQty] = useState('1');
   const [recipeIngredients, setRecipeIngredients] = useState(() => [blankRecipeIngredient()]);
   const [reservationForm, setReservationForm] = useState({ guest_name: '', phone: '', table: '', guest_count: '2', starts_at: reservationStart(), ends_at: businessDateTime(new Date(Date.now() + 2 * 60 * 60 * 1000)), note: '' });
+
+  async function createRecord(qname, payload) {
+    const scope = `${session.current()?.tenantId || ''}:create:${qname}`;
+    const { key, fingerprint } = getPersistentIdempotencyRequest(scope, JSON.stringify(payload));
+    const created = await api(dataPath(qname), {
+      method: 'POST', body: payload,
+      headers: { 'idempotency-key': key },
+    });
+    clearPersistentIdempotencyRequest(scope, fingerprint);
+    return created;
+  }
 
   const setQuantity = (id, value) => {
     if (value === '' || value == null) {
@@ -48,7 +60,8 @@ export function useRestaurantServiceWorkflow({ load, setSelectedId, t }) {
     event.preventDefault(); setBusy('recipe'); setError(''); setNotice('');
     try {
       const body = { product: recipeProduct, output_qty: String(recipeOutputQty), ingredients: recipeIngredients.map((item) => ({ product: item.product, qty: String(item.qty), ...(item.uom ? { uom: item.uom } : {}) })) };
-      await api(dataPath('restaurant.recipe', ...(editingRecipe ? [editingRecipe] : [])), { method: editingRecipe ? 'PATCH' : 'POST', body });
+      if (editingRecipe) await api(dataPath('restaurant.recipe', editingRecipe), { method: 'PATCH', body });
+      else await createRecord('restaurant.recipe', body);
       resetRecipe(); await load(true); setNotice(t('Đã lưu công thức món ăn.'));
     } catch (reason) { setError(reason.message || t('Không lưu được công thức.')); }
     finally { setBusy(''); }
@@ -58,11 +71,11 @@ export function useRestaurantServiceWorkflow({ load, setSelectedId, t }) {
     event.preventDefault(); if (!cart.length) return;
     setBusy('create'); setError(''); setNotice('');
     try {
-      const created = await api(dataPath('restaurant.table_order'), { method: 'POST', body: {
+      const created = await createRecord('restaurant.table_order', {
         table: tableId || undefined, warehouse: warehouseId || undefined,
         ...(tableId ? { guest_count: Number(guestCount) } : {}),
         lines: cart.map(({ product, qty, note }) => ({ product: product.id, qty, ...(note ? { note } : {}) })),
-      } });
+      });
       setQuantities({}); setLineNotes({}); setTableId(''); setGuestCount('1'); await load(true); setSelectedId(created.id);
       setNotice(`${t('Đã tạo order')} ${String(created.id).slice(0, 8)}${t('. Giá món do server lấy từ danh mục.')}`);
     } catch (reason) { setError(reason.message || t('Không tạo được order. Kiểm tra món, thực đơn và giá bán.')); }
@@ -72,12 +85,12 @@ export function useRestaurantServiceWorkflow({ load, setSelectedId, t }) {
   async function createReservation(event) {
     event.preventDefault(); setBusy('reservation:create'); setError(''); setNotice('');
     try {
-      await api(dataPath('restaurant.reservation'), { method: 'POST', body: {
+      await createRecord('restaurant.reservation', {
         guest_name: reservationForm.guest_name.trim(), phone: reservationForm.phone.trim() || undefined,
         table: reservationForm.table || undefined, guest_count: Number(reservationForm.guest_count),
         starts_at: localDateTimeToIso(reservationForm.starts_at), ends_at: localDateTimeToIso(reservationForm.ends_at),
         note: reservationForm.note.trim() || undefined,
-      } });
+      });
       setReservationForm({ guest_name: '', phone: '', table: '', guest_count: '2', starts_at: reservationStart(), ends_at: businessDateTime(new Date(Date.now() + 2 * 60 * 60 * 1000)), note: '' });
       await load(true); setNotice(t('Đã ghi nhận yêu cầu đặt bàn. Xác nhận để giữ bàn trong khung giờ đã chọn.'));
     } catch (reason) { setError(reason.message || t('Không tạo được yêu cầu đặt bàn. Kiểm tra sức chứa và thời gian.')); }

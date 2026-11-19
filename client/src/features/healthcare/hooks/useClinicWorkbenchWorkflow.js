@@ -52,13 +52,16 @@ export function useClinicWorkbenchWorkflow({ load, selected, selectedId, patient
     try {
       let partyId = pendingPatientParty?.id || (patientRegistration.mode === 'existing' ? patientRegistration.party : '');
       let partyRequest;
-      if (!partyId) {
-        const partyPayload = {
+      let partyPayload;
+      if (patientRegistration.mode === 'new') {
+        partyPayload = {
           name: patientRegistration.name.trim(), kind: 'person', is_customer: true,
           phone: patientRegistration.phone.trim() || undefined, email: patientRegistration.email.trim() || undefined,
         };
         const partyScope = `${session.current()?.tenantId || ''}:clinic.patient-registration:party`;
         partyRequest = { scope: partyScope, ...getPersistentIdempotencyRequest(partyScope, JSON.stringify(partyPayload)) };
+      }
+      if (!partyId) {
         const party = await api(dataPath('master-data.party'), {
           method: 'POST', body: partyPayload,
           headers: { 'idempotency-key': partyRequest.key },

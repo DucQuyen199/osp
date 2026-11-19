@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { localDate as formatLocalDate, localDateTime as businessDateTime, localDateTimeToIso } from '../../../lib/dates.js';
-import { api, dataPath } from '../../../lib/api.js';
+import { api, dataPath, session } from '../../../lib/api.js';
+import { clearPersistentIdempotencyRequest, getPersistentIdempotencyRequest } from '../../../lib/idempotency.js';
 
 const localDate = formatLocalDate;
 const sessionDate = () => businessDateTime(new Date(Date.now() + 60 * 60 * 1000));
@@ -22,6 +23,17 @@ export function useEducationWorkbenchWorkflow({ data, t }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+
+  async function createRecord(qname, payload) {
+    const scope = `${session.current()?.tenantId || ''}:create:${qname}`;
+    const { key, fingerprint } = getPersistentIdempotencyRequest(scope, JSON.stringify(payload));
+    const created = await api(dataPath(qname), {
+      method: 'POST', body: payload,
+      headers: { 'idempotency-key': key },
+    });
+    clearPersistentIdempotencyRequest(scope, fingerprint);
+    return created;
+  }
 
   useEffect(() => {
     setForm((current) => ({ ...current, class: current.class || classes[0]?.id || '' }));
@@ -46,7 +58,7 @@ export function useEducationWorkbenchWorkflow({ data, t }) {
         ...(feeForm.due_date ? { due_date: feeForm.due_date } : {}),
         ...(feeForm.note.trim() ? { note: feeForm.note.trim() } : {}),
       };
-      await api(dataPath('school.fee'), { method: 'POST', body });
+      await createRecord('school.fee', body);
       setNotice(t('Đã tạo khoản học phí nháp. Kiểm tra thông tin rồi phát hành để tạo hóa đơn kế toán.'));
       setFeeForm((current) => ({ ...current, period: '', amount: '', note: '' })); await load();
     } catch (reason) { setError(reason.message || t('Không thể tạo khoản học phí.')); }
@@ -55,7 +67,7 @@ export function useEducationWorkbenchWorkflow({ data, t }) {
   async function createTuitionBatch(event) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
-      await api(dataPath('school.tuition_batch'), { method: 'POST', body: { ...tuitionBatchForm, period: tuitionBatchForm.period.trim(), status: 'draft' } });
+      await createRecord('school.tuition_batch', { ...tuitionBatchForm, period: tuitionBatchForm.period.trim(), status: 'draft' });
       setNotice(t('Đã tạo đợt học phí nháp. Rà soát rồi chạy để tạo các khoản thu còn thiếu.'));
       setTuitionBatchForm((current) => ({ ...current, period: '' })); await load();
     } catch (reason) { setError(reason.message || t('Không thể tạo đợt học phí.')); }
@@ -81,7 +93,7 @@ export function useEducationWorkbenchWorkflow({ data, t }) {
         ...(classForm.capacity ? { capacity: Number(classForm.capacity) } : {}),
         ...(classForm.tuition ? { tuition: String(classForm.tuition).trim() } : {}),
       };
-      await api(dataPath('school.course_class'), { method: 'POST', body });
+      await createRecord('school.course_class', body);
       setNotice(t('Đã tạo lớp học.')); setClassForm({ name: '', subject: '', teacher: '', teacher_employee: '', start_date: '', capacity: '', tuition: '' }); await load();
     } catch (reason) { setError(reason.message || t('Không thể tạo lớp học.')); }
     finally { setBusy(false); }
@@ -90,20 +102,34 @@ export function useEducationWorkbenchWorkflow({ data, t }) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
       let partyId = pendingStudentParty?.id;
+      const partyPayload = {
+        name: studentForm.name.trim(), kind: 'person', is_customer: true,
+        ...(studentForm.phone.trim() ? { phone: studentForm.phone.trim() } : {}),
+        ...(studentForm.email.trim() ? { email: studentForm.email.trim() } : {}),
+      };
+      const partyScope = `${session.current()?.tenantId || ''}:school.student-registration:party`;
+      const partyRequest = { scope: partyScope, ...getPersistentIdempotencyRequest(partyScope, JSON.stringify(partyPayload)) };
       if (!partyId) {
-        const party = await api(dataPath('master-data.party'), { method: 'POST', body: {
-          name: studentForm.name.trim(), kind: 'person', is_customer: true,
-          ...(studentForm.phone.trim() ? { phone: studentForm.phone.trim() } : {}),
-          ...(studentForm.email.trim() ? { email: studentForm.email.trim() } : {}),
-        } });
+        const party = await api(dataPath('master-data.party'), {
+          method: 'POST', body: partyPayload,
+          headers: { 'idempotency-key': partyRequest.key },
+        });
         partyId = party.id; setPendingStudentParty({ id: party.id, name: party.name || studentForm.name.trim() });
       }
-      await api(dataPath('school.student'), { method: 'POST', body: {
+      const studentPayload = {
         party: partyId,
         ...(studentForm.student_code.trim() ? { student_code: studentForm.student_code.trim() } : {}),
         ...(studentForm.dob ? { dob: studentForm.dob } : {}),
         ...(studentForm.guardian.trim() ? { guardian: studentForm.guardian.trim() } : {}),
-      } });
+      };
+      const studentScope = `${session.current()?.tenantId || ''}:school.student-registration:student`;
+      const studentRequest = getPersistentIdempotencyRequest(studentScope, JSON.stringify(studentPayload));
+      await api(dataPath('school.student'), {
+        method: 'POST', body: studentPayload,
+        headers: { 'idempotency-key': studentRequest.key },
+      });
+      clearPersistentIdempotencyRequest(studentScope, studentRequest.fingerprint);
+      if (partyRequest) clearPersistentIdempotencyRequest(partyRequest.scope, partyRequest.fingerprint);
       setPendingStudentParty(null); setNotice(t('Đã tạo hồ sơ học viên.'));
       setStudentForm({ name: '', student_code: '', dob: '', guardian: '', phone: '', email: '' }); await load();
     } catch (reason) { setError(reason.message || t('Không thể tạo hồ sơ học viên.')); }
@@ -120,7 +146,7 @@ export function useEducationWorkbenchWorkflow({ data, t }) {
     try {
       const startsAt = localDateTimeToIso(form.starts_at); const endsAt = localDateTimeToIso(form.ends_at);
       if (!startsAt || !endsAt) throw new Error(t('Giờ học không hợp lệ trong múi giờ kinh doanh.'));
-      await api(dataPath('school.class_session'), { method: 'POST', body: { ...form, starts_at: startsAt, ends_at: endsAt, status: 'scheduled' } });
+      await createRecord('school.class_session', { ...form, starts_at: startsAt, ends_at: endsAt, status: 'scheduled' });
       setNotice(t('Đã lên lịch buổi học.')); setForm((current) => ({ ...current, topic: '' })); await load();
     } catch (reason) { setError(reason.message || t('Không thể lên lịch buổi học.')); }
     finally { setBusy(false); }
@@ -128,7 +154,7 @@ export function useEducationWorkbenchWorkflow({ data, t }) {
   async function createEnrollment(event) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
-      await api(dataPath('school.class_enrollment'), { method: 'POST', body: { class: enrollmentForm.class, student: enrollmentForm.student, status: 'active' } });
+      await createRecord('school.class_enrollment', { class: enrollmentForm.class, student: enrollmentForm.student, status: 'active' });
       setNotice(t('Student enrolled in the selected class.')); setEnrollmentForm((current) => ({ ...current, student: '' })); await load();
     } catch (reason) { setError(reason.message || t('Could not enroll this student.')); }
     finally { setBusy(false); }
@@ -146,7 +172,7 @@ export function useEducationWorkbenchWorkflow({ data, t }) {
     try {
       const existing = marks.get(enrollmentId);
       if (existing) await api(dataPath('school.attendance', existing.id), { method: 'PATCH', body: { status } });
-      else await api(dataPath('school.attendance'), { method: 'POST', body: { session: selectedId, enrollment: enrollmentId, status } });
+      else await createRecord('school.attendance', { session: selectedId, enrollment: enrollmentId, status });
       setNotice(t('Đã lưu điểm danh.')); await load();
     } catch (reason) { setError(reason.message || t('Không thể lưu điểm danh.')); }
     finally { setBusy(false); }
@@ -158,7 +184,7 @@ export function useEducationWorkbenchWorkflow({ data, t }) {
     try {
       const existing = gradeMap.get(enrollmentId); const body = { enrollment: enrollmentId, term, subject, score: numericScore };
       if (existing) await api(dataPath('school.grade', existing.id), { method: 'PATCH', body: { term, subject, score: numericScore } });
-      else await api(dataPath('school.grade'), { method: 'POST', body });
+      else await createRecord('school.grade', body);
       setNotice(t('Đã lưu điểm học viên.')); await load();
     } catch (reason) { setError(reason.message || t('Không thể lưu điểm học viên.')); }
     finally { setBusy(false); }
