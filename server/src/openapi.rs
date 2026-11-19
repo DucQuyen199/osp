@@ -1176,7 +1176,7 @@ pub fn build(reg: &Registry) -> Value {
             "parameters": [tid, { "name": "connectorId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
             "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["returnTo"], "properties": { "returnTo": { "type": "string", "format": "uri", "maxLength": 2048 } } } } } },
             "responses": with_common(Map::from_iter([
-                ("200".to_string(), json!({ "description": "Salt Edge Connect URL; customer is provisioned server-side and return URL is pinned to OSP_PUBLIC_URL origin" })),
+                ("200".to_string(), json!({ "description": "Salt Edge Connect URL; Vietnamese providers are highlighted while other supported countries remain selectable. Customer is provisioned server-side and return URL is pinned to OSP_PUBLIC_URL origin" })),
                 ("409".to_string(), err("Connector is already linked or changed while preparing the connection")),
                 ("422".to_string(), err("Invalid Salt Edge credentials or return URL")),
                 ("502".to_string(), err("Salt Edge Connect API is unavailable"))

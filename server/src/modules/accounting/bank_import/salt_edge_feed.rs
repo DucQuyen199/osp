@@ -62,6 +62,7 @@ pub(super) async fn create_connect_url(
                     "fetch_from_date": from.to_string(),
                     "fetch_to_date": to.to_string(),
                     "locale": "en",
+                    "popular_providers_country": "VN",
                     "return_to": return_to,
                     "custom_fields": {"integration": "osp"}
                 },

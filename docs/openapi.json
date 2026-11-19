@@ -21975,7 +21975,7 @@
         },
         "responses": {
           "200": {
-            "description": "Salt Edge Connect URL; customer is provisioned server-side and return URL is pinned to OSP_PUBLIC_URL origin"
+            "description": "Salt Edge Connect URL; Vietnamese providers are highlighted while other supported countries remain selectable. Customer is provisioned server-side and return URL is pinned to OSP_PUBLIC_URL origin"
           },
           "401": {
             "content": {
