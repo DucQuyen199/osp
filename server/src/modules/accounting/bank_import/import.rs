@@ -737,7 +737,7 @@ async fn sync_statement_feed(
     tx.commit().await?;
 
     let mut parsed = match provider {
-        "casso" => super::casso_feed::fetch(&config, from, to, &expected_account).await?,
+        "casso" => super::casso_feed::fetch(kernel, &config, from, to, &expected_account).await?,
         "sepay" => super::sepay_feed::fetch(&config, from, to, &expected_account).await?,
         "salt_edge" => super::salt_edge_feed::fetch(&config, from, to, &expected_account).await?,
         _ => super::plaid_feed::fetch(&config, from, to, &expected_account).await?,

@@ -117,6 +117,11 @@ let uiTranslationsPromise;
 let uiTranslationsLoaded = false;
 let uiLocaleRequest = 0;
 const INTEGRATION_ERROR_VI = {
+  'Bank provider rate limit reached; the next automatic sync is delayed to respect Retry-After.': 'Nhà cung cấp ngân hàng giới hạn số lần gọi; lần đồng bộ tự động tiếp theo đã được dời theo Retry-After.',
+  'Bank provider rate limit reached; the next automatic sync will follow the configured interval.': 'Nhà cung cấp ngân hàng giới hạn số lần gọi; lần đồng bộ tự động tiếp theo sẽ theo khoảng thời gian đã cấu hình.',
+  'Bank provider is unavailable; the next automatic sync will follow the configured interval.': 'Nhà cung cấp ngân hàng hiện không khả dụng; lần đồng bộ tự động tiếp theo sẽ theo khoảng thời gian đã cấu hình.',
+  'Bank provider rejected the request; check connector credentials and permissions.': 'Nhà cung cấp ngân hàng từ chối yêu cầu; hãy kiểm tra thông tin xác thực và quyền của connector.',
+  'Bank feed sync failed; check connector settings and server logs.': 'Đồng bộ bank feed thất bại; hãy kiểm tra cấu hình connector và nhật ký máy chủ.',
   'Webhook URL must use HTTPS': 'URL webhook phải dùng HTTPS.',
   'Webhook URL must have a host and cannot include credentials': 'URL webhook phải có máy chủ và không được chứa thông tin đăng nhập.',
   'Webhook URL cannot contain a fragment': 'URL webhook không được chứa fragment.',

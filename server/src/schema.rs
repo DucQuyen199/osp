@@ -12,6 +12,11 @@ pub const SCHEMA_VERSION: i32 = 1;
 const PLATFORM_DDL: &str = r#"
 CREATE TABLE IF NOT EXISTS osp_schema_version (version integer NOT NULL);
 CREATE TABLE IF NOT EXISTS osp_schema (table_name text PRIMARY KEY, hash text NOT NULL);
+CREATE TABLE IF NOT EXISTS osp_provider_request_limits (
+  scope_hash text PRIMARY KEY CHECK (scope_hash ~ '^[a-f0-9]{64}$'),
+  next_request_at timestamptz NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
 
 CREATE TABLE IF NOT EXISTS osp_tenants (
   id text PRIMARY KEY,

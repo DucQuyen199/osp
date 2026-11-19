@@ -177,6 +177,14 @@ fn validate_casso_bank_feed(config: &Value, errors: &mut Vec<String>) {
             if (16..=512).contains(&value.len()) && !value.chars().any(char::is_control) => {}
         _ => errors.push("Casso bank feed requires an app_secret of 16 to 512 characters".into()),
     }
+    if let Some(value) = config.get("requests_per_minute")
+        && !matches!(value.as_u64(), Some(2 | 5 | 20))
+    {
+        errors.push(
+            "Casso requests_per_minute must be 2, 5, or 20 according to the documented plan limits"
+                .into(),
+        );
+    }
     validate_bank_feed_webhook(config, "webhook_account_id", errors);
 }
 

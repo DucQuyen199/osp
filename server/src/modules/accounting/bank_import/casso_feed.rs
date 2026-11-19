@@ -1,19 +1,35 @@
 //! Casso Flow v3 transaction pull adapter.
 use super::model::{BankAccountIdentity, ParsedBankStatement, validation};
 use crate::error::{ApiError, R};
+use crate::kernel::Kernel;
 use chrono::NaiveDate;
 use reqwest::{Client, StatusCode, redirect::Policy};
 use serde_json::{Value, json};
-use std::time::Duration;
+use sha2::{Digest, Sha256};
+use std::{collections::HashMap, sync::LazyLock, time::Duration};
+use tokio::sync::Mutex;
 
 const API_ROOT: &str = "https://openapi.casso.vn";
 const MAX_RESPONSE_BYTES: usize = 2_000_000;
 const MAX_TOTAL_RESPONSE_BYTES: usize = 20_000_000;
-const PAGE_SIZE: u32 = 1000;
+const PAGE_SIZE: u32 = 100;
 const MAX_PAGES: u32 = 20;
 const MAX_RECORDS: usize = PAGE_SIZE as usize * MAX_PAGES as usize;
+const DEFAULT_REQUESTS_PER_MINUTE: u32 = 2;
+const DEFAULT_TOKEN_TTL_SECONDS: u64 = 900;
+const MAX_CACHED_TOKENS: usize = 1024;
+
+struct CachedToken {
+    secret_fingerprint: String,
+    access_token: String,
+    expires_at: tokio::time::Instant,
+}
+
+static ACCESS_TOKENS: LazyLock<Mutex<HashMap<String, CachedToken>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 pub(super) async fn fetch(
+    kernel: &Kernel,
     config: &Value,
     from: NaiveDate,
     to: NaiveDate,
@@ -29,6 +45,15 @@ pub(super) async fn fetch(
         .and_then(Value::as_str)
         .filter(|value| !value.trim().is_empty())
         .ok_or_else(|| validation("Casso connector is missing app_secret"))?;
+    let requests_per_minute = match config.get("requests_per_minute").and_then(Value::as_u64) {
+        None => DEFAULT_REQUESTS_PER_MINUTE,
+        Some(value @ (2 | 5 | 20)) => value as u32,
+        Some(_) => {
+            return Err(validation(
+                "Casso requests_per_minute must match a documented plan limit: 2, 5, or 20",
+            ));
+        }
+    };
     let client = Client::builder()
         .https_only(true)
         .redirect(Policy::none())
@@ -38,28 +63,16 @@ pub(super) async fn fetch(
         .build()
         .map_err(|_| ApiError::internal("Cannot build Casso API client"))?;
 
-    let token_response = client
-        .post(format!("{API_ROOT}/oauth/token"))
-        .json(&json!({ "app_id": app_id, "app_secret": app_secret }))
-        .send()
-        .await
-        .map_err(|_| provider_unavailable())?;
-    let token_body = read_body(token_response, "Casso token endpoint").await?;
-    let token_payload: Value = serde_json::from_slice(&token_body)
-        .map_err(|_| provider_response("Casso token endpoint returned invalid JSON"))?;
-    let access_token = token_payload
-        .get("access_token")
-        .and_then(Value::as_str)
-        .filter(|value| !value.trim().is_empty())
-        .ok_or_else(|| provider_response("Casso token response is missing access_token"))?;
+    let access_token = get_access_token(&client, app_id, app_secret).await?;
 
     let mut records = Vec::new();
     let mut expected_total_pages = None;
     let mut total_response_bytes = 0usize;
     for page_number in 1..=MAX_PAGES {
+        reserve_request_slot(kernel, app_id, requests_per_minute).await?;
         let response = client
             .get(format!("{API_ROOT}/flow/v3/transactions"))
-            .bearer_auth(access_token)
+            .bearer_auth(&access_token)
             .query(&[
                 ("fromDate", from.to_string()),
                 ("toDate", to.to_string()),
@@ -178,6 +191,82 @@ pub(super) async fn fetch(
         identity: BankAccountIdentity::Casso(expected_account.to_owned()),
         lines,
     })
+}
+
+async fn reserve_request_slot(kernel: &Kernel, app_id: &str, requests_per_minute: u32) -> R<()> {
+    let scope_hash = hex::encode(Sha256::digest(format!("casso:{app_id}").as_bytes()));
+    let interval_seconds = 60.0 / f64::from(requests_per_minute);
+    let connection = kernel.pool.get().await?;
+    connection
+        .execute(
+            "INSERT INTO osp_provider_request_limits (scope_hash, next_request_at) VALUES ($1, now()) ON CONFLICT (scope_hash) DO NOTHING",
+            &[&scope_hash],
+        )
+        .await?;
+    let row = connection
+        .query_one(
+            "UPDATE osp_provider_request_limits SET next_request_at = GREATEST(next_request_at, now()) + ($2 * interval '1 second'), updated_at = now() WHERE scope_hash = $1 RETURNING next_request_at - ($2 * interval '1 second')",
+            &[&scope_hash, &interval_seconds],
+        )
+        .await?;
+    let reserved_at: chrono::DateTime<chrono::Utc> = row.get(0);
+    drop(connection);
+    if let Ok(delay) = reserved_at
+        .signed_duration_since(chrono::Utc::now())
+        .to_std()
+    {
+        tokio::time::sleep(delay).await;
+    }
+    Ok(())
+}
+
+async fn get_access_token(client: &Client, app_id: &str, app_secret: &str) -> R<String> {
+    let cache_key = hex::encode(Sha256::digest(app_id.as_bytes()));
+    let secret_fingerprint = hex::encode(Sha256::digest(app_secret.as_bytes()));
+    let now = tokio::time::Instant::now();
+    let mut cache = ACCESS_TOKENS.lock().await;
+    cache.retain(|_, token| token.expires_at > now);
+    if let Some(cached) = cache.get(&cache_key)
+        && cached.secret_fingerprint == secret_fingerprint
+        && cached.expires_at > now
+    {
+        return Ok(cached.access_token.clone());
+    }
+
+    let token_response = client
+        .post(format!("{API_ROOT}/oauth/token"))
+        .json(&json!({ "app_id": app_id, "app_secret": app_secret }))
+        .send()
+        .await
+        .map_err(|_| provider_unavailable())?;
+    let token_body = read_body(token_response, "Casso token endpoint").await?;
+    let token_payload: Value = serde_json::from_slice(&token_body)
+        .map_err(|_| provider_response("Casso token endpoint returned invalid JSON"))?;
+    let access_token = token_payload
+        .get("access_token")
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| provider_response("Casso token response is missing access_token"))?
+        .to_owned();
+    let token_lifetime = token_payload
+        .get("expires_in")
+        .and_then(Value::as_u64)
+        .unwrap_or(DEFAULT_TOKEN_TTL_SECONDS);
+    let cache_lifetime = token_lifetime.saturating_sub(60).max(1);
+    if cache.len() >= MAX_CACHED_TOKENS {
+        if let Some(key) = cache.keys().next().cloned() {
+            cache.remove(&key);
+        }
+    }
+    cache.insert(
+        cache_key,
+        CachedToken {
+            secret_fingerprint,
+            access_token: access_token.clone(),
+            expires_at: now + Duration::from_secs(cache_lifetime),
+        },
+    );
+    Ok(access_token)
 }
 
 async fn read_body(response: reqwest::Response, endpoint: &str) -> R<Vec<u8>> {

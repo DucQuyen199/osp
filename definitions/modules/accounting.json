@@ -1000,6 +1000,7 @@
     { "name": "enabled", "type": "bool", "required": false },
     { "name": "last_attempt_at", "type": "datetime", "required": false, "system": true },
     { "name": "last_success_at", "type": "datetime", "required": false, "system": true },
+    { "name": "next_attempt_at", "type": "datetime", "required": false, "system": true },
     { "name": "last_error", "type": "text", "required": false, "system": true }
    ],
    "computed": {},

@@ -63,7 +63,8 @@ export default function BankFeedSchedulePanel({ statement, connectors, translate
         {!schedule.enabled && <button className="btn btn-secondary" disabled={busy || !connectors.some((item) => item.id === connector && item.enabled)} onClick={() => save(true)}>{t('Tiếp tục')}</button>}
         {can('accounting.bank_feed_schedule.delete') && <button className="btn btn-ghost" disabled={busy} onClick={remove}>{t('Xóa lịch')}</button>}
       </div>}
-      {schedule.last_attempt_at && <div className="small muted">{t('Lần thử cuối')}: {new Date(schedule.last_attempt_at).toLocaleString()} {schedule.last_error && <span className="danger">· {schedule.last_error}</span>}</div>}
+      {schedule.last_attempt_at && <div className="small muted">{t('Lần thử cuối')}: {new Date(schedule.last_attempt_at).toLocaleString()} {schedule.last_error && <span className="danger">· {t(schedule.last_error)}</span>}</div>}
+      {schedule.enabled && schedule.next_attempt_at && <div className="small muted">{t('Lần đồng bộ tiếp theo dự kiến')}: {new Date(schedule.next_attempt_at).toLocaleString()}</div>}
     </div>}
   </section>;
 }
