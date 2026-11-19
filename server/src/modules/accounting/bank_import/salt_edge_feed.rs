@@ -288,7 +288,12 @@ pub(super) async fn fetch(
             .filter(|value| {
                 value.len() == 3 && value.bytes().all(|byte| byte.is_ascii_alphabetic())
             })
-            .map(|value| value.to_ascii_uppercase());
+            .map(|value| value.to_ascii_uppercase())
+            .ok_or_else(|| {
+                validation(format!(
+                    "Salt Edge transaction {row}: currency_code is missing or invalid"
+                ))
+            })?;
         lines.push(BankLine {
             row,
             date,
@@ -301,7 +306,7 @@ pub(super) async fn fetch(
                 "credit"
             },
             amount: signed.abs(),
-            currency,
+            currency: Some(currency),
         });
     }
     Ok(ParsedBankStatement {

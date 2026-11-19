@@ -274,7 +274,19 @@ pub(super) async fn fetch(
             .filter(|value| {
                 value.len() == 3 && value.bytes().all(|byte| byte.is_ascii_alphabetic())
             })
-            .map(|value| value.to_ascii_uppercase());
+            .map(|value| value.to_ascii_uppercase())
+            .ok_or_else(|| {
+                let detail = if transaction
+                    .get("unofficial_currency_code")
+                    .and_then(Value::as_str)
+                    .is_some()
+                {
+                    "uses an unofficial currency code that bank statements cannot reconcile"
+                } else {
+                    "is missing a valid ISO currency code"
+                };
+                validation(format!("Plaid transaction {row}: {detail}"))
+            })?;
         lines.push(BankLine {
             row,
             date,
@@ -286,7 +298,7 @@ pub(super) async fn fetch(
                 "credit"
             },
             amount: signed.abs(),
-            currency,
+            currency: Some(currency),
         });
     }
     Ok(ParsedBankStatement {

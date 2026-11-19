@@ -8,7 +8,10 @@ use std::time::Duration;
 
 const API_ROOT: &str = "https://openapi.casso.vn";
 const MAX_RESPONSE_BYTES: usize = 2_000_000;
+const MAX_TOTAL_RESPONSE_BYTES: usize = 20_000_000;
 const PAGE_SIZE: u32 = 1000;
+const MAX_PAGES: u32 = 20;
+const MAX_RECORDS: usize = PAGE_SIZE as usize * MAX_PAGES as usize;
 
 pub(super) async fn fetch(
     config: &Value,
@@ -50,48 +53,97 @@ pub(super) async fn fetch(
         .filter(|value| !value.trim().is_empty())
         .ok_or_else(|| provider_response("Casso token response is missing access_token"))?;
 
-    let response = client
-        .get(format!("{API_ROOT}/flow/v3/transactions"))
-        .bearer_auth(access_token)
-        .query(&[
-            ("fromDate", from.to_string()),
-            ("toDate", to.to_string()),
-            ("page", "1".to_owned()),
-            ("pageSize", PAGE_SIZE.to_string()),
-            ("sort", "ASC".to_owned()),
-        ])
-        .send()
-        .await
-        .map_err(|_| provider_unavailable())?;
-    let body = read_body(response, "Casso transaction endpoint").await?;
-    let payload: Value = serde_json::from_slice(&body)
-        .map_err(|_| provider_response("Casso transaction endpoint returned invalid JSON"))?;
-    if payload.get("error").and_then(Value::as_i64) != Some(0) {
-        return Err(provider_response("Casso rejected the transaction query"));
-    }
-    let total_pages = payload
-        .pointer("/data/totalPages")
-        .and_then(Value::as_u64)
-        .ok_or_else(|| {
-            provider_response("Casso transaction response is missing data.totalPages")
-        })?;
-    let page = payload
-        .pointer("/data/records")
-        .and_then(Value::as_array)
-        .ok_or_else(|| provider_response("Casso transaction response is missing data.records"))?;
-    if total_pages > 1 {
-        return Err(ApiError::new(
-            422,
-            "BANK_FEED_PAGE_LIMIT",
-            format!(
-                "Casso returned more than {PAGE_SIZE} transactions for this date range; sync a shorter date range"
-            ),
-        ));
+    let mut records = Vec::new();
+    let mut expected_total_pages = None;
+    let mut total_response_bytes = 0usize;
+    for page_number in 1..=MAX_PAGES {
+        let response = client
+            .get(format!("{API_ROOT}/flow/v3/transactions"))
+            .bearer_auth(access_token)
+            .query(&[
+                ("fromDate", from.to_string()),
+                ("toDate", to.to_string()),
+                ("page", page_number.to_string()),
+                ("pageSize", PAGE_SIZE.to_string()),
+                ("sort", "ASC".to_owned()),
+            ])
+            .send()
+            .await
+            .map_err(|_| provider_unavailable())?;
+        let body = read_body(response, "Casso transaction endpoint").await?;
+        total_response_bytes = total_response_bytes.saturating_add(body.len());
+        if total_response_bytes > MAX_TOTAL_RESPONSE_BYTES {
+            return Err(provider_response(
+                "Casso transaction result exceeds the 20 MB sync limit; use a shorter date range",
+            ));
+        }
+        let payload: Value = serde_json::from_slice(&body)
+            .map_err(|_| provider_response("Casso transaction endpoint returned invalid JSON"))?;
+        if payload.get("error").and_then(Value::as_i64) != Some(0) {
+            return Err(provider_response("Casso rejected the transaction query"));
+        }
+        let total_pages = payload
+            .pointer("/data/totalPages")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| {
+                provider_response("Casso transaction response is missing data.totalPages")
+            })?;
+        let page_records = payload
+            .pointer("/data/records")
+            .and_then(Value::as_array)
+            .ok_or_else(|| {
+                provider_response("Casso transaction response is missing data.records")
+            })?;
+        if total_pages > u64::from(MAX_PAGES) {
+            return Err(ApiError::new(
+                422,
+                "BANK_FEED_PAGE_LIMIT",
+                format!(
+                    "Casso returned more than {MAX_RECORDS} transactions; sync a shorter date range"
+                ),
+            ));
+        }
+        if total_pages == 0 {
+            if page_number == 1 && page_records.is_empty() {
+                break;
+            }
+            return Err(provider_response(
+                "Casso transaction response has an invalid totalPages value",
+            ));
+        }
+        if total_pages < u64::from(page_number)
+            || expected_total_pages.is_some_and(|expected| expected != total_pages)
+        {
+            return Err(provider_response(
+                "Casso transaction pagination changed during the sync; retry with a shorter date range",
+            ));
+        }
+        expected_total_pages = Some(total_pages);
+        if let Some(returned_page) = payload.pointer("/data/page").and_then(Value::as_u64)
+            && returned_page != u64::from(page_number)
+        {
+            return Err(provider_response(
+                "Casso transaction response page does not match the requested page",
+            ));
+        }
+        records.extend(page_records.iter().cloned());
+        if records.len() > MAX_RECORDS {
+            return Err(ApiError::new(
+                422,
+                "BANK_FEED_PAGE_LIMIT",
+                format!(
+                    "Casso returned more than {MAX_RECORDS} transactions; sync a shorter date range"
+                ),
+            ));
+        }
+        if u64::from(page_number) >= total_pages {
+            break;
+        }
     }
 
     let expected_account = expected_account.trim();
     let mut matching = Vec::new();
-    for (index, record) in page.iter().enumerate() {
+    for (index, record) in records.iter().enumerate() {
         let account = record
             .get("bankSubAccId")
             .or_else(|| record.get("bank_sub_acc_id"))
@@ -112,7 +164,7 @@ pub(super) async fn fetch(
             matching.push(record.clone());
         }
     }
-    if !page.is_empty() && matching.is_empty() {
+    if !records.is_empty() && matching.is_empty() {
         return Err(validation(
             "Casso returned transactions, but none match the bank account configured on the selected ledger account",
         ));
