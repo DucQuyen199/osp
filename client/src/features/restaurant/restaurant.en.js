@@ -53,6 +53,7 @@ const restaurantEnglish = {
   'Đang hiển thị {from}–{to} trên {total} phiếu': 'Showing {from}–{to} of {total} tickets', 'Phiếu ở trang khác': 'Tickets are on another page', 'Phân trang phiếu bếp': 'Kitchen ticket pagination', 'Trang trước': 'Previous page', 'Trang sau': 'Next page',
   'Chờ chế biến': 'Queued', 'Đang chế biến': 'Preparing', 'Đã xong · chờ phục vụ': 'Ready · awaiting service',
   'Không có phiếu': 'No tickets', 'Order chỉ được chuyển sang phục vụ khi tất cả phiếu bếp và quầy pha chế đã sẵn sàng.': 'An order can be served after all kitchen and bar tickets are ready.',
+  'Bàn đang có order chưa thanh toán; hãy đóng order trước khi mở order mới.': 'This table already has an unpaid order. Close it before opening another order.',
 };
 
 export default restaurantEnglish;

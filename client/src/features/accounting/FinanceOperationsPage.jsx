@@ -4,6 +4,7 @@ import { fmtDate, statusLabel, fmtNumber, uiText } from '../../lib/i18n.js';
 import { can, recordLabel } from '../../lib/state.js';
 import { useFinanceOperationsData } from './hooks/useFinanceOperationsData.js';
 import { useFinanceOperationsWorkflow } from './hooks/useFinanceOperationsWorkflow.js';
+import { useInsuranceWorkflow } from './hooks/useInsuranceWorkflow.js';
 import LoanRepaymentPanel from './workbenches/LoanRepaymentPanel.jsx';
 import InsurancePolicyPanel from './workbenches/InsurancePolicyPanel.jsx';
 import InsuranceClaimsPanel from './workbenches/InsuranceClaimsPanel.jsx';
@@ -11,15 +12,19 @@ const money = (value) => fmtNumber(String(value || 0), { maximumFractionDigits: 
 export default function FinanceOperationsPage() {
   useDocumentTitle(`${uiText('Điều hành cho vay và bảo hiểm')} · OSP Suite`);
   const { parties, accounts, loans, repayments, policies, claims, invoices, loading, loadError, load } = useFinanceOperationsData();
-  const workflow = useFinanceOperationsWorkflow({ parties, accounts, policies, claims, load });
+  const workflow = useFinanceOperationsWorkflow({ parties, load });
+  const insurance = useInsuranceWorkflow({ parties, accounts, policies, claims, run: workflow.run });
   const {
-    today, busy, error, notice, refresh, claimPay, setClaimPay,
-    policyCancellationReasons, setPolicyCancellationReasons,
-    claimApprovalAmounts, setClaimApprovalAmounts, claimRejectionReasons, setClaimRejectionReasons,
+    today, busy, error, notice, refresh,
     repaymentMethods, setRepaymentMethods, loanForm, setLoanForm,
-    policyForm, setPolicyForm, claimForm, setClaimForm, eligiblePolicies,
-    createLoan, loanAction, repaymentAction, createPolicy, createClaim, payClaim, claimAction, policyAction,
+    createLoan, loanAction, repaymentAction,
   } = workflow;
+  const {
+    policyForm, setPolicyForm, claimForm, setClaimForm, eligiblePolicies,
+    claimPay, setClaimPay, policyCancellationReasons, setPolicyCancellationReasons,
+    claimApprovalAmounts, setClaimApprovalAmounts, claimRejectionReasons, setClaimRejectionReasons,
+    createPolicy, createClaim, payClaim, claimAction, policyAction,
+  } = insurance;
   const invoiceByPolicy = useMemo(() => new Map(invoices.filter((item) => item.source === 'policy').map((item) => [item.source_id, item])), [invoices]);
   const repaymentsByLoan = useMemo(() => {
     const map = new Map();

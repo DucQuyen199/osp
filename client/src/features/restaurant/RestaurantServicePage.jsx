@@ -77,9 +77,16 @@ export default function RestaurantServicePage() {
     createReservation, transitionReservation, assignReservationTable, transition,
   } = useRestaurantServiceWorkflow({ load, setSelectedId, t });
   const occupiedTableIds = useMemo(() => new Set(orders.filter((order) => ['open', 'sent', 'served'].includes(order.status)).map((order) => order.table).filter(Boolean)), [orders]);
-  const availableTables = tables.filter((table) => !occupiedTableIds.has(table.id));
+  const now = Date.now();
+  const reservedTableIds = new Set(reservations.filter((reservation) => reservation.status === 'confirmed'
+    && Number.isFinite(Date.parse(reservation.starts_at)) && Date.parse(reservation.starts_at) <= now
+    && Number.isFinite(Date.parse(reservation.ends_at)) && Date.parse(reservation.ends_at) > now)
+    .map((reservation) => reservation.table).filter(Boolean));
+  const availableTables = tables.filter((table) => !occupiedTableIds.has(table.id) && !reservedTableIds.has(table.id));
   const selectedTable = tables.find((table) => table.id === tableId);
   const exceedsTableCapacity = Boolean(tableId && selectedTable?.seats && Number(guestCount) > Number(selectedTable.seats));
+  const selectedTableReserved = Boolean(tableId && reservedTableIds.has(tableId));
+  const selectedTableOccupied = Boolean(tableId && occupiedTableIds.has(tableId));
   const availableMenu = menuItems.filter((item) => item.available !== false).map((item) => ({ item, product: products.get(item.product) })).filter(({ product }) => product && product.active !== false).sort((a, b) => String(a.product.name).localeCompare(String(b.product.name), 'vi'));
   const selected = orders.find((order) => order.id === selectedId) || null;
   const openOrderCount = orders.filter((order) => ['open', 'sent', 'served'].includes(order.status)).length;
@@ -147,7 +154,9 @@ export default function RestaurantServicePage() {
         </article>)}</div>
         <div className="restaurant-cart-total"><span>{t('Tạm tính chưa gồm thuế')}</span><strong className="num">{fmtMoney(indicativeTotal)}</strong></div>
         {exceedsTableCapacity && <div className="alert warning" role="status">{t('Bàn chỉ có')} {selectedTable.seats} {t('chỗ; chọn bàn lớn hơn hoặc giảm số khách.')}</div>}
-        <button className="btn btn-primary" disabled={busy === 'create' || !cart.length || exceedsTableCapacity}>{busy === 'create' ? t('Đang tạo…') : t('Mở order')}</button>
+        {selectedTableReserved && <div className="alert warning" role="status">{t('Bàn đang được giữ cho khách đặt trước; hãy ghi nhận khách đến trước khi mở order')}</div>}
+        {selectedTableOccupied && <div className="alert warning" role="status">{t('Bàn đang có order chưa thanh toán; hãy đóng order trước khi mở order mới.')}</div>}
+        <button className="btn btn-primary" disabled={busy === 'create' || !cart.length || exceedsTableCapacity || selectedTableReserved || selectedTableOccupied}>{busy === 'create' ? t('Đang tạo…') : t('Mở order')}</button>
       </form></section>
       <RestaurantOrderList loading={loading} orders={orderListItems} openCount={openOrderCount} selectedId={selectedId} onSelect={setSelectedId} t={t} />
       <RestaurantOrderDetailPanel
