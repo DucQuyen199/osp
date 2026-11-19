@@ -27,9 +27,9 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
         if !document
             .get("note")
             .and_then(Value::as_str)
-            .is_some_and(|note| !note.trim().is_empty())
+            .is_some_and(|note| (5..=500).contains(&note.trim().chars().count()))
         {
-            errors.push("Cần ghi lý do giải phóng một phần hàng QC".into());
+            errors.push("Lý do giải phóng phải từ 5 đến 500 ký tự".into());
         }
         return errors;
     }

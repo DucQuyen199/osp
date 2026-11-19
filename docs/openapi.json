@@ -141235,6 +141235,143 @@
         ]
       }
     },
+    "/api/t/{tenantId}/data/quality/inspection_disposition/create-and-act/posted": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "inspection": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "note": {
+                    "maxLength": 500,
+                    "minLength": 5,
+                    "type": "string"
+                  },
+                  "qty": {
+                    "oneOf": [
+                      {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      },
+                      {
+                        "pattern": "^[0-9]+(?:\\.[0-9]+)?$",
+                        "type": "string"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "inspection",
+                  "qty",
+                  "note"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Disposition created and posted in one transaction; repeating the same idempotency key and body returns the committed result"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Missing or invalid Idempotency-Key"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Idempotency key reused with different request, inspection is not pending, or held quantity is insufficient"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Invalid inspection, quantity, note, source, or partial disposition total"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Atomically create and post a partial quality-hold release",
+        "tags": [
+          "quality",
+          "inventory"
+        ]
+      }
+    },
     "/api/t/{tenantId}/data/quality/inspection_disposition/{id}": {
       "delete": {
         "parameters": [

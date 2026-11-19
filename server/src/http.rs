@@ -95,6 +95,40 @@ fn decimal_json(value: Decimal) -> R<Value> {
         .ok_or_else(|| ApiError::internal("numeric response exceeds Decimal range"))
 }
 
+fn idempotency_key(headers: &axum::http::HeaderMap) -> R<Option<String>> {
+    let mut values = headers.get_all("idempotency-key").iter();
+    let value = values.next();
+    if values.next().is_some() {
+        return Err(ApiError::new(
+            400,
+            "BAD_IDEMPOTENCY_KEY",
+            "Chỉ được gửi một header Idempotency-Key",
+        ));
+    }
+    value
+        .map(|value| {
+            let key = value.to_str().map_err(|_| {
+                ApiError::new(
+                    400,
+                    "BAD_IDEMPOTENCY_KEY",
+                    "Idempotency-Key phải là chuỗi ASCII in được",
+                )
+            })?;
+            if key.is_empty()
+                || key.len() > 200
+                || !key.bytes().all(|byte| (0x21..=0x7e).contains(&byte))
+            {
+                return Err(ApiError::new(
+                    400,
+                    "BAD_IDEMPOTENCY_KEY",
+                    "Idempotency-Key phải có 1–200 ký tự ASCII in được",
+                ));
+            }
+            Ok(key.to_owned())
+        })
+        .transpose()
+}
+
 fn line_decimal(line: &Value, field: &str) -> R<Decimal> {
     match line.get(field).filter(|value| !value.is_null()) {
         None => Ok(Decimal::ZERO),
@@ -2542,43 +2576,28 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                 return json_ok(k.list(&actor, &t, &q, &lq).await?);
             }
             (&Method::POST, []) => {
-                let idempotency_values = parts.headers.get_all("idempotency-key");
-                let mut idempotency_values = idempotency_values.iter();
-                let idempotency_key = idempotency_values.next();
-                if idempotency_values.next().is_some() {
-                    return Err(ApiError::new(
-                        400,
-                        "BAD_IDEMPOTENCY_KEY",
-                        "Chỉ được gửi một header Idempotency-Key",
-                    ));
-                }
-                let key = idempotency_key
-                    .map(|value| {
-                        let key = value.to_str().map_err(|_| {
-                            ApiError::new(
-                                400,
-                                "BAD_IDEMPOTENCY_KEY",
-                                "Idempotency-Key phải là chuỗi ASCII in được",
-                            )
-                        })?;
-                        if key.is_empty()
-                            || key.len() > 200
-                            || !key.bytes().all(|byte| (0x21..=0x7e).contains(&byte))
-                        {
-                            return Err(ApiError::new(
-                                400,
-                                "BAD_IDEMPOTENCY_KEY",
-                                "Idempotency-Key phải có 1–200 ký tự ASCII in được",
-                            ));
-                        }
-                        Ok(key)
-                    })
-                    .transpose()?;
+                let key = idempotency_key(&parts.headers)?;
                 let data = json_obj(&bytes)?;
                 let created = match key {
-                    Some(key) => k.create_idempotent(&actor, &t, &q, data, key).await?,
+                    Some(key) => k.create_idempotent(&actor, &t, &q, data, &key).await?,
                     None => k.create(&actor, &t, &q, data).await?,
                 };
+                return Ok(Reply::Json(201, created));
+            }
+            (&Method::POST, ["create-and-act", action]) => {
+                if q != "quality.inspection_disposition" || *action != "posted" {
+                    return Err(ApiError::new(404, "NOT_FOUND", "Route không tồn tại"));
+                }
+                let key = idempotency_key(&parts.headers)?.ok_or_else(|| {
+                    ApiError::new(
+                        400,
+                        "BAD_IDEMPOTENCY_KEY",
+                        "Cần gửi Idempotency-Key cho tác vụ này",
+                    )
+                })?;
+                let created = k
+                    .create_and_act_idempotent(&actor, &t, &q, json_obj(&bytes)?, action, &key)
+                    .await?;
                 return Ok(Reply::Json(201, created));
             }
             (&Method::GET, [id]) => return json_ok(k.get(&actor, &t, &q, id).await?),

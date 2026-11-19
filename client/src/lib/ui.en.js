@@ -1326,6 +1326,8 @@ const uiTextEnglish = {
   'Mỗi ID phải là chuỗi UUID': 'Each ID must be a UUID string.',
   'Cần trường ids dạng mảng': 'The ids field must be an array.',
   'Chỉ được gửi một header Idempotency-Key': 'Send only one Idempotency-Key header.',
+  'Cần gửi Idempotency-Key cho tác vụ này': 'An Idempotency-Key is required for this operation.',
+  'Lý do giải phóng phải từ 5 đến 500 ký tự': 'The release reason must contain 5 to 500 characters.',
   'Idempotency-Key phải là chuỗi ASCII in được': 'Idempotency-Key must contain printable ASCII characters.',
   'Idempotency-Key phải có 1–200 ký tự ASCII in được': 'Idempotency-Key must contain 1 to 200 printable ASCII characters.',
   'Cần gửi duy nhất cancellation_reason từ 5 đến 500 ký tự': 'Send only cancellation_reason, with 5 to 500 characters.',

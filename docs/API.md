@@ -103,7 +103,7 @@ Mã `event_id` được chống lặp trong phạm vi vận đơn: gửi lại c
 
 Bulk action nhận `{ "ids": ["<uuid>", "…"] }`. Danh sách phải có 1–100 ID duy nhất. Máy chủ sắp khóa theo ID để tránh deadlock giữa các lô giao nhau, kiểm tra quyền và chạy đầy đủ validation/event của action trên từng bản ghi; response có `{ action, count, items }`.
 
-Khi tạo bản ghi, client có thể gửi `Idempotency-Key` (1–200 ký tự ASCII in được). Khóa được phân theo tenant, người gửi và entity. Gửi lại cùng khóa và cùng JSON trong 30 ngày trả lại phản hồi `201` đã lưu mà không tạo thêm bản ghi hay lặp lại nghiệp vụ. Dùng lại khóa cho JSON khác trả `409 IDEMPOTENCY_KEY_REUSED`. Sau 30 ngày, khóa hết hạn và có thể được tạo lại.
+Khi tạo bản ghi, client có thể gửi `Idempotency-Key` (1–200 ký tự ASCII in được). Khóa được phân theo tenant, người gửi và entity; với tác vụ tổng hợp, khóa được phân theo entity và action. Gửi lại cùng khóa và cùng JSON trong 30 ngày trả lại phản hồi `201` đã lưu mà không tạo thêm bản ghi hay lặp lại nghiệp vụ. Dùng lại khóa cho JSON khác trả `409 IDEMPOTENCY_KEY_REUSED`. Sau 30 ngày, khóa hết hạn và có thể được tạo lại.
 
 Khi ghi nhận kết quả giao dịch thanh toán hoặc hoàn tiền, có thể gửi `{"reference":"mã nhà cung cấp"}` cùng request `POST .../{id}/{succeeded|failed}`. Mã tham chiếu và chuyển trạng thái sẽ commit hoặc rollback cùng nhau. Bỏ body nếu không cần đổi mã; gửi chuỗi rỗng để xóa mã khi ghi nhận thất bại.
 
@@ -114,6 +114,8 @@ Khi ghi nhận kết quả giao dịch thanh toán hoặc hoàn tiền, có th�
 `GET /api/t/{tenantId}/reports/inventory/lot-expiry?days=90` cần cùng hai quyền. Báo cáo liệt kê tồn dương theo lô/kho cho các lô đã hết hạn hoặc hết hạn trong kỳ, phân trang bằng `limit` và `offset`.
 
 `POST /api/t/{tenantId}/reports/inventory/lot-expiry/writeoff-counts` nhận `{ "warehouseId": "<uuid>" }` và cần thêm `inventory.stock_count.create`. Máy chủ tạo phiếu kiểm kê hủy hàng hết hạn dạng nháp theo lô/vị trí, giữ nguyên tồn đến khi người dùng rà soát, gửi duyệt và phê duyệt; bước duyệt dùng luồng kiểm kê hiện tại để ghi giảm kho và hạch toán hao hụt. Lô vẫn đang bị giữ QC phải được xử lý qua quy trình chất lượng trước.
+
+Giải phóng một phần hàng mua đang giữ QC dùng `POST /api/t/{tenantId}/data/quality/inspection_disposition/create-and-act/posted` với header bắt buộc `Idempotency-Key` và body `{ "inspection": "<uuid>", "qty": 2, "note": "Kết quả kiểm tra đạt một phần" }`. Máy chủ tạo phiếu xử lý và ghi sổ cùng một transaction; lỗi ở bất kỳ bước nào sẽ rollback toàn bộ. Gửi lại cùng khóa và cùng body trong 30 ngày trả lại kết quả đã ghi sổ, tránh tạo phiếu nháp mồ côi hoặc giải phóng trùng khi mất phản hồi mạng. Tác vụ cần `quality.inspection_disposition.create` và `quality.inspection_disposition.posted`.
 
 `GET /api/t/{tenantId}/reports/restaurant/kitchen-board?station=all` cần `restaurant.kitchen_ticket.read`; `station` nhận `all`, `kitchen` hoặc `bar`. Bảng chỉ hiện phiếu thuộc order đang gửi hoặc chờ phục vụ; order hoàn tất/hủy được ẩn. Phiếu chuyển `queued → preparing → ready` qua action dữ liệu chuẩn.
 

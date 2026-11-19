@@ -26,6 +26,11 @@ function decimalText(coefficient, scale) {
   return `${negative ? '-' : ''}${digits}`;
 }
 
+export function normalizeDecimal(value) {
+  const { coefficient, scale } = decimalParts(value);
+  return decimalText(coefficient, scale);
+}
+
 function combine(left, right, subtract = false) {
   const a = decimalParts(left);
   const b = decimalParts(right);
