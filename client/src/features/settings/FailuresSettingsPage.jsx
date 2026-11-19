@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, tenantPath } from '../../lib/api.js';
 import { confirmDialog, toast } from '../../lib/feedback.js';
@@ -6,29 +6,15 @@ import { fmtDateTime, uiText } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
 import SettingsTabs from './SettingsTabs.jsx';
 import SettingsListPager from './SettingsListPager.jsx';
+import { useSettingsQueueData } from './hooks/useSettingsQueueData.js';
 const PAGE_SIZE = 50;
 export default function FailuresSettingsPage() {
   useDocumentTitle(`${uiText('Lỗi tích hợp')} · ${uiText('Cài đặt')} · OSP Suite`);
   const [status, setStatus] = useState('open');
-  const [entries, setEntries] = useState([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
-  const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
-  const reload = useCallback(async (nextStatus = status, nextPage = page) => {
-    setError('');
-    try {
-      const query = new URLSearchParams({ status: nextStatus, limit: String(PAGE_SIZE), offset: String(nextPage * PAGE_SIZE) });
-      const response = await api(tenantPath(`/failures?${query}`));
-      setEntries(Array.isArray(response?.items) ? response.items : []);
-      const nextTotal = Number(response?.total || 0);
-      setTotal(nextTotal);
-      if (nextPage > 0 && nextPage * PAGE_SIZE >= nextTotal) setPage(Math.max(0, Math.ceil(nextTotal / PAGE_SIZE) - 1));
-    }
-    catch (reason) { setError(reason.message || uiText('Không tải được danh sách lỗi.')); }
-  }, [status, page]);
+  const { entries, total, error, setError, reloadCurrent } = useSettingsQueueData({ path: '/failures', status, page, pageSize: PAGE_SIZE, errorMessage: 'Không tải được danh sách lỗi.', setPage });
   const changeStatus = (nextStatus) => { setStatus(nextStatus); setPage(0); };
-  useEffect(() => {  reload(); }, [reload]);
   const act = async (entry, action) => {
     if (action === 'dismiss' && !await confirmDialog({ title: uiText('Bỏ qua cảnh báo'), message: uiText('Bỏ qua cảnh báo này? Bạn vẫn có thể xem lại trong bộ lọc đã bỏ qua.'), confirmLabel: uiText('Bỏ qua') })) return;
     setBusy(entry.id);
@@ -36,7 +22,7 @@ export default function FailuresSettingsPage() {
     try {
       await api(tenantPath(`/failures/${entry.id}/${action}`), { method: 'POST', body: {} });
       toast(action === 'retry' ? uiText('Đã thử xử lý lại luồng sự kiện.') : uiText('Đã bỏ qua cảnh báo.'), 'success');
-      await reload();
+      await reloadCurrent();
     } catch (reason) { setError(reason.message || uiText('Không xử lý được cảnh báo.')); }
     finally { setBusy(''); }
   };
