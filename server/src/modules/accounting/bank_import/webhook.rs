@@ -74,7 +74,10 @@ pub async fn receive_bank_feed_webhook(
             verify_sepay_signature(&secret, sepay_signature, sepay_timestamp, raw_body)?;
             let payload: Value = serde_json::from_slice(raw_body)
                 .map_err(|_| invalid("SePay webhook body must be valid JSON"))?;
-            let event = parse_sepay_event(&payload)?;
+            let mut event = parse_sepay_event(&payload)?;
+            event.line.currency = Some(super::import::configured_bank_feed_currency(
+                &config, "SePay",
+            )?);
             let expected_account = config
                 .get("webhook_account_number")
                 .and_then(Value::as_str)
@@ -131,7 +134,11 @@ pub async fn receive_bank_feed_webhook(
             if provider_error != Some(0) {
                 return Err(invalid("Casso webhook error must be zero"));
             }
-            let parsed = casso::parse(&payload)?;
+            let mut parsed = casso::parse(&payload)?;
+            let currency = super::import::configured_bank_feed_currency(&config, "Casso")?;
+            for line in &mut parsed.lines {
+                line.currency = Some(currency.clone());
+            }
             if parsed.lines.len() > MAX_CASSO_EVENTS {
                 return Err(ApiError::new(
                     413,

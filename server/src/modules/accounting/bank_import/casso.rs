@@ -114,6 +114,10 @@ pub(super) fn parse(payload: &Value) -> R<ParsedBankStatement> {
                     "Casso transaction {row}: description is limited to 1,000 characters"
                 )));
             }
+            let currency = value("currency")
+                .or_else(|| value("currencyCode"))
+                .map(|currency| validate_currency(&currency, row))
+                .transpose()?;
             Ok(BankLine {
                 row,
                 date,
@@ -125,7 +129,7 @@ pub(super) fn parse(payload: &Value) -> R<ParsedBankStatement> {
                     "debit"
                 },
                 amount,
-                currency: None,
+                currency,
             })
         })
         .collect::<R<Vec<_>>>()?;
@@ -135,6 +139,15 @@ pub(super) fn parse(payload: &Value) -> R<ParsedBankStatement> {
         identity: BankAccountIdentity::Casso(identity),
         lines,
     })
+}
+
+fn validate_currency(value: &str, row: usize) -> R<String> {
+    if value.len() != 3 || !value.bytes().all(|byte| byte.is_ascii_alphabetic()) {
+        return Err(validation(format!(
+            "Casso transaction {row}: invalid ISO currency code"
+        )));
+    }
+    Ok(value.to_ascii_uppercase())
 }
 
 fn parse_casso_date(value: &str) -> Option<NaiveDate> {

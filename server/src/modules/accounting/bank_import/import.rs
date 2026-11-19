@@ -84,6 +84,12 @@ pub async fn import_statement_casso(
 ) -> R<Value> {
     let statement_id = authorize_import(kernel, actor, tenant, statement_id)?;
     let parsed = super::casso::parse(payload)?;
+    if parsed.lines.iter().any(|line| line.currency.is_none()) {
+        return Err(ApiError::validation(
+            "accounting.bank_statement_line",
+            vec!["Casso payload does not include currency. Use a Casso connector with currency_code configured, or include currency on every transaction.".into()],
+        ));
+    }
     persistence::import_lines(
         kernel,
         actor,
@@ -708,12 +714,18 @@ async fn sync_statement_feed(
         })?;
     tx.commit().await?;
 
-    let parsed = match provider {
+    let mut parsed = match provider {
         "casso" => super::casso_feed::fetch(&config, from, to, &expected_account).await?,
         "sepay" => super::sepay_feed::fetch(&config, from, to, &expected_account).await?,
         "salt_edge" => super::salt_edge_feed::fetch(&config, from, to, &expected_account).await?,
         _ => super::plaid_feed::fetch(&config, from, to, &expected_account).await?,
     };
+    if matches!(provider, "casso" | "sepay") {
+        let currency = configured_bank_feed_currency(&config, provider)?;
+        for line in &mut parsed.lines {
+            line.currency = Some(currency.clone());
+        }
+    }
     persistence::import_lines(
         kernel,
         actor,
@@ -735,6 +747,25 @@ async fn sync_statement_feed(
         },
     )
     .await
+}
+
+pub(super) fn configured_bank_feed_currency(config: &Value, provider: &str) -> R<String> {
+    let currency = config
+        .get("currency_code")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|currency| {
+            currency.len() == 3 && currency.bytes().all(|byte| byte.is_ascii_alphabetic())
+        })
+        .ok_or_else(|| {
+            ApiError::validation(
+                "integration-hub.connector",
+                vec![format!(
+                    "Configure a valid ISO currency_code on the {provider} connector"
+                )],
+            )
+        })?;
+    Ok(currency.to_ascii_uppercase())
 }
 
 fn authorize_import(

@@ -240,7 +240,9 @@ pub(super) async fn fetch(
             description,
             direction,
             amount,
-            currency: Some("VND".to_owned()),
+            // Currency is supplied by the connector's explicit account setting.
+            // SePay transaction payloads do not include a currency field.
+            currency: None,
         });
     }
     Ok(ParsedBankStatement {

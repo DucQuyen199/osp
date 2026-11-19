@@ -9,8 +9,8 @@ const t = (text) => uiTextWith(text, integrationEnglish);
 
 const connectorConfigs = {
   http_event_sink: '{\n  "adapter": "http_event_sink",\n  "url": "https://api.example.com/osp/events",\n  "events": ["sales.*"],\n  "headers": {},\n  "secret": ""\n}',
-  casso_bank_feed: '{\n  "adapter": "casso_bank_feed",\n  "app_id": "",\n  "app_secret": ""\n}',
-  sepay_bank_feed: '{\n  "adapter": "sepay_bank_feed",\n  "environment": "sandbox",\n  "api_token": "",\n  "bank_account_id": ""\n}',
+  casso_bank_feed: '{\n  "adapter": "casso_bank_feed",\n  "app_id": "",\n  "app_secret": "",\n  "currency_code": "VND"\n}',
+  sepay_bank_feed: '{\n  "adapter": "sepay_bank_feed",\n  "environment": "sandbox",\n  "api_token": "",\n  "bank_account_id": "",\n  "currency_code": "VND"\n}',
   plaid_bank_feed: '{\n  "adapter": "plaid_bank_feed",\n  "environment": "sandbox",\n  "client_id": "",\n  "secret": "",\n  "country_codes": ["US"]\n}',
   salt_edge_bank_feed: '{\n  "adapter": "salt_edge_bank_feed",\n  "app_id": "",\n  "secret": ""\n}',
   carrier_tracking_webhook: '{\n  "adapter": "carrier_tracking_webhook",\n  "carrier_name": "VNPost",\n  "secret_env": "OSP_CARRIER_WEBHOOK_SECRET_VNPOST"\n}',
