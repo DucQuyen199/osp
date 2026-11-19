@@ -1,12 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { useLatestRequest } from '../../lib/useLatestRequest.js';
-import { api, dataPath, tenantPath } from '../../lib/api.js';
+import { api, tenantPath } from '../../lib/api.js';
 import { fmtMoney, fmtNumber, uiText } from '../../lib/i18n.js';
-import { compareDecimals } from '../../lib/decimal.js';
 import { can, loadRefs } from '../../lib/state.js';
+import { useQualityHoldsWorkflow } from './hooks/useQualityHoldsWorkflow.js';
 const quantity = (value) => fmtNumber(String(value || 0), { maximumFractionDigits: 3 });
-const validReleaseQuantity = (qty, maximum) => { try { return compareDecimals(qty || 0, 0) > 0 && compareDecimals(qty, maximum) <= 0; } catch { return false; } };
 const unitName = (item) => item.unit || uiText('Chưa đặt đơn vị');
 const statusLabel = (value) => uiText(value === 'failed' ? 'Không đạt' : 'Chờ kiểm tra');
 const sourceLabel = (value) => uiText(value === 'purchase_receipt' ? 'Phiếu nhận mua' : value === 'purchase_order' ? 'Đơn mua' : value);
@@ -18,9 +17,6 @@ export default function InventoryQualityHoldsPage() {
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [busy, setBusy] = useState('');
-  const [notes, setNotes] = useState({});
-  const [releaseDrafts, setReleaseDrafts] = useState({});
   const latestRequest = useLatestRequest();
   useEffect(() => {
     let active = true;
@@ -52,32 +48,9 @@ export default function InventoryQualityHoldsPage() {
     }
   }, [status, warehouse, latestRequest]);
   useEffect(() => { load(); }, [load]);
-  const decide = async (item, action) => {
-    setBusy(`${item.inspectionId}:${action}`); setError('');
-    try {
-      if (action === 'failed') {
-        const note = notes[item.inspectionId]?.trim() || '';
-        if (note.length < 5) throw new Error(uiText('Nhập mô tả lỗi QC từ 5 ký tự trở lên.'));
-        await api(dataPath('quality.inspection', item.inspectionId), { method: 'PATCH', body: { note } });
-      }
-      await api(dataPath('quality.inspection', item.inspectionId, action), { method: 'POST' });
-      await load();
-    } catch (reason) { setError(reason.message || uiText('Không cập nhật được phiếu QC.')); }
-    finally { setBusy(''); }
-  };
-  const releasePartial = async (item) => {
-    const draft = releaseDrafts[item.inspectionId] || {};
-    setBusy(`${item.inspectionId}:release`); setError('');
-    try {
-      const note = draft.note?.trim() || '';
-      const releaseQty = String(draft.qty || '');
-      if (!note || !validReleaseQuantity(releaseQty, item.heldQty)) throw new Error(uiText('Nhập số lượng và lý do giải phóng hợp lệ.'));
-      const disposition = await api(dataPath('quality.inspection_disposition'), { method: 'POST', body: { inspection: item.inspectionId, qty: releaseQty, note } });
-      await api(dataPath('quality.inspection_disposition', disposition.id, 'posted'), { method: 'POST' });
-      await load();
-    } catch (reason) { setError(reason.message || uiText('Không giải phóng được một phần lô hàng.')); }
-    finally { setBusy(''); }
-  };
+  const workflow = useQualityHoldsWorkflow({ load, clearLoadError: () => setError('') });
+  const { busy, error: workflowError, notes, setNotes, releaseDrafts, setReleaseDrafts, decide, releasePartial } = workflow;
+  const visibleError = error || workflowError;
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Hàng tồn đang giữ QC')}</h1><p className="sub">{uiText('Theo dõi số lượng và giá trị còn bị giữ theo phiếu kiểm tra, lô và lớp nhập kho.')}</p></div></div>
     <section className="card"><form className="toolbar" onSubmit={(event) => { event.preventDefault(); load(); }}>
@@ -90,7 +63,7 @@ export default function InventoryQualityHoldsPage() {
       </select></label>
       <button className="btn btn-primary" type="submit" disabled={loading}>{loading ? uiText('Đang tải…') : uiText('Làm mới')}</button>
     </form></section>
-    {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
+    {visibleError && <div className="alert danger" role="alert">{uiText(visibleError)}</div>}
     {loading && !report ? <div className="card-pad"><div className="skeleton" data-h="row" /></div> : report && <div className="stack">
       <div className="stats">
         <div className="card stat"><span className="stat-label">{uiText('Phiếu kiểm tra còn giữ hàng')}</span><strong className="stat-value num">{fmtNumber(String(report.itemCount || 0))}</strong></div>
