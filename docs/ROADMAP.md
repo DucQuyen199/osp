@@ -83,6 +83,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 
 - Báo cáo hợp nhất có ảnh chụp bất biến có audit và bút toán loại trừ quản trị riêng, cân bằng, có bằng chứng đối chiếu và duyệt độc lập; chỉ bút toán đã duyệt mới vào tổng hợp, không sửa sổ thành viên. API xem trước gợi ý ghép hóa đơn bán/hóa đơn mua nhận snapshot không xác minh do người gọi cung cấp, có grant báo cáo riêng, kiểm tra thành viên và consent chia sẻ cấp nhóm hiện có, giới hạn 500 dòng; consent này không cấp quyền chia sẻ chứng từ. Gợi ý không đọc/xác minh chứng từ gốc, không lưu và không hạch toán. Vẫn thiếu consent chia sẻ chứng từ riêng, nguồn snapshot do server xác minh, ghép và lưu đối chiếu đã duyệt, cùng chính sách dịch thuật/loại trừ theo chuẩn mực báo cáo tài chính.
 - Gian hàng thương mại điện tử có thể tạm dừng nhận đơn; bộ chọn loại bỏ gian hàng tạm dừng, còn máy chủ chặn tạo/đặt/cập nhật giỏ mới trong cùng giao dịch và vẫn cho hủy giỏ đã tạo. Gian hàng cũ không có giá trị này tiếp tục hoạt động.
+- Rà soát bổ sung: đơn thương mại điện tử đã hủy có danh sách lịch sử chỉ đọc; yêu cầu bảo trì chỉ chọn tài sản đang hoạt động như backend yêu cầu; rule phê duyệt tập trung có thể chọn bút toán loại trừ hợp nhất; vé đang giữ chỗ không thể đổi sang sự kiện khác để lách kiểm tra sức chứa. Danh sách entity dùng chung và các workbench thương mại điện tử, bảo trì, phê duyệt, CRM và buồng phòng đã tách orchestration vào React hooks; các luồng tài sản cố định, kiểm kê kho và dịch vụ chuyên môn cũng đã được tách.
 
 ## Còn thiếu
 

@@ -17,6 +17,7 @@ const eventsEnglish = {
   'Đã hoàn vé và ghi nhận bút toán hoàn tiền.': 'Ticket refunded and refund journal entry recorded.',
   'Đã hủy chỗ giữ vé.': 'Ticket reservation cancelled.',
   'Không thể xử lý vé.': 'Could not process the ticket.',
+  'Không thể chuyển chỗ giữ vé sang sự kiện khác; hãy hủy chỗ này rồi tạo lượt giữ mới': 'A reserved ticket cannot be moved to another event. Cancel this reservation and create a new one.',
   'Không tìm thấy mã vé. Kiểm tra mã rồi quét lại.': 'Ticket code not found. Check the code and scan again.',
   'Vé đang ở trạng thái': 'Ticket is in status', 'không thể check-in.': 'and cannot be checked in.',
   'Check-in chỉ mở từ 2 giờ trước đến 24 giờ sau giờ bắt đầu sự kiện.': 'Check-in is available from 2 hours before until 24 hours after the event starts.',
