@@ -37,7 +37,7 @@ async fn fifo_return_unit_cost(
         .unwrap_or_default();
     let original_moves = tx
         .query(
-            "SELECT fifo_allocations FROM inventory__stock_move WHERE tenant_id = $1 AND source = $2 AND source_id = $3 AND product = $4 AND direction = 'out' ORDER BY created_at, id",
+            "SELECT fifo_allocations, qty::text, COALESCE(total_cost, 0)::text, lot FROM inventory__stock_move WHERE tenant_id = $1 AND source = $2 AND source_id = $3 AND product = $4 AND direction = 'out' ORDER BY created_at, id",
             &[&tenant.id, &sale_source, &order_id.to_string(), &product_id],
         )
         .await?;
@@ -46,26 +46,38 @@ async fn fifo_return_unit_cost(
     let mut return_cost = Decimal::ZERO;
     let mut has_fifo_history = false;
     for row in original_moves {
-        let Some(allocations) = row
+        let allocations = row
             .get::<_, Option<Value>>(0)
             .and_then(|value| value.as_array().cloned())
-        else {
-            continue;
-        };
+            .unwrap_or_default();
+        let mut cost_slices = Vec::<(Decimal, Decimal, Option<String>)>::new();
         for allocation in allocations {
-            let allocation_lot = allocation
-                .get("lot")
-                .and_then(Value::as_str)
-                .map(str::to_owned);
-            if allocation_lot != lot {
-                continue;
-            }
-            let Some(mut allocation_qty) = allocation.get("qty").and_then(money::decimal) else {
+            let Some(allocation_qty) = allocation.get("qty").and_then(money::decimal) else {
                 continue;
             };
             let Some(allocation_cost) = allocation.get("unit_cost").and_then(money::decimal) else {
                 continue;
             };
+            let allocation_lot = allocation
+                .get("lot")
+                .and_then(Value::as_str)
+                .map(str::to_owned);
+            cost_slices.push((allocation_qty, allocation_cost, allocation_lot));
+        }
+        if cost_slices.is_empty() {
+            let movement_qty = decimal_column(&row, 1, "original sale quantity")?;
+            let movement_cost = decimal_column(&row, 2, "original sale value")?;
+            let movement_lot: Option<String> = row.get(3);
+            if movement_qty > Decimal::ZERO
+                && let Some(unit_cost) = movement_cost.checked_div(movement_qty)
+            {
+                cost_slices.push((movement_qty, unit_cost, movement_lot));
+            }
+        }
+        for (mut allocation_qty, allocation_cost, allocation_lot) in cost_slices {
+            if allocation_lot != lot {
+                continue;
+            }
             has_fifo_history = true;
             let skipped = remaining_to_skip.min(allocation_qty);
             remaining_to_skip = remaining_to_skip.checked_sub(skipped).ok_or_else(|| {
