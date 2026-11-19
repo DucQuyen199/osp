@@ -240,14 +240,28 @@ pub(super) async fn fetch(
         {
             continue;
         }
-        let date_text = transaction
-            .get("made_on")
+        // `extra.posting_date` is the date the bank placed the transaction on
+        // its statement. `made_on` is the transaction's effective date and is
+        // only a fallback for providers that omit the posting date.
+        let (date_field, date_text) = transaction
+            .pointer("/extra/posting_date")
             .and_then(Value::as_str)
+            .map(|date| ("posting_date", date))
+            .or_else(|| {
+                transaction
+                    .get("made_on")
+                    .and_then(Value::as_str)
+                    .map(|date| ("made_on", date))
+            })
             .ok_or_else(|| {
-                validation(format!("Salt Edge transaction {row}: made_on is missing"))
+                validation(format!(
+                    "Salt Edge transaction {row}: posting_date and made_on are missing"
+                ))
             })?;
         let date = NaiveDate::parse_from_str(date_text, "%Y-%m-%d").map_err(|_| {
-            validation(format!("Salt Edge transaction {row}: invalid made_on date"))
+            validation(format!(
+                "Salt Edge transaction {row}: invalid {date_field} date"
+            ))
         })?;
         if date < from || date > to {
             continue;
