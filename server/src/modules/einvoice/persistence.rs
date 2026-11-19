@@ -14,6 +14,17 @@ pub async fn validate_persistence(
         return Ok(Vec::new());
     }
     let mut errors = Vec::new();
+    if action == "cancel_requested"
+        && document
+            .get("provider")
+            .and_then(Value::as_str)
+            .is_some_and(|provider| provider.trim().eq_ignore_ascii_case("sepay"))
+    {
+        errors.push(
+            "SePay e-invoice cancellation is not supported; no cancellation request was queued"
+                .into(),
+        );
+    }
     if matches!(
         action,
         "created"
