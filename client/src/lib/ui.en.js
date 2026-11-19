@@ -1328,6 +1328,7 @@ const uiTextEnglish = {
   'Chỉ được gửi một header Idempotency-Key': 'Send only one Idempotency-Key header.',
   'Cần gửi Idempotency-Key cho tác vụ này': 'An Idempotency-Key is required for this operation.',
   'Lý do giải phóng phải từ 5 đến 500 ký tự': 'The release reason must contain 5 to 500 characters.',
+  'Chỉ cho phép một phiếu nháp đang hoạt động cho mỗi lần kiểm tra thuốc trả': 'Only one active draft disposal is allowed per returned-medicine inspection.',
   'Idempotency-Key phải là chuỗi ASCII in được': 'Idempotency-Key must contain printable ASCII characters.',
   'Idempotency-Key phải có 1–200 ký tự ASCII in được': 'Idempotency-Key must contain 1 to 200 printable ASCII characters.',
   'Cần gửi duy nhất cancellation_reason từ 5 đến 500 ký tự': 'Send only cancellation_reason, with 5 to 500 characters.',

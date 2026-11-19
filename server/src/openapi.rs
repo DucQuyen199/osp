@@ -1505,6 +1505,15 @@ pub fn build(reg: &Registry) -> Value {
         } }),
     );
     paths.insert(
+        "/api/t/{tenantId}/data/pharmacy/return_disposition/create-and-act/posted".into(),
+        json!({ "post": {
+            "tags": ["pharmacy", "inventory"], "summary": "Atomically create and post returned-medicine disposal", "security": sec,
+            "parameters": [tid, { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "minLength": 1, "maxLength": 200 } }],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["inspection", "qty", "note"], "properties": { "inspection": { "type": "string", "format": "uuid" }, "qty": { "oneOf": [{ "type": "number", "exclusiveMinimum": 0 }, { "type": "string", "pattern": "^[0-9]+(?:\\.[0-9]+)?$" }] }, "note": { "type": "string", "minLength": 5, "maxLength": 500 } } } } } },
+            "responses": with_common(Map::from_iter([("201".to_string(), json!({ "description": "Disposal created and posted in one transaction; retries with the same key and body return the committed result" })), ("400".to_string(), err("Missing or invalid Idempotency-Key")), ("403".to_string(), err("Requires pharmacy.return_disposition.create and pharmacy.return_disposition.posted")), ("409".to_string(), err("Idempotency key reused with different request")), ("422".to_string(), err("Inspection is not a failed returned-medicine inspection, a draft already exists, or the quantity/reason is invalid"))]))
+        } }),
+    );
+    paths.insert(
         "/api/t/{tenantId}/reports/inventory/replenishment/purchase-requisitions".into(),
         json!({ "post": {
             "tags": ["inventory", "purchasing"], "summary": "Create a draft purchase requisition from current replenishment suggestions", "security": sec,

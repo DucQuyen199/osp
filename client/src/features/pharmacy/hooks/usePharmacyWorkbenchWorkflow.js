@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { localDate } from '../../../lib/dates.js';
-import { api, dataPath } from '../../../lib/api.js';
+import { api, dataPath, session } from '../../../lib/api.js';
 import { textDialog } from '../../../lib/feedback.js';
-import { addDecimals, compareDecimals, subtractDecimals } from '../../../lib/decimal.js';
+import { addDecimals, compareDecimals, normalizeDecimal, subtractDecimals } from '../../../lib/decimal.js';
+import { clearPersistentIdempotencyRequest, getPersistentIdempotencyRequest } from '../../../lib/idempotency.js';
 
 const today = localDate;
 const newLine = () => ({ rowId: crypto.randomUUID(), product: '', uom: '', qty: '1', dosage: '' });
@@ -91,19 +92,35 @@ export function usePharmacyWorkbenchWorkflow({ products, returnDispositions, set
     }
     setBusy(true); setError(''); setNotice('');
     try {
+      const normalizedQty = normalizeDecimal(qtyText);
       let disposition = returnDispositions.find((item) => item.inspection === inspection.id && item.status === 'draft');
       if (!disposition) {
-        disposition = await api(dataPath('pharmacy.return_disposition'), { method: 'POST', body: { inspection: inspection.id, qty: qtyText, note } });
-        setReturnDispositions((items) => [...items, disposition]);
-      } else if (compareDecimals(disposition.qty || 0, qtyText) !== 0 || disposition.note !== note) {
-        disposition = await api(dataPath('pharmacy.return_disposition', disposition.id), { method: 'PATCH', body: { qty: qtyText, note } });
+        const payload = { inspection: inspection.id, qty: normalizedQty, note };
+        const scope = `${session.current()?.tenantId || ''}:pharmacy.return_disposition.posted:${inspection.id}`;
+        const { key, fingerprint } = getPersistentIdempotencyRequest(scope, JSON.stringify(payload));
+        disposition = await api(dataPath('pharmacy.return_disposition', 'create-and-act', 'posted'), {
+          method: 'POST',
+          body: payload,
+          headers: { 'idempotency-key': key },
+        });
+        clearPersistentIdempotencyRequest(scope, fingerprint);
+        setReturnDispositions((items) => items.some((item) => item.id === disposition.id)
+          ? items.map((item) => item.id === disposition.id ? disposition : item)
+          : [...items, disposition]);
+      } else {
+        if (compareDecimals(disposition.qty || 0, normalizedQty) !== 0 || disposition.note !== note) {
+          disposition = await api(dataPath('pharmacy.return_disposition', disposition.id), { method: 'PATCH', body: { qty: normalizedQty, note } });
+        }
         setReturnDispositions((items) => items.map((item) => item.id === disposition.id ? disposition : item));
+        await api(dataPath('pharmacy.return_disposition', disposition.id, 'posted'), { method: 'POST' });
       }
-      await api(dataPath('pharmacy.return_disposition', disposition.id, 'posted'), { method: 'POST' });
       setDisposalDrafts((items) => ({ ...items, [inspection.id]: { qty: '', note: '' } }));
       setNotice(t('Đã ghi sổ hủy thuốc và xuất khỏi tồn kho cách ly.'));
       await load();
-    } catch (reason) { setError(t(reason.message || 'Không thể ghi sổ hủy thuốc. Phiếu nháp được giữ để thử lại.')); }
+    } catch (reason) {
+      try { await load(); } catch { /* preserve the mutation error if a refresh also fails */ }
+      setError(t(reason.message || 'Không thể ghi sổ hủy thuốc. Phiếu nháp được giữ để thử lại.'));
+    }
     finally { setBusy(false); }
   }
 

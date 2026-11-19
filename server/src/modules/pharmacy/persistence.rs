@@ -11,6 +11,42 @@ pub async fn validate_persistence(
     action: &str,
     doc: &Value,
 ) -> R<Vec<String>> {
+    if entity == "return_disposition" && action == "created" {
+        let Some(inspection_id) = id(doc, "inspection") else {
+            return Ok(vec![
+                "Return disposition requires a valid inspection".into(),
+            ]);
+        };
+        let inspection = tx
+            .query_opt(
+                "SELECT source, status FROM quality__inspection WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                &[&tenant.id, &inspection_id],
+            )
+            .await?;
+        let Some(inspection) = inspection else {
+            return Ok(vec!["Returned medicine inspection was not found".into()]);
+        };
+        let source: String = inspection.get(0);
+        let status: String = inspection.get(1);
+        if source != "pharmacy_return" || status != "failed" {
+            return Ok(vec![
+                "Only failed customer-returned medicine can be disposed".into(),
+            ]);
+        }
+        if tx
+            .query_opt(
+                "SELECT id FROM pharmacy__return_disposition WHERE tenant_id = $1 AND inspection = $2 AND status = 'draft' LIMIT 1 FOR UPDATE",
+                &[&tenant.id, &inspection_id],
+            )
+            .await?
+            .is_some()
+        {
+            return Ok(vec![
+                "Chỉ cho phép một phiếu nháp đang hoạt động cho mỗi lần kiểm tra thuốc trả".into(),
+            ]);
+        }
+        return Ok(Vec::new());
+    }
     if entity == "return_disposition" && action == "posted" {
         let Some(inspection_id) = id(doc, "inspection") else {
             return Ok(vec![

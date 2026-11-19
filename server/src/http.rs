@@ -2588,7 +2588,11 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                 return Ok(Reply::Json(201, created));
             }
             (&Method::POST, ["create-and-act", action]) => {
-                if q != "quality.inspection_disposition" || *action != "posted" {
+                if !matches!(
+                    (q.as_str(), *action),
+                    ("quality.inspection_disposition", "posted")
+                        | ("pharmacy.return_disposition", "posted")
+                ) {
                     return Err(ApiError::new(404, "NOT_FOUND", "Route không tồn tại"));
                 }
                 let key = idempotency_key(&parts.headers)?.ok_or_else(|| {

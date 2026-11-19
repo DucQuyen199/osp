@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api, dataPath } from '../../../lib/api.js';
+import { api, dataPath, session } from '../../../lib/api.js';
+import { clearPersistentIdempotencyRequest, getPersistentIdempotencyRequest } from '../../../lib/idempotency.js';
 
 const blankBoqLine = () => ({ rowId: crypto.randomUUID(), description: '', unit: '', qty: '1', unit_price: '' });
 
@@ -15,6 +16,18 @@ export function useConstructionWorkflow({
   const [busy, setBusy] = useState('');
   const [notice, setNotice] = useState('');
 
+  async function createRecord(qname, payload) {
+    const scope = `${session.current()?.tenantId || ''}:create:${qname}`;
+    const { key, fingerprint } = getPersistentIdempotencyRequest(scope, JSON.stringify(payload));
+    const result = await api(dataPath(qname), {
+      method: 'POST',
+      body: payload,
+      headers: { 'idempotency-key': key },
+    });
+    clearPersistentIdempotencyRequest(scope, fingerprint);
+    return result;
+  }
+
   useEffect(() => {
     setSiteForm((current) => ({ ...current, project: current.project || projects.find((row) => ['planned', 'active'].includes(row.status))?.id || '' }));
     setDiaryForm((current) => ({ ...current, site: current.site || sites.find((site) => site.project === projects[0]?.id)?.id || sites.find((site) => !site.project)?.id || '' }));
@@ -25,50 +38,55 @@ export function useConstructionWorkflow({
 
   async function run(key, operation, success) {
     setBusy(key); setError(''); setNotice('');
-    try { await operation(); setNotice(t(success)); await load(true); }
-    catch (reason) { setError(t(reason.message || 'Thao tác không thành công.')); await load(true); }
+    try { await operation(); setNotice(t(success)); await load(true); return true; }
+    catch (reason) { setError(t(reason.message || 'Thao tác không thành công.')); await load(true); return false; }
     finally { setBusy(''); }
   }
 
   async function createSite(event) {
     event.preventDefault();
-    await run('site', () => api(dataPath('construction.site'), { method: 'POST', body: { ...siteForm, project: projectId || undefined } }), 'Đã tạo hồ sơ công trường.');
-    setSiteForm((current) => ({ ...current, name: '', address: '' }));
+    const created = await run('site', () => createRecord('construction.site', { ...siteForm, project: projectId || undefined }), 'Đã tạo hồ sơ công trường.');
+    if (created) setSiteForm((current) => ({ ...current, name: '', address: '' }));
   }
 
   async function createDiary(event) {
     event.preventDefault();
-    await run('diary', () => api(dataPath('construction.site_diary'), { method: 'POST', body: { ...diaryForm, weather: diaryForm.weather || undefined, notes: diaryForm.notes || undefined } }), 'Đã ghi nhật ký thi công. Nhật ký được lưu thành lịch sử không thể sửa.');
-    setDiaryForm((current) => ({ ...current, weather: '', notes: '' }));
+    const payload = { ...diaryForm, weather: diaryForm.weather || undefined, notes: diaryForm.notes || undefined };
+    const created = await run('diary', () => createRecord('construction.site_diary', payload), 'Đã ghi nhật ký thi công. Nhật ký được lưu thành lịch sử không thể sửa.');
+    if (created) setDiaryForm((current) => ({ ...current, weather: '', notes: '' }));
   }
 
   async function createBoq(event) {
     event.preventDefault();
-    await run('boq', async () => {
+    const created = await run('boq', async () => {
       const payload = {
         ...boqForm, project: boqForm.project, supersedes: boqForm.supersedes || undefined,
         revision_reason: boqForm.revision_reason || undefined,
         items: boqLines.map((line) => ({ description: line.description.trim(), unit: line.unit.trim(), qty: String(line.qty), unit_price: String(line.unit_price) })),
       };
       delete payload.revision;
-      await api(dataPath('construction.boq'), { method: 'POST', body: payload });
+      await createRecord('construction.boq', payload);
     }, 'Đã lập dự toán BOQ nháp; tổng giá trị được máy chủ tính từ khối lượng và đơn giá.');
-    setBoqLines([blankBoqLine()]);
-    setBoqForm((current) => ({ ...current, supersedes: '', revision_reason: '' }));
+    if (created) {
+      setBoqLines([blankBoqLine()]);
+      setBoqForm((current) => ({ ...current, supersedes: '', revision_reason: '' }));
+    }
   }
 
   async function createSubcontract(event) {
     event.preventDefault();
-    await run('subcontract', () => api(dataPath('construction.subcontract'), { method: 'POST', body: { ...subcontractForm, project: projectId, value: String(subcontractForm.value) } }), 'Đã lập dự thảo hợp đồng thầu phụ.');
-    setSubcontractForm((current) => ({ ...current, value: '', scope: '' }));
+    const payload = { ...subcontractForm, project: projectId, value: String(subcontractForm.value) };
+    const created = await run('subcontract', () => createRecord('construction.subcontract', payload), 'Đã lập dự thảo hợp đồng thầu phụ.');
+    if (created) setSubcontractForm((current) => ({ ...current, value: '', scope: '' }));
   }
 
   async function createClaim(event) {
     event.preventDefault();
     const contract = subcontracts.find((row) => row.id === claimForm.subcontract);
     if (!contract) return;
-    await run('claim', () => api(dataPath('construction.progress_claim'), { method: 'POST', body: { ...claimForm, vendor: contract.vendor, amount: String(claimForm.amount), notes: claimForm.notes || undefined } }), 'Đã lập hồ sơ nghiệm thu/đề nghị thanh toán nháp.');
-    setClaimForm((current) => ({ ...current, amount: '', notes: '' }));
+    const payload = { ...claimForm, vendor: contract.vendor, amount: String(claimForm.amount), notes: claimForm.notes || undefined };
+    const created = await run('claim', () => createRecord('construction.progress_claim', payload), 'Đã lập hồ sơ nghiệm thu/đề nghị thanh toán nháp.');
+    if (created) setClaimForm((current) => ({ ...current, amount: '', notes: '' }));
   }
 
   async function transition(entity, row, verb, success) {
