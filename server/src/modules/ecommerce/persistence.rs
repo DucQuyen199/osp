@@ -68,6 +68,22 @@ async fn validate_storefront(
             .get("id")
             .and_then(Value::as_str)
             .and_then(|value| Uuid::parse_str(value).ok());
+        let normalized_domain: String = tx
+            .query_opt("SELECT lower(btrim($1::text))", &[&domain])
+            .await?
+            .ok_or_else(|| {
+                crate::error::ApiError::internal("Unable to normalize storefront domain")
+            })?
+            .get(0);
+        let lock_key = format!(
+            "ecommerce.storefront-domain:{}:{}",
+            tenant.id, normalized_domain
+        );
+        tx.query_opt(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            &[&lock_key],
+        )
+        .await?;
         if tx
             .query_opt(
                 "SELECT id FROM ecommerce__storefront WHERE tenant_id = $1 AND lower(btrim(domain)) = lower($2) AND ($3::uuid IS NULL OR id <> $3) LIMIT 1 FOR UPDATE",
