@@ -109,14 +109,15 @@ pub async fn prepare_document(
     Ok(errors)
 }
 
-/// Sum quantities from completed, non-refunded POS orders linked to a prescription.
+/// Sum quantities from fulfilled POS orders linked to a prescription.
+/// Refunding a sale does not undo that medicine was dispensed to the patient.
 pub(super) async fn dispensed_quantities(
     tx: &Tx<'_>,
     tenant: &Tenant,
     prescription_id: Uuid,
 ) -> R<BTreeMap<Uuid, rust_decimal::Decimal>> {
     let rows = tx.query(
-        "SELECT lines FROM pos__pos_order WHERE tenant_id = $1 AND prescription = $2::text AND status = 'completed' FOR SHARE",
+        "SELECT lines FROM pos__pos_order WHERE tenant_id = $1 AND prescription = $2::text AND status IN ('completed', 'refunded') FOR SHARE",
         &[&tenant.id, &prescription_id.to_string()],
     ).await?;
     let mut quantities = BTreeMap::<Uuid, rust_decimal::Decimal>::new();
@@ -125,7 +126,7 @@ pub(super) async fn dispensed_quantities(
         let Some(lines) = lines.as_array() else {
             return Err(ApiError::validation(
                 "pharmacy.prescription",
-                vec!["Completed POS order has invalid lines; dispensed quantities cannot be verified".into()],
+                vec!["Fulfilled POS order has invalid lines; dispensed quantities cannot be verified".into()],
             ));
         };
         for (index, line) in lines.iter().enumerate() {
@@ -137,7 +138,7 @@ pub(super) async fn dispensed_quantities(
                 return Err(ApiError::validation(
                     "pharmacy.prescription",
                     vec![format!(
-                        "Completed POS order line {} has an invalid product",
+                        "Fulfilled POS order line {} has an invalid product",
                         index + 1
                     )],
                 ));
@@ -151,7 +152,7 @@ pub(super) async fn dispensed_quantities(
                     ApiError::validation(
                         "pharmacy.prescription",
                         vec![format!(
-                            "Completed POS order line {} has an invalid quantity",
+                            "Fulfilled POS order line {} has an invalid quantity",
                             index + 1
                         )],
                     )
