@@ -21,8 +21,7 @@ pub async fn validate_persistence(
             .is_some_and(|provider| provider.trim().eq_ignore_ascii_case("sepay"))
     {
         errors.push(
-            "SePay e-invoice cancellation is not supported; no cancellation request was queued"
-                .into(),
+            "SePay chưa hỗ trợ hủy hóa đơn điện tử qua OSP. Hóa đơn vẫn giữ trạng thái đã phát hành.".into(),
         );
     }
     if matches!(

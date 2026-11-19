@@ -645,7 +645,7 @@ const uiTextEnglish = {
   'Chưa có mã từ nhà cung cấp': 'No provider reference yet', 'Chưa cấu hình': 'Not configured', 'Ký hiệu': 'Serial', 'Tự thử lại': 'Retry scheduled', 'lần': 'attempts',
   'Đã đưa yêu cầu vào hàng đợi thử lại.': 'Request queued for retry.', 'Đã rút yêu cầu phát hành chưa gửi đến nhà cung cấp.': 'Unsent issuance request withdrawn.',
   'Chi tiết yêu cầu': 'Request details', 'Mã yêu cầu:': 'Request ID:', 'Hóa đơn nguồn': 'Source invoice', 'Chưa phát hành': 'Not issued', 'Số hóa đơn / ký hiệu': 'Invoice number / serial',
-  'Provider': 'Provider', 'Rút yêu cầu': 'Withdraw request', 'Yêu cầu hủy': 'Request cancellation',
+  'Provider': 'Provider', 'SePay chưa hỗ trợ hủy hóa đơn điện tử qua OSP. Hóa đơn vẫn giữ trạng thái đã phát hành.': 'SePay invoice cancellation is not available through OSP. The invoice remains issued.', 'Rút yêu cầu': 'Withdraw request', 'Yêu cầu hủy': 'Request cancellation',
   'Chưa được cấp': 'Not assigned', 'Số lần gọi provider': 'Provider calls', 'Cập nhật gần nhất': 'Last updated', 'Lần thử tự động tiếp theo': 'Next automatic retry',
   'Lỗi gần nhất': 'Last error', 'Lý do hủy': 'Cancellation reason', 'Lý do yêu cầu hủy *': 'Cancellation reason *',
   'Nêu lý do nghiệp vụ để gửi đến nhà cung cấp hóa đơn điện tử.': 'Enter the business reason to send to the e-invoice provider.',
