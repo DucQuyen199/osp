@@ -138,12 +138,124 @@ pub(super) async fn resolve_unit_cost(
             }
             "sales_return" => {
                 if let Some(source_id) = source_id {
-                    if let Some(row) = tx.query_opt(
-                        "SELECT (SUM(sm.total_cost::numeric) / NULLIF(SUM(sm.qty::numeric), 0))::text FROM sales__sales_return sr JOIN inventory__stock_move sm ON sm.tenant_id = sr.tenant_id AND sm.source = 'sales_order' AND sm.source_id = sr.sales_order::text WHERE sr.tenant_id = $1 AND sr.id = $2 AND sm.product = $3 AND sm.direction = 'out'",
-                        &[&tenant.id, &source_id, &product_id],
-                    ).await? {
-                        let prior = optional_decimal_column(&row, 0, "sales return unit cost")?;
-                        unit_cost = prior.unwrap_or(standard_cost);
+                    let return_order = tx
+                        .query_opt(
+                            "SELECT sales_order FROM sales__sales_return WHERE tenant_id = $1 AND id = $2",
+                            &[&tenant.id, &source_id],
+                        )
+                        .await?
+                        .and_then(|row| row.get::<_, Option<Uuid>>(0));
+                    if let Some(order_id) = return_order {
+                        let lot = document
+                            .get("lot")
+                            .and_then(Value::as_str)
+                            .filter(|value| !value.is_empty())
+                            .map(str::to_owned);
+                        let returned = tx
+                            .query_opt(
+                                "SELECT COALESCE(SUM(returned.qty::numeric), 0)::text FROM inventory__stock_move returned JOIN sales__sales_return sr ON sr.tenant_id = returned.tenant_id AND sr.id::text = returned.source_id WHERE returned.tenant_id = $1 AND sr.sales_order = $2 AND returned.source = 'sales_return' AND returned.product = $3 AND returned.direction = 'in' AND returned.lot IS NOT DISTINCT FROM $4",
+                                &[&tenant.id, &order_id, &product_id, &lot],
+                            )
+                            .await?
+                            .map(|row| decimal_column(&row, 0, "previously returned quantity"))
+                            .transpose()?
+                            .unwrap_or_default();
+                        let mut remaining_to_skip = returned;
+                        let mut remaining_to_value = document
+                            .get("qty")
+                            .and_then(money::decimal)
+                            .unwrap_or_default();
+                        let mut return_cost = Decimal::ZERO;
+                        let mut has_fifo_history = false;
+                        let original_moves = tx
+                            .query(
+                                "SELECT fifo_allocations FROM inventory__stock_move WHERE tenant_id = $1 AND source = 'sales_order' AND source_id = $2 AND product = $3 AND direction = 'out' ORDER BY created_at, id",
+                                &[&tenant.id, &order_id.to_string(), &product_id],
+                            )
+                            .await?;
+                        for row in original_moves {
+                            let Some(allocations) = row
+                                .get::<_, Option<Value>>(0)
+                                .and_then(|value| value.as_array().cloned())
+                            else {
+                                continue;
+                            };
+                            for allocation in allocations {
+                                let allocation_lot = allocation
+                                    .get("lot")
+                                    .and_then(Value::as_str)
+                                    .map(str::to_owned);
+                                if allocation_lot != lot {
+                                    continue;
+                                }
+                                let Some(mut allocation_qty) =
+                                    allocation.get("qty").and_then(money::decimal)
+                                else {
+                                    continue;
+                                };
+                                let Some(allocation_cost) =
+                                    allocation.get("unit_cost").and_then(money::decimal)
+                                else {
+                                    continue;
+                                };
+                                has_fifo_history = true;
+                                let skipped = remaining_to_skip.min(allocation_qty);
+                                remaining_to_skip = remaining_to_skip
+                                    .checked_sub(skipped)
+                                    .ok_or_else(|| crate::error::ApiError::validation(
+                                        "inventory.stock_move",
+                                        vec!["Returned quantity exceeds its original sale quantity".into()],
+                                    ))?;
+                                allocation_qty = allocation_qty
+                                    .checked_sub(skipped)
+                                    .ok_or_else(|| crate::error::ApiError::validation(
+                                        "inventory.stock_move",
+                                        vec!["FIFO return quantity exceeds its original layer quantity".into()],
+                                    ))?;
+                                let restored = remaining_to_value.min(allocation_qty);
+                                return_cost = return_cost
+                                    .checked_add(restored.checked_mul(allocation_cost).ok_or_else(|| {
+                                        crate::error::ApiError::validation(
+                                            "inventory.stock_move",
+                                            vec!["FIFO return value exceeds the supported decimal range".into()],
+                                        )
+                                    })?)
+                                    .ok_or_else(|| crate::error::ApiError::validation(
+                                        "inventory.stock_move",
+                                        vec!["FIFO return value exceeds the supported decimal range".into()],
+                                    ))?;
+                                remaining_to_value =
+                                    remaining_to_value.checked_sub(restored).ok_or_else(|| {
+                                        crate::error::ApiError::validation(
+                                            "inventory.stock_move",
+                                            vec![
+                                                "FIFO return quantity exceeds the supported range"
+                                                    .into(),
+                                            ],
+                                        )
+                                    })?;
+                            }
+                        }
+                        if has_fifo_history {
+                            if remaining_to_skip > Decimal::ZERO || remaining_to_value > Decimal::ZERO {
+                                return Err(crate::error::ApiError::validation(
+                                    "inventory.stock_move",
+                                    vec!["Sales return quantity exceeds the unreturned FIFO quantity from its original sale".into()],
+                                ));
+                            }
+                            unit_cost = return_cost
+                                .checked_div(document.get("qty").and_then(money::decimal).unwrap_or_default())
+                                .ok_or_else(|| crate::error::ApiError::validation(
+                                    "inventory.stock_move",
+                                    vec!["FIFO return unit cost exceeds the supported range".into()],
+                                ))?;
+                        } else if let Some(row) = tx.query_opt(
+                            "SELECT (SUM(sm.total_cost::numeric) / NULLIF(SUM(sm.qty::numeric), 0))::text FROM inventory__stock_move sm WHERE sm.tenant_id = $1 AND sm.source = 'sales_order' AND sm.source_id = $2 AND sm.product = $3 AND sm.direction = 'out'",
+                            &[&tenant.id, &order_id.to_string(), &product_id],
+                        ).await? {
+                            let prior = optional_decimal_column(&row, 0, "sales return unit cost")?;
+                            unit_cost = prior.unwrap_or(standard_cost);
+                        }
                     }
                 }
             }
