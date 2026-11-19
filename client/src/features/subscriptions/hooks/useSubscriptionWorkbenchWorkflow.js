@@ -42,7 +42,7 @@ export function useSubscriptionWorkbenchWorkflow({ t }) {
         setForm((current) => ({ ...current, party: current.party || [...partyMap.keys()][0] || '', plan: current.plan || planRows[0]?.id || '' }));
       }
     } catch (reason) {
-      if (isLatest()) setError(t(reason.message || 'KhÃ´ng táº£i Ä‘Æ°á»£c há»“ sÆ¡ thuÃª bao.'));
+      if (isLatest()) setError(t(reason.message || 'Không tải được hồ sơ thuê bao.'));
     } finally {
       if (isLatest()) setLoading(false);
     }
@@ -57,21 +57,21 @@ export function useSubscriptionWorkbenchWorkflow({ t }) {
       setNotice(t(success));
       await load(true);
     } catch (reason) {
-      setError(t(reason.message || 'Thao tÃ¡c khÃ´ng thÃ nh cÃ´ng.'));
+      setError(t(reason.message || 'Thao tác không thành công.'));
       await load(true);
     } finally { setBusy(''); }
   }
 
   async function createSubscription(event) {
     event.preventDefault();
-    await run('create', () => api(dataPath('subscription.subscription'), { method: 'POST', body: { ...form, status: 'active' } }), 'ÄÃ£ kÃ­ch hoáº¡t thuÃª bao. Há»‡ thá»‘ng tá»± táº¡o ká»³ thu Ä‘áº§u tiÃªn theo ngÃ y báº¯t Ä‘áº§u vÃ  giÃ¡ gÃ³i.');
+    await run('create', () => api(dataPath('subscription.subscription'), { method: 'POST', body: { ...form, status: 'active' } }), 'Đã kích hoạt thuê bao. Hệ thống tự tạo kỳ thu đầu tiên theo ngày bắt đầu và giá gói.');
   }
 
   async function changeStatus(row, action) {
     const messages = {
-      paused: 'ÄÃ£ táº¡m dá»«ng; cÃ¡c ká»³ chÆ°a Ä‘áº¿n háº¡n Ä‘Æ°á»£c há»§y.',
-      resumed: 'ÄÃ£ tiáº¿p tá»¥c thuÃª bao; ká»³ tiáº¿p theo Ä‘Æ°á»£c lÃªn lá»‹ch láº¡i.',
-      cancelled: 'ÄÃ£ há»§y thuÃª bao; cÃ¡c ká»³ chÆ°a Ä‘áº¿n háº¡n Ä‘Æ°á»£c há»§y.',
+      paused: 'Đã tạm dừng; các kỳ chưa đến hạn được hủy.',
+      resumed: 'Đã tiếp tục thuê bao; kỳ tiếp theo được lên lịch lại.',
+      cancelled: 'Đã hủy thuê bao; các kỳ chưa đến hạn được hủy.',
     };
     await run(`${row.id}:${action}`, () => transition('subscription.subscription', row, action), messages[action]);
   }

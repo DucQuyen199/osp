@@ -90,6 +90,8 @@ export function useEntityListWorkflow({ qname, definition, columns }) {
     setReloadKey((value) => value + 1);
     location.hash = recordHref(qname, record.id);
   };
+  const refresh = () => setReloadKey((value) => value + 1);
+  const openRecord = (record) => { location.hash = recordHref(qname, record.id); };
   const exportCsv = async () => {
     try {
       const response = await api(tenantPath(`/export/${qname.replace('.', '/')}`), { raw: true });
@@ -137,9 +139,9 @@ export function useEntityListWorkflow({ qname, definition, columns }) {
   };
 
   return {
-    rows, refs, total, query, setQuery, status, setStatus, page, setPage,
+    rows, refs, total, pages: Math.max(1, Math.ceil(total / PAGE_SIZE)), query, setQuery, status, setStatus, page, setPage,
     loading, error, formOpen, setFormOpen, importOpen, setImportOpen, selectedIds,
-    bulkAction, selectedRows, allRowsSelected, bulkActions, created, exportCsv,
+    bulkAction, selectedRows, allRowsSelected, bulkActions, created, exportCsv, refresh, openRecord,
     toggleRow, togglePage, runBulkAction,
   };
 }

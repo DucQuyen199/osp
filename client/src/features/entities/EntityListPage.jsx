@@ -15,9 +15,9 @@ export default function EntityListPage({ qname }) {
   const columns = useMemo(() => (definition ? listColumns(definition) : []), [definition]);
   const workflow = useEntityListWorkflow({ qname, definition, columns });
   const {
-    rows, refs, total, query, setQuery, status, setStatus, page, setPage,
+    rows, refs, total, pages, query, setQuery, status, setStatus, page, setPage,
     loading, error, formOpen, setFormOpen, importOpen, setImportOpen, selectedIds,
-    bulkAction, selectedRows, allRowsSelected, bulkActions, created, exportCsv,
+    bulkAction, selectedRows, allRowsSelected, bulkActions, created, exportCsv, refresh, openRecord,
     toggleRow, togglePage, runBulkAction,
   } = workflow;
   if (!definition) return <div className="page"><div className="empty">
@@ -25,7 +25,6 @@ export default function EntityListPage({ qname }) {
     <p>{uiText('Module có thể chưa được bật cho doanh nghiệp của bạn.')}</p>
     <a className="btn" href="#/">{uiText('Về trang chủ')}</a>
   </div></div>;
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const canCreate = !definition.systemManaged && can(`${qname}.create`);
   const selectable = Boolean(definition.states && Object.keys(definition.states.actions).some((action) => can(`${qname}.${action}`)));
   const states = definition.states
@@ -66,12 +65,12 @@ export default function EntityListPage({ qname }) {
           qname={qname} definition={definition} columns={columns} rows={rows} refs={refs}
           selectable={selectable} selectedIds={selectedIds} allRowsSelected={allRowsSelected} busy={Boolean(bulkAction)}
           onTogglePage={togglePage} onToggleRow={toggleRow}
-          onOpenRecord={(record) => { location.hash = recordHref(qname, record.id); }}
+          onOpenRecord={openRecord}
         />}
       <EntityListPager total={total} page={page} pages={pages} loading={loading} onPageChange={setPage} />
     </section>
   </div>
   {formOpen && <EntityFormDialog qname={qname} onClose={() => setFormOpen(false)} onSaved={created} />}
-  {importOpen && <EntityImportDialog qname={qname} onClose={() => setImportOpen(false)} onDone={() => setReloadKey((value) => value + 1)} />}
+  {importOpen && <EntityImportDialog qname={qname} onClose={() => setImportOpen(false)} onDone={refresh} />}
   </>;
 }
