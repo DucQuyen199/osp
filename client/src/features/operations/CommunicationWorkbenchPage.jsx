@@ -1,95 +1,27 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
-import { useLatestRequest } from '../../lib/useLatestRequest.js';
-import { localDateTime, localDateTimeToIso } from '../../lib/dates.js';
-import { api, dataPath } from '../../lib/api.js';
+import { localDateTime } from '../../lib/dates.js';
 import { fmtDateTime, statusLabel, uiTextWith } from '../../lib/i18n.js';
-import { can, loadRefs, recordLabel } from '../../lib/state.js';
+import { can, recordLabel } from '../../lib/state.js';
 import EntityListPager from '../entities/components/EntityListPager.jsx';
 import communicationEnglish from './communication.en.js';
+import { MESSAGE_PAGE_SIZE, REMINDER_PAGE_SIZE, useCommunicationWorkbenchData } from './hooks/useCommunicationWorkbenchData.js';
+import { useCommunicationWorkbenchWorkflow } from './hooks/useCommunicationWorkbenchWorkflow.js';
 const t = (text) => uiTextWith(text, communicationEnglish);
-const rows = (response) => Array.isArray(response?.items) ? response.items : [];
 const channelLabels = { email: 'Email', sms: 'SMS' };
 const deliveryLabels = { queued: 'Đang chờ', processing: 'Đang gửi', retry: 'Chờ gửi lại', sent: 'Đã gửi', failed: 'Thất bại' };
 const reminderLabels = { pending: 'Đã lên lịch', queued: 'Đã xếp hàng gửi', cancelled: 'Đã hủy' };
-const REMINDER_PAGE_SIZE = 25;
-const MESSAGE_PAGE_SIZE = 50;
-const MESSAGE_STATUSES = ['queued', 'processing', 'retry', 'sent', 'failed'];
-const pageRequest = (qname, page, pageSize, sort, dir, filters = {}) => {
-  const query = new URLSearchParams({ limit: String(pageSize), offset: String(page * pageSize), sort, dir, ...filters });
-  return api(`${dataPath(qname)}?${query}`);
-};
 export default function CommunicationWorkbenchPage() {
   useDocumentTitle(`${t('Lịch nhắc và nhật ký gửi')} · OSP Suite`);
-  const [reminders, setReminders] = useState([]);
-  const [reminderTotal, setReminderTotal] = useState(0);
   const [reminderPage, setReminderPage] = useState(0);
-  const [messages, setMessages] = useState([]);
-  const [messageTotal, setMessageTotal] = useState(0);
   const [messagePage, setMessagePage] = useState(0);
-  const [messageCounts, setMessageCounts] = useState({});
-  const [pendingReminderCount, setPendingReminderCount] = useState(0);
-  const [parties, setParties] = useState(new Map());
-  const [form, setForm] = useState({ party: '', channel: 'email', subject: '', body: '', send_at: '' });
   const [filter, setFilter] = useState('all');
-  const [busy, setBusy] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const latestRequest = useLatestRequest();
-  const load = useCallback(async (quiet = false) => {
-    const isLatest = latestRequest();
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const [reminderRes, messageRes, partyMap, reminderPendingRes, messageCountPairs] = await Promise.all([
-        can('communication.reminder.read') ? pageRequest('communication.reminder', reminderPage, REMINDER_PAGE_SIZE, 'send_at', 'asc', filter === 'all' ? {} : { status: filter }) : Promise.resolve({ items: [], total: 0 }),
-        can('communication.message_log.read') ? pageRequest('communication.message_log', messagePage, MESSAGE_PAGE_SIZE, 'createdAt', 'desc') : Promise.resolve({ items: [], total: 0 }),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('communication.reminder.read') ? pageRequest('communication.reminder', 0, 1, 'send_at', 'asc', { status: 'pending' }) : Promise.resolve({ total: 0 }),
-        can('communication.message_log.read')
-          ? Promise.all(MESSAGE_STATUSES.map(async (status) => [status, await pageRequest('communication.message_log', 0, 1, 'createdAt', 'desc', { status })]))
-          : Promise.resolve([]),
-      ]);
-      const reminderRows = rows(reminderRes);
-      const messageRows = rows(messageRes);
-      const nextReminderTotal = Number(reminderRes.total || 0);
-      const nextMessageTotal = Number(messageRes.total || 0);
-      if (isLatest()) {
-        if (reminderPage > 0 && reminderPage * REMINDER_PAGE_SIZE >= nextReminderTotal) setReminderPage(Math.max(0, Math.ceil(nextReminderTotal / REMINDER_PAGE_SIZE) - 1));
-        if (messagePage > 0 && messagePage * MESSAGE_PAGE_SIZE >= nextMessageTotal) setMessagePage(Math.max(0, Math.ceil(nextMessageTotal / MESSAGE_PAGE_SIZE) - 1));
-        setReminders(reminderRows); setReminderTotal(nextReminderTotal); setMessages(messageRows); setMessageTotal(nextMessageTotal); setParties(partyMap);
-        setPendingReminderCount(Number(reminderPendingRes?.total || 0));
-        setMessageCounts(Object.fromEntries(messageCountPairs.map(([status, response]) => [status, Number(response.total || 0)])));
-        setForm((current) => ({ ...current, party: current.party && partyMap.has(current.party) ? current.party : [...partyMap.keys()][0] || '' }));
-      }
-    } catch (reason) { if (isLatest()) setError(t(reason.message || 'Không tải được lịch và nhật ký gửi.')); }
-    finally { if (isLatest()) setLoading(false); }
-  }, [filter, messagePage, reminderPage, latestRequest]);
-  useEffect(() => { load(); }, [load]);
+  const data = useCommunicationWorkbenchData({ filter, messagePage, reminderPage, setMessagePage, setReminderPage });
+  const { reminders, reminderTotal, messages, messageTotal, messageCounts, pendingReminderCount, parties, loading, error: loadError, load } = data;
+  const workflow = useCommunicationWorkbenchWorkflow({ parties, load, t });
+  const { form, setForm, eligibleParties, partiesForChannel, busy, error: workflowError, notice, create, cancel } = workflow;
+  const error = loadError || workflowError;
   const deliveryCounts = messageCounts;
-  const partiesForChannel = (channel) => [...parties.values()].filter((party) => channel === 'email'
-    ? Boolean(party.email?.trim()) : Boolean(party.phone?.trim()));
-  const eligibleParties = partiesForChannel(form.channel);
-  async function run(key, operation, message) {
-    setBusy(key); setError(''); setNotice('');
-    try { await operation(); await load(true); setNotice(t(message)); }
-    catch (reason) { setError(t(reason.message || 'Thao tác không thành công.')); }
-    finally { setBusy(''); }
-  }
-  async function create(event) {
-    event.preventDefault();
-    if (!eligibleParties.some((party) => party.id === form.party)) { setError(t('Người nhận cần có địa chỉ phù hợp với kênh gửi.')); return; }
-    if (!form.send_at || !form.body.trim()) return;
-    const sendAt = localDateTimeToIso(form.send_at);
-    if (!sendAt) { setError(t('Thời điểm gửi không hợp lệ trong múi giờ kinh doanh.')); return; }
-    const payload = { party: form.party, channel: form.channel, body: form.body.trim(), send_at: sendAt };
-    if (form.subject.trim()) payload.subject = form.subject.trim();
-    await run('create', async () => {
-      await api(dataPath('communication.reminder'), { method: 'POST', body: payload });
-      setForm((current) => ({ ...current, subject: '', body: '', send_at: '' }));
-    }, 'Đã lên lịch nhắc. Hệ thống sẽ xếp hàng gửi khi đến giờ.');
-  }
-  const cancel = (reminder) => run(`${reminder.id}:cancelled`, () => api(dataPath('communication.reminder', reminder.id, 'cancelled'), { method: 'POST' }), 'Đã hủy lịch nhắc.');
   const recipient = (id) => parties.has(id) ? recordLabel('master-data.party', parties.get(id)) : id || '—';
   return <div className="page">
     <div className="page-head"><div><h1>{t('Lịch nhắc và nhật ký gửi')}</h1><p className="sub">{t('Lên lịch email hoặc SMS cho liên hệ và theo dõi trạng thái gửi trong cùng một nơi.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div>
