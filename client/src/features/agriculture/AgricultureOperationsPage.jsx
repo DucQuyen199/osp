@@ -32,6 +32,7 @@ export default function AgricultureOperationsPage() {
     const baseUnit = products.get(productId)?.uom;
     return baseUnit ? [...units.values()].filter((unit) => unit.id === baseUnit || unit.base_uom === baseUnit) : [];
   };
+  const waterUnits = [...units.values()].filter((unit) => !unit.base_uom || !units.get(unit.base_uom)?.base_uom);
   const {
     farmName, setFarmName, farmLocation, setFarmLocation, farmArea, setFarmArea, farmOwner, setFarmOwner,
     newCycleFarm, setNewCycleFarm, crop, setCrop, plantedOn, setPlantedOn, expectedHarvest, setExpectedHarvest,
@@ -67,6 +68,21 @@ export default function AgricultureOperationsPage() {
     }
     return [...totals.values()];
   }, [cycleHarvests, products, units]);
+  const waterTotals = useMemo(() => {
+    const totals = new Map();
+    for (const application of cycleInputs) {
+      if (application.kind !== 'water') continue;
+      const hasSnapshot = application.base_qty != null;
+      const baseUnit = application.base_uom || application.uom || '';
+      const key = baseUnit || `legacy:${application.id}`;
+      const unitName = units.get(baseUnit)?.name || application.uom_name || t('Chưa rõ đơn vị');
+      const quantity = hasSnapshot ? String(application.base_qty) : String(application.qty || 0);
+      const current = totals.get(key) || { key, quantity: '0', unitName };
+      current.quantity = addDecimals([current.quantity, quantity]);
+      totals.set(key, current);
+    }
+    return [...totals.values()];
+  }, [cycleInputs, units]);
   const canViewInputCost = can('agriculture.input_application.read') && can('inventory.stock_move.read');
   const { report: inputCostReport, error: inputCostError } = useAgricultureInputCostsData({ cycleId: selectedCycle?.id, inputs: cycleInputs, enabled: canViewInputCost });
   const harvestSafety = useMemo(() => {
@@ -129,7 +145,7 @@ export default function AgricultureOperationsPage() {
       </section>
       <section className="agriculture-cycle-detail">{selectedCycle ? <>
         <article className="card agriculture-panel"><header className="agriculture-section-head"><div><h2>{selectedCycle.crop}</h2><p className="small muted">{selectedFarm?.name} · {t('Gieo')} {fmtDate(selectedCycle.planted_on)}{selectedCycle.expected_harvest ? ` · ${t('Dự kiến')} ${fmtDate(selectedCycle.expected_harvest)}` : ''}</p></div><span className={`badge ${selectedCycle.status === 'growing' ? 'warning' : selectedCycle.status === 'harvested' ? 'success' : 'plain'}`}>{statusLabel(selectedCycle.status)}</span></header>
-          <div className="agriculture-kpis"><div><span>{t('Sản lượng đã thu theo sản phẩm')}</span>{harvestTotals.length ? harvestTotals.map((total) => <strong className="num" key={total.key}>{total.productName}: {fmtNumber(total.quantity)}{total.unitName ? ` ${total.unitName}` : ''}</strong>) : <strong className="num">0</strong>}</div><div><span>{t('Diện tích')}</span><strong>{selectedFarm?.area ? `${fmtNumber(selectedFarm.area)} ${t('ha')}` : t('Chưa khai báo')}</strong></div><div><span>{t('Năng suất lũy kế theo sản phẩm')}</span>{hasArea && harvestTotals.length ? harvestTotals.map((total) => <strong className="num" key={total.key}>{total.productName}: {fmtNumber(divideDecimals(total.quantity, selectedFarm.area, 12), { maximumFractionDigits: 3 })}{total.unitName ? ` ${total.unitName}` : ''} / {t('ha')}</strong>) : <strong>{hasArea ? t('Chưa có thu hoạch') : t('Cần diện tích')}</strong>}</div><div><span>{t('Lần bón / dùng vật tư')}</span><strong>{cycleInputs.length}</strong></div>{canViewInputCost && <><div><span>{t('Chi phí vật tư đã xuất kho')}</span><strong>{inputCostReport ? fmtMoney(inputCostReport.materialCost || 0) : '—'}</strong></div><div><span>{t('Chi phí vật tư / ha')}</span><strong>{inputCostReport?.costPerHectare != null ? fmtMoney(inputCostReport.costPerHectare) : selectedFarm?.area ? '—' : t('Cần diện tích')}</strong></div></>}</div>
+          <div className="agriculture-kpis"><div><span>{t('Sản lượng đã thu theo sản phẩm')}</span>{harvestTotals.length ? harvestTotals.map((total) => <strong className="num" key={total.key}>{total.productName}: {fmtNumber(total.quantity)}{total.unitName ? ` ${total.unitName}` : ''}</strong>) : <strong className="num">0</strong>}</div><div><span>{t('Diện tích')}</span><strong>{selectedFarm?.area ? `${fmtNumber(selectedFarm.area)} ${t('ha')}` : t('Chưa khai báo')}</strong></div><div><span>{t('Năng suất lũy kế theo sản phẩm')}</span>{hasArea && harvestTotals.length ? harvestTotals.map((total) => <strong className="num" key={total.key}>{total.productName}: {fmtNumber(divideDecimals(total.quantity, selectedFarm.area, 12), { maximumFractionDigits: 3 })}{total.unitName ? ` ${total.unitName}` : ''} / {t('ha')}</strong>) : <strong>{hasArea ? t('Chưa có thu hoạch') : t('Cần diện tích')}</strong>}</div><div><span>{t('Lần bón / dùng vật tư')}</span><strong>{cycleInputs.length}</strong></div>{waterTotals.length > 0 && <div><span>{t('Lượng nước tưới ghi nhận')}</span>{waterTotals.map((total) => <strong className="num" key={total.key}>{fmtNumber(total.quantity)} {total.unitName}</strong>)}</div>}{canViewInputCost && <><div><span>{t('Chi phí vật tư đã xuất kho')}</span><strong>{inputCostReport ? fmtMoney(inputCostReport.materialCost || 0) : '—'}</strong></div><div><span>{t('Chi phí vật tư / ha')}</span><strong>{inputCostReport?.costPerHectare != null ? fmtMoney(inputCostReport.costPerHectare) : selectedFarm?.area ? '—' : t('Cần diện tích')}</strong></div></>}</div>
           {inputCostError && <p className="small muted" role="status">{inputCostError}</p>}
           {inputCostReport?.byKind && <p className="small muted">{t('Phân bón')} {fmtMoney(inputCostReport.byKind.fertilizer || 0)} · {t('Thuốc')} {fmtMoney(inputCostReport.byKind.pesticide || 0)} · {t('Giống')} {fmtMoney(inputCostReport.byKind.seed || 0)} · {t('Nước có xuất kho')} {fmtMoney(inputCostReport.byKind.water || 0)}. {t('Theo giá trị phiếu xuất tại thời điểm ghi nhận; chưa gồm nhân công, nước ghi ngoài kho hoặc khoản landed cost hạch toán sau.')}</p>}
           {selectedCycle.status === 'growing' && <footer className="row wrap agriculture-cycle-actions">{can('agriculture.crop_cycle.harvested') && <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(busy) || !cycleHarvests.length} title={!cycleHarvests.length ? t('Ghi nhận ít nhất một lần thu hoạch trước') : ''} onClick={() => closeCycle('harvested')}>{t('Kết thúc vụ')}</button>}{can('agriculture.crop_cycle.failed') && <button className="btn btn-secondary btn-sm" type="button" disabled={Boolean(busy)} onClick={() => closeCycle('failed')}>{t('Đánh dấu thất bại')}</button>}</footer>}
@@ -138,7 +154,7 @@ export default function AgricultureOperationsPage() {
           <AgricultureInputForm
             cycle={selectedCycle} inputKinds={inputKinds} inputKind={inputKind} inputProduct={inputProduct}
             inputUom={inputUom} inputWarehouse={inputWarehouse} inputQty={inputQty} inputDate={inputDate}
-            products={products} warehouses={warehouses} unitsFor={unitsFor} requiresProduct={requiresProduct}
+            products={products} warehouses={warehouses} unitsFor={unitsFor} waterUnits={waterUnits} requiresProduct={requiresProduct}
             pesticideIntervalMissing={pesticideIntervalMissing} busy={busy}
             canCreate={can('agriculture.input_application.create')} today={today()}
             onSubmit={createInput}

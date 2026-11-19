@@ -59,6 +59,9 @@ const agricultureEnglish = {
   'Chọn vụ mùa để xem nhật ký, nhập vật tư và sản lượng.': 'Select a crop cycle to review logs and record inputs or harvests.',
   'Sản lượng đã thu theo sản phẩm': 'Harvested quantity by product', 'ha': 'ha',
   'base': 'base units', 'Lô': 'Lot', 'Đơn vị ghi nhận': 'Recorded unit',
+  'Đơn vị đo *': 'Measurement unit *', 'Chọn đơn vị đo': 'Select a measurement unit',
+  'Nước tưới ghi ngoài kho cần có đơn vị đo': 'Irrigation water recorded outside inventory requires a measurement unit.',
+  'Lượng nước tưới ghi nhận': 'Irrigation water recorded', 'Chưa rõ đơn vị': 'Unit not recorded',
 };
 
 export default agricultureEnglish;

@@ -70,7 +70,7 @@ export function useAgricultureOperationsWorkflow({ farms, selectedCycle, product
     event.preventDefault(); if (!selectedCycle) return;
     setBusy('input'); setError(''); setNotice('');
     try {
-      await createRecord('agriculture.input_application', { cycle: selectedCycle.id, kind: inputKind, qty: String(inputQty), date: inputDate, ...(inputProduct ? { product: inputProduct, warehouse: inputWarehouse, ...(unitsFor(inputProduct).length ? { uom: inputUom || products.get(inputProduct)?.uom } : {}) } : {}) });
+      await createRecord('agriculture.input_application', { cycle: selectedCycle.id, kind: inputKind, qty: String(inputQty), date: inputDate, ...(inputProduct ? { product: inputProduct, warehouse: inputWarehouse, ...(unitsFor(inputProduct).length ? { uom: inputUom || products.get(inputProduct)?.uom } : {}) } : inputKind === 'water' && inputUom ? { uom: inputUom } : {}) });
       setInputQty(''); await load(true); setNotice(t('Đã ghi nhật ký sử dụng vật tư và cập nhật tồn kho nếu có sản phẩm.'));
     } catch (reason) { setError(reason.message || t('Không ghi được nhật ký vật tư. Kiểm tra kho và tồn khả dụng.')); }
     finally { setBusy(''); }

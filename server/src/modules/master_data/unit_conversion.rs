@@ -88,3 +88,61 @@ pub async fn resolve(
         ratio,
     }))
 }
+
+/// Resolve an operational unit without tying it to an inventory product.
+/// This is used for measured resources such as irrigation water. Alternate
+/// units must point directly to a tenant-owned base unit.
+pub async fn resolve_standalone(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    selected_unit: Uuid,
+) -> R<Result<UnitSnapshot, String>> {
+    let unit = tx
+        .query_opt(
+            "SELECT name, base_uom, ratio::text FROM master_data__uom WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+            &[&tenant.id, &selected_unit],
+        )
+        .await?;
+    let Some(unit) = unit else {
+        return Ok(Err("Selected unit must belong to this tenant".into()));
+    };
+    let name: String = unit.get(0);
+    let parent: Option<Uuid> = unit.get(1);
+    let ratio_text: Option<String> = unit.get(2);
+    let Some(base_unit_id) = parent else {
+        return Ok(Ok(UnitSnapshot {
+            unit_id: Some(selected_unit),
+            unit_name: Some(name),
+            base_unit_id: Some(selected_unit),
+            ratio: Decimal::ONE,
+        }));
+    };
+    let base = tx
+        .query_opt(
+            "SELECT name, base_uom FROM master_data__uom WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+            &[&tenant.id, &base_unit_id],
+        )
+        .await?;
+    let Some(base) = base else {
+        return Ok(Err("Selected unit base must belong to this tenant".into()));
+    };
+    let base_parent: Option<Uuid> = base.get(1);
+    if base_parent.is_some() {
+        return Ok(Err(
+            "Selected unit must convert directly to a base unit".into()
+        ));
+    }
+    let Some(ratio) = ratio_text
+        .as_deref()
+        .and_then(money::decimal_str)
+        .filter(|ratio| *ratio > Decimal::ZERO)
+    else {
+        return Ok(Err("Selected unit has an invalid conversion ratio".into()));
+    };
+    Ok(Ok(UnitSnapshot {
+        unit_id: Some(selected_unit),
+        unit_name: Some(name),
+        base_unit_id: Some(base_unit_id),
+        ratio,
+    }))
+}

@@ -17,13 +17,6 @@ pub async fn prepare_stock_quantity(
     for field in ["base_qty", "uom_name", "uom_ratio", "base_uom"] {
         document.remove(field);
     }
-    let Some(product_id) = document
-        .get("product")
-        .and_then(Value::as_str)
-        .and_then(|value| Uuid::parse_str(value).ok())
-    else {
-        return Ok(Vec::new());
-    };
     let selected_unit = match document.get("uom") {
         Some(Value::String(value)) => match Uuid::parse_str(value) {
             Ok(unit) => Some(unit),
@@ -33,6 +26,54 @@ pub async fn prepare_stock_quantity(
             return Ok(vec!["Selected agricultural unit is invalid".into()]);
         }
         _ => None,
+    };
+    let Some(product_id) = document
+        .get("product")
+        .and_then(Value::as_str)
+        .and_then(|value| Uuid::parse_str(value).ok())
+    else {
+        if entity == "input_application"
+            && document.get("kind").and_then(Value::as_str) == Some("water")
+        {
+            let Some(selected_unit) = selected_unit else {
+                return Ok(vec!["Irrigation water requires a measurement unit".into()]);
+            };
+            let unit = match crate::modules::master_data::unit_conversion::resolve_standalone(
+                tx,
+                tenant,
+                selected_unit,
+            )
+            .await?
+            {
+                Ok(unit) => unit,
+                Err(message) => return Ok(vec![format!("Agricultural unit: {message}")]),
+            };
+            if let Some(quantity) = document.get("qty").and_then(crate::money::decimal) {
+                let Some(base_quantity) = unit
+                    .base_quantity(quantity)
+                    .and_then(crate::money::json_number)
+                else {
+                    return Ok(vec![
+                        "Agricultural quantity exceeds the supported range".into(),
+                    ]);
+                };
+                document.insert("base_qty".into(), base_quantity);
+            }
+            document.insert("uom".into(), serde_json::json!(selected_unit));
+            if let Some(name) = unit.unit_name {
+                document.insert("uom_name".into(), serde_json::json!(name));
+            }
+            if let Some(base_unit) = unit.base_unit_id {
+                document.insert("base_uom".into(), serde_json::json!(base_unit));
+            }
+            let Some(ratio) = crate::money::json_number(unit.ratio) else {
+                return Ok(vec![
+                    "Agricultural unit ratio exceeds the supported range".into(),
+                ]);
+            };
+            document.insert("uom_ratio".into(), ratio);
+        }
+        return Ok(Vec::new());
     };
     let unit = match crate::modules::master_data::unit_conversion::resolve(
         tx,

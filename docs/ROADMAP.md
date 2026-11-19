@@ -57,6 +57,7 @@ Trạng thái hiện tại: **v0.2** — hệ thống có kernel Rust, PostgreSQ
 - Timesheet dự án có thể gắn mã nhân viên HRM để tổng hợp giờ/cost theo người; tên nhân viên vẫn được lưu snapshot và dữ liệu timesheet cũ dạng văn bản tiếp tục hiển thị.
 - Nhật ký thuốc bảo vệ thực vật lưu snapshot số ngày cách ly trước thu hoạch; không cho ghi lần phun khi sản phẩm chưa có thời gian cách ly được khai báo rõ (0 ngày vẫn hợp lệ theo nhãn), và máy chủ chặn nhập kho thu hoạch trước hạn hoặc khi hồ sơ thuốc cũ chưa xác minh được.
 - Báo cáo mùa vụ tính chi phí phân bón/thuốc/giống theo giá trị xuất kho đã định giá và chi phí trên hecta; chỉ hiện khi người dùng có quyền xem stock move, không tính nước/nhân công chưa ghi nhận chi phí kho.
+- Nhật ký nước tưới ngoài kho yêu cầu đơn vị đo, lưu snapshot số lượng quy đổi theo đơn vị gốc và cộng báo cáo theo từng đơn vị gốc; không tự quy đổi giữa các loại đơn vị khác gốc hoặc ghi chi phí kế toán.
 - Sản lượng thu hoạch cộng theo Decimal trên đơn vị gốc và theo từng sản phẩm; danh sách vụ mùa hiển thị số lần thu thay vì cộng chung các mặt hàng khác đơn vị.
 - Phiếu thu hoạch sản phẩm quản lý lô lưu ngày hết hạn; bắt buộc theo policy sản phẩm, không trước ngày thu hoạch, truyền nguyên tử sang lô tồn kho và từ chối tái dùng mã lô với hạn dùng khác.
 - Đề xuất bổ sung tồn kho dùng cùng ngưỡng Decimal của máy chủ khi xác định dòng cần mua.

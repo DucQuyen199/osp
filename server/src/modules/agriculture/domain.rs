@@ -85,6 +85,18 @@ pub fn validate(entity: &str, document: &Value) -> Vec<String> {
             if date(document, "date").is_none() {
                 errors.push("Ngày sử dụng vật tư phải hợp lệ".into());
             }
+            if document.get("kind").and_then(Value::as_str) == Some("water")
+                && document
+                    .get("product")
+                    .and_then(Value::as_str)
+                    .is_none_or(str::is_empty)
+                && document
+                    .get("uom")
+                    .and_then(Value::as_str)
+                    .is_none_or(str::is_empty)
+            {
+                errors.push("Nước tưới ghi ngoài kho cần có đơn vị đo".into());
+            }
             if matches!(
                 document.get("kind").and_then(Value::as_str),
                 Some("fertilizer" | "pesticide" | "seed")

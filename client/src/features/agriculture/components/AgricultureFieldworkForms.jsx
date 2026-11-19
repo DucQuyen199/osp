@@ -3,7 +3,7 @@ import { recordHref } from '../../../lib/routes.js';
 
 export function AgricultureInputForm({
   cycle, inputKinds, inputKind, inputProduct, inputUom, inputWarehouse, inputQty, inputDate,
-  products, warehouses, unitsFor, requiresProduct, pesticideIntervalMissing, busy, canCreate,
+  products, warehouses, unitsFor, waterUnits, requiresProduct, pesticideIntervalMissing, busy, canCreate,
   today, onSubmit, onKindChange, onProductChange, onUomChange, onWarehouseChange, onQtyChange, onDateChange,
   recordLabel, t,
 }) {
@@ -28,6 +28,12 @@ export function AgricultureInputForm({
     {unitsFor(inputProduct).length > 0 && <label className="field"><span className="label">{t('Đơn vị ghi nhận')}</span>
       <select className="select" value={inputUom || products.get(inputProduct)?.uom || ''} onChange={(event) => onUomChange(event.target.value)}>
         {unitsFor(inputProduct).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` (${unit.ratio} × ${t('base')})` : ` (${t('base')})`}</option>)}
+      </select>
+    </label>}
+    {inputKind === 'water' && !inputProduct && <label className="field"><span className="label">{t('Đơn vị đo *')}</span>
+      <select className="select" required value={inputUom} onChange={(event) => onUomChange(event.target.value)}>
+        <option value="">{t('Chọn đơn vị đo')}</option>
+        {waterUnits.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}{unit.base_uom ? ` (${unit.ratio} × ${t('base')})` : ''}</option>)}
       </select>
     </label>}
     {inputProduct && <label className="field"><span className="label">{t('Kho xuất *')}</span>
