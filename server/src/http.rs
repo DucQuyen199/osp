@@ -2886,26 +2886,39 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                         .map(str::trim)
                         .unwrap_or_default()
                         .to_owned();
-                    let valid = body.len() == 3
-                        && body.contains_key("doctor")
+                    let valid = body.keys().all(|field| {
+                        matches!(
+                            field.as_str(),
+                            "doctor" | "diagnosis" | "fee" | "no_charge_reason"
+                        )
+                    }) && body.contains_key("doctor")
                         && body.contains_key("diagnosis")
                         && body.contains_key("fee")
-                        && !doctor.is_empty()
-                        && !diagnosis.is_empty()
                         && body
-                            .get("fee")
-                            .and_then(crate::money::decimal)
-                            .is_some_and(|fee| fee > rust_decimal::Decimal::ZERO);
+                            .get("no_charge_reason")
+                            .is_none_or(|reason| reason.is_null() || reason.as_str().is_some())
+                        && !doctor.is_empty()
+                        && !diagnosis.is_empty();
                     if !valid {
                         return Err(ApiError::validation(
                             "clinic.encounter.completed",
                             vec![
-                                "Cần gửi bác sĩ, chẩn đoán không rỗng và phí khám lớn hơn 0".into(),
+                                "Dữ liệu hoàn tất lượt khám không hợp lệ: cần có bác sĩ, chẩn đoán và chỉ gửi doctor, diagnosis, fee, no_charge_reason tùy chọn".into(),
                             ],
                         ));
                     }
                     body.insert("doctor".into(), serde_json::json!(doctor));
                     body.insert("diagnosis".into(), serde_json::json!(diagnosis));
+                    if let Some(reason) = body
+                        .get("no_charge_reason")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::trim)
+                    {
+                        body.insert(
+                            "no_charge_reason".into(),
+                            serde_json::Value::String(reason.to_owned()),
+                        );
+                    }
                     return json_ok(k.update_and_act(&actor, &t, &q, id, action, body).await?);
                 }
                 if q == "clinic.lab_order" && *action == "resulted" {
