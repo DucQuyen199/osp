@@ -1,22 +1,22 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
-import { api, dataPath } from '../../lib/api.js';
 import { statusLabel, fmtDateTime, uiText, uiLocale } from '../../lib/i18n.js';
 import { app, can } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import { useEInvoiceWorkbenchData } from './hooks/useEInvoiceWorkbenchData.js';
+import { useEInvoiceWorkbenchWorkflow } from './hooks/useEInvoiceWorkbenchWorkflow.js';
 const formatDateTime = (value) => value ? fmtDateTime(value) : '—';
 const statusTone = (status) => status === 'issued' || status === 'cancelled' ? 'success' : status === 'failed' ? 'danger' : status === 'withdrawn' ? 'muted' : 'warning';
 export default function EInvoiceWorkbenchPage() {
   useDocumentTitle(`${uiText('Hóa đơn điện tử')} · OSP Suite`);
-  const { rows, invoices, loading, error, setError, load } = useEInvoiceWorkbenchData();
+  const { rows, invoices, loading, error: loadError, setError: setLoadError, load } = useEInvoiceWorkbenchData();
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState('');
-  const [reason, setReason] = useState('');
-  const [busy, setBusy] = useState('');
-  const [notice, setNotice] = useState('');
+  const workflow = useEInvoiceWorkbenchWorkflow({ load, clearLoadError: () => setLoadError('') });
+  const { reason, setReason, busy, error: workflowError, notice, run, requestCancellation } = workflow;
+  const error = loadError || workflowError;
   useEffect(() => { setSelectedId((current) => current && rows.some((row) => row.id === current) ? current : rows[0]?.id || ''); }, [rows]);
   const counts = useMemo(() => rows.reduce((result, row) => {
     result.all += 1;
@@ -35,35 +35,6 @@ export default function EInvoiceWorkbenchPage() {
   }, [rows, invoices, filter, search, uiLocale]);
   const selected = rows.find((row) => row.id === selectedId);
   const selectedInvoice = selected ? invoices.get(selected.invoice) : null;
-  async function run(row, action, success, operation = () => api(dataPath('einvoice.einvoice', row.id, action), { method: 'POST' })) {
-    setBusy(`${row.id}:${action}`);
-    setError('');
-    setNotice('');
-    try {
-      await operation();
-      setNotice(success);
-      await load();
-    } catch (reason) {
-      setError(reason.message || uiText('Không cập nhật được yêu cầu hóa đơn điện tử.'));
-    } finally {
-      setBusy('');
-    }
-  }
-  function requestCancellation(row) {
-    const value = reason.trim();
-    if (!value) {
-      setError(uiText('Nhập lý do hủy theo quy trình nghiệp vụ trước khi gửi nhà cung cấp.'));
-      return;
-    }
-    if (value.length > 2000) {
-      setError(uiText('Lý do hủy không được vượt quá 2.000 ký tự.'));
-      return;
-    }
-    run(row, 'cancel_requested', uiText('Đã đưa yêu cầu hủy vào hàng đợi xử lý.'), async () => {
-      await api(dataPath('einvoice.einvoice', row.id, 'cancel_requested'), { method: 'POST', body: { cancellation_reason: value } });
-      setReason('');
-    });
-  }
   const enabled = app.meta?.modules?.some((module) => module.id === 'einvoice');
   const filterOptions = [
     ['all', 'Tất cả'], ['pending', 'Chờ phát hành'], ['failed', 'Lỗi'],
