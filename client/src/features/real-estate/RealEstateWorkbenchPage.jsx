@@ -58,7 +58,7 @@ export default function RealEstateWorkbenchPage() {
     propertyForm, setPropertyForm, viewingForm, reservationForm, leaseForm,
     busy, notice, createProperty, createViewing, createReservation, createLease,
     updateViewingField, updateReservationField, updateLeaseField,
-    convertReservation, expireReservation, cancelReservation,
+    convertReservation, reserveReservation, expireReservation, cancelReservation,
     activateLease, issueRent, terminateLease,
   } = workflow;
   const saleInvoice = selected && invoices.find((row) => row.source === 'property' && row.source_id === selected.id);
@@ -71,6 +71,7 @@ export default function RealEstateWorkbenchPage() {
   const leaseRows = useMemo(() => leases.filter((row) => row.property === selectedProperty), [leases, selectedProperty]);
   const cycleRows = useMemo(() => rentCycles.filter((row) => leaseRows.some((lease) => lease.id === row.lease)).sort((a, b) => String(b.due_date || '').localeCompare(String(a.due_date || ''))), [rentCycles, leaseRows]);
   const reservationActions = (row) => ({
+    reserve: row.status === 'draft' && can('real-estate.reservation.reserved'),
     convert: row.status === 'reserved' && can('real-estate.reservation.converted'),
     expire: row.status === 'reserved' && row.expires_on < today() && can('real-estate.reservation.expired'),
     cancel: ['draft', 'reserved'].includes(row.status) && can('real-estate.reservation.cancelled'),
@@ -110,7 +111,7 @@ export default function RealEstateWorkbenchPage() {
           onViewingFieldChange={updateViewingField} onReservationFieldChange={updateReservationField}
           onLeaseFieldChange={updateLeaseField} onCreateViewing={createViewing}
           onCreateReservation={createReservation} onCreateLease={createLease}
-          onConvertReservation={convertReservation} onExpireReservation={expireReservation}
+          onConvertReservation={convertReservation} onReserveReservation={reserveReservation} onExpireReservation={expireReservation}
           onCancelReservation={cancelReservation} onActivateLease={activateLease}
           onIssueRent={issueRent} onTerminateLease={terminateLease}
         />}

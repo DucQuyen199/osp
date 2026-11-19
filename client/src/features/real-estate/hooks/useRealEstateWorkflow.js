@@ -27,8 +27,8 @@ export function useRealEstateWorkflow({ properties, parties, selectedProperty, l
 
   async function run(label, operation, success) {
     setBusy(label); setError(''); setNotice('');
-    try { await operation(); setNotice(t(success)); await load(true); }
-    catch (reason) { setError(t(reason.message || 'Thao tác không thành công.')); await load(true); }
+    try { await operation(); setNotice(t(success)); await load(true); return true; }
+    catch (reason) { setError(t(reason.message || 'Thao tác không thành công.')); await load(true); return false; }
     finally { setBusy(''); }
   }
   async function createProperty(event) {
@@ -51,13 +51,13 @@ export function useRealEstateWorkflow({ properties, parties, selectedProperty, l
   }
   async function createReservation(event) {
     event.preventDefault();
-    await run('reservation', async () => {
+    const succeeded = await run('reservation', async () => {
       const row = await api(dataPath('real-estate.reservation'), { method: 'POST', body: {
         ...reservationForm, property: selectedProperty, agreed_price: String(reservationForm.agreed_price), status: 'draft',
       } });
       await action('real-estate.reservation', row, 'reserved');
     }, 'Đã xác nhận giữ chỗ; bất động sản đã chuyển trạng thái giữ chỗ.');
-    setReservationForm((current) => ({ ...current, number: '', agreed_price: '', notes: '' }));
+    if (succeeded) setReservationForm((current) => ({ ...current, number: '', agreed_price: '', notes: '' }));
   }
   async function createLease(event) {
     event.preventDefault();
@@ -73,6 +73,7 @@ export function useRealEstateWorkflow({ properties, parties, selectedProperty, l
   const updateReservationField = (field, value) => setReservationForm((form) => ({ ...form, [field]: value }));
   const updateLeaseField = (field, value) => setLeaseForm((form) => ({ ...form, [field]: value }));
   const convertReservation = (row) => transition('real-estate.reservation', row, 'converted', 'Đã chốt giao dịch; tài sản được ghi nhận đã bán và hóa đơn đã tạo.');
+  const reserveReservation = (row) => transition('real-estate.reservation', row, 'reserved', 'Đã xác nhận giữ chỗ; bất động sản đã chuyển trạng thái giữ chỗ.');
   const expireReservation = (row) => transition('real-estate.reservation', row, 'expired', 'Đã hết hạn giữ chỗ; tài sản được giải phóng.');
   const cancelReservation = (row) => transition('real-estate.reservation', row, 'cancelled', 'Đã hủy phiếu giữ chỗ; trạng thái tài sản được cập nhật.');
   const activateLease = (row) => transition('real-estate.lease', row, 'activated', 'Đã kích hoạt hợp đồng; tài sản được chuyển sang đang cho thuê.');
@@ -83,7 +84,7 @@ export function useRealEstateWorkflow({ properties, parties, selectedProperty, l
     propertyForm, setPropertyForm, viewingForm, reservationForm, leaseForm,
     busy, notice, createProperty, createViewing, createReservation, createLease,
     updateViewingField, updateReservationField, updateLeaseField,
-    convertReservation, expireReservation, cancelReservation,
+    convertReservation, reserveReservation, expireReservation, cancelReservation,
     activateLease, issueRent, terminateLease,
   };
 }

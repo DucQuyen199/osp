@@ -98,7 +98,7 @@ async fn apply_lease_amendment(
     ]);
     if let Some(value) = changes.get("value") {
         if value.is_null()
-            || !crate::money::decimal(value).is_some_and(|amount| amount >= Decimal::ZERO)
+            || !crate::money::decimal(value).is_some_and(|amount| amount > Decimal::ZERO)
         {
             return Err(crate::error::ApiError::validation(
                 "contract.amendment.applied",
