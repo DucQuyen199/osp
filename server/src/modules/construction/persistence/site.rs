@@ -31,6 +31,25 @@ pub(super) async fn validate_site(
         .and_then(Value::as_str)
         .unwrap_or_default()
         .trim();
+    let normalized_name: String = tx
+        .query_opt("SELECT lower(btrim($1::text))", &[&name])
+        .await?
+        .ok_or_else(|| {
+            crate::error::ApiError::internal("Unable to normalize construction site name")
+        })?
+        .get(0);
+    let project_scope = project
+        .map(|project| project.to_string())
+        .unwrap_or_else(|| "unassigned".into());
+    let lock_key = format!(
+        "construction.site-name:{}:{}:{}",
+        tenant.id, project_scope, normalized_name
+    );
+    tx.query_opt(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        &[&lock_key],
+    )
+    .await?;
     if tx.query_opt(
         "SELECT id FROM construction__site WHERE tenant_id = $1 AND lower(btrim(name)) = lower($2) AND project IS NOT DISTINCT FROM $3::uuid AND ($4::uuid IS NULL OR id <> $4) LIMIT 1 FOR UPDATE",
         &[&tenant.id, &name, &project, &id],
