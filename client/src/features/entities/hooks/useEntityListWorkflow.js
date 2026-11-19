@@ -23,6 +23,12 @@ export function useEntityListWorkflow({ qname, definition, columns }) {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkAction, setBulkAction] = useState('');
 
+  useEffect(() => {
+    setPage(0);
+    setStatus('');
+    setQuery('');
+    setDebouncedQuery('');
+  }, [qname]);
   useEffect(() => { setSelectedIds(new Set()); }, [qname, page, status, debouncedQuery, reloadKey]);
   useEffect(() => {
     const timeout = setTimeout(() => setDebouncedQuery(query.trim()), 250);
@@ -64,6 +70,10 @@ export function useEntityListWorkflow({ qname, definition, columns }) {
     });
     return () => { active = false; controller.abort(); };
   }, [definition, qname, columns, page, status, debouncedQuery, reloadKey]);
+  useEffect(() => {
+    const lastPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1);
+    if (!loading && page > lastPage) setPage(lastPage);
+  }, [loading, page, total]);
 
   const selectedRows = useMemo(() => rows.filter((record) => selectedIds.has(record.id)), [rows, selectedIds]);
   const allRowsSelected = rows.length > 0 && rows.every((record) => selectedIds.has(record.id));
