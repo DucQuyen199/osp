@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId, useRef } from 'react';
 import { fmtDate, fmtDateTime, fmtMoney, fmtNumber, statusLabel, tone, uiText } from '../../lib/i18n.js';
 import { fieldLabelOf, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
@@ -40,12 +40,31 @@ export default function EntityDetailTabs({
   error,
   onTabChange,
 }) {
+  const tabBaseId = useId();
+  const tabRefs = useRef([]);
+  const tabValues = ['info', 'flow'];
+  const handleTabKeyDown = (event) => {
+    const currentIndex = tabValues.indexOf(event.currentTarget.dataset.tab);
+    let nextIndex;
+    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabValues.length;
+    else if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabValues.length) % tabValues.length;
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = tabValues.length - 1;
+    else return;
+    event.preventDefault();
+    onTabChange(tabValues[nextIndex]);
+    tabRefs.current[nextIndex]?.focus();
+  };
+  const activeTabIndex = tabValues.indexOf(tab);
+  const activeTabId = `${tabBaseId}-${tab}-tab`;
+
   return <>
     <div className="tabs" role="tablist" aria-label={uiText('Thông tin bản ghi')}>
-      <button className="tab" type="button" role="tab" aria-selected={tab === 'info'} onClick={() => onTabChange('info')}>{uiText('Thông tin')}</button>
-      <button className="tab" type="button" role="tab" aria-selected={tab === 'flow'} onClick={() => onTabChange('flow')}>{uiText('Hệ quả liên mô-đun')}</button>
+      <button ref={(node) => { tabRefs.current[0] = node; }} id={`${tabBaseId}-info-tab`} className="tab" type="button" role="tab" data-tab="info" aria-selected={tab === 'info'} aria-controls={`${tabBaseId}-info-panel`} tabIndex={activeTabIndex === 0 ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => onTabChange('info')}>{uiText('Thông tin')}</button>
+      <button ref={(node) => { tabRefs.current[1] = node; }} id={`${tabBaseId}-flow-tab`} className="tab" type="button" role="tab" data-tab="flow" aria-selected={tab === 'flow'} aria-controls={`${tabBaseId}-flow-panel`} tabIndex={activeTabIndex === 1 ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => onTabChange('flow')}>{uiText('Hệ quả liên mô-đun')}</button>
     </div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}
+    <div id={`${tabBaseId}-${tab}-panel`} role="tabpanel" aria-labelledby={activeTabId} tabIndex={0}>
     {tab === 'info' ? <dl className="dl">{fields.map((field) => <React.Fragment key={field.name}>
       <dt>{uiText(fieldLabelOf(qname, field.name))}</dt>
       <dd><FieldValue qname={qname} field={field} value={record[field.name]} refs={refs} definition={definition} record={record}/></dd>
@@ -57,5 +76,6 @@ export default function EntityDetailTabs({
       <p className="muted">{uiText('Các bước đã chạy từ bản ghi này, gồm cả phản ứng tự động ở những mô-đun khác.')}</p>
       {events ? <EventTimeline events={events} currentId={currentId}/> : <div className="skeleton" data-h="row" aria-label={uiText('Đang tải chuỗi sự kiện')}/>}
     </div>}
+    </div>
   </>;
 }

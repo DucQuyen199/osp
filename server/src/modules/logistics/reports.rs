@@ -110,6 +110,8 @@ impl Kernel {
                    'id', shipment.id, 'status', CASE WHEN shipment.status = 'delivered' AND NULLIF(btrim(shipment.short_delivery_reason), '') IS NOT NULL THEN 'partial' ELSE shipment.status END, 'source', shipment.source, \
                    'sourceId', shipment.source_id, 'partyId', shipment.party, \
                    'party', party.name, 'warehouseId', shipment.warehouse, \
+                   'routeId', shipment.route, 'route', route.name, \
+                   'routeStopNumber', shipment.route_stop_number, 'routeStop', route_stop.value, \
                    'lines', COALESCE((SELECT jsonb_agg(line.value || jsonb_build_object('productName', product.name)) \
                      FROM jsonb_array_elements(shipment.lines) AS line(value) \
                      LEFT JOIN master_data__product product ON product.tenant_id = shipment.tenant_id AND product.id::text = line.value->>'product'), '[]'::jsonb), \
@@ -128,6 +130,8 @@ impl Kernel {
                  LEFT JOIN master_data__party party ON party.tenant_id = shipment.tenant_id AND party.id = shipment.party \
                  LEFT JOIN logistics__vehicle vehicle ON vehicle.tenant_id = shipment.tenant_id AND vehicle.id = shipment.vehicle \
                  LEFT JOIN logistics__driver driver ON driver.tenant_id = shipment.tenant_id AND driver.id = shipment.driver \
+                 LEFT JOIN logistics__route route ON route.tenant_id = shipment.tenant_id AND route.id = shipment.route \
+                 LEFT JOIN LATERAL (SELECT stop.value FROM jsonb_array_elements(CASE WHEN jsonb_typeof(route.stops) = 'array' THEN route.stops ELSE '[]'::jsonb END) WITH ORDINALITY stop(value, ordinal) WHERE shipment.route_stop_number = stop.ordinal::double precision LIMIT 1) route_stop ON true \
                  LEFT JOIN LATERAL (SELECT status, occurred_at, location FROM logistics__tracking_event event \
                    WHERE event.tenant_id = shipment.tenant_id AND event.shipment = shipment.id \
                    ORDER BY event.occurred_at DESC, event.id DESC LIMIT 1) latest ON true \

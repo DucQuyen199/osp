@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
@@ -19,6 +19,21 @@ export default function ApprovalWorkbenchPage() {
   } = workflow;
   const [requestFilter, setRequestFilter] = useState('pending');
   const [tab, setTab] = useState('inbox');
+  const tabBaseId = useId();
+  const tabRefs = useRef([]);
+  const tabValues = ['inbox', 'rules'];
+  const handleTabKeyDown = (event) => {
+    const currentIndex = tabValues.indexOf(event.currentTarget.dataset.tab);
+    let nextIndex;
+    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabValues.length;
+    else if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabValues.length) % tabValues.length;
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = tabValues.length - 1;
+    else return;
+    event.preventDefault();
+    setTab(tabValues[nextIndex]);
+    tabRefs.current[nextIndex]?.focus();
+  };
   const visibleRequests = useMemo(() => requests.filter((row) => requestFilter === 'all' || row.status === requestFilter), [requests, requestFilter]);
   const selected = visibleRequests.find((row) => row.id === selectedId) || requests.find((row) => row.id === selectedId);
   const pendingCount = requests.filter((row) => row.status === 'pending').length;
@@ -41,7 +56,11 @@ export default function ApprovalWorkbenchPage() {
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     <div className="stats u-mb-16" ><div className="card stat"><span className="stat-label">{t("Đang chờ xử lý")}</span><strong className="stat-value">{pendingCount}</strong></div><div className="card stat"><span className="stat-label">{t("Đã duyệt")}</span><strong className="stat-value">{requests.filter((row) => row.status === 'approved').length}</strong></div><div className="card stat"><span className="stat-label">{t("Đã từ chối")}</span><strong className="stat-value">{requests.filter((row) => row.status === 'rejected').length}</strong></div><div className="card stat"><span className="stat-label">{t("Quy tắc đang áp dụng")}</span><strong className="stat-value">{rules.length}</strong></div></div>
     <section className="card card-pad">
-      <div className="tabs" role="tablist" aria-label={t('Phê duyệt và quy tắc')}><button className="tab" type="button" role="tab" aria-selected={tab === 'inbox'} onClick={() => setTab('inbox')}>{t('Hàng chờ')} ({pendingCount})</button><button className="tab" type="button" role="tab" aria-selected={tab === 'rules'} onClick={() => setTab('rules')}>{t("Quy tắc phê duyệt")}</button></div>
+      <div className="tabs" role="tablist" aria-label={t('Phê duyệt và quy tắc')}>
+        <button ref={(node) => { tabRefs.current[0] = node; }} id={`${tabBaseId}-inbox-tab`} className="tab" type="button" role="tab" data-tab="inbox" aria-selected={tab === 'inbox'} aria-controls={`${tabBaseId}-inbox-panel`} tabIndex={tab === 'inbox' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setTab('inbox')}>{t('Hàng chờ')} ({pendingCount})</button>
+        <button ref={(node) => { tabRefs.current[1] = node; }} id={`${tabBaseId}-rules-tab`} className="tab" type="button" role="tab" data-tab="rules" aria-selected={tab === 'rules'} aria-controls={`${tabBaseId}-rules-panel`} tabIndex={tab === 'rules' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setTab('rules')}>{t("Quy tắc phê duyệt")}</button>
+      </div>
+      <div id={`${tabBaseId}-${tab}-panel`} role="tabpanel" aria-labelledby={`${tabBaseId}-${tab}-tab`} tabIndex={0}>
       {tab === 'inbox' && <div className="u-mt-12">
         <div className="row wrap"><h2>{t("Yêu cầu phê duyệt")}</h2><span className="grow"/><label className="field"><span className="label">{t("Lọc trạng thái")}</span><select className="select" value={requestFilter} onChange={(event) => setRequestFilter(event.target.value)}><option value="pending">{t("Đang chờ")}</option><option value="approved">{t("Đã duyệt")}</option><option value="rejected">{t("Đã từ chối")}</option><option value="cancelled">{t("Đã hủy")}</option><option value="all">{t("Tất cả")}</option></select></label></div>
         {!can('workflow-approval.approval_request.read') ? <div className="empty">{t("Bạn chưa có quyền xem yêu cầu phê duyệt.")}</div> : loading ? <div className="skeleton" data-h="row"/> : !visibleRequests.length ? <div className="empty">{t("Không có yêu cầu ở trạng thái này.")}</div> : <div className="layout-split u-mt-10" >
@@ -49,6 +68,7 @@ export default function ApprovalWorkbenchPage() {
           {selected && <section className="card card-pad"><div className="row wrap"><div><h3>{selected.subject}</h3><div className="small muted">{t(sourceLabel(selected.entity))} · {t('gửi lúc')} {fmtDateTime(selected.createdAt)}</div></div><span className="grow"/><span className={`badge ${selected.status === 'pending' ? 'warning' : selected.status === 'approved' ? 'success' : 'plain'}`}>{statusLabel(selected.status)}</span></div><dl className="u-auto-grid"><div><dt className="label">{t("Hồ sơ nguồn")}</dt><dd className="u-m-0-break-words"><a href={recordHref(selected.entity, selected.record_id)}>{t('Mở hồ sơ')} {String(selected.record_id || '').slice(0, 8)}</a></dd></div><div><dt className="label">{t("Giá trị đề nghị")}</dt><dd className="u-m-0">{selected.amount != null ? fmtMoney(selected.amount) : t('Không áp dụng')}</dd></div><div><dt className="label">{t("Người yêu cầu")}</dt><dd className="u-m-0-break-words">{selected.requested_by || selected.requested_by_user || t('Hệ thống')}</dd></div><div><dt className="label">{t("Người/nhóm có quyền duyệt")}</dt><dd className="u-m-0-break-words">{[...selectedApprovers.roles.map((role) => app.meta?.roles?.[role]?.name || role), ...selectedApprovers.users.map(approverName)].join(', ') || t('Theo quyền cơ bản của vai trò')}</dd></div></dl><div className="row wrap u-mt-16" >{selected.status === 'pending' && can('workflow-approval.approval_request.approved') && <button className="btn btn-primary" disabled={Boolean(busy)} onClick={() => decide(selected, 'approved')}>{t("Duyệt hồ sơ")}</button>}{selected.status === 'pending' && can('workflow-approval.approval_request.rejected') && <button className="btn btn-secondary" disabled={Boolean(busy)} onClick={() => decide(selected, 'rejected')}>{t("Từ chối")}</button>}</div><p className="small muted u-mt-12" >{t("Quyết định sẽ được ghi nhật ký; khi duyệt hoặc từ chối, trạng thái hồ sơ nguồn được chuyển trong cùng quy trình xử lý.")}</p></section>}
         </div>}
       </div>}
+      </div>
       {tab === 'rules' && <div className="u-mt-12"><div className="row wrap"><div><h2>{t("Quy tắc theo giá trị và vai trò")}</h2><p className="small muted">{t("Quy tắc có ngưỡng cao nhất phù hợp sẽ xác định người được duyệt. Có thể khai báo nhiều ngưỡng cho cùng loại hồ sơ.")}</p></div><span className="grow"/></div>
         {(can('workflow-approval.approval_rule.read') || canManageRules) && <>{!rules.length ? <div className="empty">{t("Chưa có quy tắc; quyền duyệt sẽ theo các quyền cơ bản của vai trò.")}</div> : <div className="table-wrap u-mt-10" ><table className="table"><thead><tr><th>{t("Tên quy tắc")}</th><th>{t("Loại hồ sơ")}</th><th>{t("Ngưỡng từ")}</th><th>{t("Người phê duyệt")}</th><th/></tr></thead><tbody>{rules.map((rule) => { const approvers = ruleApprovers(rule.approvers); return <tr key={rule.id}><td><strong>{rule.name}</strong>{rule.variance_tolerance != null && <div className="small muted">{t('Dung sai hóa đơn')} {fmtMoney(rule.variance_tolerance)}</div>}</td><td>{t(sourceLabel(rule.entity))}</td><td>{rule.min_amount == null ? t('Mọi giá trị') : fmtMoney(rule.min_amount)}</td><td>{[...approvers.roles.map((role) => app.meta?.roles?.[role]?.name || role), ...approvers.users.map(approverName)].join(', ')}</td><td>{can('workflow-approval.approval_rule.update') && <button className="btn btn-secondary btn-sm" type="button" onClick={() => beginEditRule(rule)}>{t("Sửa")}</button>}</td></tr>; })}</tbody></table></div>}</>}
         {!can('workflow-approval.approval_rule.read') && !canManageRules && <div className="empty">{t("Bạn chưa có quyền xem hoặc cấu hình quy tắc.")}</div>}

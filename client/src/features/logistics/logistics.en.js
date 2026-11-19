@@ -12,6 +12,7 @@ const logisticsEnglish = {
   'Không hoàn tất được giao hàng. Kiểm tra bằng chứng giao hàng và số lượng đã điều phối.': 'Could not complete delivery. Check the proof and delivered quantities.',
   'Không tạo được vận đơn giao lại.': 'Could not create the replacement shipment.',
   'Vận đơn': 'Shipment', 'Khách chưa xác định': 'Customer not identified',
+  'Tuyến': 'Route', 'Điểm dừng': 'Stop',
   'Lý do giao thiếu:': 'Short delivery reason:', 'Chưa ghi lý do': 'No reason provided',
   'Đã nhận thực tế:': 'Actually received:', 'Còn giao bù:': 'Remaining to deliver:',
   'Kho': 'Warehouse', 'Chưa khai báo điểm giao': 'Delivery destination not provided',

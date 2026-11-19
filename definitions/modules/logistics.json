@@ -69,6 +69,7 @@
     },
     {
      "name": "stops",
+     "label": "Danh sách điểm dừng (JSON, thứ tự từ 1)",
      "type": "json",
      "required": false
     }
@@ -106,6 +107,19 @@
     {
      "name": "destination",
      "type": "string",
+     "required": false
+    },
+    {
+     "name": "route",
+     "label": "Tuyến giao hàng",
+     "type": "ref",
+     "required": false,
+     "ref": "logistics.route"
+    },
+    {
+     "name": "route_stop_number",
+     "label": "Số thứ tự điểm dừng (từ 1)",
+     "type": "number",
      "required": false
     },
     {

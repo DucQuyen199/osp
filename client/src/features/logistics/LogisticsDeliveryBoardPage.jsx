@@ -71,6 +71,12 @@ export default function LogisticsDeliveryBoardPage() {
       key: `${line.product}-${index}`,
       label: `${(shipment.lines || []).find((item) => sameDeliveryLine(item, line))?.productName || line.name || line.product} ${fmtNumber(line.qty || 0, { maximumFractionDigits: 6 })} ${line.uom_name || ''}`,
     }));
+    const routeStop = shipment.routeStop;
+    const stopName = typeof routeStop === 'string'
+      ? routeStop
+      : routeStop && typeof routeStop === 'object'
+        ? routeStop.name || routeStop.address || routeStop.label || routeStop.location || JSON.stringify(routeStop)
+        : '';
     return <article className="card delivery-card" key={shipment.id}>
       <DeliveryShipmentDetails
         title={shipmentTitle}
@@ -81,6 +87,8 @@ export default function LogisticsDeliveryBoardPage() {
         badgeLabel={shipment.status === 'partial' ? t('Giao thiếu · cần giao bù') : statusLabel(shipment.status)}
         originLabel={shipment.origin || t('Kho')}
         destinationLabel={shipment.destination || t('Chưa khai báo điểm giao')}
+        routeLabel={shipment.route ? `${t('Tuyến')}: ${shipment.route}` : ''}
+        routeStopLabel={stopName ? `${t('Điểm dừng')} ${shipment.routeStopNumber}: ${stopName}` : ''}
         isPartial={shipment.status === 'partial'}
         shortDeliveryReason={shipment.shortDeliveryReason}
         deliveredLines={deliveredLines}

@@ -10,7 +10,7 @@ const TABS = [
 ];
 
 export default function SettingsTabs({ active }) {
-  return <nav className="tabs" role="tablist" aria-label={uiText('Mục cài đặt')}>
-    {TABS.map(([key, label]) => <a key={key} className="tab" role="tab" aria-selected={key === active} href={`#/settings/${key}`}>{uiText(label)}</a>)}
+  return <nav className="tabs" aria-label={uiText('Mục cài đặt')}>
+    {TABS.map(([key, label]) => <a key={key} className="tab" aria-current={key === active ? 'page' : undefined} href={`#/settings/${key}`}>{uiText(label)}</a>)}
   </nav>;
 }

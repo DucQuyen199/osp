@@ -42,10 +42,10 @@ export default function AuthPage({ route, onSignedIn }) {
     <AuthLandingHero moduleCount={catalog.modules.length} verticalCount={catalog.verticals.length} t={t} />
     <main className="landing-panel" id="main">
       <div><h2>{t(mode === 'login' ? 'Chào mừng trở lại' : mode === 'mfa' ? 'Xác thực hai lớp' : mode === 'signup' ? 'Bắt đầu trong vài phút' : mode === 'forgot' ? 'Khôi phục mật khẩu' : mode === 'verify-request' ? 'Gửi lại email xác minh' : mode === 'verify' ? 'Đang xác minh email' : 'Đặt mật khẩu mới')}</h2><p className="muted">{t(mode === 'login' ? 'Đăng nhập để tiếp tục.' : mode === 'mfa' ? 'Nhập mã 6 chữ số từ ứng dụng xác thực hoặc một mã khôi phục chưa dùng.' : mode === 'signup' ? 'Chọn ngành, hệ thống bật sẵn các module và thuật ngữ phù hợp.' : mode === 'forgot' ? 'Nhập mã doanh nghiệp và email đăng nhập.' : mode === 'verify-request' ? 'Nhập mã doanh nghiệp và email đăng ký.' : mode === 'verify' ? 'Đang xác minh liên kết dùng một lần.' : 'Liên kết đặt lại chỉ dùng được một lần trong 30 phút.')}</p></div>
-      {['login', 'signup'].includes(mode) && <div className="tabs" role="tablist" aria-label={t('Tài khoản')}>
-        <button className="tab" role="tab" type="button" aria-selected={mode === 'login'} onClick={() => chooseMode('login')}>{t('Đăng nhập')}</button>
-        {catalog.signup && <button className="tab" role="tab" type="button" aria-selected={mode === 'signup'} onClick={() => chooseMode('signup')}>{t('Tạo doanh nghiệp')}</button>}
-      </div>}
+      {['login', 'signup'].includes(mode) && <nav className="tabs" aria-label={t('Tài khoản')}>
+        <a className="tab" aria-current={mode === 'login' ? 'page' : undefined} href="#/login" onClick={() => { setError(''); setNotice(''); }}>{t('Đăng nhập')}</a>
+        {catalog.signup && <a className="tab" aria-current={mode === 'signup' ? 'page' : undefined} href="#/signup" onClick={() => { setError(''); setNotice(''); }}>{t('Tạo doanh nghiệp')}</a>}
+      </nav>}
       {notice && <div className="alert success" role="status">{notice.startsWith('Doanh nghiệp đã được tạo.') ? `${t('Doanh nghiệp đã được tạo. Hãy xác minh email để kích hoạt tài khoản. Mã doanh nghiệp:')} ${notice.split(': ').at(-1)}` : t(notice)}</div>}
       {error && <div className="alert danger" role="alert">{t(error)}</div>}
       {mode === 'mfa' ? <form className="stack" onSubmit={completeMfaLogin}>

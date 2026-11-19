@@ -1,7 +1,7 @@
 //! Tenant-scoped shipment, vehicle, and source-order validation.
 use super::domain::{id, number};
 use crate::{db::Tx, error::R, kernel::Tenant, money};
-use rust_decimal::{Decimal, RoundingStrategy};
+use rust_decimal::{Decimal, RoundingStrategy, prelude::ToPrimitive};
 use serde_json::Value;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -111,6 +111,69 @@ fn decimal_column(row: &tokio_postgres::Row, column: usize, field: &str) -> R<De
         })
 }
 
+async fn validate_shipment_route(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<Vec<String>> {
+    let route_value = document.get("route").filter(|value| !value.is_null());
+    let stop_value = document
+        .get("route_stop_number")
+        .filter(|value| !value.is_null());
+    let Some(route_value) = route_value else {
+        return Ok(if stop_value.is_some() {
+            vec!["A shipment stop requires a route".into()]
+        } else {
+            Vec::new()
+        });
+    };
+    let Some(route_id) = route_value
+        .as_str()
+        .and_then(|value| Uuid::parse_str(value).ok())
+    else {
+        return Ok(vec![
+            "Shipment route must be a valid route in this tenant".into(),
+        ]);
+    };
+    let Some(route) = tx
+        .query_opt(
+            "SELECT stops FROM logistics__route WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+            &[&tenant.id, &route_id],
+        )
+        .await?
+    else {
+        return Ok(vec!["Shipment route was not found in this tenant".into()]);
+    };
+    let Some(stop_value) = stop_value else {
+        return Ok(Vec::new());
+    };
+    let Some(stop_number) = money::decimal(stop_value)
+        .filter(|value| *value > Decimal::ZERO && value.fract().is_zero())
+        .and_then(|value| value.to_u64())
+    else {
+        return Ok(vec![
+            "Shipment route stop number must be a positive whole number".into(),
+        ]);
+    };
+    let stops: Value = route.get(0);
+    let Some(stops) = stops.as_array() else {
+        return Ok(vec!["The selected route has no valid stop list".into()]);
+    };
+    let Some(stop) = stop_number
+        .checked_sub(1)
+        .and_then(|index| usize::try_from(index).ok())
+        .and_then(|index| stops.get(index))
+    else {
+        return Ok(vec![
+            "Shipment route stop number is not present on the selected route".into(),
+        ]);
+    };
+    let is_valid_stop = stop.as_str().is_some_and(|label| !label.trim().is_empty())
+        || stop.as_object().is_some_and(|fields| !fields.is_empty());
+    if !is_valid_stop {
+        return Ok(vec![
+            "Shipment route stop must reference a non-empty stop".into(),
+        ]);
+    }
+    Ok(Vec::new())
+}
+
 async fn validate_sales_shipment_quantities(
     tx: &Tx<'_>,
     tenant: &Tenant,
@@ -192,9 +255,64 @@ pub async fn validate_persistence(
     document: &Value,
 ) -> R<Vec<String>> {
     if entity == "shipment" && action == "updated" {
-        return validate_sales_shipment_quantities(tx, tenant, document).await;
+        let mut errors = validate_shipment_route(tx, tenant, document).await?;
+        errors.extend(validate_sales_shipment_quantities(tx, tenant, document).await?);
+        return Ok(errors);
     }
     let mut errors = Vec::new();
+    if entity == "shipment" && matches!(action, "created" | "dispatched") {
+        errors.extend(validate_shipment_route(tx, tenant, document).await?);
+    }
+    if entity == "shipment"
+        && action == "dispatched"
+        && id(document, "route").is_some()
+        && document
+            .get("route_stop_number")
+            .and_then(money::decimal)
+            .is_none()
+    {
+        errors.push("Select a stop on the assigned route before dispatch".into());
+    }
+    if entity == "route" && action == "updated" {
+        if let (Some(route_id), Some(stops)) = (id(document, "id"), document.get("stops")) {
+            if let Some(current) = tx
+                .query_opt(
+                    "SELECT stops FROM logistics__route WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                    &[&tenant.id, &route_id],
+                )
+                .await?
+            {
+                let current_stops: Value = current.get(0);
+                if current_stops != *stops
+                    && tx
+                        .query_opt(
+                            "SELECT id FROM logistics__shipment WHERE tenant_id = $1 AND route = $2 LIMIT 1 FOR UPDATE",
+                            &[&tenant.id, &route_id],
+                        )
+                        .await?
+                        .is_some()
+                {
+                    errors.push(
+                        "Route stops cannot be reordered or removed after a shipment references the route".into(),
+                    );
+                }
+            }
+        }
+    }
+    if entity == "route" && action == "removed" {
+        if let Some(route_id) = id(document, "id") {
+            if tx
+                .query_opt(
+                    "SELECT id FROM logistics__shipment WHERE tenant_id = $1 AND route = $2 LIMIT 1 FOR UPDATE",
+                    &[&tenant.id, &route_id],
+                )
+                .await?
+                .is_some()
+            {
+                errors.push("A route referenced by a shipment cannot be removed".into());
+            }
+        }
+    }
     match (entity, action) {
         ("tracking_event", "created") => {
             let Some(shipment) = id(document, "shipment") else {
