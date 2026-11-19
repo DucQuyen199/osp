@@ -55,6 +55,17 @@ async fn validate_meter(
         .and_then(Value::as_str)
         .unwrap_or_default()
         .trim();
+    let normalized_code: String = tx
+        .query_opt("SELECT lower(btrim($1::text))", &[&code])
+        .await?
+        .ok_or_else(|| crate::error::ApiError::internal("Unable to normalize utility meter code"))?
+        .get(0);
+    let lock_key = format!("utilities.meter-code:{}:{}", tenant.id, normalized_code);
+    tx.query_opt(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        &[&lock_key],
+    )
+    .await?;
     if tx
         .query_opt(
             "SELECT id FROM utilities__meter WHERE tenant_id = $1 AND lower(btrim(code)) = lower($2) AND ($3::uuid IS NULL OR id <> $3) LIMIT 1 FOR UPDATE",
