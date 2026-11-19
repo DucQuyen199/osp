@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { fmtMoney, statusLabel, uiText, uiTextWith } from '../../lib/i18n.js';
 import { app, can, recordLabel } from '../../lib/state.js';
+import { api, tenantPath } from '../../lib/api.js';
 import { recordHref } from '../../lib/routes.js';
 import { absDecimal, addDecimals, compareDecimals, multiplyDecimals, subtractDecimals, minDecimal, roundDecimal } from '../../lib/decimal.js';
 import { useSalesReturnsData } from './hooks/useSalesReturnsData.js';
@@ -17,14 +18,32 @@ export default function SalesReturnsWorkbenchPage() {
   useDocumentTitle(`${uiText('Trả hàng bán')} · OSP Suite`);
   const workflowApproval = app.meta?.modules?.some((module) => module.id === 'workflow-approval') || false;
   const logisticsEnabled = app.meta?.modules?.some((module) => module.id === 'logistics') || false;
+  const inventoryEnabled = app.meta?.modules?.some((module) => module.id === 'inventory') || false;
   const { orders, returns, products, units, parties, warehouses, shipments, invoices, creditNotes, approvalRequests, loading, error, setError, load } = useSalesReturnsData(logisticsEnabled, workflowApproval);
   const workflow = useSalesReturnsWorkflow({ orders, returns, invoices, load, setError });
+  const [returnLots, setReturnLots] = useState([]);
+  const [lotsLoading, setLotsLoading] = useState(false);
+  const [lotSelections, setLotSelections] = useState({});
   const {
     orderId, quantities, returnInvoiceId, setReturnInvoiceId,
     linkedInvoiceId, setLinkedInvoiceId, reason, setReason, selectedId, setSelectedId,
     busy, notice, formOrder, formInvoices, selected, selectedOrder, selectedReturnInvoices,
     changeOrder, changeQuantity, createReturn, transition, assignReturnInvoice,
   } = workflow;
+  useEffect(() => {
+    if (!orderId || !inventoryEnabled || !can('sales.sales_return.create')) {
+      setReturnLots([]);
+      setLotsLoading(false);
+      return undefined;
+    }
+    let active = true;
+    setLotsLoading(true);
+    api(`${tenantPath('/reports/sales/return-lots')}?order=${encodeURIComponent(orderId)}`)
+      .then((response) => { if (active) setReturnLots(Array.isArray(response?.items) ? response.items : []); })
+      .catch((reason) => { if (active) { setReturnLots([]); setError(reason.message || t('Không tải được lô hàng đã xuất cho đơn bán.')); } })
+      .finally(() => { if (active) setLotsLoading(false); });
+    return () => { active = false; };
+  }, [orderId, inventoryEnabled, setError]);
   const orderById = useMemo(() => new Map(orders.map((row) => [row.id, row])), [orders]);
   const returnableOrders = orders.filter((row) => ['confirmed','partially_delivered','delivered'].includes(row.status));
   const unitName = (line) => line.uom_name || units.get(line.uom)?.name || '';
@@ -47,7 +66,7 @@ export default function SalesReturnsWorkbenchPage() {
       const tax = line.tax || '';
       const taxRate = addDecimals([line.tax_rate || 0]);
       const key = [line.product, roundDecimal(price, 2), uom, discount, tax, taxRate].join(':');
-      const current = groups.get(key) || { key, product: line.product, price, uom: line.uom, uom_name: line.uom_name, uom_ratio: line.uom_ratio, discount_pct: discount, tax: line.tax ?? null, tax_rate: taxRate, ordered: '0', name: products.get(line.product)?.name || uiText('Mặt hàng') };
+      const current = groups.get(key) || { key, product: line.product, price, uom: line.uom, uom_name: line.uom_name, uom_ratio: line.uom_ratio || 1, discount_pct: discount, tax: line.tax ?? null, tax_rate: taxRate, ordered: '0', lotTracked: products.get(line.product)?.lot_tracked === true, name: products.get(line.product)?.name || uiText('Mặt hàng') };
       current.ordered = addDecimals([current.ordered, line.qty || 0]);
       groups.set(key, current);
     }
@@ -63,12 +82,41 @@ export default function SalesReturnsWorkbenchPage() {
     }).filter((line) => compareDecimals(line.remaining, '0.000001') > 0);
   }
   const eligible = formOrder ? eligibleLines(formOrder) : [];
+  const lotsByProduct = useMemo(() => {
+    const grouped = new Map();
+    for (const lot of returnLots) grouped.set(lot.product, [...(grouped.get(lot.product) || []), lot]);
+    return grouped;
+  }, [returnLots]);
+  function lotSelectionValid(line) {
+    if (!line.lotTracked || !positiveDecimal(quantities[line.key])) return true;
+    const allocations = lotSelections[line.key] || [];
+    if (!allocations.length || allocations.some((item) => !item.lot || !positiveDecimal(item.qty))) return false;
+    const availableLots = lotsByProduct.get(line.product) || [];
+    const allocationTotal = addDecimals(allocations.map((item) => item.qty));
+    const requiredBase = multiplyDecimals([quantities[line.key], line.uom_ratio || 1]);
+    if (!sameDecimal(allocationTotal, requiredBase)) return false;
+    return allocations.every((item) => {
+      const lot = availableLots.find((candidate) => candidate.lot === item.lot);
+      const selectedOnProduct = eligible.filter((other) => other.product === line.product)
+        .flatMap((other) => lotSelections[other.key] || [])
+        .filter((other) => other.lot === item.lot)
+        .reduce((sum, other) => addDecimals([sum, other.qty || 0]), '0');
+      return lot && compareDecimals(selectedOnProduct, lot.availableQty) <= 0;
+    });
+  }
+  function changeLot(lineKey, index, field, value) {
+    setLotSelections((current) => ({ ...current, [lineKey]: (current[lineKey] || []).map((item, position) => position === index ? { ...item, [field]: value } : item) }));
+  }
+  function addLot(lineKey) { setLotSelections((current) => ({ ...current, [lineKey]: [...(current[lineKey] || []), { lot: '', qty: '' }] })); }
+  function removeLot(lineKey, index) { setLotSelections((current) => ({ ...current, [lineKey]: (current[lineKey] || []).filter((_, position) => position !== index) })); }
+  function changeReturnOrder(value) { setLotSelections({}); changeOrder(value); }
 
   const selectedInvoice = formOrder ? invoiceFor(formOrder, returnInvoiceId) : null;
   const hasReturnQuantity = eligible.some((line) => positiveDecimal(quantities[line.key]));
-  const returnSubmitDisabled = !hasReturnQuantity || !reason.trim() || !selectedInvoice;
+  const returnSubmitDisabled = !hasReturnQuantity || !reason.trim() || !selectedInvoice || lotsLoading || eligible.some((line) => !lotSelectionValid(line));
   const linkedInvoice = selected ? invoiceFor(selectedOrder, selected.invoice || linkedInvoiceId) : null;
   const returnedTotal = selected ? addDecimals((selected.lines || []).map((line) => line.line_total ?? multiplyDecimals([line.price || 0, line.qty || 0]))) : '0';
+  const selectedHasLotAllocations = (selected?.lines || []).some((line) => Array.isArray(line.lot_allocations) && line.lot_allocations.length > 0);
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Trả hàng và điều chỉnh doanh thu')}</h1><p className="sub">{uiText('Chỉ nhận trả trên số lượng đủ điều kiện, phê duyệt trước khi nhập kho và tạo credit note theo hóa đơn gốc.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{uiText('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{uiText(error)}</div>}{notice && <div className="alert success" role="status">{uiText(notice)}</div>}
@@ -84,6 +132,9 @@ export default function SalesReturnsWorkbenchPage() {
       showInvoiceSelector={formInvoices.length > 1}
       eligibleLines={eligible}
       quantities={quantities}
+      lotSelections={lotSelections}
+      lotsByProduct={lotsByProduct}
+      lotsLoading={lotsLoading}
       reason={reason}
       busy={busy}
       submitDisabled={returnSubmitDisabled}
@@ -91,17 +142,21 @@ export default function SalesReturnsWorkbenchPage() {
       unitName={unitName}
       fmtMoney={fmtMoney}
       statusLabel={statusLabel}
-      onOrderChange={changeOrder}
+      onOrderChange={changeReturnOrder}
       onInvoiceChange={setReturnInvoiceId}
       onQuantityChange={changeQuantity}
+      onLotChange={changeLot}
+      onLotQuantityChange={(lineKey, index, value) => changeLot(lineKey, index, 'qty', value)}
+      onAddLot={addLot}
+      onRemoveLot={removeLot}
       onReasonChange={setReason}
-      onSubmit={createReturn}
+      onSubmit={(event) => createReturn(event, { formOrder, selectedInvoice, eligible, lotSelections })}
       t={t}
     />}
     <div className="layout-split u-mt-16" >
       <section className="card card-pad"><h2>{uiText('Phiếu trả hàng')}</h2>{loading ? <div className="skeleton" data-h="row"/> : !returns.length ? <div className="empty">{uiText('Chưa có phiếu trả hàng.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{uiText('Đơn / khách hàng')}</th><th>{uiText('Lý do')}</th><th>{uiText('Tổng giảm')}</th><th>{uiText('Trạng thái')}</th></tr></thead><tbody>{returns.map((row) => { const order = orderById.get(row.sales_order); return <tr {...selectableTableRowProps} key={row.id} aria-selected={row.id === selectedId} className={[row.id === selectedId ? 'selected' : '', 'u-pointer'].filter(Boolean).join(' ')} onClick={() => setSelectedId(row.id)} ><td><strong>{order ? recordLabel('master-data.party', parties.get(order.party)) : uiText('Khách hàng')}</strong><div className="small muted">{uiText('Đơn')} {String(row.sales_order || '').slice(0, 8)}</div></td><td>{row.reason || '—'}</td><td>{fmtMoney(row.total || 0)}</td><td>{statusLabel(row.status)}</td></tr>; })}</tbody></table></div>}</section>
       {selected && <section className="card card-pad"><div className="row wrap"><div><h2>{uiText('Phiếu trả')} {String(selected.id).slice(0, 8)}</h2><div className="small muted">{uiText('Đơn bán')} {selectedOrder?.number || String(selected.sales_order).slice(0, 8)} · {selected.reason}</div><div className="small muted">{uiText('Hóa đơn gốc')}: {linkedInvoice ? `${linkedInvoice.number || String(linkedInvoice.id).slice(0, 8)} · ${statusLabel(linkedInvoice.status)}` : uiText('chưa chọn')}</div></div><span className="grow"/><span className="badge warning">{statusLabel(selected.status)}</span></div>
-        <div className="table-wrap u-mt-12" ><table className="table"><thead><tr><th>{uiText('Mặt hàng')}</th><th>{uiText('Số lượng')}</th><th>{uiText('Đơn giá')}</th><th>{uiText('Giảm trừ')}</th></tr></thead><tbody>{(selected.lines || []).map((line, index) => <tr key={`${line.product}-${index}`}><td>{products.get(line.product)?.name || uiText('Mặt hàng')}</td><td>{line.qty} {unitName(line)}</td><td>{fmtMoney(line.price || 0)}</td><td>{fmtMoney(line.line_total ?? multiplyDecimals([line.qty || 0, line.price || 0]))}</td></tr>)}</tbody><tfoot><tr><th colSpan="3">{uiText('Tổng credit note dự kiến')}</th><th>{fmtMoney(selected.total || returnedTotal)}</th></tr></tfoot></table></div>
+        <div className="table-wrap u-mt-12" ><table className="table"><thead><tr><th>{uiText('Mặt hàng')}</th><th>{uiText('Số lượng')}</th>{selectedHasLotAllocations && <th>{t('Lô hàng nhập lại')}</th>}<th>{uiText('Đơn giá')}</th><th>{uiText('Giảm trừ')}</th></tr></thead><tbody>{(selected.lines || []).map((line, index) => <tr key={`${line.product}-${index}`}><td>{products.get(line.product)?.name || uiText('Mặt hàng')}</td><td>{line.qty} {unitName(line)}</td>{selectedHasLotAllocations && <td>{(line.lot_allocations || []).map((allocation) => `${String(allocation.lot).slice(0, 8)}: ${allocation.qty}`).join(' · ') || '—'}</td>}<td>{fmtMoney(line.price || 0)}</td><td>{fmtMoney(line.line_total ?? multiplyDecimals([line.qty || 0, line.price || 0]))}</td></tr>)}</tbody><tfoot><tr><th colSpan={selectedHasLotAllocations ? 4 : 3}>{uiText('Tổng credit note dự kiến')}</th><th>{fmtMoney(selected.total || returnedTotal)}</th></tr></tfoot></table></div>
         {selected.status === 'submitted' && workflowApproval && approvalFor(selected) && <p className="small muted u-mt-10" >{uiText('Yêu cầu duyệt')}: <a href={recordHref('workflow-approval.approval_request', approvalFor(selected).id)}>{statusLabel(approvalFor(selected).status)} · {uiText('mở yêu cầu')}</a></p>}
         {['submitted', 'approved'].includes(selected.status) && !selected.invoice && selectedReturnInvoices.length > 1 && can('sales.sales_return.update') && <div className="row wrap u-mt-12" ><label className="field"><span className="label">{uiText('Hóa đơn gốc')} *</span><select className="select" value={linkedInvoiceId} onChange={(event) => setLinkedInvoiceId(event.target.value)}><option value="">{uiText('Chọn hóa đơn đã ghi sổ')}</option>{selectedReturnInvoices.map((invoice) => <option key={invoice.id} value={invoice.id}>{invoice.number || String(invoice.id).slice(0, 8)} · {statusLabel(invoice.status)} · {fmtMoney(invoice.total || 0)}</option>)}</select></label><button className="btn btn-secondary btn-sm" type="button" disabled={Boolean(busy) || !linkedInvoiceId} onClick={() => assignReturnInvoice(selected)}>{uiText('Gắn hóa đơn')}</button></div>}
         {selected.status === 'submitted' && !workflowApproval && can('sales.sales_return.approved') && <div className="row wrap u-mt-12" ><button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => transition(selected, 'approved')}>{uiText('Duyệt')}</button>{can('sales.sales_return.rejected') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => transition(selected, 'rejected')}>{uiText('Từ chối')}</button>}</div>}

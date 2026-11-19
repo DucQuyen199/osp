@@ -45,7 +45,7 @@ export function useSalesReturnsWorkflow({ orders, returns, invoices, load, setEr
     finally { setBusy(''); }
   }
 
-  async function createReturn(event, { formOrder, selectedInvoice, eligible }) {
+  async function createReturn(event, { formOrder, selectedInvoice, eligible, lotSelections = {} }) {
     event.preventDefault();
     if (!formOrder) return;
     if (!selectedInvoice) { setError(uiText('Chá»n má»™t hÃ³a Ä‘Æ¡n Ä‘Ã£ ghi sá»• cá»§a Ä‘Æ¡n bÃ¡n trÆ°á»›c khi gá»­i duyá»‡t phiáº¿u tráº£.')); return; }
@@ -56,6 +56,7 @@ export function useSalesReturnsWorkflow({ orders, returns, invoices, load, setEr
       product: line.product, uom: line.uom || undefined, price: String(line.price),
       qty: String(quantities[line.key] || '0'), discount_pct: String(line.discount_pct),
       tax: line.tax, tax_rate: String(line.tax_rate),
+      ...(line.lotTracked ? { lot_allocations: (lotSelections[line.key] || []).map((allocation) => ({ lot: allocation.lot, qty: String(allocation.qty || '0') })) } : {}),
     })).filter((line) => isPositive(line.qty));
     if (!lines.length || !reason.trim()) { setError(uiText('Nháº­p sá»‘ lÆ°á»£ng tráº£ vÃ  lÃ½ do cho Ã­t nháº¥t má»™t máº·t hÃ ng.')); return; }
     await run('return:create', async () => {

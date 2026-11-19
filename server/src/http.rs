@@ -1963,6 +1963,14 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
         (&Method::GET, ["reports", "inventory", "replenishment"]) => {
             return json_ok(k.inventory_replenishment_report(&actor, &t).await?);
         }
+        (&Method::GET, ["reports", "sales", "return-lots"]) => {
+            let order_id = query
+                .iter()
+                .find(|(key, _)| key == "order")
+                .map(|(_, value)| value.as_str())
+                .ok_or_else(|| ApiError::new(422, "MISSING_ORDER", "order is required"))?;
+            return json_ok(k.sales_return_lots_report(&actor, &t, order_id).await?);
+        }
         (&Method::GET, ["reports", "inventory", "lot-expiry"]) => {
             let days = query_usize(&query, "days", 90, 365)? as i32;
             let limit = query_usize(&query, "limit", 100, 500)?;

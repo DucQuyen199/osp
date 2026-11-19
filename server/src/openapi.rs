@@ -1357,6 +1357,14 @@ pub fn build(reg: &Registry) -> Value {
         } }),
     );
     paths.insert(
+        "/api/t/{tenantId}/reports/sales/return-lots".into(),
+        json!({ "get": {
+            "tags": ["sales", "inventory"], "summary": "Original lot quantities available for sales returns", "security": sec,
+            "parameters": [tid, { "name": "order", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "Original sales-order lots with expiry and remaining returnable quantity in product base units" })), ("403".to_string(), err("Requires sales.sales_return.create")), ("404".to_string(), err("Sales order not found for this tenant")), ("422".to_string(), err("Invalid order id or inconsistent original lot quantities"))]))
+        } }),
+    );
+    paths.insert(
         "/api/t/{tenantId}/reports/inventory/location-stock".into(),
         json!({ "get": {
             "tags": ["inventory"], "summary": "Stock balance by warehouse and location", "security": sec,

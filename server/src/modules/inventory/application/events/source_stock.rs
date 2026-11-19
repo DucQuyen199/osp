@@ -531,7 +531,9 @@ pub async fn handle_source_stock_event(
         } else {
             movement_source_id.clone()
         };
-        let allocations = if line_direction == "in" && source == "pos_return" {
+        let allocations = if line_direction == "in"
+            && matches!(source, "pos_return" | "sales_return")
+        {
             if let Some(lot_allocations) = line.get("lot_allocations").and_then(Value::as_array) {
                 lot_allocations
                     .iter()
@@ -542,7 +544,7 @@ pub async fn handle_source_stock_event(
                             .ok_or_else(|| {
                                 crate::error::ApiError::validation(
                                     event_type,
-                                    vec!["POS return lot allocation requires a valid lot".into()],
+                                    vec!["Return lot allocation requires a valid lot".into()],
                                 )
                             })?;
                         let qty = lot_allocation
@@ -553,8 +555,7 @@ pub async fn handle_source_stock_event(
                                 crate::error::ApiError::validation(
                                     event_type,
                                     vec![
-                                        "POS return lot allocation requires a positive quantity"
-                                            .into(),
+                                        "Return lot allocation requires a positive quantity".into(),
                                     ],
                                 )
                             })?;
@@ -562,7 +563,7 @@ pub async fn handle_source_stock_event(
                         let quantity = money::json_number(qty).ok_or_else(|| {
                             crate::error::ApiError::validation(
                                 event_type,
-                                vec!["POS return lot quantity exceeds the supported range".into()],
+                                vec!["Return lot quantity exceeds the supported range".into()],
                             )
                         })?;
                         allocated["qty"] = quantity.clone();

@@ -225,6 +225,79 @@ pub(super) async fn validate(
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
+    let mut requested_lots = HashMap::<(String, String), Decimal>::new();
+    for (line_index, line) in return_lines.iter().enumerate() {
+        let Some(product) = line
+            .get("product")
+            .and_then(Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok())
+        else {
+            continue;
+        };
+        let lot_tracked = tx
+            .query_opt(
+                "SELECT COALESCE(lot_tracked, false) FROM master_data__product WHERE tenant_id = $1 AND id = $2 FOR SHARE",
+                &[&tenant.id, &product],
+            )
+            .await?
+            .is_some_and(|row| row.get::<_, bool>(0));
+        if !lot_tracked {
+            if line.get("lot_allocations").is_some() {
+                errors.push(format!(
+                    "Return line {} cannot assign lots to a product that is not lot-tracked",
+                    line_index + 1
+                ));
+            }
+            continue;
+        }
+        let base_qty = line.get("base_qty").and_then(money::decimal);
+        let allocations = line.get("lot_allocations").and_then(Value::as_array);
+        let (Some(base_qty), Some(allocations)) = (base_qty, allocations) else {
+            errors.push(format!(
+                "Return line {} for a lot-tracked product requires original lot allocations",
+                line_index + 1
+            ));
+            continue;
+        };
+        let mut allocated_qty = Decimal::ZERO;
+        for allocation in allocations {
+            let lot = allocation
+                .get("lot")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok());
+            let qty = allocation
+                .get("qty")
+                .and_then(money::decimal)
+                .filter(|qty| *qty > Decimal::ZERO);
+            let (Some(lot), Some(qty)) = (lot, qty) else {
+                errors.push(format!(
+                    "Return line {} has an invalid lot allocation",
+                    line_index + 1
+                ));
+                continue;
+            };
+            let key = (product.to_string(), lot.to_string());
+            let total = requested_lots.entry(key).or_insert(Decimal::ZERO);
+            *total = total.checked_add(qty).ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    "sales.return",
+                    vec!["Return lot quantity exceeds the supported decimal range".into()],
+                )
+            })?;
+            allocated_qty = allocated_qty.checked_add(qty).ok_or_else(|| {
+                crate::error::ApiError::validation(
+                    "sales.return",
+                    vec!["Return lot quantity exceeds the supported decimal range".into()],
+                )
+            })?;
+        }
+        if (allocated_qty - base_qty).abs() > Decimal::new(1, 6) {
+            errors.push(format!(
+                "Return line {} lot allocation total must equal its base quantity",
+                line_index + 1
+            ));
+        }
+    }
     let mut requested: HashMap<ReturnLineKey, Decimal> = HashMap::new();
     for line in &return_lines {
         let Some(product) = line.get("product").and_then(Value::as_str) else {
@@ -262,6 +335,51 @@ pub(super) async fn validate(
     else {
         return Ok(vec!["Could not identify the sales return record".into()]);
     };
+    for ((product, lot), return_qty) in requested_lots {
+        let sold_row = tx
+            .query_opt(
+                "SELECT COALESCE(SUM(qty::numeric), 0)::text FROM inventory__stock_move WHERE tenant_id = $1 AND source = 'sales_order' AND source_id = $2 AND product = $3 AND lot = $4 AND direction = 'out'",
+                &[&tenant.id, &order_id.to_string(), &product, &lot],
+            )
+            .await?;
+        let sold_qty = sold_row
+            .as_ref()
+            .map(|row| decimal_column(row, 0, "original lot shipment quantity"))
+            .transpose()?
+            .unwrap_or_default();
+        let received_row = tx
+            .query_opt(
+                "SELECT COALESCE(SUM(move.qty::numeric), 0)::text FROM inventory__stock_move move JOIN sales__sales_return ret ON ret.tenant_id = move.tenant_id AND ret.id::text = move.source_id WHERE move.tenant_id = $1 AND ret.sales_order = $2 AND ret.id <> $3 AND ret.status = 'received' AND move.source = 'sales_return' AND move.product = $4 AND move.lot = $5 AND move.direction = 'in'",
+                &[&tenant.id, &order_id, &return_id, &product, &lot],
+            )
+            .await?;
+        let received_qty = received_row
+            .as_ref()
+            .map(|row| decimal_column(row, 0, "received return lot quantity"))
+            .transpose()?
+            .unwrap_or_default();
+        let reserved_row = tx
+            .query_opt(
+                "SELECT COALESCE(SUM((allocation->>'qty')::numeric), 0)::text FROM sales__sales_return ret CROSS JOIN LATERAL jsonb_array_elements(COALESCE(ret.lines, '[]'::jsonb)) line CROSS JOIN LATERAL jsonb_array_elements(COALESCE(line->'lot_allocations', '[]'::jsonb)) allocation WHERE ret.tenant_id = $1 AND ret.sales_order = $2 AND ret.id <> $3 AND ret.status IN ('submitted', 'approved') AND line->>'product' = $4 AND allocation->>'lot' = $5",
+                &[&tenant.id, &order_id, &return_id, &product, &lot],
+            )
+            .await?;
+        let reserved_qty = reserved_row
+            .as_ref()
+            .map(|row| decimal_column(row, 0, "reserved return lot quantity"))
+            .transpose()?
+            .unwrap_or_default();
+        let total_returned = received_qty
+            .checked_add(reserved_qty)
+            .and_then(|qty| qty.checked_add(return_qty));
+        if sold_qty <= Decimal::ZERO
+            || total_returned.is_none_or(|qty| qty > sold_qty + Decimal::new(1, 6))
+        {
+            errors.push(format!(
+                "Return allocation for product {product} and lot {lot} exceeds its original sold quantity"
+            ));
+        }
+    }
     if let Some(invoice_id) = resolved_invoice {
         let return_total = document
             .get("total")
