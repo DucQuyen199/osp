@@ -1,12 +1,12 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
-import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { localDate } from '../../lib/dates.js';
-import { api, tenantPath } from '../../lib/api.js';
 import { uiText } from '../../lib/i18n.js';
 import AccountingReportResults from './AccountingReportResults.jsx';
 import { can } from '../../lib/state.js';
 import AccountingChartTemplateDialog from './AccountingChartTemplateDialog.jsx';
+import { useAccountingReportsData } from './hooks/useAccountingReportsData.js';
+import { useAccountingReportsWorkflow } from './hooks/useAccountingReportsWorkflow.js';
 const today = localDate;
 const yearStart = () => `${today().slice(0, 4)}-01-01`;
 const forecastEnd = (start) => {
@@ -20,66 +20,12 @@ export default function AccountingReportsPage() {
   const [from, setFrom] = useState(yearStart());
   const [to, setTo] = useState(today());
   const [asOf, setAsOf] = useState(today());
-  const [report, setReport] = useState(null);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [fxMemo, setFxMemo] = useState('Đánh giá lại công nợ ngoại tệ');
-  const [fxJournal, setFxJournal] = useState(null);
-  const [postingFx, setPostingFx] = useState(false);
   const [showChartTemplates, setShowChartTemplates] = useState(false);
-  const latestRequest = useLatestRequest();
-  const load = useCallback(async () => {
-    const isLatest = latestRequest();
-    setLoading(true);
-    setError('');
-    try {
-      const params = new URLSearchParams();
-      let path;
-      if (mode === 'balance') {
-        if (asOf) params.set('asOf', asOf);
-        path = '/reports/accounting/balance-sheet';
-      } else if (mode === 'receivables' || mode === 'payables' || mode === 'fx') {
-        if (asOf) params.set('asOf', asOf);
-        path = mode === 'fx' ? '/reports/accounting/fx-revaluation-preview' : `/reports/accounting/${mode === 'receivables' ? 'receivables-aging' : 'payables-aging'}`;
-      } else if (mode === 'cashflow') {
-        if (from) params.set('from', from);
-        if (to) params.set('to', to);
-        path = '/reports/accounting/cash-flow-forecast';
-      } else {
-        if (from) params.set('from', from);
-        if (to) params.set('to', to);
-        path = mode === 'trial' ? '/reports/accounting/trial-balance' : mode === 'tax' ? '/reports/accounting/tax-register' : '/reports/accounting/income-statement';
-      }
-      const nextReport = await api(`${tenantPath(path)}?${params}`);
-      if (isLatest()) setReport(nextReport);
-    } catch (reason) {
-      if (isLatest()) {
-        setReport(null);
-        setError(reason.message || uiText('Không tải được báo cáo.'));
-      }
-    } finally {
-      if (isLatest()) setLoading(false);
-    }
-  }, [mode, from, to, asOf, latestRequest]);
-  useEffect(() => { load(); }, [load]);
-  const createFxDraft = async () => {
-    setPostingFx(true);
-    setError('');
-    setFxJournal(null);
-    try {
-      const result = await api(tenantPath('/reports/accounting/fx-revaluation-journals'), {
-        method: 'POST', body: { asOf, memo: fxMemo },
-      });
-      const journal = result.journal || null;
-      const id = journal?.id || result.journalId;
-      setFxJournal({ id, status: journal?.status || result.status || 'draft', existing: result.existing });
-      await load();
-    } catch (reason) {
-      setError(reason.message || uiText('Không tạo được bút toán đánh giá lại ngoại tệ nháp.'));
-    } finally {
-      setPostingFx(false);
-    }
-  };
+  const data = useAccountingReportsData({ mode, from, to, asOf });
+  const workflow = useAccountingReportsWorkflow({ asOf, load: data.load });
+  const { report, error: dataError, loading, load } = data;
+  const { fxMemo, setFxMemo, fxJournal, postingFx, error: workflowError, createFxDraft } = workflow;
+  const error = dataError || workflowError;
   return <div className="page">
     <div className="page-head"><div><h1>{uiText("Báo cáo kế toán")}</h1><p className="sub">{uiText("Số liệu lấy từ bút toán đã ghi sổ theo ngày hạch toán.")}</p></div>{can('accounting.account.read') && can('accounting.account.create') && <button className="btn btn-secondary" type="button" onClick={() => setShowChartTemplates(true)}>{uiText("Mẫu hệ thống tài khoản")}</button>}</div>
     {showChartTemplates && <AccountingChartTemplateDialog onClose={() => setShowChartTemplates(false)} />}

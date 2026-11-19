@@ -94,6 +94,7 @@ export default function HotelFrontDeskPage() {
           guestLabel={recordLabel('master-data.party', parties.get(selected.party))}
           roomTypeName={roomTypes.get(selected.room_type)?.name || t('Loại phòng')}
           assignedRoomNumber={selected.room ? rooms.get(selected.room)?.number || '' : ''}
+          assignedRoomStatus={selected.room ? rooms.get(selected.room)?.status : ''}
           availableRooms={availableRooms}
           assignment={assignment}
           onAssignmentChange={setAssignment}

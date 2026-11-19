@@ -1,51 +1,25 @@
-import React, { useEffect, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
-import { api, tenantPath } from '../../lib/api.js';
-import { fmtDate, fmtMoney, fmtNumber, statusLabel, uiText } from '../../lib/i18n.js';
+import { fmtDate, fmtMoney, fmtNumber, uiText } from '../../lib/i18n.js';
 import { can } from '../../lib/state.js';
+import { useInventoryLotExpiryData } from './hooks/useInventoryLotExpiryData.js';
+import { useInventoryLotExpiryWorkflow } from './hooks/useInventoryLotExpiryWorkflow.js';
 const quantity = (value) => fmtNumber(String(value || 0), { maximumFractionDigits: 3 });
 export default function InventoryLotExpiryPage() {
   useDocumentTitle(`${uiText('Lô sắp hết hạn')} · OSP Suite`);
   const [days, setDays] = useState(90);
   const [offset, setOffset] = useState(0);
-  const [report, setReport] = useState(null);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [creatingWarehouse, setCreatingWarehouse] = useState('');
-  const [notice, setNotice] = useState(null);
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setError('');
-    const params = new URLSearchParams({ days: String(days), limit: '100', offset: String(offset) });
-    api(tenantPath(`/reports/inventory/lot-expiry?${params}`))
-      .then((data) => { if (active) setReport(data); })
-      .catch((reason) => { if (active) setError(reason.message || uiText('Không tải được danh sách lô cận hạn.')); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [days, offset]);
+  const { report, error: loadError, loading } = useInventoryLotExpiryData({ days, offset });
+  const workflow = useInventoryLotExpiryWorkflow();
+  const { creatingWarehouse, error: workflowError, notice, createWriteoff } = workflow;
+  const error = loadError || workflowError;
   const changeDays = (value) => { setDays(value); setOffset(0); };
-  const createWriteoff = async (warehouse) => {
-    setCreatingWarehouse(warehouse.id);
-    setError('');
-    setNotice(null);
-    try {
-      const result = await api(tenantPath('/reports/inventory/lot-expiry/writeoff-counts'), {
-        method: 'POST', body: { warehouseId: warehouse.id },
-      });
-      setNotice({ id: result.id, message: result.existing ? `${uiText('Đã có phiếu kiểm kê')} ${statusLabel(result.status)} ${uiText('cho')} ${warehouse.name}.` : `${uiText('Đã tạo phiếu kiểm kê nháp gồm')} ${result.lineCount} ${uiText('vị trí lô hết hạn tại')} ${warehouse.name}.` });
-    } catch (reason) {
-      setError(reason.message || uiText('Không tạo được phiếu kiểm kê xử lý hàng hết hạn.'));
-    } finally {
-      setCreatingWarehouse('');
-    }
-  };
-  const expiredByWarehouse = (report?.items || []).reduce((groups, item) => {
+  const expiredByWarehouse = useMemo(() => (report?.items || []).reduce((groups, item) => {
     if (!item.expired || !item.warehouseId) return groups;
     const group = groups.get(item.warehouseId) || { id: item.warehouseId, name: item.warehouse };
     groups.set(item.warehouseId, group);
     return groups;
-  }, new Map());
+  }, new Map()), [report]);
   return <div className="page">
     <div className="page-head"><div><h1>{uiText('Lô sắp hết hạn')}</h1><p className="sub">{uiText('Tồn dương của các lô đã hết hạn hoặc sẽ hết hạn trong kỳ đã chọn, theo kho.')}</p></div></div>
     <section className="card"><div className="toolbar">

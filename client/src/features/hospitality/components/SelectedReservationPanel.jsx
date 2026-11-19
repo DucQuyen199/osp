@@ -6,6 +6,7 @@ export default function SelectedReservationPanel({
   guestLabel,
   roomTypeName,
   assignedRoomNumber,
+  assignedRoomStatus,
   availableRooms,
   assignment,
   onAssignmentChange,
@@ -39,6 +40,7 @@ export default function SelectedReservationPanel({
   onAddCharge,
   extensionPanel,
 }) {
+  const roomReadyForCheckIn = assignedRoomStatus === 'vacant';
   return <>
     <article className="card hotel-detail-card">
       <header className="hotel-detail-head">
@@ -59,8 +61,9 @@ export default function SelectedReservationPanel({
         <label className="field"><span className="label">{t('Lý do khách vắng mặt *')}</span><textarea className="textarea" rows="2" maxLength="500" required value={noShowReason} onChange={(event) => onNoShowReasonChange(event.target.value)} placeholder={t('Ví dụ: khách không đến, không liên lạc được')} /></label>
         {canRecordNoShow && <button className="btn btn-secondary" type="button" disabled={Boolean(busy) || !noShowReason.trim()} onClick={onNoShow}>{t('Ghi nhận khách vắng mặt')}</button>}
       </div>}
+      {canCheckIn && reservation.room && !roomReadyForCheckIn && <div className="alert warning" role="status">{assignedRoomStatus ? t('Phòng đã phân chưa sẵn sàng nhận khách. Hoàn tất buồng phòng trước khi nhận phòng.') : t('Chưa xác định được trạng thái phòng. Làm mới danh sách phòng trước khi nhận phòng.')}</div>}
       <footer className="row wrap hotel-detail-actions">
-        {canCheckIn && <button className="btn btn-primary" type="button" disabled={Boolean(busy) || !reservation.room} title={!reservation.room ? t('Phân phòng trước khi nhận khách') : ''} onClick={() => onTransition('checked_in')}>{t('Nhận phòng')}</button>}
+        {canCheckIn && <button className="btn btn-primary" type="button" disabled={Boolean(busy) || !reservation.room || !roomReadyForCheckIn} title={!reservation.room ? t('Phân phòng trước khi nhận khách') : !roomReadyForCheckIn ? assignedRoomStatus ? t('Hoàn tất buồng phòng trước khi nhận phòng') : t('Làm mới trạng thái phòng trước khi nhận phòng') : ''} onClick={() => onTransition('checked_in')}>{t('Nhận phòng')}</button>}
         {canCheckOut && <button className="btn btn-primary" type="button" disabled={Boolean(busy)} onClick={() => onTransition('checked_out')}>{t('Trả phòng · chốt folio')}</button>}
         {canCancel && <button className="btn btn-secondary" type="button" disabled={Boolean(busy)} onClick={() => onTransition('cancelled')}>{t('Hủy đặt phòng')}</button>}
         {invoice && canOpenInvoice && <a className="btn btn-secondary" href={recordHref('accounting.invoice', invoice.id)}>{t('Mở hóa đơn ·')} {statusLabel(invoice.status)}</a>}
