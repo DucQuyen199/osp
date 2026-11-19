@@ -1,16 +1,15 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
-import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { addCalendarDays, localDate } from '../../lib/dates.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
-import { app, can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
+import { app, can, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import contractEnglish from './contracts.en.js';
 import ContractDraftForm from './components/ContractDraftForm.jsx';
 import ContractRegisterTable from './components/ContractRegisterTable.jsx';
 import { useContractWorkflow } from './hooks/useContractWorkflow.js';
+import { useContractWorkbenchData } from './hooks/useContractWorkbenchData.js';
 const t = (text) => uiTextWith(text, contractEnglish);
-const rows = (response) => Array.isArray(response?.items) ? response.items : [];
 const endingSoon = (contract) => {
   const today = localDate();
   if (contract.status !== 'active' || !contract.end_date || contract.end_date < today) return false;
@@ -18,37 +17,11 @@ const endingSoon = (contract) => {
 };
 export default function ContractWorkbenchPage() {
   useDocumentTitle(`${t('Sổ hợp đồng')} · OSP Suite`);
-  const [contracts, setContracts] = useState([]);
-  const [clauses, setClauses] = useState([]);
-  const [amendments, setAmendments] = useState([]);
-  const [approvalRequests, setApprovalRequests] = useState([]);
-  const [parties, setParties] = useState(new Map());
+  const workflowEnabled = app.meta?.modules?.some((module) => module.id === 'workflow-approval') || false;
+  const { contracts, clauses, amendments, approvalRequests, parties, loading, error, setError, load } = useContractWorkbenchData(workflowEnabled);
   const [selectedId, setSelectedId] = useState('');
   const [contractFilter, setContractFilter] = useState('all');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const workflowEnabled = app.meta?.modules?.some((module) => module.id === 'workflow-approval') || false;
-  const latestRequest = useLatestRequest();
-  const load = useCallback(async (quiet = false) => {
-    const isLatest = latestRequest();
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const [contractRes, clauseRes, amendmentRes, partyMap, approvalRes] = await Promise.all([
-        can('contract.contract.read') ? loadAllResponse('contract.contract') : Promise.resolve({ items: [] }),
-        can('contract.clause.read') ? loadAllResponse('contract.clause') : Promise.resolve({ items: [] }),
-        can('contract.amendment.read') ? loadAllResponse('contract.amendment') : Promise.resolve({ items: [] }),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        workflowEnabled && can('workflow-approval.approval_request.read') ? loadAllResponse('workflow-approval.approval_request') : Promise.resolve({ items: [] }),
-      ]);
-      const contractRows = rows(contractRes).sort((a, b) => String(a.end_date || '9999-12-31').localeCompare(String(b.end_date || '9999-12-31')) || String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
-      if (isLatest()) {
-        setContracts(contractRows); setClauses(rows(clauseRes)); setAmendments(rows(amendmentRes)); setParties(partyMap); setApprovalRequests(rows(approvalRes));
-        setSelectedId((id) => contractRows.some((row) => row.id === id) ? id : contractRows[0]?.id || '');
-      }
-    } catch (reason) { if (isLatest()) setError(reason.message || t("Không tải được sổ hợp đồng.")); }
-    finally { if (isLatest()) setLoading(false); }
-  }, [workflowEnabled, latestRequest]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { setSelectedId((id) => id && contracts.some((row) => row.id === id) ? id : contracts[0]?.id || ''); }, [contracts]);
   const selected = contracts.find((row) => row.id === selectedId);
   const workflow = useContractWorkflow({ selected, selectedId, setSelectedId, parties, load, workflowEnabled, setError, t });
   const {

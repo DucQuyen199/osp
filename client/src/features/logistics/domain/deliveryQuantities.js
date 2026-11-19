@@ -12,8 +12,12 @@ export function isDeliveredWithinLimit(receivedQty, shippedQty) {
 
 export function sameDeliveryLine(left, right) {
   try {
+    const discountPct = (line) => line.effective_discount_pct ?? line.discount_pct ?? 0;
     return left.product === right.product
       && (left.uom || '') === (right.uom || '')
-      && roundDecimal(left.price || 0, 2) === roundDecimal(right.price || 0, 2);
+      && roundDecimal(left.price || 0, 2) === roundDecimal(right.price || 0, 2)
+      && compareDecimals(discountPct(left), discountPct(right)) === 0
+      && (left.tax || '') === (right.tax || '')
+      && compareDecimals(left.tax_rate || 0, right.tax_rate || 0) === 0;
   } catch { return false; }
 }

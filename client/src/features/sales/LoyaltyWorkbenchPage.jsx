@@ -1,15 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { selectableTableRowProps } from '../../lib/accessibility.js';
 import { localDate } from '../../lib/dates.js';
-import { api, dataPath } from '../../lib/api.js';
 import { fmtDateTime, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { addDecimals, compareDecimals } from '../../lib/decimal.js';
-import { can, loadAllResponse, loadRefs, recordLabel } from '../../lib/state.js';
-import { useLatestRequest } from '../../lib/useLatestRequest.js';
+import { can, recordLabel } from '../../lib/state.js';
 import loyaltyEnglish from './loyalty.en.js';
+import { useLoyaltyWorkbenchData } from './hooks/useLoyaltyWorkbenchData.js';
+import { useLoyaltyWorkbenchWorkflow } from './hooks/useLoyaltyWorkbenchWorkflow.js';
 const t = (text) => uiTextWith(text, loyaltyEnglish);
-const rows = (response) => Array.isArray(response?.items) ? response.items : [];
 const tiers = ['bronze', 'silver', 'gold', 'platinum'];
 const tierLabels = { bronze: 'Đồng', silver: 'Bạc', gold: 'Vàng', platinum: 'Bạch kim' };
 const sourceLabels = { pos_order: 'Đơn POS', sales_order: 'Đơn bán hàng', pos_order_refund: 'Hoàn POS', sales_return: 'Trả hàng' };
@@ -18,71 +17,14 @@ const isNegative = (value) => { try { return compareDecimals(value || 0, '0') < 
 const isPositive = (value) => { try { return compareDecimals(value || 0, '0') > 0; } catch { return false; } };
 export default function LoyaltyWorkbenchPage() {
   useDocumentTitle(`${t('Khách hàng thân thiết')} · OSP Suite`);
-  const [members, setMembers] = useState([]);
-  const [transactions, setTransactions] = useState([]);
-  const [vouchers, setVouchers] = useState([]);
-  const [parties, setParties] = useState(new Map());
-  const [selectedId, setSelectedId] = useState('');
-  const [form, setForm] = useState({ party: '', tier: 'bronze' });
-  const [voucherForm, setVoucherForm] = useState({ code: '', kind: 'percent', value: '', valid_until: '' });
-  const [busy, setBusy] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const beginRequest = useLatestRequest();
-  const load = useCallback(async (quiet = false) => {
-    const isCurrent = beginRequest();
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const [memberRes, transactionRes, partyMap, voucherRes] = await Promise.all([
-        can('loyalty.member.read') ? loadAllResponse('loyalty.member') : Promise.resolve({ items: [] }),
-        can('loyalty.point_txn.read') ? loadAllResponse('loyalty.point_txn') : Promise.resolve({ items: [] }),
-        can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        can('loyalty.voucher.read') ? loadAllResponse('loyalty.voucher') : Promise.resolve({ items: [] }),
-      ]);
-      if (!isCurrent()) return;
-      const memberRows = rows(memberRes).sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
-      setMembers(memberRows); setTransactions(rows(transactionRes).sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))); setParties(partyMap);
-      setVouchers(rows(voucherRes).sort((a, b) => String(a.valid_until || '').localeCompare(String(b.valid_until || ''))));
-      setSelectedId((id) => memberRows.some((row) => row.id === id) ? id : memberRows[0]?.id || '');
-      setForm((current) => ({ ...current, party: current.party || [...partyMap.keys()][0] || '' }));
-    } catch (reason) { if (isCurrent()) setError(t(reason.message || 'Không tải được chương trình thành viên.')); }
-    finally { if (isCurrent()) setLoading(false); }
-  }, [beginRequest]);
-  useEffect(() => { load(); }, [load]);
+  const { members, transactions, vouchers, parties, selectedId, setSelectedId, loading, error: loadError, load } = useLoyaltyWorkbenchData();
   const selected = members.find((row) => row.id === selectedId);
   const ledger = useMemo(() => transactions.filter((row) => row.party === selected?.party), [transactions, selected]);
   const totalPoints = addDecimals(members.map((member) => member.points || 0));
   const partyName = (id) => parties.has(id) ? recordLabel('master-data.party', parties.get(id)) : t('Khách hàng');
-  async function run(key, operation, message) {
-    setBusy(key); setError(''); setNotice('');
-    try { await operation(); await load(true); setNotice(t(message)); }
-    catch (reason) { setError(t(reason.message || 'Thao tác không thành công.')); }
-    finally { setBusy(''); }
-  }
-  async function enroll(event) {
-    event.preventDefault();
-    await run('member:create', async () => {
-      const created = await api(dataPath('loyalty.member'), { method: 'POST', body: { party: form.party, tier: form.tier } });
-      setSelectedId(created.id); setForm((current) => ({ ...current, party: '' }));
-    }, 'Đã đăng ký thành viên. Điểm sẽ được cộng tự động từ đơn hàng đủ điều kiện.');
-  }
-  async function changeTier(tier) {
-    if (!selected || tier === selected.tier) return;
-    await run(`${selected.id}:tier`, () => api(dataPath('loyalty.member', selected.id), { method: 'PATCH', body: { tier } }), 'Đã cập nhật hạng thành viên.');
-  }
-  async function createVoucher(event) {
-    event.preventDefault();
-    const value = String(voucherForm.value ?? '').trim().replace(/^([+-]?)\./, (_, sign) => `${sign}0.`);
-    let validValue = false;
-    try { validValue = compareDecimals(value, '0') > 0 && (voucherForm.kind !== 'percent' || compareDecimals(value, '100') < 0); } catch { /* Invalid decimal input is reported below. */ }
-    if (!validValue) { setError(t('Giá trị voucher không hợp lệ.')); return; }
-    const body = { code: voucherForm.code.trim().toUpperCase(), ...(voucherForm.kind === 'percent' ? { percent: value } : { amount: value }), ...(voucherForm.valid_until ? { valid_until: voucherForm.valid_until } : {}) };
-    await run('voucher:create', async () => {
-      await api(dataPath('loyalty.voucher'), { method: 'POST', body });
-      setVoucherForm({ code: '', kind: 'percent', value: '', valid_until: '' });
-    }, 'Đã phát hành voucher đơn lẻ. Mã được đánh dấu đã dùng khi đơn bán hoặc POS hoàn tất.');
-  }
+  const workflow = useLoyaltyWorkbenchWorkflow({ members, parties, selected, setSelectedId, load, t });
+  const { form, setForm, voucherForm, setVoucherForm, busy, error: workflowError, notice, enroll, changeTier, createVoucher } = workflow;
+  const error = loadError || workflowError;
   return <div className="page">
     <div className="page-head"><div><h1>{t('Khách hàng thân thiết')}</h1><p className="sub">{t('Đăng ký thành viên và tra cứu số dư, lịch sử điểm được ghi tự động từ bán hàng, POS và trả hàng.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{t('Làm mới')}</button></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}

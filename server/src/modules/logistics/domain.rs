@@ -1,9 +1,44 @@
 //! Pure shipment and fleet validation rules.
 use crate::money;
-use rust_decimal::Decimal;
+use rust_decimal::{Decimal, RoundingStrategy};
 use serde_json::Value;
 use std::collections::HashMap;
 use uuid::Uuid;
+
+type ShipmentLineKey = (
+    String,
+    Decimal,
+    Option<String>,
+    Decimal,
+    Option<String>,
+    Decimal,
+);
+
+fn shipment_line_key(line: &Value) -> Option<ShipmentLineKey> {
+    let product = line.get("product").and_then(Value::as_str)?;
+    let price = number(line, "price")?;
+    if product.is_empty() || price < Decimal::ZERO {
+        return None;
+    }
+    let discount = line
+        .get("effective_discount_pct")
+        .and_then(money::decimal)
+        .or_else(|| line.get("discount_pct").and_then(money::decimal))
+        .unwrap_or(Decimal::ZERO);
+    let tax = line.get("tax").and_then(Value::as_str).map(str::to_owned);
+    let tax_rate = line
+        .get("tax_rate")
+        .and_then(money::decimal)
+        .unwrap_or(Decimal::ZERO);
+    Some((
+        product.to_owned(),
+        price.round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero),
+        line.get("uom").and_then(Value::as_str).map(str::to_owned),
+        discount,
+        tax,
+        tax_rate,
+    ))
+}
 
 pub(super) fn number(document: &Value, field: &str) -> Option<Decimal> {
     document.get(field).and_then(money::decimal)
@@ -16,9 +51,7 @@ pub(super) fn id(document: &Value, field: &str) -> Option<Uuid> {
         .and_then(|value| Uuid::parse_str(value).ok())
 }
 
-fn shipment_quantities(
-    lines: &Value,
-) -> Option<HashMap<(String, Decimal, Option<String>), Decimal>> {
+fn shipment_quantities(lines: &Value) -> Option<HashMap<ShipmentLineKey, Decimal>> {
     let mut quantities = HashMap::new();
     for line in lines.as_array()? {
         if matches!(
@@ -27,15 +60,12 @@ fn shipment_quantities(
         ) {
             continue;
         }
-        let product = line.get("product").and_then(Value::as_str)?;
-        let price = number(line, "price")?.round_dp(2);
         let qty = number(line, "qty")?;
-        if product.is_empty() || price < Decimal::ZERO || qty <= Decimal::ZERO {
+        if qty <= Decimal::ZERO {
             return None;
         }
-        let unit = line.get("uom").and_then(Value::as_str).map(str::to_owned);
         let total = quantities
-            .entry((product.to_owned(), price, unit))
+            .entry(shipment_line_key(line)?)
             .or_insert(Decimal::ZERO);
         *total = total.checked_add(qty)?;
     }
@@ -52,11 +82,8 @@ pub(super) fn normalize_delivered_lines(shipped: &Value, delivered: &Value) -> O
         ) {
             continue;
         }
-        let product = line.get("product").and_then(Value::as_str)?;
-        let price = number(line, "price")?.round_dp(2);
         let shipped_qty = number(line, "qty")?;
-        let unit = line.get("uom").and_then(Value::as_str).map(str::to_owned);
-        let key = (product.to_owned(), price, unit);
+        let key = shipment_line_key(line)?;
         let delivered_qty = remaining
             .get_mut(&key)
             .map(|qty| {
@@ -94,11 +121,8 @@ pub(super) fn remaining_lines(shipped: &Value, delivered: &Value) -> Option<Valu
         ) {
             continue;
         }
-        let product = line.get("product").and_then(Value::as_str)?;
-        let price = number(line, "price")?.round_dp(2);
         let shipped_qty = number(line, "qty")?;
-        let unit = line.get("uom").and_then(Value::as_str).map(str::to_owned);
-        let key = (product.to_owned(), price, unit);
+        let key = shipment_line_key(line)?;
         let delivered_qty = delivered.entry(key).or_default();
         let remaining_qty = shipped_qty.checked_sub((*delivered_qty).min(shipped_qty))?;
         *delivered_qty -= (*delivered_qty).min(shipped_qty);
