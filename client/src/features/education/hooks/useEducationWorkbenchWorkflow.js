@@ -79,7 +79,7 @@ export function useEducationWorkbenchWorkflow({ data, t }) {
         ...(classForm.teacher_employee ? { teacher_employee: classForm.teacher_employee } : {}),
         ...(classForm.start_date ? { start_date: classForm.start_date } : {}),
         ...(classForm.capacity ? { capacity: Number(classForm.capacity) } : {}),
-        ...(classForm.tuition ? { tuition: Number(classForm.tuition) } : {}),
+        ...(classForm.tuition ? { tuition: String(classForm.tuition).trim() } : {}),
       };
       await api(dataPath('school.course_class'), { method: 'POST', body });
       setNotice(t('Đã tạo lớp học.')); setClassForm({ name: '', subject: '', teacher: '', teacher_employee: '', start_date: '', capacity: '', tuition: '' }); await load();

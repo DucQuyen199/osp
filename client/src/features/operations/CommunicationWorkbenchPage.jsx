@@ -67,6 +67,9 @@ export default function CommunicationWorkbenchPage() {
   }, [filter, messagePage, reminderPage, latestRequest]);
   useEffect(() => { load(); }, [load]);
   const deliveryCounts = messageCounts;
+  const partiesForChannel = (channel) => [...parties.values()].filter((party) => channel === 'email'
+    ? Boolean(party.email?.trim()) : Boolean(party.phone?.trim()));
+  const eligibleParties = partiesForChannel(form.channel);
   async function run(key, operation, message) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); await load(true); setNotice(t(message)); }
@@ -75,7 +78,8 @@ export default function CommunicationWorkbenchPage() {
   }
   async function create(event) {
     event.preventDefault();
-    if (!form.party || !form.send_at || !form.body.trim()) return;
+    if (!eligibleParties.some((party) => party.id === form.party)) { setError(t('Người nhận cần có địa chỉ phù hợp với kênh gửi.')); return; }
+    if (!form.send_at || !form.body.trim()) return;
     const sendAt = localDateTimeToIso(form.send_at);
     if (!sendAt) { setError(t('Thời điểm gửi không hợp lệ trong múi giờ kinh doanh.')); return; }
     const payload = { party: form.party, channel: form.channel, body: form.body.trim(), send_at: sendAt };
@@ -92,12 +96,16 @@ export default function CommunicationWorkbenchPage() {
     {error && <div className="alert danger" role="alert">{t(error)}</div>}{notice && <div className="alert success" role="status">{t(notice)}</div>}
     <div className="stats u-mb-16" ><div className="card stat"><span className="stat-label">{t('Lịch nhắc đang chờ')}</span><strong className="stat-value">{pendingReminderCount}</strong></div><div className="card stat"><span className="stat-label">{t('Tin đang chờ gửi')}</span><strong className="stat-value">{(deliveryCounts.queued || 0) + (deliveryCounts.retry || 0) + (deliveryCounts.processing || 0)}</strong></div><div className="card stat"><span className="stat-label">{t('Gửi thất bại')}</span><strong className="stat-value">{deliveryCounts.failed || 0}</strong></div></div>
     {can('communication.reminder.create') && <section className="card card-pad"><h2>{t('Lên lịch nhắc')}</h2><form className="form-grid" onSubmit={create}>
-      <label className="field"><span className="label">{t('Người nhận *')}</span><select className="select" required value={form.party} onChange={(event) => setForm({ ...form, party: event.target.value })}><option value="">{t('Chọn liên hệ')}</option>{[...parties.values()].map((party) => <option key={party.id} value={party.id}>{recordLabel('master-data.party', party)}{party.email ? ` · ${party.email}` : party.phone ? ` · ${party.phone}` : ''}</option>)}</select></label>
-      <label className="field"><span className="label">{t('Kênh')}</span><select className="select" value={form.channel} onChange={(event) => setForm({ ...form, channel: event.target.value })}><option value="email">Email</option><option value="sms">SMS</option></select></label>
+      <label className="field"><span className="label">{t('Người nhận *')}</span><select className="select" required value={form.party} onChange={(event) => setForm({ ...form, party: event.target.value })}><option value="">{t('Chọn liên hệ')}</option>{eligibleParties.map((party) => <option key={party.id} value={party.id}>{recordLabel('master-data.party', party)}{form.channel === 'email' ? ` · ${party.email}` : ` · ${party.phone}`}</option>)}</select>{!eligibleParties.length && <span className="small muted">{t('Không có liên hệ nào có địa chỉ phù hợp với kênh gửi.')}</span>}</label>
+      <label className="field"><span className="label">{t('Kênh')}</span><select className="select" value={form.channel} onChange={(event) => {
+        const channel = event.target.value;
+        const candidates = partiesForChannel(channel);
+        setForm((current) => ({ ...current, channel, party: candidates.some((party) => party.id === current.party) ? current.party : candidates[0]?.id || '' }));
+      }}><option value="email">Email</option><option value="sms">SMS</option></select></label>
       <label className="field"><span className="label">{t('Thời điểm gửi *')}</span><input className="input" required type="datetime-local" min={localDateTime()} value={form.send_at} onChange={(event) => setForm({ ...form, send_at: event.target.value })}/></label>
       <label className="field"><span className="label">{t('Tiêu đề')}</span><input className="input" maxLength="240" value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })}/></label>
       <label className="field full"><span className="label">{t('Nội dung *')}</span><textarea className="input" required rows="4" maxLength="10000" value={form.body} onChange={(event) => setForm({ ...form, body: event.target.value })}/></label>
-      <div className="row full"><span className="grow small muted">{t('Kênh gửi phải được cấu hình ở máy chủ. Lịch nhắc chưa đến giờ có thể hủy.')}</span><button className="btn btn-primary" disabled={Boolean(busy) || !form.party}>{t('Lên lịch')}</button></div>
+      <div className="row full"><span className="grow small muted">{t('Kênh gửi phải được cấu hình ở máy chủ. Lịch nhắc chưa đến giờ có thể hủy.')}</span><button className="btn btn-primary" disabled={Boolean(busy) || !eligibleParties.some((party) => party.id === form.party)}>{t('Lên lịch')}</button></div>
     </form></section>}
     {can('communication.reminder.read') && <section className="card card-pad u-mt-16" ><div className="row wrap"><div><h2>{t('Lịch nhắc')}</h2><p className="small muted">{t('Các lịch đến hạn được hệ thống tự động xếp hàng gửi.')}</p></div><span className="grow"/><label className="field"><span className="label">{t('Trạng thái')}</span><select className="select" value={filter} onChange={(event) => { setFilter(event.target.value); setReminderPage(0); }}><option value="all">{t('Tất cả')}</option><option value="pending">{t('Đã lên lịch')}</option><option value="queued">{t('Đã xếp hàng gửi')}</option><option value="cancelled">{t('Đã hủy')}</option></select></label></div>
       {loading ? <div className="skeleton" data-h="row"/> : !reminders.length ? <div className="empty">{t('Không có lịch nhắc trong bộ lọc này.')}</div> : <div className="table-wrap"><table className="table"><thead><tr><th>{t('Thời điểm')}</th><th>{t('Người nhận')}</th><th>{t('Kênh')}</th><th>{t('Tiêu đề / nội dung')}</th><th>{t('Trạng thái')}</th><th/></tr></thead><tbody>{reminders.map((row) => <tr key={row.id}><td>{fmtDateTime(row.send_at)}</td><td>{recipient(row.party)}</td><td>{t(channelLabels[row.channel] || row.channel)}</td><td><strong>{row.subject || t('Nhắc việc')}</strong><div className="small muted">{row.body}</div></td><td><span className={`badge ${row.status === 'queued' ? 'success' : row.status === 'pending' ? 'warning' : 'plain'}`}>{t(reminderLabels[row.status] || statusLabel(row.status))}</span></td><td>{row.status === 'pending' && can('communication.reminder.cancelled') && <button className="btn btn-ghost btn-sm" type="button" disabled={Boolean(busy)} onClick={() => cancel(row)}>{t('Hủy')}</button>}</td></tr>)}</tbody></table></div>}

@@ -1,47 +1,21 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
-import { useLatestRequest } from '../../lib/useLatestRequest.js';
-import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtNumber, uiTextWith } from '../../lib/i18n.js';
-import { app, can, loadAllResponse } from '../../lib/state.js';
+import { app, can } from '../../lib/state.js';
 import biEnglish from './bi.en.js';
 import BiReportBuilderForm from './components/BiReportBuilderForm.jsx';
 import { BiDataTable, BiKpiCard, BiReportWidget } from './components/BiReportVisualizations.jsx';
+import { useBiReportsData } from './hooks/useBiReportsData.js';
 import { useBiReportsWorkflow } from './hooks/useBiReportsWorkflow.js';
 const t = (text) => uiTextWith(text, biEnglish);
 const asItems = (value) => Array.isArray(value?.items) ? value.items : [];
 export default function BiReportsPage({ route }) {
   useDocumentTitle(`${t('Báo cáo & phân tích')} · OSP Suite`);
-  const [dashboards, setDashboards] = useState([]);
-  const [reports, setReports] = useState([]);
-  const [kpis, setKpis] = useState([]);
-  const [dashboard, setDashboard] = useState(null);
-  const [report, setReport] = useState(null);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [reportRuns, setReportRuns] = useState([]);
-  const [selectedRun, setSelectedRun] = useState(null);
-  const latestRequest = useLatestRequest();
-  const load = useCallback(async () => {
-    const isLatest = latestRequest();
-    setLoading(true);
-    setError('');
-    try {
-      const [dashboardList, reportList, kpiList] = await Promise.all([
-        can('bi.dashboard.read') ? loadAllResponse('bi.dashboard') : Promise.resolve({ items: [] }),
-        can('bi.report.read') ? loadAllResponse('bi.report') : Promise.resolve({ items: [] }),
-        can('bi.kpi.read') ? loadAllResponse('bi.kpi') : Promise.resolve({ items: [] }),
-      ]);
-      if (isLatest()) {
-        setDashboards(asItems(dashboardList));
-        setReports(asItems(reportList));
-        setKpis(asItems(kpiList));
-      }
-    } catch (reason) {
-      if (isLatest()) setError(t(reason.message || 'Không tải được danh mục báo cáo BI.'));
-    } finally { if (isLatest()) setLoading(false); }
-  }, [latestRequest]);
+  const data = useBiReportsData({ route });
+  const {
+    dashboards, reports, kpis, dashboard, report, result, error, setError,
+    loading, reportRuns, setReportRuns, selectedRun, setSelectedRun, setReport, load,
+  } = data;
   const sources = (app.meta?.modules || []).flatMap((module) => (module.entities || [])
     .filter((item) => can(`${module.id}.${item.name}.read`))
     .map((item) => ({ qname: `${module.id}.${item.name}`, label: `${module.name} · ${item.label}`, fields: item.fields || [] })));
@@ -58,32 +32,6 @@ export default function BiReportsPage({ route }) {
     numericFields, groupFields, selectedWidgetReport, widgetTypeOptions, kpiReports, reportWidgetTypes,
     exportReport, createReport, runReportAction, addDashboardWidget, createDashboard, createKpi,
   } = workflow;
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => {
-    let active = true;
-    setError('');
-    setDashboard(null); setReport(null); setResult(null); setReportRuns([]); setSelectedRun(null);
-    if (route.view === 'dashboard' && route.id) {
-      api(dataPath('bi.dashboard', route.id)).then((value) => { if (active) setDashboard(value); }).catch((reason) => { if (active) setError(t(reason.message || 'Không tải được dashboard.')); });
-    }
-    if (route.view === 'report' && route.id) {
-      api(dataPath('bi.report', route.id)).then(async (value) => {
-        if (!active) return;
-        setReport(value);
-        if (value.query) {
-          const nextResult = await api(tenantPath(`/reports/bi/${encodeURIComponent(route.id)}`));
-          if (active) setResult(nextResult);
-        }
-      }).catch((reason) => { if (active) setError(t(reason.message || 'Không tải được báo cáo.')); });
-      if (can('bi.report.read')) {
-        api(tenantPath(`/reports/bi/${encodeURIComponent(route.id)}/runs`))
-          .then((value) => { if (active) setReportRuns(asItems(value)); })
-          .catch((reason) => { if (active) setError(t(reason.message || 'Could not load report run history.')); });
-      }
-    }
-    return () => { active = false; };
-  }, [route.view, route.id]);
-
   if (route.view === 'dashboard' && route.id) return <div className="page">
     <div className="page-head"><div><a className="back-link" href="#/reports/bi">{t("← Báo cáo & phân tích")}</a><h1>{dashboard?.name || t('Dashboard')}</h1><p className="sub">{t("Các widget được lấy từ báo cáo đã lưu và phân quyền theo tenant.")}</p></div></div>
     {error && <div className="alert danger" role="alert">{t(error)}</div>}

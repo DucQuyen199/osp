@@ -14,7 +14,47 @@ pub async fn validate_persistence(
     action: &str,
     document: &serde_json::Value,
 ) -> R<Vec<String>> {
-    if entity != "reminder" || action != "queued" {
+    if entity != "reminder" {
+        return Ok(Vec::new());
+    }
+    if action == "created" {
+        let channel = document.get("channel").and_then(serde_json::Value::as_str);
+        let party_id = document
+            .get("party")
+            .and_then(serde_json::Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok());
+        let (Some(channel @ ("email" | "sms")), Some(party_id)) = (channel, party_id) else {
+            return Ok(Vec::new());
+        };
+        let row = tx
+            .query_opt(
+                "SELECT NULLIF(btrim(email), ''), NULLIF(btrim(phone), '') FROM master_data__party WHERE tenant_id = $1 AND id = $2",
+                &[&tenant.id, &party_id],
+            )
+            .await?;
+        let Some(row) = row else {
+            return Ok(vec![
+                "Không tìm thấy người nhận lịch nhắc trong tenant này".into(),
+            ]);
+        };
+        let has_email: Option<String> = row.get(0);
+        let has_phone: Option<String> = row.get(1);
+        let has_destination = match channel {
+            "email" => has_email.is_some(),
+            "sms" => has_phone.is_some(),
+            _ => true,
+        };
+        if !has_destination {
+            let message = if channel == "email" {
+                "Người nhận cần có địa chỉ email để gửi email"
+            } else {
+                "Người nhận cần có số điện thoại để gửi SMS"
+            };
+            return Ok(vec![message.into()]);
+        }
+        return Ok(Vec::new());
+    }
+    if action != "queued" {
         return Ok(Vec::new());
     }
     let Some(id) = document
