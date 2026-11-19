@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ApiError, api, tenantPath } from '../../lib/api.js';
+import { ApiError, api, session, tenantPath } from '../../lib/api.js';
+import { clearPersistentIdempotencyRequest, getPersistentIdempotencyRequest } from '../../lib/idempotency.js';
 import { uiTextWith } from '../../lib/i18n.js';
 import { entityLabel } from '../../lib/state.js';
 import importEnglish from './import.en.js';
@@ -35,9 +36,12 @@ export default function EntityImportDialog({ qname, onClose, onDone }) {
     setSaving(true);
     try {
       const csv = await file.text();
+      const scope = `${session.current()?.tenantId || ''}:import:${qname}`;
+      const { key, fingerprint } = getPersistentIdempotencyRequest(scope, JSON.stringify(['csv', csv]));
       const result = await api(tenantPath(`/import/${qname.replace('.', '/')}`), {
-        method: 'POST', body: csv, headers: { 'content-type': 'text/csv' },
+        method: 'POST', body: csv, headers: { 'content-type': 'text/csv', 'idempotency-key': key },
       });
+      clearPersistentIdempotencyRequest(scope, fingerprint);
       setSuccess(true);
       setMessage(`${t('Đã nhập')} ${result.imported} ${t('dòng.')}`);
       onDone?.(result);

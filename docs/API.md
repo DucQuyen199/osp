@@ -103,7 +103,7 @@ Mã `event_id` được chống lặp trong phạm vi vận đơn: gửi lại c
 
 Bulk action nhận `{ "ids": ["<uuid>", "…"] }`. Danh sách phải có 1–100 ID duy nhất. Máy chủ sắp khóa theo ID để tránh deadlock giữa các lô giao nhau, kiểm tra quyền và chạy đầy đủ validation/event của action trên từng bản ghi; response có `{ action, count, items }`.
 
-Khi tạo bản ghi, client có thể gửi `Idempotency-Key` (1–200 ký tự ASCII in được). Khóa được phân theo tenant, người gửi và entity; với tác vụ tổng hợp, khóa được phân theo entity và action. Gửi lại cùng khóa và cùng JSON trong 30 ngày trả lại phản hồi `201` đã lưu mà không tạo thêm bản ghi hay lặp lại nghiệp vụ. Dùng lại khóa cho JSON khác trả `409 IDEMPOTENCY_KEY_REUSED`. Sau 30 ngày, khóa hết hạn và có thể được tạo lại.
+Khi tạo bản ghi hoặc nhập dữ liệu, client có thể gửi `Idempotency-Key` (1–200 ký tự ASCII in được). Khóa được phân theo tenant, người gửi và entity; với tác vụ tổng hợp, khóa được phân theo entity và action. Gửi lại cùng khóa và cùng yêu cầu trong 30 ngày trả lại phản hồi đã lưu mà không tạo thêm bản ghi hay lặp lại nghiệp vụ. Dùng lại khóa cho nội dung khác trả `409 IDEMPOTENCY_KEY_REUSED`. Sau 30 ngày, khóa hết hạn và có thể được tạo lại.
 
 Khi ghi nhận kết quả giao dịch thanh toán hoặc hoàn tiền, có thể gửi `{"reference":"mã nhà cung cấp"}` cùng request `POST .../{id}/{succeeded|failed}`. Mã tham chiếu và chuyển trạng thái sẽ commit hoặc rollback cùng nhau. Bỏ body nếu không cần đổi mã; gửi chuỗi rỗng để xóa mã khi ghi nhận thất bại.
 
@@ -221,7 +221,7 @@ Mẫu: `*` mọi quyền · `crm.*` mọi quyền của module · `*.*.read` m�
 |---|---|---|
 | `GET /export` | `tenant.export` | Toàn bộ dữ liệu + cấu hình, JSON `osp-export/1`. **Không** có mật khẩu/token |
 | `GET /export/:module/:entity` | `tenant.export` + đọc | CSV UTF-8 có BOM (mở được bằng Excel). Ô chuỗi bắt đầu bằng `= + - @` được thêm `'` để chặn formula injection |
-| `POST /import/:module/:entity` | `tenant.import` + tạo | Thân `text/csv` hoặc JSON `[...]` / `{"rows":[...]}` |
+| `POST /import/:module/:entity` | `tenant.import` + tạo | Thân `text/csv` hoặc JSON `[...]` / `{"rows":[...]}`; hỗ trợ `Idempotency-Key` để gửi lại lô đã commit an toàn |
 | `DELETE /api/t/:tid` | `tenant.delete` | `{ "confirm": "<đúng tên doanh nghiệp>" }` — xóa vĩnh viễn |
 
 **Nhập** là *tất-cả-hoặc-không*: có lỗi ở bất kỳ dòng nào thì không ghi gì và trả `422 { imported: 0, errors: [{row, message}] }`. Tối đa 5.000 dòng, 5 MB. Mặc định **không kích hoạt** luật tích hợp (đây là di chuyển dữ liệu); thêm `?events=true` để kích hoạt. CSV: dòng đầu là tên trường; bool nhận `true/1/có/yes` và `false/0/không/no`; `json` là chuỗi JSON.

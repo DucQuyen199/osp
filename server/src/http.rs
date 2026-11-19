@@ -2494,6 +2494,7 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
         }
         (&Method::POST, ["import", m, e]) => {
             let q = format!("{m}.{e}");
+            let key = idempotency_key(&parts.headers)?;
             let fire = query.iter().any(|(a, v)| a == "events" && v == "true");
             let is_csv = parts
                 .headers
@@ -2541,7 +2542,9 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                         .collect::<R<Vec<_>>>()?,
                 )
             };
-            let result = k.import_records(&actor, &t, &q, input, fire).await?;
+            let result = k
+                .import_records(&actor, &t, &q, input, fire, key.as_deref())
+                .await?;
             let status = if result["errors"].as_array().is_some_and(|a| !a.is_empty()) {
                 422
             } else {

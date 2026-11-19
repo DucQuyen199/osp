@@ -230,7 +230,17 @@ impl Kernel {
     }
 
     pub async fn enable_modules(&self, t: &Tenant, ids: &[String]) -> R<Vec<String>> {
-        let mut want: Vec<String> = t.modules.clone();
+        let mut conn = self.pool.get().await?;
+        let tx = Tx::begin(&mut conn, &t.id, true).await?;
+        let row = tx
+            .query_opt(
+                "SELECT modules FROM osp_tenants WHERE id = $1 FOR UPDATE",
+                &[&t.id],
+            )
+            .await?
+            .ok_or_else(|| ApiError::new(404, "TENANT_NOT_FOUND", "Không tìm thấy doanh nghiệp"))?;
+        let current_modules: Vec<String> = row.get(0);
+        let mut want = current_modules.clone();
         want.extend(ids.iter().cloned());
         let target = self
             .reg
@@ -238,16 +248,15 @@ impl Kernel {
             .map_err(|e| ApiError::new(404, "MODULE_NOT_FOUND", e))?;
         let added: Vec<String> = target
             .iter()
-            .filter(|m| !t.modules.contains(m))
+            .filter(|m| !current_modules.contains(m))
             .cloned()
             .collect();
         if added.is_empty() {
+            tx.commit().await?;
             return Ok(added);
         }
         let mut next = t.clone();
         next.modules = target.clone();
-        let mut conn = self.pool.get().await?;
-        let tx = Tx::begin(&mut conn, &t.id, true).await?;
         tx.execute(
             "UPDATE osp_tenants SET modules = $2 WHERE id = $1",
             &[&t.id, &target],
@@ -284,11 +293,21 @@ impl Kernel {
                 format!("Module lõi \"{id}\" không thể tắt"),
             ));
         }
+        let mut conn = self.pool.get().await?;
+        let tx = Tx::begin(&mut conn, &t.id, true).await?;
+        let row = tx
+            .query_opt(
+                "SELECT modules FROM osp_tenants WHERE id = $1 FOR UPDATE",
+                &[&t.id],
+            )
+            .await?
+            .ok_or_else(|| ApiError::new(404, "TENANT_NOT_FOUND", "Không tìm thấy doanh nghiệp"))?;
+        let current_modules: Vec<String> = row.get(0);
         let blockers: Vec<String> = self
             .reg
             .dependents(id)
             .into_iter()
-            .filter(|d| t.has_module(d))
+            .filter(|d| current_modules.contains(d))
             .collect();
         if !blockers.is_empty() {
             return Err(ApiError::new(
@@ -300,9 +319,11 @@ impl Kernel {
                 ),
             ));
         }
-        let modules: Vec<String> = t.modules.iter().filter(|m| *m != id).cloned().collect(); // dữ liệu được giữ nguyên
-        let mut conn = self.pool.get().await?;
-        let tx = Tx::begin(&mut conn, &t.id, true).await?;
+        let modules: Vec<String> = current_modules
+            .iter()
+            .filter(|module| module.as_str() != id)
+            .cloned()
+            .collect(); // dữ liệu được giữ nguyên
         tx.execute(
             "UPDATE osp_tenants SET modules = $2 WHERE id = $1",
             &[&t.id, &modules],

@@ -3,12 +3,12 @@ import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { toast } from '../../lib/feedback.js';
 import { app, can } from '../../lib/state.js';
-import { setBaseCurrency, uiText } from '../../lib/i18n.js';
+import { setBaseCurrency as setDisplayBaseCurrency, uiText } from '../../lib/i18n.js';
 import SettingsTabs from './SettingsTabs.jsx';
 export default function CurrencySettingsPage() {
   useDocumentTitle(`${uiText('Tiền tệ')} · ${uiText('Cài đặt')} · OSP Suite`);
   const [currencies, setCurrencies] = useState([]);
-  const [baseCurrency, setBaseCurrency] = useState(app.meta.settings?.baseCurrency || 'VND');
+  const [baseCurrency, setBaseCurrencyState] = useState(app.meta.settings?.baseCurrency || 'VND');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -27,7 +27,8 @@ export default function CurrencySettingsPage() {
         method: 'PATCH', body: { baseCurrency: next },
       });
       app.meta.settings = settings;
-      setBaseCurrency(next);
+      setBaseCurrencyState(next);
+      setDisplayBaseCurrency(next);
       window.dispatchEvent(new Event('osp:meta'));
       toast(`${uiText('Đã đặt tiền tệ cơ sở thành')} ${next}.`, 'success');
     } catch (reason) {

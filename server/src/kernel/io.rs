@@ -5,6 +5,7 @@ use crate::db::Tx;
 use crate::defs::FieldDef;
 use crate::error::{ApiError, R};
 use serde_json::{Value, json};
+use sha2::Digest;
 
 /// Chống CSV/formula injection khi mở bằng Excel: ô chuỗi bắt đầu bằng = + - @ thêm dấu nháy đơn.
 fn safe_cell(v: Option<&Value>, f: Option<&FieldDef>) -> String {
@@ -245,10 +246,17 @@ impl Kernel {
         qname: &str,
         rows_in: ImportInput,
         fire_events: bool,
+        idempotency_key: Option<&str>,
     ) -> R<Value> {
         let ent = self.ent(t, qname)?;
         self.authorize(t, actor, "tenant.import")?;
         self.authorize(t, actor, &format!("{qname}.create"))?;
+        let canonical = match &rows_in {
+            ImportInput::Rows(rows) => serde_json::to_vec(&(qname, fire_events, "rows", rows)),
+            ImportInput::Csv(csv) => serde_json::to_vec(&(qname, fire_events, "csv", csv)),
+        }
+        .map_err(|error| ApiError::internal(error.to_string()))?;
+        let request_hash = hex::encode(sha2::Sha256::digest(canonical));
         let mut errors: Vec<(usize, String)> = Vec::new();
         let rows: Vec<Obj> = match rows_in {
             ImportInput::Rows(r) => r,
@@ -294,6 +302,39 @@ impl Kernel {
         }
         let mut conn = self.pool.get().await?;
         let tx = Tx::begin(&mut conn, &t.id, true).await?;
+        let actor_id = actor.user_id().to_owned();
+        let entity = format!("import:{qname}");
+        if let Some(key) = idempotency_key {
+            tx.execute(
+                "DELETE FROM osp_idempotency_keys WHERE tenant_id = $1 AND created_at < now() - interval '30 days'",
+                &[&t.id],
+            )
+            .await?;
+            let key_lock = format!("idempotency:{}:{}:{}:{}", t.id, actor_id, entity, key);
+            tx.query_opt(
+                "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                &[&key_lock],
+            )
+            .await?;
+            if let Some(row) = tx
+                .query_opt(
+                    "SELECT request_hash, response FROM osp_idempotency_keys WHERE tenant_id = $1 AND actor_id = $2 AND entity = $3 AND idempotency_key = $4",
+                    &[&t.id, &actor_id, &entity, &key],
+                )
+                .await?
+            {
+                let saved_hash: String = row.get(0);
+                if saved_hash != request_hash {
+                    return Err(ApiError::new(
+                        409,
+                        "IDEMPOTENCY_KEY_REUSED",
+                        "Idempotency-Key đã được dùng với nội dung yêu cầu khác",
+                    ));
+                }
+                tx.commit().await?;
+                return Ok(row.get(1));
+            }
+        }
         let opts = Opts {
             depth: Some(0),
             causation: None,
@@ -332,8 +373,16 @@ impl Kernel {
             Some(format!("{} dòng", rows.len())),
         )
         .await?;
+        let result = json!({ "imported": rows.len(), "errors": [] });
+        if let Some(key) = idempotency_key {
+            tx.execute(
+                "INSERT INTO osp_idempotency_keys (tenant_id, actor_id, entity, idempotency_key, request_hash, response) VALUES ($1, $2, $3, $4, $5, $6)",
+                &[&t.id, &actor_id, &entity, &key, &request_hash, &result],
+            )
+            .await?;
+        }
         tx.commit().await?;
-        Ok(json!({ "imported": rows.len(), "errors": [] }))
+        Ok(result)
     }
 }
 

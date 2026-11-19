@@ -1452,6 +1452,15 @@ pub fn build(reg: &Registry) -> Value {
         } }),
     );
     paths.insert(
+        "/api/t/{tenantId}/import/{module}/{entity}".into(),
+        json!({ "post": {
+            "tags": ["data"], "summary": "Import CSV or JSON records atomically", "security": sec,
+            "parameters": [tid, { "name": "module", "in": "path", "required": true, "schema": { "type": "string" } }, { "name": "entity", "in": "path", "required": true, "schema": { "type": "string" } }, { "name": "events", "in": "query", "required": false, "schema": { "type": "boolean", "default": false }, "description": "Set true to fire source events for imported rows" }, { "name": "Idempotency-Key", "in": "header", "required": false, "schema": { "type": "string", "minLength": 1, "maxLength": 200 } }],
+            "requestBody": { "required": true, "content": { "text/csv": { "schema": { "type": "string", "description": "UTF-8 CSV with field names in the first row" } }, "application/json": { "schema": { "oneOf": [{ "type": "array", "items": { "type": "object" } }, { "type": "object", "required": ["rows"], "properties": { "rows": { "type": "array", "items": { "type": "object" } } } }] } } } },
+            "responses": with_common(Map::from_iter([("200".to_string(), json!({ "description": "All rows imported; when Idempotency-Key is sent, retries return the saved result without duplicating rows" })), ("400".to_string(), err("Invalid CSV or JSON input, or invalid Idempotency-Key")), ("409".to_string(), err("Idempotency-Key reused with different import content")), ("413".to_string(), err("Import exceeds 5,000 rows")), ("422".to_string(), err("One or more rows failed validation; no row was committed"))]))
+        } }),
+    );
+    paths.insert(
         "/api/t/{tenantId}/reports/logistics/shipments/{shipmentId}/redeliver".into(),
         json!({ "post": {
             "tags": ["logistics"], "summary": "Create an idempotent retry shipment from a failed or short delivery", "security": sec,
