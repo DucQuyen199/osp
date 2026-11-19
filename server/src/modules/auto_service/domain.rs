@@ -68,6 +68,32 @@ pub fn validate_action(entity: &str, action: &str, document: &Value) -> Vec<Stri
     if entity != "repair_order" {
         return Vec::new();
     }
+    if action == "approved" {
+        let Some(lines) = document.get("lines").and_then(Value::as_array) else {
+            return vec!["Báo giá phải có ít nhất một dòng công việc có số lượng và đơn giá hợp lệ trước khi duyệt".into()];
+        };
+        if lines.is_empty()
+            || lines.iter().any(|line| {
+                !line
+                    .get("qty")
+                    .and_then(money::decimal)
+                    .is_some_and(|quantity| quantity > Decimal::ZERO)
+                    || !line
+                        .get("price")
+                        .and_then(money::decimal)
+                        .is_some_and(|price| price >= Decimal::ZERO)
+            })
+        {
+            return vec!["Báo giá phải có ít nhất một dòng công việc có số lượng và đơn giá hợp lệ trước khi duyệt".into()];
+        }
+        let total = document.get("total").and_then(money::decimal);
+        let expected_total = money::sum_line_totals(lines);
+        if !matches!((total, expected_total), (Some(total), Some(expected)) if total >= Decimal::ZERO && total == expected)
+        {
+            return vec!["Tổng báo giá phải khớp với các dòng công việc trước khi duyệt".into()];
+        }
+        return Vec::new();
+    }
     if action == "quote_declined" {
         let reason = document
             .get("declined_reason")
@@ -153,7 +179,7 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
     if entity == "repair_order"
         && matches!(
             document.get("status").and_then(Value::as_str),
-            Some("completed" | "delivered" | "quote_declined")
+            Some("approved" | "in_progress" | "completed" | "delivered" | "quote_declined")
         )
     {
         vec![
