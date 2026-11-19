@@ -605,6 +605,8 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
         5_000_000
     } else if seg(6) == Some("import-ofx") {
         5_000_000
+    } else if seg(6) == Some("import-mt940") {
+        5_000_000
     } else if seg(6) == Some("import") || seg(4) == Some("import") || seg(3) == Some("import") {
         5_000_000
     } else {
@@ -1359,6 +1361,29 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
             return json_ok(
                 crate::modules::accounting::import_statement_ofx(k, &actor, &t, statement_id, ofx)
                     .await?,
+            );
+        }
+        (
+            &Method::POST,
+            [
+                "accounting",
+                "bank-statements",
+                statement_id,
+                "import-mt940",
+            ],
+        ) => {
+            let mt940 = std::str::from_utf8(&bytes).map_err(|_| {
+                ApiError::new(400, "INVALID_MT940", "MT940 body must be UTF-8 text")
+            })?;
+            return json_ok(
+                crate::modules::accounting::import_statement_mt940(
+                    k,
+                    &actor,
+                    &t,
+                    statement_id,
+                    mt940,
+                )
+                .await?,
             );
         }
         (

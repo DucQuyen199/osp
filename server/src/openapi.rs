@@ -1289,6 +1289,23 @@ pub fn build(reg: &Registry) -> Value {
         } }),
     );
     paths.insert(
+        "/api/t/{tenantId}/accounting/bank-statements/{statementId}/import-mt940".into(),
+        json!({ "post": {
+            "tags": ["accounting"], "summary": "Import SWIFT MT940 bank statement", "security": sec,
+            "parameters": [tid, { "name": "statementId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+            "requestBody": { "required": true, "content": {
+                "text/plain": { "schema": { "type": "string", "description": "UTF-8 SWIFT MT940 statement with one account, opening/closing balances, and up to 20,000 booked transactions; 5 MB maximum" } },
+                "application/x-mt940": { "schema": { "type": "string", "description": "UTF-8 SWIFT MT940 customer statement" } }
+            } },
+            "responses": with_common(Map::from_iter([
+                ("200".to_string(), json!({ "description": "Rows imported or skipped as exact idempotent replays" })),
+                ("409".to_string(), err("Only a draft statement accepts imported rows")),
+                ("413".to_string(), err("File exceeds 5 MB or has more than 20,000 transactions")),
+                ("422".to_string(), err("Invalid MT940 account identity, balance currency, transaction date, amount, or reference"))
+            ]))
+        } }),
+    );
+    paths.insert(
         "/api/t/{tenantId}/approvals/approvers".into(),
         json!({ "get": {
             "tags": ["workflow-approval"], "summary": "List tenant users available as approval-rule approvers", "security": sec,

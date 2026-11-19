@@ -100,13 +100,14 @@ export function useBankReconciliationWorkflow({ data, statementId, setStatementI
   async function importFile() {
     if (!selected || !statementFile) return;
     const camt = /\.(xml|camt)$/i.test(statementFile.name);
+    const mt940 = /\.(mt940|940|sta)$/i.test(statementFile.name);
     const ofx = /\.(ofx|qfx)$/i.test(statementFile.name);
     const casso = /\.json$/i.test(statementFile.name);
     await run(`${selected.id}:import`, async () => {
       const content = ofx ? await readOfxFile(statementFile, t) : await statementFile.text();
       const payload = casso ? JSON.parse(content) : content;
-      const result = await api(tenantPath(`/accounting/bank-statements/${selected.id}/${casso ? 'import-casso' : camt ? 'import-camt053' : ofx ? 'import-ofx' : 'import'}`), {
-        method: 'POST', body: payload, headers: { 'content-type': casso ? 'application/json' : camt ? 'application/xml; charset=utf-8' : ofx ? 'text/plain; charset=utf-8' : 'text/csv; charset=utf-8' },
+      const result = await api(tenantPath(`/accounting/bank-statements/${selected.id}/${casso ? 'import-casso' : camt ? 'import-camt053' : mt940 ? 'import-mt940' : ofx ? 'import-ofx' : 'import'}`), {
+        method: 'POST', body: payload, headers: { 'content-type': casso ? 'application/json' : camt ? 'application/xml; charset=utf-8' : mt940 ? 'application/x-mt940; charset=utf-8' : ofx ? 'text/plain; charset=utf-8' : 'text/csv; charset=utf-8' },
       });
       setStatementFile(null);
       return result;

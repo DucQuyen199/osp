@@ -75,6 +75,28 @@ pub async fn import_statement_ofx(
     .await
 }
 
+pub async fn import_statement_mt940(
+    kernel: &Kernel,
+    actor: &Actor,
+    tenant: &Tenant,
+    statement_id: &str,
+    mt940_text: &str,
+) -> R<Value> {
+    let statement_id = authorize_import(kernel, actor, tenant, statement_id)?;
+    let parsed = super::mt940::parse(mt940_text)?;
+    persistence::import_lines(
+        kernel,
+        actor,
+        tenant,
+        statement_id,
+        parsed.lines,
+        Some(parsed.identity),
+        "MT940",
+        "MT940 transaction",
+    )
+    .await
+}
+
 pub async fn import_statement_casso(
     kernel: &Kernel,
     actor: &Actor,
