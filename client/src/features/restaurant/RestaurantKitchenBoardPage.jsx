@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
-import { api, dataPath } from '../../lib/api.js';
 import { fmtAgo, fmtDateTime, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { can, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import restaurantEnglish from './restaurant.en.js';
 import { RESTAURANT_KITCHEN_PAGE_SIZE, useRestaurantKitchenBoardData } from './hooks/useRestaurantKitchenBoardData.js';
+import { useRestaurantKitchenBoardWorkflow } from './hooks/useRestaurantKitchenBoardWorkflow.js';
 const t = (text) => uiTextWith(text, restaurantEnglish);
 const STATIONS = [
       ['all', 'Tất cả trạm'],
@@ -17,27 +17,13 @@ export default function RestaurantKitchenBoardPage() {
   const [station, setStation] = useState('all');
   const [offset, setOffset] = useState(0);
   const { items, counts, total, hasMore, products, error, loading, lastUpdated, setError, load } = useRestaurantKitchenBoardData(station, offset);
-  const [busy, setBusy] = useState('');
+  const { busy, transition } = useRestaurantKitchenBoardWorkflow({ load, setError });
   const [printingTicketId, setPrintingTicketId] = useState('');
   const grouped = useMemo(() => ({
     queued: items.filter((item) => item.status === 'queued'),
     preparing: items.filter((item) => item.status === 'preparing'),
     ready: items.filter((item) => item.status === 'ready'),
   }), [items]);
-  const transition = async (ticket, action) => {
-    const key = `${ticket.id}:${action}`;
-    setBusy(key);
-    setError('');
-    try {
-      await api(dataPath('restaurant.kitchen_ticket', ticket.id, action), { method: 'POST' });
-      await load(true);
-    } catch (reason) {
-      setError(reason.message || t('Không cập nhật được trạng thái phiếu bếp.'));
-      await load(true);
-    } finally {
-      setBusy('');
-    }
-  };
   const printTicket = (ticket) => {
     setPrintingTicketId(ticket.id);
     const finishPrint = () => setPrintingTicketId('');
