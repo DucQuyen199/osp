@@ -153,6 +153,17 @@ async fn validate_farm(
         .and_then(Value::as_str)
         .unwrap_or_default()
         .trim();
+    let normalized_name: String = tx
+        .query_opt("SELECT lower(btrim($1::text))", &[&name])
+        .await?
+        .ok_or_else(|| crate::error::ApiError::internal("Unable to normalize farm name"))?
+        .get(0);
+    let lock_key = format!("agriculture.farm-name:{}:{}", tenant.id, normalized_name);
+    tx.query_opt(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        &[&lock_key],
+    )
+    .await?;
     if tx.query_opt(
         "SELECT id FROM agriculture__farm WHERE tenant_id = $1 AND lower(btrim(name)) = lower($2) AND ($3::uuid IS NULL OR id <> $3) LIMIT 1 FOR UPDATE",
         &[&tenant.id, &name, &id],
@@ -324,6 +335,19 @@ async fn validate_harvest(tx: &Tx<'_>, tenant: &Tenant, document: &Value) -> R<V
         .filter(|code| !code.is_empty())
     {
         let id = parse_id(document, "id");
+        let normalized_code: String = tx
+            .query_opt("SELECT lower(btrim($1::text))", &[&code])
+            .await?
+            .ok_or_else(|| {
+                crate::error::ApiError::internal("Unable to normalize harvest lot code")
+            })?
+            .get(0);
+        let lock_key = format!("agriculture.harvest-lot:{}:{}", tenant.id, normalized_code);
+        tx.query_opt(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            &[&lock_key],
+        )
+        .await?;
         if tx.query_opt(
             "SELECT id FROM agriculture__harvest WHERE tenant_id = $1 AND lower(btrim(lot_code)) = lower($2) AND ($3::uuid IS NULL OR id <> $3) LIMIT 1 FOR UPDATE",
             &[&tenant.id, &code, &id],
