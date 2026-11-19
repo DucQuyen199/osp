@@ -272,9 +272,19 @@ pub async fn validate_persistence(
         }
         ("vehicle", "created" | "updated") => {
             if let Some(plate) = document.get("plate").and_then(Value::as_str) {
+                let normalized: String = tx
+                    .query_one_row("SELECT lower(btrim($1::text))", &[&plate])
+                    .await?
+                    .get(0);
+                let lock_key = format!("logistics.vehicle-plate:{}:{}", tenant.id, normalized);
+                tx.query_opt(
+                    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                    &[&lock_key],
+                )
+                .await?;
                 let record = id(document, "id").unwrap_or(Uuid::nil());
                 if tx.query_opt(
-                    "SELECT 1 FROM logistics__vehicle WHERE tenant_id = $1 AND lower(plate) = lower($2) AND id <> $3 LIMIT 1",
+                    "SELECT 1 FROM logistics__vehicle WHERE tenant_id = $1 AND lower(btrim(plate)) = lower(btrim($2)) AND id <> $3 LIMIT 1",
                     &[&tenant.id, &plate, &record],
                 ).await?.is_some() {
                     errors.push("Biển số phương tiện đã tồn tại trong doanh nghiệp".into());
@@ -287,9 +297,19 @@ pub async fn validate_persistence(
                 .and_then(Value::as_str)
                 .filter(|value| !value.trim().is_empty())
             {
+                let normalized: String = tx
+                    .query_one_row("SELECT lower(btrim($1::text))", &[&license])
+                    .await?
+                    .get(0);
+                let lock_key = format!("logistics.driver-license:{}:{}", tenant.id, normalized);
+                tx.query_opt(
+                    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                    &[&lock_key],
+                )
+                .await?;
                 let record = id(document, "id").unwrap_or(Uuid::nil());
                 if tx.query_opt(
-                    "SELECT 1 FROM logistics__driver WHERE tenant_id = $1 AND lower(license) = lower($2) AND id <> $3 LIMIT 1",
+                    "SELECT 1 FROM logistics__driver WHERE tenant_id = $1 AND lower(btrim(license)) = lower(btrim($2)) AND id <> $3 LIMIT 1",
                     &[&tenant.id, &license, &record],
                 ).await?.is_some() {
                     errors.push("Số giấy phép lái xe đã được đăng ký".into());

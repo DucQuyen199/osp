@@ -263,6 +263,9 @@ impl Kernel {
         } else {
             Vec::new()
         };
+        if qname.starts_with("logistics.") {
+            crate::modules::logistics::prepare_fleet_record(ent.def.name.as_str(), &mut clean);
+        }
         let mut errors = self.validate(tx, t, ent, &clean, true).await?;
         errors.append(&mut purchasing_prepare_errors);
         if !matches!(actor, Actor::System) && !user_supplied_system_fields.is_empty() {

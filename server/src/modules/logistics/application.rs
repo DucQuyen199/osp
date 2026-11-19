@@ -10,6 +10,19 @@ use rust_decimal::Decimal;
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
+pub fn prepare_fleet_record(entity: &str, document: &mut Map<String, Value>) {
+    let field = match entity {
+        "vehicle" => Some("plate"),
+        "driver" => Some("license"),
+        _ => None,
+    };
+    if let Some(field) = field
+        && let Some(value) = document.get(field).and_then(Value::as_str)
+    {
+        document.insert(field.into(), Value::String(value.trim().to_uppercase()));
+    }
+}
+
 fn line_discount_pct(line: &Value) -> Decimal {
     line.get("effective_discount_pct")
         .and_then(money::decimal)

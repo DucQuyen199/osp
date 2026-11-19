@@ -65,6 +65,9 @@ impl Kernel {
             .get_row(tx, t, &qname, id)
             .await?
             .ok_or_else(|| ApiError::not_found(format!("Không tìm thấy {qname} {id}")))?;
+        if qname.starts_with("logistics.") {
+            crate::modules::logistics::prepare_fleet_record(ent.def.name.as_str(), &mut patch);
+        }
         if qname == "consolidation.elimination_journal"
             && matches!(actor, Actor::User { .. })
             && !matches!(

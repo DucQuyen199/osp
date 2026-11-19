@@ -423,7 +423,23 @@ pub async fn validate_persistence(
         }
         let occupied: i64 = tx
             .query_one_row(
-                "SELECT COUNT(*)::bigint FROM hotel__reservation r LEFT JOIN hotel__room assigned ON assigned.tenant_id = r.tenant_id AND assigned.id = r.room WHERE r.tenant_id = $1 AND COALESCE(assigned.room_type, r.room_type) = $2 AND r.id <> $3 AND r.status IN ('booked', 'checked_in') AND r.check_in < $5 AND r.check_out > $4",
+                "WITH overlapping AS ( \
+                    SELECT GREATEST(r.check_in, $4) AS starts_at, LEAST(r.check_out, $5) AS ends_at \
+                    FROM hotel__reservation r \
+                    LEFT JOIN hotel__room assigned ON assigned.tenant_id = r.tenant_id AND assigned.id = r.room \
+                    WHERE r.tenant_id = $1 AND COALESCE(assigned.room_type, r.room_type) = $2 \
+                      AND r.id <> $3 AND r.status IN ('booked', 'checked_in') \
+                      AND r.check_in < $5 AND r.check_out > $4 \
+                 ), events AS ( \
+                    SELECT starts_at AS day, 1::bigint AS delta FROM overlapping \
+                    UNION ALL SELECT ends_at AS day, -1::bigint AS delta FROM overlapping \
+                 ), daily AS ( \
+                    SELECT day, SUM(delta) AS delta FROM events GROUP BY day \
+                 ), occupancy AS ( \
+                    SELECT SUM(delta) OVER (ORDER BY day ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS occupied_rooms \
+                    FROM daily \
+                 ) \
+                 SELECT COALESCE(MAX(occupied_rooms), 0)::bigint FROM occupancy",
                 &[&tenant.id, &room_type, &reservation_id, &check_in, &check_out],
             )
             .await?
