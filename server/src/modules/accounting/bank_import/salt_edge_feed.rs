@@ -181,7 +181,7 @@ pub(super) async fn fetch(
                 422,
                 "BANK_FEED_PAGE_LIMIT",
                 format!(
-                    "Salt Edge returned more than {MAX_ROWS} transactions; sync a shorter date range"
+                    "Salt Edge returned more than {MAX_ROWS} transactions for this account; the statement date filter is applied after fetching provider history. Use a narrower consent window by relinking, or import a statement file"
                 ),
             ));
         }
@@ -215,7 +215,7 @@ pub(super) async fn fetch(
         return Err(ApiError::new(
             422,
             "BANK_FEED_PAGE_LIMIT",
-            "Salt Edge exceeded the maximum number of pages; sync a shorter date range",
+            "Salt Edge exceeded the maximum number of pages for this account; the statement date filter is applied after fetching provider history. Use a narrower consent window by relinking, or import a statement file",
         ));
     }
 
