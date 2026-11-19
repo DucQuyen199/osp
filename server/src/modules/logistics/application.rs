@@ -37,7 +37,10 @@ pub async fn handle_source_event(
     depth: u32,
 ) -> R<bool> {
     if tenant.has_module("logistics") && event_type == "logistics.tracking_event.created" {
-        return apply_tracking_delivery(kernel, tx, tenant, document, event_id, depth).await;
+        // Carrier status is tracking history. A status-only event has no
+        // line-level proof of delivery, so fulfillment remains an explicit
+        // shipment action with received quantities and delivery evidence.
+        return Ok(true);
     }
     if !tenant.has_module("logistics")
         || event_type != "sales.sales_order.confirmed"
@@ -80,105 +83,6 @@ pub async fn handle_source_event(
                 causation: Some(event_id),
                 silent: false,
             },
-        )
-        .await?;
-    Ok(true)
-}
-
-async fn apply_tracking_delivery(
-    kernel: &Kernel,
-    tx: &Tx<'_>,
-    tenant: &Tenant,
-    event: &Value,
-    event_id: Uuid,
-    depth: u32,
-) -> R<bool> {
-    if event.get("status").and_then(Value::as_str) != Some("delivered") {
-        return Ok(true);
-    }
-    let Some(shipment_id) = event
-        .get("shipment")
-        .and_then(Value::as_str)
-        .and_then(|value| Uuid::parse_str(value).ok())
-    else {
-        return Err(crate::error::ApiError::validation(
-            "logistics.tracking_event",
-            vec!["Delivered tracking event requires a valid shipment".into()],
-        ));
-    };
-    let shipment = tx
-        .query_opt(
-            "SELECT status FROM logistics__shipment WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
-            &[&tenant.id, &shipment_id],
-        )
-        .await?
-        .ok_or_else(|| {
-            crate::error::ApiError::validation(
-                "logistics.tracking_event",
-                vec!["Shipment for delivered tracking event was not found".into()],
-            )
-        })?;
-    let status: String = shipment.get(0);
-    if status != "dispatched" {
-        // Keep late carrier scans as history without replaying fulfillment for
-        // a shipment that has already been finalized or replaced by a retry.
-        return Ok(true);
-    }
-    let Some(occurred_at) = event.get("occurred_at").and_then(Value::as_str) else {
-        return Err(crate::error::ApiError::validation(
-            "logistics.tracking_event",
-            vec!["Delivered tracking event requires its occurrence time".into()],
-        ));
-    };
-    let description = event
-        .get("description")
-        .and_then(Value::as_str)
-        .unwrap_or("Carrier marked the shipment delivered");
-    let carrier_reference = event
-        .get("carrier_event_id")
-        .and_then(Value::as_str)
-        .filter(|value| !value.trim().is_empty())
-        .map(|value| format!("Carrier event {value}: "))
-        .unwrap_or_default();
-    let location = event
-        .get("location")
-        .and_then(Value::as_str)
-        .filter(|value| !value.trim().is_empty())
-        .map(|value| format!(" Location: {value}."))
-        .unwrap_or_default();
-    let evidence = format!("{carrier_reference}{description}.{location}")
-        .chars()
-        .take(1000)
-        .collect::<String>();
-    let shipment_entity = kernel.ent(tenant, "logistics.shipment")?;
-    let child = Opts {
-        depth: Some(depth + 1),
-        causation: Some(event_id),
-        silent: false,
-    };
-    kernel
-        .update_in(
-            tx,
-            &Actor::System,
-            tenant,
-            &shipment_entity,
-            &shipment_id.to_string(),
-            Map::from_iter([
-                ("delivered_at".into(), json!(occurred_at)),
-                ("delivery_evidence".into(), json!(evidence)),
-            ]),
-            &child,
-        )
-        .await?;
-    kernel
-        .act_in(
-            tx,
-            &Actor::System,
-            tenant,
-            &shipment_entity,
-            &shipment_id.to_string(),
-            "delivered",
-            &child,
         )
         .await?;
     Ok(true)
