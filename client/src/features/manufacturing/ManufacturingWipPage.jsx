@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
 import { localDate } from '../../lib/dates.js';
-import { api, dataPath, tenantPath } from '../../lib/api.js';
 import { fmtMoney, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { can } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
@@ -25,12 +24,10 @@ export default function ManufacturingWipPage() {
   const { report, accounts, boms, productionOrders, reworkOrders, productionDispositions,
     conditionalAcceptances, inspections, workCenters, products, warehouses, units,
     loading, loadError, load } = useManufacturingWipData(asOf);
-  const [offsetAccountId, setOffsetAccountId] = useState('');
-  const [memo, setMemo] = useState(t("Điều chỉnh đối chiếu WIP"));
-  const [adjustment, setAdjustment] = useState(null);
-  const [creating, setCreating] = useState(false);
   const {
     busy, error, setError, notice,
+    offsetAccountId, setOffsetAccountId, memo, setMemo, adjustment, creatingAdjustment,
+    createWipReconciliationDraft,
     editingBom, bomProduct, bomOutputQty, components, resetBom, editBom, saveBom,
     setBomProduct, setBomOutputQty, onComponentChange, onAddComponent, onRemoveComponent,
     selectedBom, orderValues, setOrderField, createProductionOrder, outputs, setOutputs, operateOrder,
@@ -52,24 +49,6 @@ export default function ManufacturingWipPage() {
   const baseUnitName = (productId) => {
     const baseUnit = products.get(productId)?.uom;
     return units.get(baseUnit)?.name || t(baseUnit ? 'đơn vị gốc' : 'chưa đặt đơn vị');
-  };
-  const createDraft = async () => {
-    setCreating(true);
-    setError('');
-    setAdjustment(null);
-    try {
-      const result = await api(tenantPath('/reports/manufacturing/wip/reconciliation-journals'), {
-        method: 'POST', body: { asOf, offsetAccountId, memo },
-      });
-      const journal = result.journal || null;
-      const id = journal?.id || result.journalId;
-      setAdjustment({ id, status: journal?.status || result.status || 'draft', existing: result.existing });
-      await load();
-    } catch (reason) {
-      setError(reason.message || t("Không tạo được bút toán nháp đối chiếu WIP."));
-    } finally {
-      setCreating(false);
-    }
   };
   return <div className="page">
     <div className="page-head"><div><h1>{t("WIP sản xuất")}</h1><p className="sub">{t("Đối chiếu giá trị vật tư theo lệnh sản xuất với số dư tài khoản 154 trên sổ cái.")}</p></div></div>
@@ -199,7 +178,7 @@ export default function ManufacturingWipPage() {
       offsetAccountId={offsetAccountId}
       memo={memo}
       adjustment={adjustment}
-      creating={creating}
+      creating={creatingAdjustment}
       canCreateAdjustment={can('accounting.journal_entry.create')}
       canReadAccounts={can('accounting.account.read')}
       formatNumber={fmtNumber}
@@ -209,7 +188,7 @@ export default function ManufacturingWipPage() {
       orderHref={(id) => recordHref('manufacturing.production_order', id)}
       onOffsetAccountChange={setOffsetAccountId}
       onMemoChange={setMemo}
-      onCreateDraft={createDraft}
+      onCreateDraft={() => createWipReconciliationDraft(asOf)}
       t={t}
     />
   </div>;

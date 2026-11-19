@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { localDate } from '../../../lib/dates.js';
-import { api, dataPath } from '../../../lib/api.js';
+import { api, dataPath, tenantPath } from '../../../lib/api.js';
 import { compareDecimals } from '../../../lib/decimal.js';
 import { isWithinFailedQty, productionOutputMatchesPlan, productionOutputQuantities, remainingFailedQty as getRemainingFailedQty } from '../domain/inspectionQuantities.js';
 
@@ -10,6 +10,10 @@ export function useManufacturingWipWorkflow({ boms, reworkOrders, productionDisp
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [offsetAccountId, setOffsetAccountId] = useState('');
+  const [memo, setMemo] = useState(t('Điều chỉnh đối chiếu WIP'));
+  const [adjustment, setAdjustment] = useState(null);
+  const [creatingAdjustment, setCreatingAdjustment] = useState(false);
   const [editingBom, setEditingBom] = useState('');
   const [bomProduct, setBomProduct] = useState('');
   const [bomOutputQty, setBomOutputQty] = useState('1');
@@ -146,6 +150,24 @@ export function useManufacturingWipWorkflow({ boms, reworkOrders, productionDisp
     } catch (reason) { await load(); setError(reason.message || t('Không gửi được đề nghị chấp nhận có điều kiện.')); }
     finally { setBusy(''); }
   };
+  const createWipReconciliationDraft = async (asOf) => {
+    setCreatingAdjustment(true);
+    setError('');
+    setAdjustment(null);
+    try {
+      const result = await api(tenantPath('/reports/manufacturing/wip/reconciliation-journals'), {
+        method: 'POST', body: { asOf, offsetAccountId, memo },
+      });
+      const journal = result.journal || null;
+      const id = journal?.id || result.journalId;
+      setAdjustment({ id, status: journal?.status || result.status || 'draft', existing: result.existing });
+      await load();
+    } catch (reason) {
+      setError(reason.message || t('Không tạo được bút toán nháp đối chiếu WIP.'));
+    } finally {
+      setCreatingAdjustment(false);
+    }
+  };
   const operateConditionalAcceptance = async (row, action) => {
     setBusy(`${row.id}:${action}`); setError(''); setNotice('');
     try {
@@ -169,6 +191,8 @@ export function useManufacturingWipWorkflow({ boms, reworkOrders, productionDisp
 
   return {
     busy, error, setError, notice, setNotice,
+    offsetAccountId, setOffsetAccountId, memo, setMemo, adjustment, creatingAdjustment,
+    createWipReconciliationDraft,
     editingBom, bomProduct, bomOutputQty, components, resetBom, editBom, saveBom,
     setBomProduct, setBomOutputQty,
     onComponentChange: (index, field, value) => setComponents((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: value, ...(field === 'product' ? { uom: '' } : {}) } : row)),
