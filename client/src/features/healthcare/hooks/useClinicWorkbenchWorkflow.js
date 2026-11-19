@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { api, dataPath } from '../../../lib/api.js';
+import { api, dataPath, session } from '../../../lib/api.js';
 import { compareDecimals } from '../../../lib/decimal.js';
+import { clearPersistentIdempotencyRequest, getPersistentIdempotencyRequest } from '../../../lib/idempotency.js';
 import { app, can } from '../../../lib/state.js';
 
 const newPrescriptionItem = () => ({ rowId: crypto.randomUUID(), product: '', qty: 1, dosage: '', uom: '' });
@@ -50,19 +51,34 @@ export function useClinicWorkbenchWorkflow({ load, selected, selectedId, patient
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
       let partyId = pendingPatientParty?.id || (patientRegistration.mode === 'existing' ? patientRegistration.party : '');
+      let partyRequest;
       if (!partyId) {
-        const party = await api(dataPath('master-data.party'), { method: 'POST', body: {
+        const partyPayload = {
           name: patientRegistration.name.trim(), kind: 'person', is_customer: true,
           phone: patientRegistration.phone.trim() || undefined, email: patientRegistration.email.trim() || undefined,
-        } });
+        };
+        const partyScope = `${session.current()?.tenantId || ''}:clinic.patient-registration:party`;
+        partyRequest = { scope: partyScope, ...getPersistentIdempotencyRequest(partyScope, JSON.stringify(partyPayload)) };
+        const party = await api(dataPath('master-data.party'), {
+          method: 'POST', body: partyPayload,
+          headers: { 'idempotency-key': partyRequest.key },
+        });
         partyId = party.id;
         setPendingPatientParty({ id: party.id, name: party.name || patientRegistration.name.trim() });
       }
-      const createdPatient = await api(dataPath('clinic.patient'), { method: 'POST', body: {
+      const patientPayload = {
         party: partyId, dob: patientRegistration.dob || undefined, gender: patientRegistration.gender || undefined,
         blood_type: patientRegistration.blood_type.trim() || undefined, allergies: patientRegistration.allergies.trim() || undefined,
         insurance_no: patientRegistration.insurance_no.trim() || undefined,
-      } });
+      };
+      const patientScope = `${session.current()?.tenantId || ''}:clinic.patient-registration:patient`;
+      const patientRequest = getPersistentIdempotencyRequest(patientScope, JSON.stringify(patientPayload));
+      const createdPatient = await api(dataPath('clinic.patient'), {
+        method: 'POST', body: patientPayload,
+        headers: { 'idempotency-key': patientRequest.key },
+      });
+      clearPersistentIdempotencyRequest(patientScope, patientRequest.fingerprint);
+      if (partyRequest) clearPersistentIdempotencyRequest(partyRequest.scope, partyRequest.fingerprint);
       await load(true); setPatientId(createdPatient.id);
       setPatientRegistration({ mode: can('master-data.party.create') ? 'new' : 'existing', party: '', name: '', phone: '', email: '', dob: '', gender: '', blood_type: '', allergies: '', insurance_no: '' });
       setPendingPatientParty(null); setNotice(t('Đã đăng ký hồ sơ bệnh nhân. Có thể tiếp nhận lượt khám ngay.'));

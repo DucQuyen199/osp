@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { api, dataPath } from '../../../lib/api.js';
+import { api, dataPath, session } from '../../../lib/api.js';
 import { compareDecimals } from '../../../lib/decimal.js';
+import { clearPersistentIdempotencyRequest, getPersistentIdempotencyRequest } from '../../../lib/idempotency.js';
 import { fmtMoney } from '../../../lib/i18n.js';
 
 export function useEcommerceOrderWorkflow({
@@ -50,10 +51,17 @@ export function useEcommerceOrderWorkflow({
     if (!cartLines.length) return;
     setBusy('create'); setError(''); setNotice('');
     try {
-      const created = await api(dataPath('ecommerce.web_order'), { method: 'POST', body: {
+      const payload = {
         party, storefront, channel, shipping_address: address.trim() || undefined,
         lines: cartLines.map(({ product, qty }) => ({ product: product.id, qty })),
-      } });
+      };
+      const scope = `${session.current()?.tenantId || ''}:ecommerce.web_order:create`;
+      const { key, fingerprint } = getPersistentIdempotencyRequest(scope, JSON.stringify(payload));
+      const created = await api(dataPath('ecommerce.web_order'), {
+        method: 'POST', body: payload,
+        headers: { 'idempotency-key': key },
+      });
+      clearPersistentIdempotencyRequest(scope, fingerprint);
       setQuantities({}); setAddress('');
       await load(true);
       setNotice(`${t('Đã tạo giỏ hàng')} ${String(created.id).slice(0, 8)} ${t('với giá theo gian hàng. Kiểm tra tổng tiền rồi đặt đơn.')}`);
