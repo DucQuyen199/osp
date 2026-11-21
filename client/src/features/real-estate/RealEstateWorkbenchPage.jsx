@@ -1,56 +1,25 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
-import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { localDate } from '../../lib/dates.js';
 import { fmtDate, fmtDateTime, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
-import { can, loadRefs, recordLabel, loadAllResponse, loadIndependentData } from '../../lib/state.js';
+import { can, recordLabel } from '../../lib/state.js';
 import realEstateEnglish from './real-estate.en.js';
 import PropertyInventoryTable from './components/PropertyInventoryTable.jsx';
 import SelectedPropertyWorkspace from './components/SelectedPropertyWorkspace.jsx';
 import { useRealEstateWorkflow } from './hooks/useRealEstateWorkflow.js';
+import { useRealEstateWorkbenchData } from './hooks/useRealEstateWorkbenchData.js';
 const t = (text) => uiTextWith(text, realEstateEnglish);
 const today = localDate;
-const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 export default function RealEstateWorkbenchPage() {
   useDocumentTitle(`${t('Sàn giao dịch và cho thuê')} · OSP Suite`);
-  const [properties, setProperties] = useState([]);
-  const [reservations, setReservations] = useState([]);
-  const [viewings, setViewings] = useState([]);
-  const [leases, setLeases] = useState([]);
-  const [rentCycles, setRentCycles] = useState([]);
-  const [invoices, setInvoices] = useState([]);
-  const [parties, setParties] = useState(new Map());
   const [selectedProperty, setSelectedProperty] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const latestRequest = useLatestRequest();
-  const load = useCallback(async (quiet = false) => {
-    const isLatest = latestRequest();
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const { data, errors } = await loadIndependentData({
-        properties: can('real-estate.property.read') ? loadAllResponse('real-estate.property') : Promise.resolve({ items: [] }),
-        reservations: can('real-estate.reservation.read') ? loadAllResponse('real-estate.reservation') : Promise.resolve({ items: [] }),
-        viewings: can('real-estate.viewing.read') ? loadAllResponse('real-estate.viewing') : Promise.resolve({ items: [] }),
-        leases: can('real-estate.lease.read') ? loadAllResponse('real-estate.lease') : Promise.resolve({ items: [] }),
-        rentCycles: can('real-estate.rent_cycle.read') ? loadAllResponse('real-estate.rent_cycle') : Promise.resolve({ items: [] }),
-        parties: can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        invoices: can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
-      }, {
-        properties: { items: [] }, reservations: { items: [] }, viewings: { items: [] }, leases: { items: [] },
-        rentCycles: { items: [] }, parties: new Map(), invoices: { items: [] },
-      });
-      const propertyRows = itemsOf(data.properties);
-      if (isLatest()) {
-        setProperties(propertyRows); setReservations(itemsOf(data.reservations)); setViewings(itemsOf(data.viewings));
-        setLeases(itemsOf(data.leases)); setRentCycles(itemsOf(data.rentCycles)); setInvoices(itemsOf(data.invoices)); setParties(data.parties);
-        setSelectedProperty((current) => propertyRows.some((row) => row.id === current) ? current : propertyRows[0]?.id || '');
-        if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được dữ liệu bất động sản.')).join(' · '));
-      }
-    } catch (reason) { if (isLatest()) setError(t(reason.message || 'Không tải được dữ liệu bất động sản.')); }
-    finally { if (isLatest()) setLoading(false); }
-  }, [latestRequest]);
-  useEffect(() => { load(); }, [load]);
+  const {
+    properties, reservations, viewings, leases, rentCycles, invoices, parties,
+    loading, error, setError, load,
+  } = useRealEstateWorkbenchData();
+  useEffect(() => {
+    setSelectedProperty((current) => properties.some((row) => row.id === current) ? current : properties[0]?.id || '');
+  }, [properties]);
   const propertyById = useMemo(() => new Map(properties.map((row) => [row.id, row])), [properties]);
   const selected = propertyById.get(selectedProperty);
   const workflow = useRealEstateWorkflow({ properties, parties, selectedProperty, load, setError });

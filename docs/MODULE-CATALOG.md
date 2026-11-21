@@ -40,7 +40,7 @@ Tổng: **51 module**, **210 loại dữ liệu**, **955 sự kiện**.
 | [`insurance`](#insurance) — Bảo hiểm | Module chuyên ngành | `master-data`, `accounting` |
 | [`lending`](#lending) — Cho vay / Tài chính vi mô | Module chuyên ngành | `master-data`, `accounting` |
 | [`lms`](#lms) — Đào tạo (LMS) | Nhân sự | `master-data` |
-| [`logistics`](#logistics) — Vận tải & giao hàng | Chuỗi cung ứng | `master-data`, `inventory` |
+| [`logistics`](#logistics) — Vận tải & giao hàng | Chuỗi cung ứng | `master-data`, `inventory`, `sales` |
 | [`loyalty`](#loyalty) — Khách hàng thân thiết | Bán hàng & khách hàng | `master-data` |
 | [`maintenance`](#maintenance) — Bảo trì | Chuỗi cung ứng | `asset`, `inventory` |
 | [`workflow-approval`](#workflow-approval) — Phê duyệt | Nền tảng dùng chung | — |

@@ -64,6 +64,18 @@ pub async fn handle_source_event(
     {
         return Ok(false);
     }
+    let order_lines = document
+        .get("lines")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let shippable_lines: Vec<_> = order_lines
+        .into_iter()
+        .filter(crate::modules::sales::is_shippable_line)
+        .collect();
+    if shippable_lines.is_empty() {
+        return Ok(false);
+    }
     let source_id = document.get("id").cloned().ok_or_else(|| {
         crate::error::ApiError::validation(
             event_type,
@@ -74,13 +86,13 @@ pub async fn handle_source_event(
     for (target, source) in [
         ("party", "party"),
         ("warehouse", "warehouse"),
-        ("lines", "lines"),
         ("destination", "shipping_address"),
     ] {
         if let Some(value) = document.get(source) {
             data.insert(target.into(), value.clone());
         }
     }
+    data.insert("lines".into(), Value::Array(shippable_lines));
     data.insert("source".into(), json!("sales_order"));
     data.insert("source_id".into(), source_id);
     let entity = kernel.ent(tenant, "logistics.shipment")?;

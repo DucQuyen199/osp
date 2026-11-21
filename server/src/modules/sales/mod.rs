@@ -5,7 +5,10 @@ mod persistence;
 mod reports;
 
 pub use application::{handle_source_event, prepare_document, preview_document, recalculate_lines};
-pub use domain::{validate, validate_action, validate_action_at, validate_remove, validate_update};
+pub use domain::{
+    has_shippable_lines, is_shippable_line, validate, validate_action, validate_action_at,
+    validate_remove, validate_update,
+};
 pub use persistence::validate_persistence;
 
 pub(crate) fn scheduled_jobs() -> Vec<crate::defs::JobSpec> {

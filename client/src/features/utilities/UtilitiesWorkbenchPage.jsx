@@ -1,14 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
-import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { localMonth } from '../../lib/dates.js';
 import { statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { estimateUtilityCharge } from './domain/utilityEstimate.js';
-import { can, loadRefs, recordLabel, loadAllResponse, loadIndependentData } from '../../lib/state.js';
+import { can, recordLabel } from '../../lib/state.js';
 import utilitiesEnglish from './utilities.en.js';
 import TariffTiersEditor from './components/TariffTiersEditor.jsx';
 import UtilityReadingsRegister from './components/UtilityReadingsRegister.jsx';
 import { useUtilitiesWorkflow } from './hooks/useUtilitiesWorkflow.js';
+import { useUtilitiesWorkbenchData } from './hooks/useUtilitiesWorkbenchData.js';
 const t = (text) => uiTextWith(text, utilitiesEnglish);
 const currentPeriod = localMonth;
 const MAX_TARIFF_TIERS = 20;
@@ -22,11 +22,6 @@ const nextPeriod = (period) => {
 const money = (value) => fmtNumber(String(value || 0), { maximumFractionDigits: 2 });
 export default function UtilitiesWorkbenchPage() {
   useDocumentTitle(t("Ghi chỉ số và hóa đơn tiện ích · OSP Suite"));
-  const [meters, setMeters] = useState([]);
-  const [readings, setReadings] = useState([]);
-  const [bills, setBills] = useState([]);
-  const [invoices, setInvoices] = useState([]);
-  const [parties, setParties] = useState(new Map());
   const [selectedMeter, setSelectedMeter] = useState('');
   const [meterForm, setMeterForm] = useState({ party: '', code: '', kind: 'electric', rate: '', fixed_charge: '0', tariff_tiers: [], opening_reading: '', address: '' });
   const [rateDraft, setRateDraft] = useState('');
@@ -34,32 +29,13 @@ export default function UtilitiesWorkbenchPage() {
   const [tariffTiersDraft, setTariffTiersDraft] = useState([]);
   const [period, setPeriod] = useState(currentPeriod());
   const [readingValue, setReadingValue] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const latestRequest = useLatestRequest();
-  const load = useCallback(async () => {
-    const isLatest = latestRequest();
-    setLoading(true); setError('');
-    try {
-      const { data, errors } = await loadIndependentData({
-        meters: can('utilities.meter.read') ? loadAllResponse('utilities.meter') : Promise.resolve({ items: [] }),
-        readings: can('utilities.meter_reading.read') ? loadAllResponse('utilities.meter_reading') : Promise.resolve({ items: [] }),
-        parties: can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        bills: can('utilities.utility_bill.read') ? loadAllResponse('utilities.utility_bill') : Promise.resolve({ items: [] }),
-        invoices: can('accounting.invoice.read') ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
-      }, { meters: { items: [] }, readings: { items: [] }, parties: new Map(), bills: { items: [] }, invoices: { items: [] } });
-      const meterItems = data.meters.items || [];
-      if (isLatest()) {
-        setMeters(meterItems); setReadings(data.readings.items || []); setParties(data.parties);
-        setBills(data.bills.items || []); setInvoices(data.invoices.items || []);
-        setSelectedMeter((current) => current && meterItems.some((x) => x.id === current) ? current : meterItems[0]?.id || '');
-        setMeterForm((current) => ({ ...current, party: current.party || [...data.parties.keys()][0] || '' }));
-        if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được dữ liệu công tơ.')).join(' · '));
-      }
-    } catch (reason) { if (isLatest()) setError(reason.message || t("Không tải được dữ liệu công tơ.")); }
-    finally { if (isLatest()) setLoading(false); }
-  }, [latestRequest]);
-  useEffect(() => { load(); }, [load]);
+  const {
+    meters, readings, bills, invoices, parties, loading, error, setError, load,
+  } = useUtilitiesWorkbenchData();
+  useEffect(() => {
+    setSelectedMeter((current) => current && meters.some((row) => row.id === current) ? current : meters[0]?.id || '');
+    setMeterForm((current) => ({ ...current, party: current.party || [...parties.keys()][0] || '' }));
+  }, [meters, parties]);
   const meter = meters.find((item) => item.id === selectedMeter);
   useEffect(() => {
     setRateDraft(meter?.rate == null ? '' : String(meter.rate));

@@ -7,6 +7,19 @@ fn decimal(value: &Value) -> Option<Decimal> {
     crate::money::decimal(value)
 }
 
+pub fn is_shippable_line(line: &Value) -> bool {
+    !matches!(
+        line.get("kind").and_then(Value::as_str),
+        Some("service" | "digital")
+    )
+}
+
+pub fn has_shippable_lines(lines: &Value) -> bool {
+    lines
+        .as_array()
+        .is_some_and(|lines| lines.iter().any(is_shippable_line))
+}
+
 pub fn validate(entity: &str, document: &Value) -> Vec<String> {
     if entity == "price_list" {
         let Some(items) = document.get("items").and_then(Value::as_array) else {

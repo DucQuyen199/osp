@@ -1,6 +1,7 @@
 //! Order uniqueness, credit, stock commitments, and delivery-state checks.
 use super::super::application::{all_order_quantities_delivered, has_delivered_order_quantities};
 use super::decimal_column;
+use crate::modules::sales::has_shippable_lines;
 use crate::{db::Tx, error::R, kernel::Tenant, money};
 use rust_decimal::Decimal;
 use serde_json::Value;
@@ -338,6 +339,7 @@ pub(super) async fn validate(
             &[&tenant.id, &order_id.to_string()],
         ).await?;
         let requires_shipment = tenant.has_module("logistics")
+            && has_shippable_lines(document.get("lines").unwrap_or(&Value::Null))
             && document
                 .get("shipping_address")
                 .and_then(Value::as_str)
