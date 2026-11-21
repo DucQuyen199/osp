@@ -232,6 +232,11 @@
             "readOnly": true,
             "type": "string"
           },
+          "next_attempt_at": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
           "statement": {
             "description": "Tham chiếu tới accounting.bank_statement",
             "format": "uuid",
@@ -270,6 +275,11 @@
             "type": "string"
           },
           "last_success_at": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "next_attempt_at": {
             "format": "date-time",
             "readOnly": true,
             "type": "string"
@@ -4944,6 +4954,107 @@
         },
         "required": [
           "project"
+        ],
+        "type": "object"
+      },
+      "construction_material_request": {
+        "description": "Yêu cầu mua vật tư theo BOQ",
+        "properties": {
+          "boq": {
+            "description": "Tham chiếu tới construction.boq",
+            "format": "uuid",
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "purchase_requisition": {
+            "description": "Tham chiếu tới purchasing.purchase_requisition",
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "requested_by": {
+            "type": "string"
+          },
+          "sourcing_method": {
+            "enum": [
+              "direct",
+              "competitive"
+            ],
+            "type": "string"
+          },
+          "supplier": {
+            "description": "Tham chiếu tới master-data.party",
+            "format": "uuid",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "warehouse": {
+            "description": "Tham chiếu tới inventory.warehouse",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "construction_material_requestInput": {
+        "additionalProperties": false,
+        "description": "Yêu cầu mua vật tư theo BOQ (dữ liệu gửi lên)",
+        "properties": {
+          "boq": {
+            "description": "Tham chiếu tới construction.boq",
+            "format": "uuid",
+            "type": "string"
+          },
+          "purchase_requisition": {
+            "description": "Tham chiếu tới purchasing.purchase_requisition",
+            "format": "uuid",
+            "readOnly": true,
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "requested_by": {
+            "type": "string"
+          },
+          "sourcing_method": {
+            "enum": [
+              "direct",
+              "competitive"
+            ],
+            "type": "string"
+          },
+          "supplier": {
+            "description": "Tham chiếu tới master-data.party",
+            "format": "uuid",
+            "type": "string"
+          },
+          "warehouse": {
+            "description": "Tham chiếu tới inventory.warehouse",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "boq",
+          "warehouse",
+          "sourcing_method"
         ],
         "type": "object"
       },
@@ -10175,6 +10286,14 @@
             "readOnly": true,
             "type": "string"
           },
+          "route": {
+            "description": "Tham chiếu tới logistics.route",
+            "format": "uuid",
+            "type": "string"
+          },
+          "route_stop_number": {
+            "type": "number"
+          },
           "short_delivery_reason": {
             "readOnly": true,
             "type": "string"
@@ -10270,6 +10389,14 @@
             "format": "uuid",
             "readOnly": true,
             "type": "string"
+          },
+          "route": {
+            "description": "Tham chiếu tới logistics.route",
+            "format": "uuid",
+            "type": "string"
+          },
+          "route_stop_number": {
+            "type": "number"
           },
           "short_delivery_reason": {
             "readOnly": true,
@@ -11393,6 +11520,11 @@
           "capacity_per_day": {
             "type": "number"
           },
+          "capacity_uom": {
+            "description": "Tham chiếu tới master-data.uom",
+            "format": "uuid",
+            "type": "string"
+          },
           "createdAt": {
             "format": "date-time",
             "readOnly": true,
@@ -11420,6 +11552,11 @@
         "properties": {
           "capacity_per_day": {
             "type": "number"
+          },
+          "capacity_uom": {
+            "description": "Tham chiếu tới master-data.uom",
+            "format": "uuid",
+            "type": "string"
           },
           "name": {
             "type": "string"
@@ -14965,6 +15102,14 @@
           "requested_by": {
             "type": "string"
           },
+          "source": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "source_id": {
+            "readOnly": true,
+            "type": "string"
+          },
           "sourcing_method": {
             "enum": [
               "direct",
@@ -14978,7 +15123,8 @@
               "rejected",
               "submitted",
               "approved",
-              "sourced"
+              "sourced",
+              "cancelled"
             ],
             "readOnly": true,
             "type": "string"
@@ -15017,6 +15163,14 @@
             "type": "string"
           },
           "requested_by": {
+            "type": "string"
+          },
+          "source": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "source_id": {
+            "readOnly": true,
             "type": "string"
           },
           "sourcing_method": {
@@ -58049,6 +58203,479 @@
           }
         ],
         "summary": "Dự toán (BOQ): superseded (approved → superseded)",
+        "tags": [
+          "construction"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/construction/material_request": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Tìm văn bản trong các trường chuỗi",
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dir",
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Lọc bằng nhau theo bất kỳ trường nào, ví dụ ?status=draft",
+            "in": "query",
+            "name": "<field>",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "$ref": "#/components/schemas/construction_material_request"
+                      },
+                      "type": "array"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Danh sách Yêu cầu mua vật tư theo BOQ",
+        "tags": [
+          "construction"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Khóa retry cho thao tác tạo; cùng khóa/cùng nội dung trả lại phản hồi đã lưu trong 30 ngày.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^[!-~]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/construction_material_requestInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/construction_material_request"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Idempotency-Key đã được dùng với nội dung khác"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Dữ liệu không hợp lệ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tạo Yêu cầu mua vật tư theo BOQ",
+        "tags": [
+          "construction"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/construction/material_request/{id}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Đã xóa"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Đang được tham chiếu"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Xóa Yêu cầu mua vật tư theo BOQ",
+        "tags": [
+          "construction"
+        ]
+      },
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/construction_material_request"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Xem Yêu cầu mua vật tư theo BOQ",
+        "tags": [
+          "construction"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/construction_material_requestInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/construction_material_request"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Dữ liệu không hợp lệ"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sửa Yêu cầu mua vật tư theo BOQ",
         "tags": [
           "construction"
         ]
@@ -129080,6 +129707,155 @@
         ]
       }
     },
+    "/api/t/{tenantId}/data/pos/cash_movement/create-and-act/posted": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "amount": {
+                    "oneOf": [
+                      {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      },
+                      {
+                        "pattern": "^[0-9]+(?:\\.[0-9]+)?$",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "direction": {
+                    "enum": [
+                      "cash_in",
+                      "cash_out"
+                    ],
+                    "type": "string"
+                  },
+                  "offset_account": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "reason": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "session": {
+                    "format": "uuid",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "session",
+                  "direction",
+                  "amount",
+                  "offset_account",
+                  "reason"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Cash movement and accounting posting committed atomically; retries with the same idempotency key and body return the committed result"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Missing or invalid Idempotency-Key"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Idempotency key reused with different request, or the cash session is closed"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Invalid amount, reason, session, or offset account"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Atomically create and post a POS cash movement",
+        "tags": [
+          "retail",
+          "accounting"
+        ]
+      }
+    },
     "/api/t/{tenantId}/data/pos/cash_movement/{id}": {
       "delete": {
         "parameters": [
@@ -136383,6 +137159,7 @@
             "schema": {
               "enum": [
                 "approved",
+                "cancelled",
                 "rejected",
                 "sourced",
                 "submitted"
@@ -136830,6 +137607,91 @@
           }
         ],
         "summary": "Đề nghị mua: approved (submitted → approved)",
+        "tags": [
+          "purchasing"
+        ]
+      }
+    },
+    "/api/t/{tenantId}/data/purchasing/purchase_requisition/{id}/cancelled": {
+      "post": {
+        "description": "Phát sự kiện `purchasing.purchase_requisition.cancelled` cho các module khác phản ứng.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/purchasing_purchase_requisition"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Thiếu/sai token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không đủ quyền"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Không tìm thấy hoặc module chưa bật"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Sai trạng thái"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Đề nghị mua: cancelled (draft|rejected → cancelled)",
         "tags": [
           "purchasing"
         ]
@@ -170709,6 +171571,14 @@
       "name": "project"
     },
     {
+      "description": "Quản lý chất lượng",
+      "name": "quality"
+    },
+    {
+      "description": "Mua hàng",
+      "name": "purchasing"
+    },
+    {
       "description": "Xây dựng",
       "name": "construction"
     },
@@ -170781,10 +171651,6 @@
       "name": "maintenance"
     },
     {
-      "description": "Quản lý chất lượng",
-      "name": "quality"
-    },
-    {
       "description": "Phê duyệt",
       "name": "workflow-approval"
     },
@@ -170815,10 +171681,6 @@
     {
       "description": "Nhà thuốc",
       "name": "pharmacy"
-    },
-    {
-      "description": "Mua hàng",
-      "name": "purchasing"
     },
     {
       "description": "Bất động sản",

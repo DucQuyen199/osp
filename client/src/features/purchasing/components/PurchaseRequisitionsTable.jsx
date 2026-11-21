@@ -31,6 +31,7 @@ export default function PurchaseRequisitionsTable({
           <div className="row wrap">
             {['draft', 'rejected'].includes(row.status) && can('purchasing.purchase_requisition.update') && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => onEdit(row)}>{uiText('Sửa')}</button>}
             {['draft', 'rejected'].includes(row.status) && can('purchasing.purchase_requisition.submitted') && <button className="btn btn-secondary btn-sm" disabled={Boolean(busy)} onClick={() => onAction(row, 'submitted')}>{uiText('Gửi duyệt')}</button>}
+            {['draft', 'rejected'].includes(row.status) && can('purchasing.purchase_requisition.cancelled') && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => onAction(row, 'cancelled')}>{uiText('Hủy')}</button>}
             {row.status === 'submitted' && !workflowApproval && can('purchasing.purchase_requisition.approved') && <>
               <button className="btn btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => onAction(row, 'approved')}>{uiText('Duyệt')}</button>
               {can('purchasing.purchase_requisition.rejected') && <button className="btn btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => onAction(row, 'rejected')}>{uiText('Từ chối')}</button>}

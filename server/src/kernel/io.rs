@@ -251,6 +251,15 @@ impl Kernel {
         let ent = self.ent(t, qname)?;
         self.authorize(t, actor, "tenant.import")?;
         self.authorize(t, actor, &format!("{qname}.create"))?;
+        if qname == "construction.material_request" {
+            self.authorize(t, actor, "purchasing.purchase_requisition.create")?;
+            if !fire_events {
+                return Err(ApiError::validation(
+                    qname,
+                    vec!["Importing material requests requires source events so the linked purchase requisition is created atomically".into()],
+                ));
+            }
+        }
         let canonical = match &rows_in {
             ImportInput::Rows(rows) => serde_json::to_vec(&(qname, fire_events, "rows", rows)),
             ImportInput::Csv(csv) => serde_json::to_vec(&(qname, fire_events, "csv", csv)),

@@ -1,6 +1,7 @@
 //! Tenant-scoped persistence policies for construction records.
 mod boq;
 mod claim;
+mod material_request;
 mod site;
 mod subcontract;
 
@@ -27,6 +28,9 @@ pub async fn validate_persistence(
         "subcontract" => subcontract::validate_subcontract(tx, tenant, action, document).await,
         "progress_claim" => claim::validate_claim(tx, tenant, action, document).await,
         "site_diary" => site::validate_diary(tx, tenant, action, document).await,
+        "material_request" => {
+            material_request::validate_material_request(tx, tenant, action, document).await
+        }
         _ => Ok(Vec::new()),
     }
 }

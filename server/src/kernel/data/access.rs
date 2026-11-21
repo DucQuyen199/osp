@@ -50,6 +50,9 @@ impl Kernel {
     pub async fn create(&self, actor: &Actor, t: &Tenant, qname: &str, data: Obj) -> R<Value> {
         let ent = self.ent(t, qname)?;
         self.authorize(t, actor, &format!("{qname}.create"))?;
+        if qname == "construction.material_request" {
+            self.authorize(t, actor, "purchasing.purchase_requisition.create")?;
+        }
         let mut conn = self.pool.get().await?;
         let tx = Tx::begin(&mut conn, &t.id, true).await?;
         let out = self
@@ -74,6 +77,9 @@ impl Kernel {
     ) -> R<Value> {
         let ent = self.ent(t, qname)?;
         self.authorize(t, actor, &format!("{qname}.create"))?;
+        if qname == "construction.material_request" {
+            self.authorize(t, actor, "purchasing.purchase_requisition.create")?;
+        }
         let canonical =
             serde_json::to_vec(&data).map_err(|error| ApiError::internal(error.to_string()))?;
         let request_hash = hex::encode(sha2::Sha256::digest(canonical));

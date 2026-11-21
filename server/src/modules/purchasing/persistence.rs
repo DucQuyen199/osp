@@ -6,6 +6,7 @@ mod supplier_invoices;
 use crate::{db::Tx, error::R, kernel::Tenant, money};
 use rust_decimal::Decimal;
 use serde_json::Value;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 pub(super) fn purchasing_quantity_error() -> crate::error::ApiError {
@@ -36,6 +37,49 @@ pub async fn validate_persistence(
     action: &str,
     document: &Value,
 ) -> R<Vec<String>> {
+    if entity == "purchase_requisition"
+        && matches!(action, "created" | "updated" | "submitted" | "approved")
+        && document.get("source").and_then(Value::as_str) == Some("construction_material_request")
+    {
+        let errors = validate_construction_requisition_lines(tx, tenant, action, document).await?;
+        if !errors.is_empty() {
+            return Ok(errors);
+        }
+    }
+    if entity == "purchase_requisition" && action == "created" {
+        let source = document.get("source").and_then(Value::as_str);
+        let source_id = document.get("source_id").and_then(Value::as_str);
+        match (source, source_id) {
+            (None, None) => {}
+            (Some("construction_material_request"), Some(source_id)) => {
+                let Some(source_id) = Uuid::parse_str(source_id).ok() else {
+                    return Ok(vec!["Mã yêu cầu vật tư xây dựng không hợp lệ".into()]);
+                };
+                let source_request = tx
+                    .query_opt(
+                        "SELECT warehouse FROM construction__material_request WHERE tenant_id=$1 AND id=$2 FOR UPDATE",
+                        &[&tenant.id, &source_id],
+                    )
+                    .await?;
+                let Some(source_request) = source_request else {
+                    return Ok(vec![
+                        "Yêu cầu vật tư xây dựng không tồn tại trong doanh nghiệp".into(),
+                    ]);
+                };
+                let source_warehouse: Option<Uuid> = source_request.get(0);
+                let request_warehouse = document
+                    .get("warehouse")
+                    .and_then(Value::as_str)
+                    .and_then(|value| Uuid::parse_str(value).ok());
+                if source_warehouse != request_warehouse {
+                    return Ok(vec![
+                        "Kho đề nghị mua phải khớp với yêu cầu vật tư xây dựng".into(),
+                    ]);
+                }
+            }
+            _ => return Ok(vec!["Nguồn liên kết đề nghị mua không hợp lệ".into()]),
+        }
+    }
     if entity == "rfq" {
         return rfqs::validate(tx, tenant, action, document).await;
     }
@@ -219,4 +263,115 @@ pub async fn validate_persistence(
                 .into(),
         ])
     }
+}
+
+async fn validate_construction_requisition_lines(
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    action: &str,
+    document: &Value,
+) -> R<Vec<String>> {
+    let Some(source_id) = document
+        .get("source_id")
+        .and_then(Value::as_str)
+        .and_then(|value| Uuid::parse_str(value).ok())
+    else {
+        return Ok(vec!["Yêu cầu mua vật tư xây dựng không hợp lệ".into()]);
+    };
+    let Some(row) = tx
+        .query_opt(
+            "SELECT mr.warehouse, boq.items, boq.status FROM construction__material_request mr JOIN construction__boq boq ON boq.tenant_id=mr.tenant_id AND boq.id=mr.boq WHERE mr.tenant_id=$1 AND mr.id=$2 FOR SHARE OF mr, boq",
+            &[&tenant.id, &source_id],
+        )
+        .await?
+    else {
+        return Ok(vec!["Không tìm thấy BOQ nguồn của đề nghị mua vật tư".into()]);
+    };
+    let source_warehouse: Option<Uuid> = row.get(0);
+    let source_boq_status: String = row.get(2);
+    if matches!(action, "submitted" | "approved") && source_boq_status != "approved" {
+        return Ok(vec![
+            "Chỉ gửi duyệt đề nghị mua vật tư từ baseline BOQ hiện hành".into(),
+        ]);
+    }
+    let request_warehouse = document
+        .get("warehouse")
+        .and_then(Value::as_str)
+        .and_then(|value| Uuid::parse_str(value).ok());
+    if source_warehouse != request_warehouse {
+        return Ok(vec![
+            "Kho nhận phải khớp với yêu cầu vật tư xây dựng".into(),
+        ]);
+    }
+    let source_items: Value = row.get(1);
+    let mut allowed: HashMap<(Uuid, Uuid), Decimal> = HashMap::new();
+    for item in source_items.as_array().into_iter().flatten() {
+        let (Some(product), Some(uom), Some(qty)) = (
+            item.get("product")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok()),
+            item.get("uom")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok()),
+            item.get("qty").and_then(money::decimal),
+        ) else {
+            continue;
+        };
+        let Some(next) = allowed
+            .get(&(product, uom))
+            .copied()
+            .unwrap_or_default()
+            .checked_add(qty)
+        else {
+            return Ok(vec![
+                "Tổng khối lượng BOQ vượt phạm vi số được hỗ trợ".into(),
+            ]);
+        };
+        allowed.insert((product, uom), next);
+    }
+    let lines = document.get("lines").and_then(Value::as_array);
+    let Some(lines) = lines.filter(|lines| !lines.is_empty()) else {
+        return Ok(vec!["Đề nghị mua vật tư cần ít nhất một dòng hàng".into()]);
+    };
+    let mut requested: HashMap<(Uuid, Uuid), Decimal> = HashMap::new();
+    for line in lines {
+        let (Some(product), Some(uom), Some(qty)) = (
+            line.get("product")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok()),
+            line.get("uom")
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok()),
+            line.get("qty").and_then(money::decimal),
+        ) else {
+            return Ok(vec![
+                "Dòng đề nghị mua cần sản phẩm, đơn vị và số lượng hợp lệ".into(),
+            ]);
+        };
+        if qty <= Decimal::ZERO {
+            return Ok(vec!["Dòng đề nghị mua cần số lượng lớn hơn 0".into()]);
+        }
+        let key = (product, uom);
+        let Some(limit) = allowed.get(&key) else {
+            return Ok(vec!["Dòng đề nghị mua không thuộc BOQ đã duyệt".into()]);
+        };
+        let Some(next) = requested
+            .get(&key)
+            .copied()
+            .unwrap_or_default()
+            .checked_add(qty)
+        else {
+            return Ok(vec![
+                "Tổng số lượng đề nghị mua vượt phạm vi số được hỗ trợ".into(),
+            ]);
+        };
+        if next <= *limit {
+            requested.insert(key, next);
+        } else {
+            return Ok(vec![
+                "Số lượng đề nghị mua vượt khối lượng BOQ đã duyệt".into(),
+            ]);
+        }
+    }
+    Ok(Vec::new())
 }

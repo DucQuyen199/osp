@@ -509,7 +509,11 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
         "purchase_return" => status != "draft",
         "purchase_receipt" => status != "draft",
         "supplier_invoice" => status != "draft",
-        "purchase_requisition" => !matches!(status, "draft" | "rejected"),
+        "purchase_requisition" => {
+            !matches!(status, "draft" | "rejected")
+                || document.get("source").and_then(Value::as_str)
+                    == Some("construction_material_request")
+        }
         "purchase_order" => {
             !matches!(status, "draft" | "cancelled") || document.get("source").is_some()
         }

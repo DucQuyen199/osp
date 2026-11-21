@@ -6,7 +6,8 @@
   "version": "0.1.0",
   "depends": [
     "project",
-    "accounting"
+    "accounting",
+    "purchasing"
   ],
   "core": false,
   "entities": [
@@ -68,6 +69,22 @@
           "superseded": { "from": ["approved"], "to": "superseded" }
         }
       },
+      "computed": {},
+      "constraints": []
+    },
+    {
+      "name": "material_request",
+      "label": "Yêu cầu mua vật tư theo BOQ",
+      "fields": [
+        { "name": "boq", "type": "ref", "required": true, "ref": "construction.boq" },
+        { "name": "warehouse", "type": "ref", "required": true, "ref": "inventory.warehouse" },
+        { "name": "sourcing_method", "type": "enum", "required": true, "options": ["direct", "competitive"] },
+        { "name": "supplier", "type": "ref", "required": false, "ref": "master-data.party" },
+        { "name": "requested_by", "type": "string", "required": false },
+        { "name": "reason", "type": "text", "required": false },
+        { "name": "purchase_requisition", "type": "ref", "required": false, "ref": "purchasing.purchase_requisition", "system": true }
+      ],
+      "states": null,
       "computed": {},
       "constraints": []
     },

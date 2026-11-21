@@ -1539,6 +1539,15 @@ pub fn build(reg: &Registry) -> Value {
         } }),
     );
     paths.insert(
+        "/api/t/{tenantId}/data/pos/cash_movement/create-and-act/posted".into(),
+        json!({ "post": {
+            "tags": ["retail", "accounting"], "summary": "Atomically create and post a POS cash movement", "security": sec,
+            "parameters": [tid, { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "minLength": 1, "maxLength": 200 } }],
+            "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["session", "direction", "amount", "offset_account", "reason"], "properties": { "session": { "type": "string", "format": "uuid" }, "direction": { "type": "string", "enum": ["cash_in", "cash_out"] }, "amount": { "oneOf": [{ "type": "number", "exclusiveMinimum": 0 }, { "type": "string", "pattern": "^[0-9]+(?:\\.[0-9]+)?$" }] }, "offset_account": { "type": "string", "format": "uuid" }, "reason": { "type": "string", "minLength": 1 } } } } } },
+            "responses": with_common(Map::from_iter([("201".to_string(), json!({ "description": "Cash movement and accounting posting committed atomically; retries with the same idempotency key and body return the committed result" })), ("400".to_string(), err("Missing or invalid Idempotency-Key")), ("403".to_string(), err("Requires pos.cash_movement.create and pos.cash_movement.posted")), ("409".to_string(), err("Idempotency key reused with different request, or the cash session is closed")), ("422".to_string(), err("Invalid amount, reason, session, or offset account"))]))
+        } }),
+    );
+    paths.insert(
         "/api/t/{tenantId}/reports/inventory/replenishment/purchase-requisitions".into(),
         json!({ "post": {
             "tags": ["inventory", "purchasing"], "summary": "Create a draft purchase requisition from current replenishment suggestions", "security": sec,

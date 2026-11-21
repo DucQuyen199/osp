@@ -9,7 +9,7 @@ Mỗi gói ngành chỉ là **cấu hình** (module nào bật, thuật ngữ, t
 ## Nông nghiệp - Thủy sản (`agriculture`)
 Trang trại, hợp tác xã, chế biến nông sản, truy xuất nguồn gốc.
 
-- **Module (16):** `master-data`, `hrm`, `integration-hub`, `accounting`, `inventory`, `agriculture`, `communication`, `bi`, `sales`, `einvoice`, `expense`, `logistics`, `quality`, `payroll`, `purchasing`, `recruitment`
+- **Module (16):** `master-data`, `hrm`, `integration-hub`, `accounting`, `inventory`, `agriculture`, `communication`, `bi`, `quality`, `purchasing`, `sales`, `einvoice`, `expense`, `logistics`, `payroll`, `recruitment`
 - **Thuật ngữ:** `master-data.party` = Đối tác thu mua/bán; `master-data.product` = Nông sản/Vật tư nông nghiệp
 - **Trường mở rộng:** `master-data.product`: vietgap_code, origin
 - **Vai trò riêng:** Quản lý khóa sổ kế toán, Kế toán duyệt thu chi, Nhân viên thu chi điều chỉnh, Nhân viên đối soát ngân hàng, Quản lý duyệt và chi trả chi phí, Chuyên viên đề nghị chi, Quản lý trang trại, Quản lý tuyển dụng, Quản lý nhân sự, Chuyên viên nhân sự, Quản lý duyệt kiểm kê, Nhân viên kiểm kê kho, Quản lý phê duyệt và chi lương, Chuyên viên tiền lương, Quản lý chính sách lương và khoản nộp, Quản lý phê duyệt mua hàng, Nhân viên mua hàng, Chuyên viên tuyển dụng, Quản lý duyệt trả hàng, Nhân viên xử lý trả hàng
@@ -20,7 +20,7 @@ Trang trại, hợp tác xã, chế biến nông sản, truy xuất nguồn gố
 ## Ô tô - Xe máy (`automotive`)
 Đại lý, showroom, garage, trung tâm bảo hành.
 
-- **Module (18):** `master-data`, `hrm`, `integration-hub`, `accounting`, `inventory`, `auto-service`, `communication`, `bi`, `booking`, `sales`, `crm`, `einvoice`, `expense`, `loyalty`, `quality`, `payroll`, `purchasing`, `recruitment`
+- **Module (18):** `master-data`, `hrm`, `integration-hub`, `accounting`, `inventory`, `auto-service`, `communication`, `bi`, `booking`, `quality`, `purchasing`, `sales`, `crm`, `einvoice`, `expense`, `loyalty`, `payroll`, `recruitment`
 - **Thuật ngữ:** `auto-service.vehicle` = Xe; `master-data.party` = Chủ xe; `master-data.product` = Phụ tùng/Dịch vụ
 - **Trường mở rộng:** `master-data.product`: oem_code, compatible_models
 - **Vai trò riêng:** Quản lý khóa sổ kế toán, Kế toán duyệt thu chi, Nhân viên thu chi điều chỉnh, Nhân viên đối soát ngân hàng, Quản lý duyệt và chi trả chi phí, Chuyên viên đề nghị chi, Quản lý tuyển dụng, Quản lý nhân sự, Chuyên viên nhân sự, Quản lý duyệt kiểm kê, Nhân viên kiểm kê kho, Kỹ thuật viên, Quản lý phê duyệt và chi lương, Chuyên viên tiền lương, Quản lý chính sách lương và khoản nộp, Quản lý phê duyệt mua hàng, Nhân viên mua hàng, Chuyên viên tuyển dụng, Cố vấn dịch vụ
@@ -42,7 +42,7 @@ Spa, salon, thẩm mỹ, phòng gym, yoga, trung tâm thể thao.
 ## Xây dựng - Nội thất (`construction`)
 Nhà thầu, thi công, thiết kế - nội thất.
 
-- **Module (20):** `master-data`, `hrm`, `integration-hub`, `accounting`, `inventory`, `asset`, `communication`, `bi`, `project`, `construction`, `contract`, `document`, `einvoice`, `expense`, `maintenance`, `quality`, `workflow-approval`, `payroll`, `purchasing`, `recruitment`
+- **Module (20):** `master-data`, `hrm`, `integration-hub`, `accounting`, `inventory`, `asset`, `communication`, `bi`, `project`, `quality`, `purchasing`, `construction`, `contract`, `document`, `einvoice`, `expense`, `maintenance`, `workflow-approval`, `payroll`, `recruitment`
 - **Thuật ngữ:** `master-data.party` = Chủ đầu tư/Khách hàng; `master-data.product` = Vật tư xây dựng; `project.project` = Công trình
 - **Trường mở rộng:** `master-data.product`: norm_code, brand
 - **Vai trò riêng:** Quản lý khóa sổ kế toán, Kế toán duyệt thu chi, Nhân viên thu chi điều chỉnh, Nhân viên đối soát ngân hàng, Dự toán, Quản lý duyệt và chi trả chi phí, Chuyên viên đề nghị chi, Quản lý tuyển dụng, Quản lý nhân sự, Chuyên viên nhân sự, Quản lý duyệt kiểm kê, Nhân viên kiểm kê kho, Quản lý bảo trì, Kỹ thuật viên bảo trì, Quản lý phê duyệt và chi lương, Chuyên viên tiền lương, Quản lý chính sách lương và khoản nộp, Quản lý phê duyệt mua hàng, Nhân viên mua hàng, Quản lý dự án, Chuyên viên tuyển dụng, Chỉ huy công trường
@@ -53,7 +53,7 @@ Nhà thầu, thi công, thiết kế - nội thất.
 ## Thương mại điện tử (`ecommerce`)
 Shop online, thương hiệu D2C, bán trên sàn.
 
-- **Module (21):** `master-data`, `hrm`, `integration-hub`, `accounting`, `inventory`, `communication`, `bi`, `sales`, `crm`, `ecommerce`, `einvoice`, `expense`, `helpdesk`, `logistics`, `loyalty`, `quality`, `marketing`, `payments`, `payroll`, `purchasing`, `recruitment`
+- **Module (21):** `master-data`, `hrm`, `integration-hub`, `accounting`, `inventory`, `communication`, `bi`, `quality`, `purchasing`, `sales`, `crm`, `ecommerce`, `einvoice`, `expense`, `helpdesk`, `logistics`, `loyalty`, `marketing`, `payments`, `payroll`, `recruitment`
 - **Thuật ngữ:** `ecommerce.web_order` = Đơn online; `master-data.party` = Khách hàng; `master-data.product` = Sản phẩm
 - **Trường mở rộng:** `master-data.product`: seo_title, weight_g, marketplace_sku
 - **Vai trò riêng:** Quản lý khóa sổ kế toán, Kế toán duyệt thu chi, Nhân viên thu chi điều chỉnh, Nhân viên đối soát ngân hàng, CSKH, Quản lý duyệt và chi trả chi phí, Chuyên viên đề nghị chi, Đóng gói - Giao hàng, Quản lý tuyển dụng, Quản lý nhân sự, Chuyên viên nhân sự, Quản lý duyệt kiểm kê, Nhân viên kiểm kê kho, Vận hành đơn online, Quản lý phê duyệt và chi lương, Chuyên viên tiền lương, Quản lý chính sách lương và khoản nộp, Quản lý phê duyệt mua hàng, Nhân viên mua hàng, Chuyên viên tuyển dụng, Quản lý duyệt trả hàng, Nhân viên xử lý trả hàng
@@ -97,7 +97,7 @@ Công ty tài chính tiêu dùng, tín dụng vi mô, đại lý bảo hiểm.
 ## Nhà hàng - Quán cà phê (F&B) (`fnb`)
 Nhà hàng, quán cà phê, chuỗi đồ uống, bếp trung tâm.
 
-- **Module (17):** `master-data`, `hrm`, `integration-hub`, `accounting`, `inventory`, `communication`, `bi`, `booking`, `einvoice`, `expense`, `loyalty`, `quality`, `payroll`, `pos`, `purchasing`, `recruitment`, `restaurant`
+- **Module (17):** `master-data`, `hrm`, `integration-hub`, `accounting`, `inventory`, `communication`, `bi`, `booking`, `quality`, `purchasing`, `einvoice`, `expense`, `loyalty`, `payroll`, `pos`, `recruitment`, `restaurant`
 - **Thuật ngữ:** `master-data.party` = Thực khách; `master-data.product` = Món/Nguyên liệu; `restaurant.table_order` = Order bàn
 - **Trường mở rộng:** `master-data.product`: allergens, prep_time_min
 - **Vai trò riêng:** Quản lý khóa sổ kế toán, Kế toán duyệt thu chi, Nhân viên thu chi điều chỉnh, Nhân viên đối soát ngân hàng, Thu ngân, Quản lý duyệt và chi trả chi phí, Chuyên viên đề nghị chi, Quản lý tuyển dụng, Quản lý nhân sự, Chuyên viên nhân sự, Quản lý duyệt kiểm kê, Nhân viên kiểm kê kho, Bếp, Quản lý phê duyệt và chi lương, Chuyên viên tiền lương, Quản lý chính sách lương và khoản nộp, Quản lý phê duyệt mua hàng, Nhân viên mua hàng, Chuyên viên tuyển dụng, Phục vụ
@@ -152,7 +152,7 @@ Công ty vận tải, giao nhận, kho vận, chuyển phát.
 ## Sản xuất (`manufacturing`)
 Nhà máy, xưởng sản xuất, gia công, lắp ráp.
 
-- **Module (19):** `master-data`, `hrm`, `integration-hub`, `accounting`, `inventory`, `asset`, `communication`, `bi`, `sales`, `crm`, `einvoice`, `expense`, `maintenance`, `quality`, `workflow-approval`, `manufacturing`, `payroll`, `purchasing`, `recruitment`
+- **Module (19):** `master-data`, `hrm`, `integration-hub`, `accounting`, `inventory`, `asset`, `communication`, `bi`, `quality`, `purchasing`, `sales`, `crm`, `einvoice`, `expense`, `maintenance`, `workflow-approval`, `manufacturing`, `payroll`, `recruitment`
 - **Thuật ngữ:** `master-data.party` = Khách hàng; `master-data.product` = Vật tư/Thành phẩm
 - **Trường mở rộng:** `master-data.product`: drawing_no, spec, shelf_life_days
 - **Vai trò riêng:** Quản lý khóa sổ kế toán, Kế toán duyệt thu chi, Nhân viên thu chi điều chỉnh, Nhân viên đối soát ngân hàng, Quản lý duyệt và chi trả chi phí, Chuyên viên đề nghị chi, Quản lý tuyển dụng, Quản lý nhân sự, Chuyên viên nhân sự, Quản lý duyệt kiểm kê, Nhân viên kiểm kê kho, Quản lý bảo trì, Kỹ thuật viên bảo trì, Quản lý phê duyệt và chi lương, Chuyên viên tiền lương, Quản lý chính sách lương và khoản nộp, Kế hoạch sản xuất, Quản lý phê duyệt mua hàng, Nhân viên mua hàng, QC, Người phê duyệt chấp nhận có điều kiện, Chuyên viên tuyển dụng, Quản lý duyệt trả hàng, Nhân viên xử lý trả hàng, Kỹ thuật bảo trì
@@ -174,7 +174,7 @@ NGO, quỹ từ thiện, hiệp hội, đơn vị hành chính sự nghiệp.
 ## Nhà thuốc (`pharmacy`)
 Nhà thuốc, chuỗi nhà thuốc, thiết bị y tế.
 
-- **Module (18):** `master-data`, `hrm`, `integration-hub`, `accounting`, `inventory`, `communication`, `bi`, `sales`, `crm`, `einvoice`, `expense`, `loyalty`, `quality`, `payroll`, `pos`, `pharmacy`, `purchasing`, `recruitment`
+- **Module (18):** `master-data`, `hrm`, `integration-hub`, `accounting`, `inventory`, `communication`, `bi`, `quality`, `purchasing`, `sales`, `crm`, `einvoice`, `expense`, `loyalty`, `payroll`, `pos`, `pharmacy`, `recruitment`
 - **Thuật ngữ:** `master-data.party` = Khách hàng; `master-data.product` = Thuốc/Vật tư y tế
 - **Trường mở rộng:** `master-data.product`: active_ingredient, registration_no, requires_prescription, storage_condition
 - **Vai trò riêng:** Quản lý khóa sổ kế toán, Kế toán duyệt thu chi, Nhân viên thu chi điều chỉnh, Nhân viên đối soát ngân hàng, Quản lý duyệt và chi trả chi phí, Chuyên viên đề nghị chi, Quản lý tuyển dụng, Quản lý nhân sự, Chuyên viên nhân sự, Quản lý duyệt kiểm kê, Nhân viên kiểm kê kho, Quản lý phê duyệt và chi lương, Chuyên viên tiền lương, Quản lý chính sách lương và khoản nộp, Dược sĩ, Quản lý phê duyệt mua hàng, Nhân viên mua hàng, Chuyên viên tuyển dụng
@@ -207,7 +207,7 @@ Sàn môi giới, chủ đầu tư, quản lý cho thuê.
 ## Bán lẻ (`retail`)
 Cửa hàng, chuỗi bán lẻ, siêu thị mini, thời trang, điện máy.
 
-- **Module (19):** `master-data`, `hrm`, `integration-hub`, `accounting`, `inventory`, `communication`, `bi`, `sales`, `crm`, `ecommerce`, `einvoice`, `expense`, `loyalty`, `quality`, `marketing`, `payroll`, `pos`, `purchasing`, `recruitment`
+- **Module (19):** `master-data`, `hrm`, `integration-hub`, `accounting`, `inventory`, `communication`, `bi`, `quality`, `purchasing`, `sales`, `crm`, `ecommerce`, `einvoice`, `expense`, `loyalty`, `marketing`, `payroll`, `pos`, `recruitment`
 - **Thuật ngữ:** `master-data.branch` = Cửa hàng; `master-data.party` = Khách hàng; `master-data.product` = Hàng hóa
 - **Trường mở rộng:** `master-data.product`: brand, barcode, size, color
 - **Vai trò riêng:** Quản lý khóa sổ kế toán, Kế toán duyệt thu chi, Nhân viên thu chi điều chỉnh, Nhân viên đối soát ngân hàng, Thu ngân, Quản lý duyệt và chi trả chi phí, Chuyên viên đề nghị chi, Quản lý tuyển dụng, Quản lý nhân sự, Chuyên viên nhân sự, Quản lý duyệt kiểm kê, Nhân viên kiểm kê kho, Quản lý phê duyệt và chi lương, Chuyên viên tiền lương, Quản lý chính sách lương và khoản nộp, Quản lý phê duyệt mua hàng, Nhân viên mua hàng, Chuyên viên tuyển dụng, Quản lý duyệt trả hàng, Nhân viên xử lý trả hàng, Thủ kho
@@ -240,7 +240,7 @@ Nhà cung cấp internet, truyền hình, nước sạch, điện, tiện ích.
 ## Bán buôn - Phân phối (`wholesale`)
 Nhà phân phối, đại lý, bán sỉ, FMCG.
 
-- **Module (18):** `master-data`, `hrm`, `integration-hub`, `accounting`, `inventory`, `communication`, `bi`, `contract`, `sales`, `crm`, `einvoice`, `expense`, `logistics`, `quality`, `workflow-approval`, `payroll`, `purchasing`, `recruitment`
+- **Module (18):** `master-data`, `hrm`, `integration-hub`, `accounting`, `inventory`, `communication`, `bi`, `quality`, `purchasing`, `contract`, `sales`, `crm`, `einvoice`, `expense`, `logistics`, `workflow-approval`, `payroll`, `recruitment`
 - **Thuật ngữ:** `master-data.party` = Khách hàng/Đại lý; `master-data.product` = Mặt hàng
 - **Trường mở rộng:** `master-data.party`: credit_limit, payment_term_days, sales_region
 - **Vai trò riêng:** Quản lý khóa sổ kế toán, Kế toán duyệt thu chi, Nhân viên thu chi điều chỉnh, Nhân viên đối soát ngân hàng, Điều phối giao hàng, Quản lý duyệt và chi trả chi phí, Chuyên viên đề nghị chi, Quản lý tuyển dụng, Quản lý nhân sự, Chuyên viên nhân sự, Quản lý duyệt kiểm kê, Nhân viên kiểm kê kho, Quản lý phê duyệt và chi lương, Chuyên viên tiền lương, Quản lý chính sách lương và khoản nộp, Quản lý phê duyệt mua hàng, Nhân viên mua hàng, Chuyên viên tuyển dụng, Trưởng kinh doanh, Quản lý duyệt trả hàng, Nhân viên xử lý trả hàng

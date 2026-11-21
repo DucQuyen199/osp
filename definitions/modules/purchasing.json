@@ -401,6 +401,18 @@
      "required": false
     },
     {
+     "name": "source",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
+     "name": "source_id",
+     "type": "string",
+     "required": false,
+     "system": true
+    },
+    {
      "name": "status",
      "type": "enum",
      "required": false,
@@ -409,7 +421,8 @@
       "rejected",
       "submitted",
       "approved",
-      "sourced"
+      "sourced",
+      "cancelled"
      ]
     }
    ],
@@ -435,6 +448,13 @@
        "submitted"
       ],
       "to": "rejected"
+     },
+     "cancelled": {
+      "from": [
+       "draft",
+       "rejected"
+      ],
+      "to": "cancelled"
      },
      "sourced": {
       "from": [

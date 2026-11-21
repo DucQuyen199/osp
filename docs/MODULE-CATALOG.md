@@ -2,7 +2,7 @@
 
 > Tệp này được sinh tự động bởi `npm run docs`. Đừng sửa tay.
 
-Tổng: **51 module**, **209 loại dữ liệu**, **951 sự kiện**.
+Tổng: **51 module**, **210 loại dữ liệu**, **955 sự kiện**.
 
 | Module | Nhóm | Phụ thuộc cứng |
 |---|---|---|
@@ -23,7 +23,9 @@ Tổng: **51 module**, **209 loại dữ liệu**, **951 sự kiện**.
 | [`clinic`](#clinic) — Phòng khám / Y tế | Module chuyên ngành | `master-data`, `inventory`, `accounting`, `booking` |
 | [`consolidation`](#consolidation) — Đa công ty | Tài chính | `accounting`, `master-data` |
 | [`project`](#project) — Quản lý dự án | Vận hành | `master-data`, `hrm` |
-| [`construction`](#construction) — Xây dựng | Module chuyên ngành | `project`, `accounting` |
+| [`quality`](#quality) — Quản lý chất lượng | Chuỗi cung ứng | `master-data`, `inventory` |
+| [`purchasing`](#purchasing) — Mua hàng | Chuỗi cung ứng | `master-data`, `inventory`, `quality`, `accounting`, `hrm` |
+| [`construction`](#construction) — Xây dựng | Module chuyên ngành | `project`, `accounting`, `purchasing` |
 | [`contract`](#contract) — Hợp đồng | Vận hành | `master-data` |
 | [`sales`](#sales) — Bán hàng | Bán hàng & khách hàng | `master-data`, `inventory`, `accounting` |
 | [`crm`](#crm) — CRM - Quan hệ khách hàng | Bán hàng & khách hàng | `master-data`, `sales` |
@@ -41,7 +43,6 @@ Tổng: **51 module**, **209 loại dữ liệu**, **951 sự kiện**.
 | [`logistics`](#logistics) — Vận tải & giao hàng | Chuỗi cung ứng | `master-data`, `inventory` |
 | [`loyalty`](#loyalty) — Khách hàng thân thiết | Bán hàng & khách hàng | `master-data` |
 | [`maintenance`](#maintenance) — Bảo trì | Chuỗi cung ứng | `asset`, `inventory` |
-| [`quality`](#quality) — Quản lý chất lượng | Chuỗi cung ứng | `master-data`, `inventory` |
 | [`workflow-approval`](#workflow-approval) — Phê duyệt | Nền tảng dùng chung | — |
 | [`manufacturing`](#manufacturing) — Sản xuất | Chuỗi cung ứng | `master-data`, `inventory`, `quality`, `accounting`, `workflow-approval` |
 | [`marketing`](#marketing) — Marketing | Bán hàng & khách hàng | `master-data`, `crm`, `accounting` |
@@ -50,7 +51,6 @@ Tổng: **51 module**, **209 loại dữ liệu**, **951 sự kiện**.
 | [`performance`](#performance) — Đánh giá hiệu suất (OKR) | Nhân sự | `hrm` |
 | [`pos`](#pos) — POS - Bán lẻ tại quầy | Bán hàng & khách hàng | `master-data`, `inventory`, `accounting` |
 | [`pharmacy`](#pharmacy) — Nhà thuốc | Module chuyên ngành | `master-data`, `inventory`, `pos`, `quality` |
-| [`purchasing`](#purchasing) — Mua hàng | Chuỗi cung ứng | `master-data`, `inventory`, `quality`, `accounting`, `hrm` |
 | [`real-estate`](#real-estate) — Bất động sản | Module chuyên ngành | `master-data`, `accounting`, `contract` |
 | [`recruitment`](#recruitment) — Tuyển dụng | Nhân sự | `hrm` |
 | [`restaurant`](#restaurant) — Nhà hàng / F&B | Module chuyên ngành | `master-data`, `inventory`, `accounting` |
@@ -187,6 +187,27 @@ Tổng: **51 module**, **209 loại dữ liệu**, **951 sự kiện**.
 | `stock_count` Kiểm kê | `draft` → **approved** (submitted→approved), **cancelled** (draft/submitted/rejected→cancelled), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 | `stock_transfer` Điều chuyển kho | `draft` → **cancelled** (draft→cancelled), **dispatched** (draft→dispatched), **received** (dispatched→received) |
 
+### quality
+**Quản lý chất lượng** — Kiểm tra chất lượng đầu vào/thành phẩm, giữ lịch sử kết quả và xử lý phần lượng lỗi được sửa theo từng lần kiểm tra lại.
+
+| Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
+|---|---|
+| `inspection` Phiếu kiểm tra | `pending` → **failed** (pending→failed), **passed** (pending→passed), **retest** (failed→pending) |
+| `inspection_disposition` Giải phóng một phần hàng QC | `draft` → **cancelled** (draft→cancelled), **posted** (draft→posted) |
+| `nonconformance` Sự không phù hợp | `open` → **closed** (open→closed) |
+
+### purchasing
+**Mua hàng** — Đề nghị mua, báo giá, đơn mua, phiếu nhận và hóa đơn nhà cung cấp; phiếu trả gửi kho và điều chỉnh bill gốc.
+
+| Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
+|---|---|
+| `rfq` Yêu cầu báo giá | `draft` → **accepted** (quoted→accepted), **cancelled** (draft/sent→cancelled), **quoted** (sent→quoted), **rejected** (sent/quoted→rejected), **sent** (draft→sent) |
+| `purchase_order` Đơn mua hàng | `draft` → **approved** (submitted→approved), **cancelled** (draft/submitted/approved/rejected→cancelled), **partially_received** (approved→partially_received), **received** (approved/partially_received→received), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
+| `purchase_receipt` Phiếu nhận hàng mua | `draft` → **cancelled** (draft→cancelled), **received** (draft→received) |
+| `supplier_invoice` Hóa đơn nhà cung cấp | `draft` → **approved** (draft/submitted→approved), **disputed** (submitted→disputed), **rejected** (submitted→rejected), **submitted** (draft/disputed/rejected→submitted) |
+| `purchase_requisition` Đề nghị mua | `draft` → **approved** (submitted→approved), **cancelled** (draft/rejected→cancelled), **rejected** (submitted→rejected), **sourced** (approved→sourced), **submitted** (draft/rejected→submitted) |
+| `purchase_return` Phiếu trả hàng mua | `draft` → **approved** (submitted→approved), **cancelled** (draft/rejected/approved→cancelled), **dispatched** (approved→dispatched), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
+
 ### logistics
 **Vận tải & giao hàng** — Phương tiện, tài xế, tuyến, vận đơn. Đơn hàng có địa chỉ giao sẽ tự sinh vận đơn; giao xong cập nhật ngược đơn hàng.
 
@@ -207,15 +228,6 @@ Tổng: **51 module**, **209 loại dữ liệu**, **951 sự kiện**.
 | `maintenance_plan` Kế hoạch bảo trì | `active` → **due** (active→active), **paused** (active→paused), **resumed** (paused→active) |
 | `maintenance_technician` Kỹ thuật viên bảo trì | — |
 
-### quality
-**Quản lý chất lượng** — Kiểm tra chất lượng đầu vào/thành phẩm, giữ lịch sử kết quả và xử lý phần lượng lỗi được sửa theo từng lần kiểm tra lại.
-
-| Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
-|---|---|
-| `inspection` Phiếu kiểm tra | `pending` → **failed** (pending→failed), **passed** (pending→passed), **retest** (failed→pending) |
-| `inspection_disposition` Giải phóng một phần hàng QC | `draft` → **cancelled** (draft→cancelled), **posted** (draft→posted) |
-| `nonconformance` Sự không phù hợp | `open` → **closed** (open→closed) |
-
 ### manufacturing
 **Sản xuất** — Định mức BOM, lệnh sản xuất theo trung tâm máy và công suất ngày. Bắt đầu lệnh xuất nguyên liệu vào WIP; QC đạt sẽ nhập thành phẩm vào kho. Hỗ trợ sửa, loại bỏ hoặc đề nghị chấp nhận có điều kiện một phần lượng lỗi; hàng concession chỉ nhập kho sau phê duyệt độc lập.
 
@@ -227,18 +239,6 @@ Tổng: **51 module**, **209 loại dữ liệu**, **951 sự kiện**.
 | `production_disposition` Xử lý hàng thành phẩm QC lỗi | `draft` → **cancelled** (draft→cancelled), **posted** (draft→posted) |
 | `conditional_acceptance` Chấp nhận có điều kiện thành phẩm | `draft` → **approved** (submitted→approved), **cancelled** (draft/rejected→cancelled), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 | `work_center` Trung tâm sản xuất | — |
-
-### purchasing
-**Mua hàng** — Đề nghị mua, báo giá, đơn mua, phiếu nhận và hóa đơn nhà cung cấp; phiếu trả gửi kho và điều chỉnh bill gốc.
-
-| Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
-|---|---|
-| `rfq` Yêu cầu báo giá | `draft` → **accepted** (quoted→accepted), **cancelled** (draft/sent→cancelled), **quoted** (sent→quoted), **rejected** (sent/quoted→rejected), **sent** (draft→sent) |
-| `purchase_order` Đơn mua hàng | `draft` → **approved** (submitted→approved), **cancelled** (draft/submitted/approved/rejected→cancelled), **partially_received** (approved→partially_received), **received** (approved/partially_received→received), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
-| `purchase_receipt` Phiếu nhận hàng mua | `draft` → **cancelled** (draft→cancelled), **received** (draft→received) |
-| `supplier_invoice` Hóa đơn nhà cung cấp | `draft` → **approved** (draft/submitted→approved), **disputed** (submitted→disputed), **rejected** (submitted→rejected), **submitted** (draft/disputed/rejected→submitted) |
-| `purchase_requisition` Đề nghị mua | `draft` → **approved** (submitted→approved), **rejected** (submitted→rejected), **sourced** (approved→sourced), **submitted** (draft/rejected→submitted) |
-| `purchase_return` Phiếu trả hàng mua | `draft` → **approved** (submitted→approved), **cancelled** (draft/rejected/approved→cancelled), **dispatched** (approved→dispatched), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 
 ## Tài chính
 
@@ -496,6 +496,7 @@ Tổng: **51 module**, **209 loại dữ liệu**, **951 sự kiện**.
 | Dữ liệu | Trạng thái → hành động (mỗi hành động phát một sự kiện) |
 |---|---|
 | `boq` Dự toán (BOQ) | `draft` → **approved** (draft→approved), **superseded** (approved→superseded) |
+| `material_request` Yêu cầu mua vật tư theo BOQ | — |
 | `site` Công trường | — |
 | `subcontract` Thầu phụ | `draft` → **completed** (signed→completed), **signed** (draft→signed) |
 | `site_diary` Nhật ký thi công | — |

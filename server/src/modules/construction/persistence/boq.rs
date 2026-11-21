@@ -128,5 +128,84 @@ pub(super) async fn validate_boq(
             errors.push("Chỉ thay thế BOQ sau khi phiên bản kế tiếp đã được duyệt".into());
         }
     }
+
+    if matches!(action, "created" | "updated" | "approved")
+        && let Some(items) = document.get("items").and_then(Value::as_array)
+    {
+        for item in items {
+            let product_value = item.get("product").filter(|value| !value.is_null());
+            let uom_value = item.get("uom").filter(|value| !value.is_null());
+            if product_value.is_none() && uom_value.is_none() {
+                continue;
+            }
+            let label = "Dòng vật tư BOQ";
+            let Some(product_id) = product_value
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+            else {
+                errors.push(format!("{label} cần sản phẩm hợp lệ trong doanh nghiệp"));
+                continue;
+            };
+            let Some(uom_id) = uom_value
+                .and_then(Value::as_str)
+                .and_then(|value| Uuid::parse_str(value).ok())
+            else {
+                errors.push(format!("{label} cần đơn vị đo hợp lệ"));
+                continue;
+            };
+            let product = tx
+                .query_opt(
+                    "SELECT uom, active, kind FROM master_data__product WHERE tenant_id=$1 AND id=$2 FOR SHARE",
+                    &[&tenant.id, &product_id],
+                )
+                .await?;
+            let Some(product) = product else {
+                errors.push(format!(
+                    "{label} có sản phẩm không tồn tại trong doanh nghiệp"
+                ));
+                continue;
+            };
+            if product.get::<_, Option<bool>>(1) == Some(false) {
+                errors.push(format!("{label} có sản phẩm không hoạt động"));
+            }
+            let product_kind: Option<String> = product.get(2);
+            if product_kind.as_deref().is_some_and(|kind| kind != "goods") {
+                errors.push(format!("{label} chỉ được liên kết với sản phẩm hàng hóa"));
+                continue;
+            }
+            let product_base_uom: Option<Uuid> = product.get(0);
+            let Some(product_base_uom) = product_base_uom else {
+                errors.push(format!("{label} sản phẩm chưa khai báo đơn vị gốc"));
+                continue;
+            };
+            let unit = tx
+                .query_opt(
+                    "SELECT base_uom, ratio::text FROM master_data__uom WHERE tenant_id=$1 AND id=$2 FOR SHARE",
+                    &[&tenant.id, &uom_id],
+                )
+                .await?;
+            let Some(unit) = unit else {
+                errors.push(format!(
+                    "{label} có đơn vị không tồn tại trong doanh nghiệp"
+                ));
+                continue;
+            };
+            let base_uom: Option<Uuid> = unit.get(0);
+            let root_uom = base_uom.unwrap_or(uom_id);
+            let ratio_text: Option<String> = unit.get(1);
+            let ratio_is_positive = match (base_uom, ratio_text.as_deref()) {
+                (None, _) => true,
+                (Some(_), Some(text)) => {
+                    money::decimal_str(text).is_some_and(|ratio| ratio > Decimal::ZERO)
+                }
+                (Some(_), None) => false,
+            };
+            if root_uom != product_base_uom || !ratio_is_positive {
+                errors.push(format!(
+                    "{label} đơn vị phải quy đổi về đơn vị gốc của sản phẩm"
+                ));
+            }
+        }
+    }
     Ok(errors)
 }

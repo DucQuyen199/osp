@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { localDate } from '../../../lib/dates.js';
-import { api, dataPath } from '../../../lib/api.js';
+import { api, dataPath, session } from '../../../lib/api.js';
 import { confirmDialog, textDialog } from '../../../lib/feedback.js';
 import { fmtMoney } from '../../../lib/i18n.js';
+import { clearPersistentIdempotencyRequest, getPersistentIdempotencyRequest } from '../../../lib/idempotency.js';
 import { addDecimals, compareDecimals, multiplyDecimals } from '../../../lib/decimal.js';
 import { app } from '../../../lib/state.js';
 import { calculatePosTotals } from '../domain/posTotals.js';
@@ -68,10 +69,16 @@ export function usePosTerminalWorkflow({ data, t, setPrintingOrderId }) {
   const startSession = async (event) => {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
-      const created = await api(dataPath('pos.pos_session'), { method: 'POST', body: {
+      const payload = {
         warehouse: warehouseId, branch: branchId || undefined,
         cashier: app.user?.name || app.user?.email || t('Thu ngân'), opening_cash: String(openingCash || '0').trim(),
-      } });
+      };
+      const idempotencyScope = `${session.current()?.tenantId || ''}:pos-session-open`;
+      const { key: requestKey, fingerprint } = getPersistentIdempotencyRequest(idempotencyScope, JSON.stringify(payload));
+      const created = await api(dataPath('pos.pos_session'), {
+        method: 'POST', body: payload, headers: { 'idempotency-key': requestKey },
+      });
+      clearPersistentIdempotencyRequest(idempotencyScope, fingerprint);
       await load(true); setSessionId(created.id); setNotice(t('Đã mở ca bán hàng.'));
     } catch (reason) { setError(t(reason.message || 'Không mở được ca bán hàng.')); }
     finally { setBusy(false); }
@@ -103,13 +110,19 @@ export function usePosTerminalWorkflow({ data, t, setPrintingOrderId }) {
     event.preventDefault(); if (!activeSession || !cart.length) return;
     setBusy(true); setError(''); setNotice('');
     try {
-      const created = await api(dataPath('pos.pos_order'), { method: 'POST', body: {
+      const payload = {
         session: activeSession.id, warehouse: activeSession.warehouse,
         ...(activeSession.branch ? { branch: activeSession.branch } : {}),
         ...(partyId ? { party: partyId } : {}), ...(rxRequired && prescriptionId ? { prescription: prescriptionId } : {}), ...(voucherCode.trim() ? { voucher_code: voucherCode.trim() } : {}), method,
         ...(method === 'cash' ? { cash_received: cashReceived } : {}),
         lines: cart.map(({ product, uom, qty }) => ({ product: product.id, uom: uom || undefined, qty, price: priceFor(product, uom) })),
-      } });
+      };
+      const idempotencyScope = `${session.current()?.tenantId || ''}:pos-checkout:${activeSession.id}`;
+      const { key: requestKey, fingerprint } = getPersistentIdempotencyRequest(idempotencyScope, JSON.stringify(payload));
+      const created = await api(dataPath('pos.pos_order'), {
+        method: 'POST', body: payload, headers: { 'idempotency-key': requestKey },
+      });
+      clearPersistentIdempotencyRequest(idempotencyScope, fingerprint);
       setQuantities({}); setSelectedUnits({}); setPartyId(''); setPrescriptionId(''); setVoucherCode(''); setCashReceived('');
       let completionError = '';
       try { await api(dataPath('pos.pos_order', created.id, 'completed'), { method: 'POST' }); }
@@ -169,7 +182,13 @@ export function usePosTerminalWorkflow({ data, t, setPrintingOrderId }) {
     try {
       let returnId = returnDraftId; const draftSignature = JSON.stringify({ reason, lines });
       if (!returnId) {
-        const created = await api(dataPath('pos.pos_return'), { method: 'POST', body: { pos_order: returningOrder.id, reason, lines } });
+        const payload = { pos_order: returningOrder.id, reason, lines };
+        const idempotencyScope = `${session.current()?.tenantId || ''}:pos-return:${returningOrder.id}`;
+        const { key: requestKey, fingerprint } = getPersistentIdempotencyRequest(idempotencyScope, JSON.stringify(payload));
+        const created = await api(dataPath('pos.pos_return'), {
+          method: 'POST', body: payload, headers: { 'idempotency-key': requestKey },
+        });
+        clearPersistentIdempotencyRequest(idempotencyScope, fingerprint);
         returnId = created.id; setReturnDraftId(returnId); setReturnDraftSignature(draftSignature);
       } else if (draftSignature !== returnDraftSignature) {
         await api(dataPath('pos.pos_return', returnId), { method: 'PATCH', body: { reason, lines } }); setReturnDraftSignature(draftSignature);
@@ -186,10 +205,15 @@ export function usePosTerminalWorkflow({ data, t, setPrintingOrderId }) {
     event.preventDefault(); if (!activeSession) return;
     setBusy(true); setError(''); setNotice('');
     try {
-      const movement = await api(dataPath('pos.cash_movement'), { method: 'POST', body: {
+      const payload = {
         session: activeSession.id, direction: cashDirection, amount: String(cashAmount), offset_account: cashAccount, reason: cashReason.trim(),
-      } });
-      await api(dataPath('pos.cash_movement', movement.id, 'posted'), { method: 'POST' });
+      };
+      const idempotencyScope = `${session.current()?.tenantId || ''}:pos-cash-movement:${activeSession.id}`;
+      const { key: requestKey, fingerprint } = getPersistentIdempotencyRequest(idempotencyScope, JSON.stringify(payload));
+      await api(dataPath('pos.cash_movement', 'create-and-act', 'posted'), {
+        method: 'POST', body: payload, headers: { 'idempotency-key': requestKey },
+      });
+      clearPersistentIdempotencyRequest(idempotencyScope, fingerprint);
       setCashAmount(''); setCashReason(''); setNotice(t(cashDirection === 'cash_in' ? 'Đã ghi nhận tiền nộp thêm vào quỹ.' : 'Đã ghi nhận khoản chi từ quỹ.')); await load(true);
     } catch (reason) { await load(true); setError(t(reason.message || 'Không ghi nhận được giao dịch quỹ.')); }
     finally { setBusy(false); }

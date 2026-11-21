@@ -72,6 +72,16 @@ pub fn validate_at(entity: &str, document: &Value, today: chrono::NaiveDate) -> 
                 {
                     errors.push(format!("{label} cần đơn giá không âm"));
                 }
+                let has_product = item.get("product").and_then(Value::as_str).is_some();
+                let has_uom = item.get("uom").and_then(Value::as_str).is_some();
+                if has_product && !has_uom {
+                    errors.push(format!("{label} cần đơn vị gắn với sản phẩm vật tư"));
+                }
+                if !has_product && has_uom {
+                    errors.push(format!(
+                        "{label} chỉ chọn đơn vị danh mục khi đã gắn sản phẩm"
+                    ));
+                }
             }
         }
         "site" => {
@@ -145,6 +155,9 @@ pub fn validate_update(entity: &str, current: &Value, patch: &Value) -> Vec<Stri
     if !patch.as_object().is_some_and(|patch| !patch.is_empty()) {
         return Vec::new();
     }
+    if entity == "material_request" {
+        return vec!["Yêu cầu vật tư đã liên kết mua hàng không thể sửa".into()];
+    }
     if entity == "boq" {
         if patch.get("status").is_some() {
             return vec!["Trạng thái BOQ chỉ được thay đổi qua thao tác quy trình".into()];
@@ -181,6 +194,9 @@ pub fn validate_remove(entity: &str, document: &Value) -> Vec<String> {
             vec!["BOQ đã duyệt phải được giữ làm lịch sử phiên bản".into()]
         }
         ("site_diary", _) => vec!["Nhật ký công trường không thể xóa khỏi lịch sử".into()],
+        ("material_request", _) => {
+            vec!["Yêu cầu vật tư và liên kết mua hàng phải được giữ làm lịch sử".into()]
+        }
         ("subcontract", Some("signed" | "completed")) => {
             vec!["Hợp đồng thầu phụ đã ký không thể xóa khỏi lịch sử".into()]
         }

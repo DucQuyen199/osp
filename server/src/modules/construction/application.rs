@@ -33,6 +33,10 @@ pub async fn handle_source_event(
     event_id: uuid::Uuid,
     depth: u32,
 ) -> R<bool> {
+    if event_type == "construction.material_request.created" {
+        create_purchase_requisition(kernel, tx, tenant, document, event_id, depth).await?;
+        return Ok(true);
+    }
     if event_type != "construction.boq.approved" {
         return Ok(false);
     }
@@ -60,6 +64,121 @@ pub async fn handle_source_event(
         )
         .await?;
     Ok(true)
+}
+
+async fn create_purchase_requisition(
+    kernel: &Kernel,
+    tx: &Tx<'_>,
+    tenant: &Tenant,
+    request: &Value,
+    event_id: uuid::Uuid,
+    depth: u32,
+) -> R<()> {
+    let request_id = request
+        .get("id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| crate::error::ApiError::internal("Material request has no id"))?;
+    let boq_id = request
+        .get("boq")
+        .and_then(Value::as_str)
+        .ok_or_else(|| crate::error::ApiError::internal("Material request has no BOQ"))?;
+    let boq_uuid = uuid::Uuid::parse_str(boq_id).map_err(|_| {
+        crate::error::ApiError::validation(
+            "construction.material_request",
+            vec!["BOQ reference is invalid".into()],
+        )
+    })?;
+    let row = tx
+        .query_opt(
+            "SELECT items FROM construction__boq WHERE tenant_id=$1 AND id=$2 AND status='approved' FOR SHARE",
+            &[&tenant.id, &boq_uuid],
+        )
+        .await?
+        .ok_or_else(|| {
+            crate::error::ApiError::validation(
+                "construction.material_request",
+                vec!["Only an approved BOQ can create a purchase requisition".into()],
+            )
+        })?;
+    let items: Value = row.get(0);
+    let lines = items
+        .as_array()
+        .into_iter()
+        .flatten()
+        .enumerate()
+        .filter_map(|(index, item)| {
+            let product = item.get("product")?.as_str()?;
+            let uom = item.get("uom")?.as_str()?;
+            let qty = item.get("qty")?;
+            Some(serde_json::json!({
+                "product": product,
+                "uom": uom,
+                "qty": qty,
+                "description": item.get("description").cloned().unwrap_or(Value::Null),
+                "source_line_index": index,
+            }))
+        })
+        .collect::<Vec<_>>();
+    if lines.is_empty() {
+        return Err(crate::error::ApiError::validation(
+            "construction.material_request",
+            vec!["The approved BOQ has no linked material lines".into()],
+        ));
+    }
+
+    let mut requisition = Map::new();
+    for field in [
+        "warehouse",
+        "sourcing_method",
+        "supplier",
+        "requested_by",
+        "reason",
+    ] {
+        if let Some(value) = request.get(field).filter(|value| !value.is_null()) {
+            requisition.insert(field.to_owned(), value.clone());
+        }
+    }
+    requisition.insert("lines".into(), Value::Array(lines));
+    requisition.insert(
+        "source".into(),
+        Value::String("construction_material_request".into()),
+    );
+    requisition.insert("source_id".into(), Value::String(request_id.to_owned()));
+    let requisition_entity = kernel.ent(tenant, "purchasing.purchase_requisition")?;
+    let created = kernel
+        .create_in(
+            tx,
+            &Actor::System,
+            tenant,
+            &requisition_entity,
+            requisition,
+            &Opts {
+                depth: Some(depth + 1),
+                causation: Some(event_id),
+                silent: false,
+            },
+        )
+        .await?;
+    let requisition_id = created
+        .get("id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| crate::error::ApiError::internal("Purchase requisition has no id"))?;
+    let request_uuid = uuid::Uuid::parse_str(request_id)
+        .map_err(|_| crate::error::ApiError::internal("Material request id is invalid"))?;
+    let requisition_uuid = uuid::Uuid::parse_str(requisition_id)
+        .map_err(|_| crate::error::ApiError::internal("Purchase requisition id is invalid"))?;
+    let updated = tx
+        .execute(
+            "UPDATE construction__material_request SET purchase_requisition=$1, updated_at=now() WHERE tenant_id=$2 AND id=$3",
+            &[&requisition_uuid, &tenant.id, &request_uuid],
+        )
+        .await?;
+    if updated != 1 {
+        return Err(crate::error::ApiError::internal(
+            "Unable to persist the material request purchase link",
+        ));
+    }
+    Ok(())
 }
 
 fn trim(document: &mut Map<String, Value>, fields: &[&str]) -> R<Vec<String>> {
@@ -129,12 +248,14 @@ async fn prepare_boq(
     }
     if let Some(items) = document.get_mut("items").and_then(Value::as_array_mut) {
         for item in items {
-            if let Some(value) = item
-                .get("unit")
-                .and_then(Value::as_str)
-                .map(|unit| unit.trim().to_owned())
-            {
-                item["unit"] = Value::String(value);
+            for field in ["unit", "description"] {
+                if let Some(value) = item
+                    .get(field)
+                    .and_then(Value::as_str)
+                    .map(|value| value.trim().to_owned())
+                {
+                    item[field] = Value::String(value);
+                }
             }
         }
     }

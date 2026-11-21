@@ -68,7 +68,10 @@ pub async fn dispatch_source_events(
     {
         handled.push(serde_json::json!({
             "module": "construction",
-            "rule": "approved_boq_supersedes_previous_baseline",
+            "rule": match event.ty.as_str() {
+                "construction.material_request.created" => "boq_materials_create_purchase_requisition",
+                _ => "approved_boq_supersedes_previous_baseline",
+            },
             "outcome": "ok"
         }));
     }

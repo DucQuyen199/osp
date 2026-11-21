@@ -2625,6 +2625,7 @@ async fn route(st: &Arc<AppState>, req: Request, ip: &str) -> R<Reply> {
                     (q.as_str(), *action),
                     ("quality.inspection_disposition", "posted")
                         | ("pharmacy.return_disposition", "posted")
+                        | ("pos.cash_movement", "posted")
                 ) {
                     return Err(ApiError::new(404, "NOT_FOUND", "Route không tồn tại"));
                 }
