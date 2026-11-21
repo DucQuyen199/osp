@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api, dataPath } from '../../../lib/api.js';
+import { api, dataPath, session } from '../../../lib/api.js';
+import { clearPersistentIdempotencyRequest, getPersistentIdempotencyRequest } from '../../../lib/idempotency.js';
 
 export function useLmsWorkbenchWorkflow({ courses, parties, load, setError, t }) {
   const [courseId, setCourseId] = useState('');
@@ -23,6 +24,17 @@ export function useLmsWorkbenchWorkflow({ courses, parties, load, setError, t })
     return () => window.removeEventListener('afterprint', clearPrinting);
   }, []);
 
+  async function createRecord(qname, payload) {
+    const scope = `${session.current()?.tenantId || ''}:create:${qname}`;
+    const { key, fingerprint } = getPersistentIdempotencyRequest(scope, JSON.stringify(payload));
+    const created = await api(dataPath(qname), {
+      method: 'POST', body: payload,
+      headers: { 'idempotency-key': key },
+    });
+    clearPersistentIdempotencyRequest(scope, fingerprint);
+    return created;
+  }
+
   async function run(key, operation, message) {
     setBusy(key); setError(''); setNotice('');
     try { await operation(); await load(true); setNotice(t(message)); }
@@ -32,7 +44,7 @@ export function useLmsWorkbenchWorkflow({ courses, parties, load, setError, t })
   async function createCourse(event) {
     event.preventDefault();
     await run('course:create', async () => {
-      const created = await api(dataPath('lms.course'), { method: 'POST', body: { title: courseForm.title.trim(), ...(courseForm.description.trim() ? { description: courseForm.description.trim() } : {}) } });
+      const created = await createRecord('lms.course', { title: courseForm.title.trim(), ...(courseForm.description.trim() ? { description: courseForm.description.trim() } : {}) });
       setCourseId(created.id); setCourseForm({ title: '', description: '' });
     }, 'ÄÃ£ táº¡o khÃ³a há»c nhÃ¡p.');
   }
@@ -41,7 +53,7 @@ export function useLmsWorkbenchWorkflow({ courses, parties, load, setError, t })
     const selected = courses.find((course) => course.id === courseId);
     if (!selected) return;
     await run(`${courseId}:lesson`, async () => {
-      await api(dataPath('lms.lesson'), { method: 'POST', body: { course: courseId, title: lessonForm.title.trim(), ...(lessonForm.content.trim() ? { content: lessonForm.content.trim() } : {}), required: lessonForm.required } });
+      await createRecord('lms.lesson', { course: courseId, title: lessonForm.title.trim(), ...(lessonForm.content.trim() ? { content: lessonForm.content.trim() } : {}), required: lessonForm.required });
       setLessonForm({ title: '', content: '', required: true });
     }, 'ÄÃ£ thÃªm bÃ i há»c.');
   }
@@ -53,10 +65,10 @@ export function useLmsWorkbenchWorkflow({ courses, parties, load, setError, t })
     event.preventDefault();
     const selected = courses.find((course) => course.id === courseId);
     if (!selected || !learner) return;
-    await run(`${courseId}:enroll`, () => api(dataPath('lms.enrollment'), { method: 'POST', body: { course: courseId, learner } }), 'ÄÃ£ ghi danh há»c viÃªn.');
+    await run(`${courseId}:enroll`, () => createRecord('lms.enrollment', { course: courseId, learner }), 'ÄÃ£ ghi danh há»c viÃªn.');
   }
   async function completeLesson(enrollment, lesson) {
-    await run(`${enrollment.id}:${lesson.id}`, () => api(dataPath('lms.lesson_progress'), { method: 'POST', body: { enrollment: enrollment.id, lesson: lesson.id } }), 'ÄÃ£ ghi nháº­n hoÃ n thÃ nh bÃ i há»c; tiáº¿n Ä‘á»™ khÃ³a há»c Ä‘Æ°á»£c cáº­p nháº­t tá»± Ä‘á»™ng.');
+    await run(`${enrollment.id}:${lesson.id}`, () => createRecord('lms.lesson_progress', { enrollment: enrollment.id, lesson: lesson.id }), 'ÄÃ£ ghi nháº­n hoÃ n thÃ nh bÃ i há»c; tiáº¿n Ä‘á»™ khÃ³a há»c Ä‘Æ°á»£c cáº­p nháº­t tá»± Ä‘á»™ng.');
   }
   function printCertificate(certificate) {
     setPrintingCertificate(certificate.id);

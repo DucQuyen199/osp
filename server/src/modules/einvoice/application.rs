@@ -47,29 +47,14 @@ pub async fn handle_source_event(
 
     let mut data = Map::new();
     data.insert("invoice".into(), Value::String(invoice.to_string()));
+    let provider_code = provider_code(tenant);
     let mut request_payload = document.clone();
-    let sepay_selected = tenant
-        .setting_str("einvoiceProvider")
-        .map(|provider| provider.trim().eq_ignore_ascii_case("sepay"))
-        .unwrap_or_else(|| {
-            std::env::var("OSP_EINVOICE_DEFAULT_PROVIDER")
-                .or_else(|_| std::env::var("OSP_EINVOICE_PROVIDER"))
-                .map(|provider| provider.trim().eq_ignore_ascii_case("sepay"))
-                .unwrap_or_else(|_| {
-                    std::env::var("OSP_EINVOICE_ENDPOINT").is_err()
-                        && std::env::var("OSP_SEPAY_EINVOICE_CLIENT_ID").is_ok()
-                })
-        });
-    if sepay_selected {
+    if provider_code.as_deref() == Some("sepay") {
         enrich_sepay_invoice(tx, tenant, invoice, &mut request_payload).await?;
     }
     data.insert("request_payload".into(), request_payload);
-    if let Some(provider) = tenant
-        .setting_str("einvoiceProvider")
-        .map(str::trim)
-        .filter(|provider| !provider.is_empty())
-    {
-        data.insert("provider".into(), Value::String(provider.to_owned()));
+    if let Some(provider) = provider_code {
+        data.insert("provider".into(), Value::String(provider));
     }
     data.insert("attempts".into(), Value::Number(0.into()));
     data.insert("operation".into(), Value::String("issue".into()));
@@ -89,6 +74,40 @@ pub async fn handle_source_event(
         )
         .await?;
     Ok(true)
+}
+
+/// Resolve the production worker's selected provider and persist it with the
+/// immutable request so a later default change cannot reroute queued invoices.
+fn provider_code(tenant: &Tenant) -> Option<String> {
+    if let Some(provider) = tenant
+        .setting_str("einvoiceProvider")
+        .map(str::trim)
+        .filter(|provider| !provider.is_empty())
+    {
+        return Some(provider.to_ascii_lowercase());
+    }
+    if let Some(provider) = std::env::var("OSP_EINVOICE_DEFAULT_PROVIDER")
+        .ok()
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| !value.is_empty())
+    {
+        return Some(provider);
+    }
+    if std::env::var("OSP_EINVOICE_ENDPOINT")
+        .ok()
+        .is_some_and(|value| !value.trim().is_empty())
+    {
+        return Some(
+            std::env::var("OSP_EINVOICE_PROVIDER")
+                .ok()
+                .map(|value| value.trim().to_ascii_lowercase())
+                .filter(|value| !value.is_empty())
+                .unwrap_or_else(|| "rest".into()),
+        );
+    }
+    std::env::var("OSP_SEPAY_EINVOICE_CLIENT_ID")
+        .is_ok()
+        .then(|| "sepay".into())
 }
 
 /// Snapshot only verified buyer/product reference data into the durable job.

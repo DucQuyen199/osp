@@ -241,6 +241,11 @@ async fn process(
     provider: &dyn EInvoiceProvider,
     job: &Job,
 ) -> R<()> {
+    if job.provider_code.is_none()
+        && !checkpoint_provider(kernel, tenant, job, provider.code()).await?
+    {
+        return Ok(());
+    }
     let mut sepay_create_checkpointed = false;
     let result = match job.operation.as_str() {
         "issue" => {
@@ -566,6 +571,48 @@ async fn checkpoint_sepay_create(kernel: &Kernel, tenant: &Tenant, job: &Job) ->
             &entity,
             &job.id.to_string(),
             serde_json::json!({"provider_response":{"_osp_create_started":true}})
+                .as_object()
+                .cloned()
+                .unwrap_or_default(),
+            &Opts::top(),
+        )
+        .await?;
+    tx.commit().await?;
+    Ok(true)
+}
+
+async fn checkpoint_provider(
+    kernel: &Kernel,
+    tenant: &Tenant,
+    job: &Job,
+    provider_code: &str,
+) -> R<bool> {
+    let mut conn = kernel.pool.get().await?;
+    let tx = Tx::begin(&mut conn, &job.tenant_id, true).await?;
+    let lease = tx
+        .query_opt(
+            "SELECT lease_token FROM einvoice__einvoice WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+            &[&job.tenant_id, &job.id],
+        )
+        .await?;
+    if lease
+        .as_ref()
+        .and_then(|row| row.get::<_, Option<String>>(0))
+        .as_deref()
+        != Some(job.lease_token.as_str())
+    {
+        tx.commit().await?;
+        return Ok(false);
+    }
+    let entity = kernel.ent(tenant, "einvoice.einvoice")?;
+    kernel
+        .update_in(
+            &tx,
+            &Actor::System,
+            tenant,
+            &entity,
+            &job.id.to_string(),
+            serde_json::json!({"provider": provider_code})
                 .as_object()
                 .cloned()
                 .unwrap_or_default(),
