@@ -54,8 +54,9 @@ export default function HotelFrontDeskPage() {
   });
   const arrivalsToday = reservations.filter((item) => item.status === 'booked' && item.check_in === today()).length;
   const departuresToday = reservations.filter((item) => item.status === 'checked_in' && item.check_out === today()).length;
-  const occupiedRooms = [...rooms.values()].filter((room) => room.status === 'occupied').length;
-  const occupancy = rooms.size ? Math.round(occupiedRooms / rooms.size * 100) : 0;
+  const rentableRooms = [...rooms.values()].filter((room) => room.status !== 'maintenance');
+  const occupiedRooms = rentableRooms.filter((room) => room.status === 'occupied').length;
+  const occupancy = rentableRooms.length ? Math.round(occupiedRooms / rentableRooms.length * 100) : 0;
   const reservationStatus = (status) => status === 'booked' ? 'warning' : status === 'checked_in' ? 'success' : status === 'checked_out' ? 'plain' : 'danger';
   return <div className="page hotel-frontdesk-page">
     <div className="page-head"><div><h1>{t('Lễ tân khách sạn')}</h1><p className="sub">{t('Đặt phòng theo loại phòng, phân phòng, nhận/trả khách và cộng phí phát sinh vào folio. Hóa đơn được tạo khi trả phòng.')}</p></div><button className="btn btn-secondary" type="button" disabled={loading || Boolean(busy)} onClick={() => load()}>{loading ? t('Đang tải…') : t('Làm mới')}</button></div>

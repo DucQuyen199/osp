@@ -1,61 +1,28 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
-import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { fmtDateTime, fmtMoney, fmtNumber, statusLabel, uiTextWith } from '../../lib/i18n.js';
-import { app, can, loadRefs, recordLabel, loadAllResponse, loadIndependentData } from '../../lib/state.js';
+import { app, can, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import autoServiceEnglish from './auto-service.en.js';
 import { repairQuoteLineTotal, storedRepairLineTotal } from './domain/repairQuoteTotals.js';
 import RepairOrderVehicleSummary from './components/RepairOrderVehicleSummary.jsx';
 import RepairOrderWorkflowPanel from './components/RepairOrderWorkflowPanel.jsx';
+import { useAutoServiceWorkshopData } from './hooks/useAutoServiceWorkshopData.js';
 import { useAutoServiceWorkshopWorkflow } from './hooks/useAutoServiceWorkshopWorkflow.js';
 const t = (text) => uiTextWith(text, autoServiceEnglish);
-const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 export default function AutoServiceWorkshopPage() {
   useDocumentTitle(`${t('Xưởng sửa chữa')} · OSP Suite`);
-  const [vehicles, setVehicles] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [parties, setParties] = useState(new Map());
-  const [products, setProducts] = useState(new Map());
-  const [units, setUnits] = useState(new Map());
-  const [warehouses, setWarehouses] = useState(new Map());
-  const [invoices, setInvoices] = useState([]);
   const [selectedId, setSelectedId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const latestRequest = useLatestRequest();
-  const load = useCallback(async (quiet = false) => {
-    const isLatest = latestRequest();
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const showInvoices = app.meta?.modules?.some((module) => module.id === 'accounting') && can('accounting.invoice.read');
-      const { data, errors } = await loadIndependentData({
-        vehicles: can('auto-service.vehicle.read') ? loadAllResponse('auto-service.vehicle') : Promise.resolve({ items: [] }),
-        orders: can('auto-service.repair_order.read') ? loadAllResponse('auto-service.repair_order') : Promise.resolve({ items: [] }),
-        parties: can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(new Map()),
-        products: can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(new Map()),
-        units: can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(new Map()),
-        warehouses: can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(new Map()),
-        invoices: showInvoices ? loadAllResponse('accounting.invoice') : Promise.resolve({ items: [] }),
-      }, {
-        vehicles: { items: [] }, orders: { items: [] }, parties: new Map(), products: new Map(),
-        units: new Map(), warehouses: new Map(), invoices: { items: [] },
-      });
-      const nextVehicles = itemsOf(data.vehicles).sort((a, b) => String(a.plate || '').localeCompare(String(b.plate || '')));
-      const nextOrders = itemsOf(data.orders).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
-      if (isLatest()) {
-        setVehicles(nextVehicles); setOrders(nextOrders); setParties(data.parties); setProducts(data.products); setUnits(data.units); setWarehouses(data.warehouses);
-        setInvoices(itemsOf(data.invoices));
-        setSelectedId((current) => nextOrders.some((item) => item.id === current) ? current : nextOrders[0]?.id || '');
-        setVehicleId((current) => nextVehicles.some((item) => item.id === current) ? current : nextVehicles[0]?.id || '');
-        if (errors.length) setError(errors.map((reason) => reason?.message || t('Không tải được dữ liệu xưởng sửa chữa.')).join(' · '));
-      }
-    } catch (reason) { if (isLatest()) setError(reason.message || t('Không tải được dữ liệu xưởng sửa chữa.')); }
-    finally { if (isLatest()) setLoading(false); }
-  }, [latestRequest]);
-  useEffect(() => { load(); }, [load]);
+  const {
+    vehicles, orders, parties, products, units, warehouses, invoices,
+    loading, error, setError, load,
+  } = useAutoServiceWorkshopData();
+  useEffect(() => {
+    setSelectedId((current) => orders.some((item) => item.id === current) ? current : orders[0]?.id || '');
+    setVehicleId((current) => vehicles.some((item) => item.id === current) ? current : vehicles[0]?.id || '');
+  }, [orders, vehicles]);
   const selected = orders.find((item) => item.id === selectedId) || null;
   const canCreateVehicle = can('auto-service.vehicle.create');
   const canCreateOrder = can('auto-service.repair_order.create');

@@ -1,7 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
-import { useLatestRequest } from '../../lib/useLatestRequest.js';
-import { api, tenantPath } from '../../lib/api.js';
 import { fmtAgo, fmtDateTime, statusLabel, fmtNumber, uiTextWith } from '../../lib/i18n.js';
 import { can } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
@@ -9,9 +7,9 @@ import { isDeliveredShort, sameDeliveryLine } from './domain/deliveryQuantities.
 import logisticsEnglish from './logistics.en.js';
 import DeliveryProofFields from './components/DeliveryProofFields.jsx';
 import DeliveryShipmentDetails from './components/DeliveryShipmentDetails.jsx';
+import { useLogisticsDeliveryData } from './hooks/useLogisticsDeliveryData.js';
 import { useLogisticsDeliveryWorkflow } from './hooks/useLogisticsDeliveryWorkflow.js';
 const t = (text) => uiTextWith(text, logisticsEnglish);
-const PAGE_SIZE = 100;
 const LANES = [
   ['failed', 'Giao thất bại · cần xử lý'],
   ['partial', 'Giao thiếu · cần giao bù'],
@@ -20,41 +18,14 @@ const LANES = [
 ];
 export default function LogisticsDeliveryBoardPage() {
   useDocumentTitle(`${t('Điều phối giao hàng')} · OSP Suite`);
-  const [items, setItems] = useState([]);
-  const [counts, setCounts] = useState({ created: 0, dispatched: 0, failed: 0, partial: 0 });
-  const [total, setTotal] = useState(0);
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState(null);
-  const latestRequest = useLatestRequest();
-  const load = useCallback(async (quiet = false) => {
-    const isLatest = latestRequest();
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const result = await api(tenantPath(`/reports/logistics/delivery-board?limit=${PAGE_SIZE}&offset=${offset}`));
-      if (isLatest()) {
-        setItems(result.items || []);
-        setCounts(result.counts || { created: 0, dispatched: 0, failed: 0, partial: 0 });
-        setTotal(Number(result.itemCount || 0));
-        setHasMore(Boolean(result.hasMore));
-        setLastUpdated(new Date().toISOString());
-      }
-    } catch (reason) {
-      if (isLatest()) setError(reason.message || t('Không tải được bảng điều phối giao hàng.'));
-    } finally {
-      if (isLatest()) setLoading(false);
-    }
-  }, [offset, latestRequest]);
+  const {
+    items, counts, total, offset, setOffset, hasMore, error, setError,
+    loading, lastUpdated, load,
+  } = useLogisticsDeliveryData();
   const {
     busy, deliveryProof, transition, confirmDelivered, redeliver, changeDeliveredQuantity,
     changeShortDeliveryReason, changeReceivedBy, changeEvidence,
   } = useLogisticsDeliveryWorkflow({ load, setError, t });
-  useEffect(() => { load();
-    const timer = window.setInterval(() => load(true), 15000);
-    return () => window.clearInterval(timer);
-  }, [load]);
   const grouped = useMemo(() => Object.fromEntries(
     LANES.map(([status]) => [status, items.filter((item) => item.status === status)]),
   ), [items]);

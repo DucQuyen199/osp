@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { localDate } from '../../../lib/dates.js';
-import { api, dataPath, tenantPath } from '../../../lib/api.js';
+import { api, dataPath, session, tenantPath } from '../../../lib/api.js';
+import { clearPersistentIdempotencyRequest, getPersistentIdempotencyRequest } from '../../../lib/idempotency.js';
 import { compareDecimals } from '../../../lib/decimal.js';
 import { isWithinFailedQty, productionOutputMatchesPlan, productionOutputQuantities, remainingFailedQty as getRemainingFailedQty } from '../domain/inspectionQuantities.js';
 
@@ -71,12 +72,18 @@ export function useManufacturingWipWorkflow({ boms, reworkOrders, productionDisp
     event.preventDefault(); if (!selectedBom) return;
     setBusy('order'); setError('');
     try {
-      await api(dataPath('manufacturing.production_order'), { method: 'POST', body: {
+      const payload = {
         product: selectedBom.product, bom: selectedBom.id, qty: String(orderQty), warehouse: orderWarehouse,
         ...(orderCenter ? { work_center: orderCenter, planned_start: orderDate } : {}),
         ...(outputLot ? { output_lot_code: outputLot } : {}), ...(outputExpiry ? { output_expiry: outputExpiry } : {}),
         scrap_cost_method: scrapMethod, ...(scrapMethod === 'expense' && scrapAccount ? { scrap_expense_account: scrapAccount } : {}),
-      } });
+      };
+      const scope = `${session.current()?.tenantId || ''}:create:manufacturing.production_order`;
+      const { key, fingerprint } = getPersistentIdempotencyRequest(scope, JSON.stringify(payload));
+      await api(dataPath('manufacturing.production_order'), {
+        method: 'POST', body: payload, headers: { 'idempotency-key': key },
+      });
+      clearPersistentIdempotencyRequest(scope, fingerprint);
       setOrderQty('1'); setOutputLot(''); setOutputExpiry(''); await load();
     } catch (reason) { setError(reason.message || t('Không tạo được lệnh sản xuất.')); }
     finally { setBusy(''); }

@@ -261,7 +261,7 @@
      "approved": { "from": ["submitted"], "to": "approved" },
      "rejected": { "from": ["submitted"], "to": "rejected" },
      "paid": { "from": ["approved"], "to": "paid" },
-     "cancelled": { "from": ["draft", "rejected", "approved"], "to": "cancelled" }
+     "cancelled": { "from": ["draft", "rejected"], "to": "cancelled" }
     }
    },
    "computed": {},

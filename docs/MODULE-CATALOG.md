@@ -351,7 +351,7 @@ Tổng: **51 module**, **210 loại dữ liệu**, **955 sự kiện**.
 | `tax_deduction` Hồ sơ giảm trừ thuế theo năm | `draft` → **approved** (submitted→approved), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 | `payroll_adjustment` Khoản cộng/trừ lương | `draft` → **approved** (submitted→approved), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 | `overtime_entry` Giờ làm thêm | `draft` → **approved** (submitted→approved), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
-| `contribution_remittance` Thanh toán khoản đóng payroll | `draft` → **approved** (submitted→approved), **cancelled** (draft/rejected/approved→cancelled), **paid** (approved→paid), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
+| `contribution_remittance` Thanh toán khoản đóng payroll | `draft` → **approved** (submitted→approved), **cancelled** (draft/rejected→cancelled), **paid** (approved→paid), **rejected** (submitted→rejected), **submitted** (draft/rejected→submitted) |
 | `payslip` Phiếu lương | — |
 
 ### performance

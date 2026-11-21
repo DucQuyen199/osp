@@ -120454,7 +120454,7 @@
             "bearer": []
           }
         ],
-        "summary": "Thanh toán khoản đóng payroll: cancelled (draft|rejected|approved → cancelled)",
+        "summary": "Thanh toán khoản đóng payroll: cancelled (draft|rejected → cancelled)",
         "tags": [
           "payroll"
         ]
