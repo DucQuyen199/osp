@@ -1,77 +1,28 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '../../lib/useDocumentTitle.js';
-import { useLatestRequest } from '../../lib/useLatestRequest.js';
 import { localDate } from '../../lib/dates.js';
 import { fmtDate, fmtMoney, statusLabel, uiTextWith } from '../../lib/i18n.js';
 import { addDecimals } from '../../lib/decimal.js';
-import { can, loadRefs, loadIndependentData, recordLabel, loadAllResponse } from '../../lib/state.js';
+import { can, recordLabel } from '../../lib/state.js';
 import { recordHref } from '../../lib/routes.js';
 import { boqLineValue, boqTotal } from './domain/boqTotals.js';
 import constructionEnglish from './construction.en.js';
 import ConstructionSiteDiaryPanel from './components/ConstructionSiteDiaryPanel.jsx';
 import ProgressClaimsPanel from './components/ProgressClaimsPanel.jsx';
 import { useConstructionWorkflow } from './hooks/useConstructionWorkflow.js';
+import { useConstructionWorkbenchData } from './hooks/useConstructionWorkbenchData.js';
 const t = (text) => uiTextWith(text, constructionEnglish);
 const today = localDate;
-const itemsOf = (response) => Array.isArray(response?.items) ? response.items : [];
 export default function ConstructionWorkbenchPage() {
   useDocumentTitle(`${t('Điều hành công trường')} · OSP Suite`);
-  const [projects, setProjects] = useState([]);
-  const [sites, setSites] = useState([]);
-  const [diaries, setDiaries] = useState([]);
-  const [boqs, setBoqs] = useState([]);
-  const [subcontracts, setSubcontracts] = useState([]);
-  const [claims, setClaims] = useState([]);
-  const [bills, setBills] = useState([]);
-  const [parties, setParties] = useState(new Map());
-  const [products, setProducts] = useState(new Map());
-  const [units, setUnits] = useState(new Map());
-  const [warehouses, setWarehouses] = useState(new Map());
-  const [materialRequests, setMaterialRequests] = useState([]);
-  const [purchaseRequisitions, setPurchaseRequisitions] = useState([]);
   const [projectId, setProjectId] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const latestRequest = useLatestRequest();
-  const load = useCallback(async (quiet = false) => {
-    const isLatest = latestRequest();
-    if (!quiet) { setLoading(true); setError(''); }
-    try {
-      const emptyResponse = () => ({ items: [] });
-      const emptyMap = () => new Map();
-      const { data, errors } = await loadIndependentData({
-        projectRes: can('project.project.read') ? loadAllResponse('project.project') : Promise.resolve(emptyResponse()),
-        siteRes: can('construction.site.read') ? loadAllResponse('construction.site') : Promise.resolve(emptyResponse()),
-        diaryRes: can('construction.site_diary.read') ? loadAllResponse('construction.site_diary') : Promise.resolve(emptyResponse()),
-        boqRes: can('construction.boq.read') ? loadAllResponse('construction.boq') : Promise.resolve(emptyResponse()),
-        subcontractRes: can('construction.subcontract.read') ? loadAllResponse('construction.subcontract') : Promise.resolve(emptyResponse()),
-        claimRes: can('construction.progress_claim.read') ? loadAllResponse('construction.progress_claim') : Promise.resolve(emptyResponse()),
-        billRes: can('accounting.bill.read') ? loadAllResponse('accounting.bill') : Promise.resolve(emptyResponse()),
-        partyMap: can('master-data.party.read') ? loadRefs('master-data.party') : Promise.resolve(emptyMap()),
-        productMap: can('master-data.product.read') ? loadRefs('master-data.product') : Promise.resolve(emptyMap()),
-        unitMap: can('master-data.uom.read') ? loadRefs('master-data.uom') : Promise.resolve(emptyMap()),
-        warehouseMap: can('inventory.warehouse.read') ? loadRefs('inventory.warehouse') : Promise.resolve(emptyMap()),
-        materialRequestRes: can('construction.material_request.read') ? loadAllResponse('construction.material_request') : Promise.resolve(emptyResponse()),
-        purchaseRequisitionRes: can('purchasing.purchase_requisition.read') ? loadAllResponse('purchasing.purchase_requisition') : Promise.resolve(emptyResponse()),
-      }, {
-        projectRes: emptyResponse(), siteRes: emptyResponse(), diaryRes: emptyResponse(), boqRes: emptyResponse(), subcontractRes: emptyResponse(), claimRes: emptyResponse(), billRes: emptyResponse(), partyMap: emptyMap(), productMap: emptyMap(), unitMap: emptyMap(), warehouseMap: emptyMap(), materialRequestRes: emptyResponse(), purchaseRequisitionRes: emptyResponse(),
-      });
-      const { projectRes, siteRes, diaryRes, boqRes, subcontractRes, claimRes, billRes, partyMap, productMap, unitMap, warehouseMap, materialRequestRes, purchaseRequisitionRes } = data;
-      const projectRows = itemsOf(projectRes);
-      const siteRows = itemsOf(siteRes);
-      const boqRows = itemsOf(boqRes);
-      if (isLatest()) {
-        setProjects(projectRows); setSites(siteRows); setDiaries(itemsOf(diaryRes)); setBoqs(boqRows);
-        setSubcontracts(itemsOf(subcontractRes)); setClaims(itemsOf(claimRes)); setBills(itemsOf(billRes)); setParties(partyMap);
-        setProducts(productMap); setUnits(unitMap); setWarehouses(warehouseMap);
-        setMaterialRequests(itemsOf(materialRequestRes)); setPurchaseRequisitions(itemsOf(purchaseRequisitionRes));
-        setProjectId((current) => projectRows.some((row) => row.id === current) ? current : projectRows[0]?.id || '');
-        if (errors.length) setError(errors[0]?.message || t('Một số dữ liệu công trường không tải được.'));
-      }
-    } catch (reason) { if (isLatest()) setError(t(reason.message || 'Không tải được dữ liệu công trường.')); }
-    finally { if (isLatest()) setLoading(false); }
-  }, [latestRequest]);
-  useEffect(() => { load(); }, [load]);
+  const {
+    projects, sites, diaries, boqs, subcontracts, claims, bills, parties, products, units, warehouses,
+    materialRequests, purchaseRequisitions, loading, error, setError, load,
+  } = useConstructionWorkbenchData();
+  useEffect(() => {
+    setProjectId((current) => projects.some((row) => row.id === current) ? current : projects[0]?.id || '');
+  }, [projects]);
   const selectedProject = projects.find((row) => row.id === projectId);
   const projectBoqs = useMemo(() => boqs.filter((row) => row.project === projectId).sort((a, b) => Number(b.revision) - Number(a.revision)), [boqs, projectId]);
   const projectSites = useMemo(() => sites.filter((row) => !row.project || row.project === projectId), [sites, projectId]);

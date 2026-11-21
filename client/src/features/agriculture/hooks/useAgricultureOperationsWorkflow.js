@@ -92,7 +92,7 @@ export function useAgricultureOperationsWorkflow({ farms, selectedCycle, product
     try {
       await api(dataPath('agriculture.crop_cycle', selectedCycle.id, action), { method: 'POST' });
       await load(true); setNotice(t(action === 'harvested' ? 'Đã kết thúc vụ mùa sau khi xác nhận sản lượng.' : 'Đã đánh dấu vụ mùa thất bại.'));
-    } catch (reason) { setError(reason.message || t('Không cập nhật được trạng thái vụ mùa.')); }
+    } catch (reason) { setError(t(reason.message || 'Không cập nhật được trạng thái vụ mùa.')); }
     finally { setBusy(''); }
   }
 

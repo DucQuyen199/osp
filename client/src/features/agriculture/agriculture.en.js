@@ -62,6 +62,7 @@ const agricultureEnglish = {
   'Đơn vị đo *': 'Measurement unit *', 'Chọn đơn vị đo': 'Select a measurement unit',
   'Nước tưới ghi ngoài kho cần có đơn vị đo': 'Irrigation water recorded outside inventory requires a measurement unit.',
   'Lượng nước tưới ghi nhận': 'Irrigation water recorded', 'Chưa rõ đơn vị': 'Unit not recorded',
+  'Không thể đánh dấu vụ mùa thất bại sau khi đã ghi nhận thu hoạch': 'A crop cycle with a recorded harvest cannot be marked as failed.',
 };
 
 export default agricultureEnglish;

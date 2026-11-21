@@ -267,11 +267,31 @@ async fn validate_cycle(
     }
     if action == "harvested" {
         if let Some(id) = id {
+            tx.query_opt(
+                "SELECT id FROM agriculture__crop_cycle WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                &[&tenant.id, &id],
+            )
+            .await?;
             if tx.query_opt(
                 "SELECT id FROM agriculture__harvest WHERE tenant_id = $1 AND cycle = $2 LIMIT 1 FOR SHARE",
                 &[&tenant.id, &id],
             ).await?.is_none() {
                 errors.push("Chỉ kết thúc vụ mùa sau khi ghi nhận ít nhất một lần thu hoạch".into());
+            }
+        }
+    }
+    if action == "failed" {
+        if let Some(id) = id {
+            tx.query_opt(
+                "SELECT id FROM agriculture__crop_cycle WHERE tenant_id = $1 AND id = $2 FOR UPDATE",
+                &[&tenant.id, &id],
+            )
+            .await?;
+            if tx.query_opt(
+                "SELECT id FROM agriculture__harvest WHERE tenant_id = $1 AND cycle = $2 LIMIT 1 FOR SHARE",
+                &[&tenant.id, &id],
+            ).await?.is_some() {
+                errors.push("Không thể đánh dấu vụ mùa thất bại sau khi đã ghi nhận thu hoạch".into());
             }
         }
     }
